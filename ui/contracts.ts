@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 设置（含只读 popoutSupported）、字体、含宿主主题色的投影与操作身份的共享类型。
+ * [OUTPUT]: 设置、字体、含宿主主题色与阅读位置的投影、呈现确认及操作身份的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -65,6 +65,7 @@ export interface PanelSnapshot {
   viewToken: string;
   promptToken: string;
   outlineToken: string;
+  readingState: PanelReadingState;
   prompts: PromptItem[];
   outlineItems: OutlineItem[];
   outlineStatus: string;
@@ -78,6 +79,14 @@ export interface PanelSnapshot {
   hostTypography: HostTypography;
   settings: Settings;
   sourceLabel: string;
+}
+export interface PanelReadingState {
+  viewToken: string;
+  contentToken: string;
+  activeTab: string;
+  scrollTop: number;
+  promptPreviewIndex: number;
+  promptScrollTop: number;
 }
 export interface PanelCommand {
   kind: 'fill' | 'generate' | 'outline-refresh' | 'outline-jump' | 'outline-anchor';
@@ -119,6 +128,9 @@ export interface PopoutBridge {
   size(width: number, height: number): Promise<void>;
   save(ui: PanelPreferences): void;
   dock(): Promise<void>;
+  cancelDock?(): void;
+  motionActive?(): boolean;
+  presented(): Promise<void>;
   pin(value: boolean): Promise<void>;
   native(message: Record<string, unknown>): void;
   notice(message: string): void;
@@ -135,6 +147,7 @@ export interface AppearanceSettings {
   revision: number;
   webRevision: number;
   detached: boolean;
+  returnOpen?: boolean | null;
   alwaysOnTop: boolean;
   position: { x: number; y: number } | null;
   ui: PanelPreferences;

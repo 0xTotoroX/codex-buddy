@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
- * [OUTPUT]: target/reports/native 中的背景验收；--appearance-only 将免截图的宿主强调色同步、主题与传统磨砂 HUDWindow/Active 状态、液态 Regular/Clear 切换及拒绝收起回读检查写入 native-appearance。
+ * [OUTPUT]: target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
  * [POS]: 原生合成验收；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -16,20 +16,57 @@ if (process.platform !== 'darwin')
   throw Error('Native backdrop acceptance requires macOS and Screen Recording permission.');
 const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
-const appearanceOnly = process.argv.includes('--appearance-only');
+const genieOnly = process.argv.includes('--genie-only');
+const chipAnchor = genieOnly && process.argv.includes('--chip-anchor');
+const crossScreen = genieOnly && process.argv.includes('--cross-screen');
+const reverseScreens = crossScreen && process.argv.includes('--reverse-screens');
+const motionOnly = genieOnly || process.argv.includes('--motion-only');
+const appearanceOnly = motionOnly || process.argv.includes('--appearance-only');
 const dir = mkdtempSync(join(tmpdir(), 'buddy-native-'));
-const output = root + '/target/reports/' + (appearanceOnly ? 'native-appearance' : 'native');
+const output =
+  root +
+  '/target/reports/' +
+  (genieOnly
+    ? crossScreen
+      ? reverseScreens
+        ? 'native-genie-cross-reverse'
+        : 'native-genie-cross'
+      : chipAnchor
+        ? 'native-genie-chip'
+        : 'native-genie'
+    : motionOnly
+      ? 'native-motion'
+      : appearanceOnly
+        ? 'native-appearance'
+        : 'native');
 mkdirSync(output, { recursive: true });
 rmSync(join(output, 'report.json'), { force: true });
 const helper = join(dir, 'native-probe');
-if (!appearanceOnly) execFileSync('swiftc', [join(root, 'tests/native-probe.swift'), '-o', helper]);
+execFileSync('swiftc', [join(root, 'tests/native-probe.swift'), '-o', helper]);
+const screens = JSON.parse(execFileSync(helper, ['screens'], { encoding: 'utf8' }));
+if (crossScreen && screens.length < 2)
+  throw Error('Cross-screen verification needs two connected displays');
+const sourceScreen = screens[reverseScreens ? 1 : 0];
+const destinationScreen = screens[crossScreen && !reverseScreens ? 1 : 0];
+const sourceAnchor = {
+  x: sourceScreen.x + 300,
+  y: sourceScreen.y + 180,
+  width: chipAnchor ? 84 : 404,
+  height: chipAnchor ? 46 : motionOnly ? 376 : 420,
+};
+const destinationPosition = crossScreen
+  ? {
+      x: (destinationScreen.x + 100) * destinationScreen.scale,
+      y: (destinationScreen.y + 125) * destinationScreen.scale,
+    }
+  : { x: 220, y: 250 };
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 const settings = fixtureSettings;
 let ui = {
   open: true,
   width: 404,
-  height: 420,
-  activeTab: 'next',
+  height: motionOnly ? 625 : 420,
+  activeTab: genieOnly ? 'settings' : 'next',
   material: 'frosted',
   fontOffset: 0,
   labelOnly: false,
@@ -86,6 +123,7 @@ function probePage() {
           glassStyleButton: Boolean(document.querySelector('[data-action=glass-style]')),
           materialLabel: document.querySelector('[data-material-value]')?.textContent,
           nativeGlassStyle: window.__companionNativeGlassStyle,
+          warp: window.__companionNativeWarp,
           theme: current?.theme,
           sourceTheme: current?.remoteSource?.theme,
           accentColor:
@@ -127,6 +165,8 @@ function probePage() {
           document.querySelector('[data-action=liquid-variant]')?.click();
         if (cmd.kind === 'cycle-material')
           document.querySelector('[data-action=material]')?.click();
+        if (cmd.kind === 'dock') void window.__companionPopout.dock();
+        if (cmd.kind === 'cancel-dock') window.__companionPopout.cancelDock();
         if (cmd.kind === 'close') window.ipc.postMessage(JSON.stringify({ kind: 'close' }));
       }
     } finally {
@@ -139,7 +179,12 @@ const server = createServer(async (req, res) => {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   const data = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : {};
-  requests.push({ at: Date.now(), path: req.url, theme: state.snapshot.theme });
+  requests.push({
+    at: Date.now(),
+    path: req.url,
+    theme: state.snapshot.theme,
+    height: data.ui?.height,
+  });
   res.setHeader('Content-Type', 'application/json');
   if (req.url === '/panel') {
     res.setHeader('Content-Type', 'text/html');
@@ -181,6 +226,14 @@ const server = createServer(async (req, res) => {
     res.end(JSON.stringify(state));
     return;
   }
+  if (req.url === '/api/panel/ready' || req.url === '/api/panel/anchor') {
+    res.end(
+      JSON.stringify({
+        anchor: sourceAnchor,
+      }),
+    );
+    return;
+  }
   res.end('{}');
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -196,12 +249,24 @@ writeFileSync(
 );
 writeFileSync(
   dir + '/panel.json',
-  JSON.stringify({ detached: true, alwaysOnTop: true, ui, position: { x: 220, y: 250 } }),
+  JSON.stringify({ detached: true, alwaysOnTop: true, ui, position: destinationPosition }),
 );
 writeFileSync(dir + '/color', 'red');
 const background = appearanceOnly ? null : spawn(helper, ['board', dir + '/color']);
 await delay(500);
-const panel = spawn(artifact.binary, ['--data-dir', dir, 'panel-window', '--lease', 'synthetic']);
+const panel = spawn(artifact.binary, ['--data-dir', dir, 'panel-window', '--lease', 'synthetic'], {
+  env: { ...process.env, CODEX_BUDDY_DEV_GENIE: genieOnly ? '1' : '0' },
+});
+const motionProbe = spawn(helper, ['motion', String(panel.pid)]);
+const motionSamples = [];
+let entryFinishedAt = null;
+let motionBuffer = '';
+motionProbe.stdout.on('data', (chunk) => {
+  motionBuffer += chunk;
+  const lines = motionBuffer.split('\n');
+  motionBuffer = lines.pop();
+  for (const line of lines) if (line) motionSamples.push(JSON.parse(line));
+});
 let log = '';
 panel.stderr.on('data', (c) => (log += c));
 panel.stdout.on('data', (c) => (log += c));
@@ -227,7 +292,7 @@ function capture(name) {
   if (!bounds) throw Error('no window ' + JSON.stringify(windows()));
   const file = output + '/' + name + '.png';
   // Preserve the transparent window gutter when reviewing rounded shadow clipping.
-  if (name.endsWith('frosted-gray')) {
+  if (name.endsWith('frosted-gray') || name.endsWith('matte-gray')) {
     execFileSync('screencapture', [
       '-x',
       '-R' + [bounds.X, bounds.Y, bounds.Width, bounds.Height].join(','),
@@ -246,280 +311,455 @@ try {
     () => telemetry?.active && telemetry?.sourceTheme && telemetry?.rect?.width > 300,
     'no native panel',
   );
-  // 未获焦点的窗口也要保持同步；跨过本机复现过的后台暂停时间再切换主题。
-  const idleStart = Date.now();
-  await delay(12000);
-  await waitFor(() => telemetry?.sentAt >= idleStart + 11000, 'background projection suspended');
-  const backgroundCheck = { idleMs: Date.now() - idleStart, visibility: telemetry.visibility };
-  for (const color of ['rgb(48, 164, 108)', 'rgb(172, 73, 201)']) {
-    state.snapshot.accentColor = color;
-    await waitFor(() => telemetry?.accentColor === color, 'native host accent sync');
-  }
-  delete state.snapshot.accentColor;
-  await waitFor(() => telemetry?.accentColor !== 'rgb(172, 73, 201)', 'native accent fallback');
-  const themeChecks = [];
-  // 宿主投影明暗不得覆盖系统窗口；网页前景跟随 WebKit 的系统颜色方案。
-  for (const material of ['frosted', 'matte', 'native-glass']) {
-    commands.push({ kind: 'material', value: material });
-    for (const theme of ['light', 'dark', 'light']) {
-      const changedAt = Date.now();
-      state.snapshot.theme = theme;
-      await waitFor(
-        () =>
-          telemetry?.sentAt >= changedAt &&
-          telemetry?.material === material &&
-          telemetry?.sourceTheme === theme &&
-          telemetry.theme === (telemetry.nativeDark ? 'dark' : 'light'),
-        'native appearance mismatch: ' + material + ' ' + theme,
-      );
-      themeChecks.push({
-        material,
-        theme,
-        nativeDark: telemetry.nativeDark,
-        syncMs: Date.now() - changedAt,
-      });
-    }
-  }
-  const geometryChecks = [];
-  commands.push({ kind: 'material', value: 'matte' });
-  commands.push({ kind: 'tab', value: 'settings' });
-  await waitFor(
-    () => telemetry?.material === 'matte' && telemetry?.activeTab === 'settings',
-    'material controls',
-  );
-  if (telemetry.glassStyleButton) throw Error('Obsolete glass style control remains');
-  const materialChecks = [];
-  for (const material of ['frosted', 'native-glass', 'matte', 'frosted', 'native-glass', 'matte']) {
-    commands.push({ kind: 'cycle-material' });
-    const style = material === 'frosted' ? 'frosted-hud-active' : 'regular';
-    const effective =
-      material === 'frosted'
-        ? 'native-frosted'
-        : material === 'native-glass' && telemetry.nativeGlassAvailable
-          ? 'native-glass'
-          : 'matte';
+  if (motionOnly) {
     await waitFor(
-      () =>
-        telemetry?.material === material &&
-        telemetry?.effectiveMaterial === effective &&
-        (material === 'matte' ||
-          (material === 'native-glass' && !telemetry.nativeGlassAvailable) ||
-          telemetry.nativeGlassStyle === style),
-      'material mapping: ' + material,
+      () => requests.some((r) => r.path === '/api/panel/presented'),
+      'presentation missing',
     );
-    commands.push({ kind: 'stale-backdrop' });
-    await delay(200);
+    if (genieOnly && !motionSamples.at(-1)?.reduceMotion) {
+      await waitFor(
+        () => telemetry?.warp?.frames > 0 && !telemetry.warp.active,
+        'genie entry completes',
+      );
+    } else await delay(450);
+    entryFinishedAt = Date.now();
+    const settled = motionSamples.at(-1);
     if (
-      material !== 'matte' &&
-      telemetry.nativeGlassAvailable &&
-      telemetry.nativeGlassStyle !== style
+      crossScreen &&
+      (Math.abs(settled.bounds.X - destinationPosition.x / destinationScreen.scale) > 2 ||
+        Math.abs(settled.bounds.Y - destinationPosition.y / destinationScreen.scale) > 2)
     )
-      throw Error('Stale viewport message replaced native material');
-    materialChecks.push({
-      material,
-      effective,
-      actual: telemetry.nativeGlassStyle,
-      label: telemetry.materialLabel,
-      rect: telemetry.rect,
-    });
-  }
-  commands.push({ kind: 'material', value: 'native-glass' });
-  await waitFor(() => telemetry?.material === 'native-glass', 'liquid variant controls');
-  if (telemetry.nativeGlassAvailable) {
-    for (const variant of ['clear', 'regular']) {
-      commands.push({ kind: 'liquid-variant' });
-      await waitFor(
-        () => telemetry?.open === true && telemetry.nativeGlassStyle === variant,
-        'expanded native ' + variant,
-      );
-      materialChecks.push({
-        material: 'native-glass',
-        variant,
-        actual: telemetry.nativeGlassStyle,
-      });
-    }
-  }
-  // Reparenting the WebView must preserve its viewport while rejecting collapse and switching materials.
-  for (const material of ['native-glass', 'matte', 'frosted', 'native-glass']) {
-    commands.push({ kind: 'material', value: material });
-    await waitFor(() => telemetry?.material === material, 'native material selection');
-    const effective =
-      material === 'frosted'
-        ? 'native-frosted'
-        : material === 'native-glass' && telemetry.nativeGlassAvailable
-          ? 'native-glass'
-          : 'matte';
-    await waitFor(() => telemetry?.effectiveMaterial === effective, 'native capability fallback');
-    commands.push({ kind: 'open', value: false });
-    await delay(500);
-    await waitFor(
-      () => telemetry?.open === true && telemetry?.rect?.width > 390 && !telemetry.animations,
-      'popout must ignore collapse',
-    );
-    const expanded = telemetry.rect;
-    const expandedStyle = telemetry.nativeGlassStyle;
-    for (const [width, height] of [
-      [524, 504],
-      [428, 444],
-    ]) {
-      commands.push({ kind: 'viewport', width, height });
+      throw Error('Native window did not settle on the requested display');
+    const reduced = settled?.reduceMotion;
+    const warpChecks = [];
+    for (const material of reduced
+      ? []
+      : ['matte', 'frosted', 'native-glass', ...(genieOnly ? ['native-glass'] : [])]) {
+      commands.push({ kind: 'material', value: material });
+      await waitFor(() => telemetry.material === material, 'motion material not applied');
+      if (genieOnly && warpChecks.length === 3 && telemetry.nativeGlassAvailable) {
+        commands.push({ kind: 'tab' });
+        await waitFor(() => telemetry.activeTab === 'settings', 'settings not ready');
+        commands.push({ kind: 'liquid-variant' });
+        await waitFor(() => telemetry.nativeGlassStyle === 'clear', 'Clear mode missing');
+      }
+      const beforeFrames = telemetry.warp?.frames ?? 0;
+      const start = Date.now();
+      commands.push({ kind: 'dock' });
       await waitFor(
         () =>
-          telemetry?.viewport?.[0] === width &&
-          telemetry?.viewport?.[1] === height &&
-          Math.abs(telemetry?.rect?.width - width + 24) < 1 &&
-          Math.abs(telemetry?.rect?.height - height + 24) < 1,
-        'native viewport resize ' + material,
+          motionSamples.some(
+            (s) =>
+              s.at > start && Math.abs((s.bounds?.X ?? settled.bounds.X) - settled.bounds.X) > 8,
+          ),
+        'return did not move',
       );
+      commands.push({ kind: 'cancel-dock' });
+      await waitFor(() => {
+        const sample = motionSamples.at(-1);
+        return (
+          Math.abs((sample.bounds?.X ?? Infinity) - settled.bounds.X) <= 2 &&
+          Math.abs((sample.bounds?.Height ?? Infinity) - settled.bounds.Height) <= 2 &&
+          sample.alpha === 1 &&
+          (!genieOnly || (telemetry.warp?.frames > beforeFrames && !telemetry.warp.active))
+        );
+      }, 'return cancellation did not settle');
+      if (requests.some((r) => r.path === '/api/panel/dock'))
+        throw Error('Cancelled return still docked');
+      const recovered = motionSamples.at(-1);
+      if (
+        Math.abs(recovered.bounds.X - settled.bounds.X) > 2 ||
+        Math.abs(recovered.bounds.Height - settled.bounds.Height) > 2 ||
+        recovered.alpha !== 1
+      )
+        throw Error('Cancelled return did not restore native pose');
+      if (genieOnly) {
+        await waitFor(
+          () => telemetry.warp?.frames > beforeFrames,
+          'WindowServer warp was not applied',
+        );
+        if (telemetry.warp.active || telemetry.warp.error || telemetry.warp.peak < 0.15)
+          throw Error('Warp failed or did not reset: ' + JSON.stringify(telemetry.warp));
+        warpChecks.push({ material, style: telemetry.nativeGlassStyle, ...telemetry.warp });
+      }
     }
-    geometryChecks.push({
-      material,
-      effective,
-      ignoresCollapse: true,
-      expanded,
-      expandedStyle,
-      resized: telemetry.rect,
-    });
-  }
-  if (telemetry.headHeight !== 48 || telemetry.eyeBox !== 'border-box')
-    throw Error('WebKit capsule baseline differs from embedded layout');
-  if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
-  if (appearanceOnly) {
     writeFileSync(
-      output + '/report.json',
+      join(output, 'report.json'),
       JSON.stringify(
         {
           artifact,
-          scope: 'appearance-only',
-          backgroundCheck,
-          themeChecks,
-          materialChecks,
-          geometryChecks,
-          telemetry,
-          log,
-        },
-        null,
-        2,
-      ),
-    );
-    rmSync(join(output, 'failure.json'), { force: true });
-    console.log(
-      JSON.stringify(
-        {
-          artifact,
-          scope: 'appearance-only',
-          backgroundCheck,
-          themeChecks,
-          materialChecks,
-          geometryChecks,
-          output,
+          scope: genieOnly ? 'genie-only' : 'motion-only',
+          screens: crossScreen ? screens : undefined,
+          sourceAnchor,
+          destinationPosition,
+          warpChecks,
+          errors: telemetry.errors,
         },
         null,
         2,
       ),
     );
   } else {
-    const results = [];
-    for (const theme of [telemetry.nativeDark ? 'dark' : 'light']) {
-      await waitFor(() => telemetry?.theme === theme, 'theme');
-      for (const material of ['frosted', 'matte', 'native-glass']) {
-        commands.push({ kind: 'material', value: material });
-        await waitFor(() => telemetry?.material === material, 'material');
-        await delay(350);
-        writeFileSync(dir + '/color', 'gray');
-        await delay(350);
-        const gray = capture(theme + '-' + material + '-gray');
-        writeFileSync(dir + '/color', 'red');
-        await delay(350);
-        const red = capture(theme + '-' + material + '-red');
-        writeFileSync(dir + '/color', 'blue');
-        const begin = Date.now();
-        await delay(180);
-        const blue = capture(theme + '-' + material + '-blue');
-        results.push({ theme, material, gray, red, blue, elapsedMs: Date.now() - begin });
+    // 未获焦点的窗口也要保持同步；跨过本机复现过的后台暂停时间再切换主题。
+    const idleStart = Date.now();
+    await delay(12000);
+    await waitFor(() => telemetry?.sentAt >= idleStart + 11000, 'background projection suspended');
+    const backgroundCheck = { idleMs: Date.now() - idleStart, visibility: telemetry.visibility };
+    for (const color of ['rgb(48, 164, 108)', 'rgb(172, 73, 201)']) {
+      state.snapshot.accentColor = color;
+      await waitFor(() => telemetry?.accentColor === color, 'native host accent sync');
+    }
+    delete state.snapshot.accentColor;
+    await waitFor(() => telemetry?.accentColor !== 'rgb(172, 73, 201)', 'native accent fallback');
+    const themeChecks = [];
+    // 宿主投影明暗不得覆盖系统窗口；网页前景跟随 WebKit 的系统颜色方案。
+    for (const material of ['frosted', 'matte', 'native-glass']) {
+      commands.push({ kind: 'material', value: material });
+      for (const theme of ['light', 'dark', 'light']) {
+        const changedAt = Date.now();
+        state.snapshot.theme = theme;
+        await waitFor(
+          () =>
+            telemetry?.sentAt >= changedAt &&
+            telemetry?.material === material &&
+            telemetry?.sourceTheme === theme &&
+            telemetry.theme === (telemetry.nativeDark ? 'dark' : 'light'),
+          'native appearance mismatch: ' + material + ' ' + theme,
+        );
+        themeChecks.push({
+          material,
+          theme,
+          nativeDark: telemetry.nativeDark,
+          syncMs: Date.now() - changedAt,
+        });
       }
     }
-    commands.push({ kind: 'open', value: false });
-    await delay(500);
+    const geometryChecks = [];
+    commands.push({ kind: 'material', value: 'matte' });
+    commands.push({ kind: 'tab', value: 'settings' });
     await waitFor(
-      () => telemetry?.open === true && telemetry?.rect?.width > 390 && !telemetry.animations,
-      'popout stays expanded',
+      () => telemetry?.material === 'matte' && telemetry?.activeTab === 'settings',
+      'material controls',
     );
-    const expanded = capture('expanded-after-collapse-request');
-    for (const r of results) {
-      const delta = Math.hypot(...r.red.rgb.map((v, i) => v - r.blue.rgb[i]));
-      if (r.material === 'matte' ? delta > 0.02 : delta < 0.08)
-        throw Error(
-          'Backdrop color check failed: ' + r.theme + ' ' + r.material + ' delta=' + delta,
+    if (telemetry.glassStyleButton) throw Error('Obsolete glass style control remains');
+    const materialChecks = [];
+    for (const material of [
+      'frosted',
+      'native-glass',
+      'matte',
+      'frosted',
+      'native-glass',
+      'matte',
+    ]) {
+      commands.push({ kind: 'cycle-material' });
+      const style = material === 'frosted' ? 'frosted-hud-active' : 'regular';
+      const effective =
+        material === 'frosted'
+          ? 'native-frosted'
+          : material === 'native-glass' && telemetry.nativeGlassAvailable
+            ? 'native-glass'
+            : 'matte';
+      await waitFor(
+        () =>
+          telemetry?.material === material &&
+          telemetry?.effectiveMaterial === effective &&
+          (material === 'matte' ||
+            (material === 'native-glass' && !telemetry.nativeGlassAvailable) ||
+            telemetry.nativeGlassStyle === style),
+        'material mapping: ' + material,
+      );
+      commands.push({ kind: 'stale-backdrop' });
+      await delay(200);
+      if (
+        material !== 'matte' &&
+        telemetry.nativeGlassAvailable &&
+        telemetry.nativeGlassStyle !== style
+      )
+        throw Error('Stale viewport message replaced native material');
+      materialChecks.push({
+        material,
+        effective,
+        actual: telemetry.nativeGlassStyle,
+        label: telemetry.materialLabel,
+        rect: telemetry.rect,
+      });
+    }
+    commands.push({ kind: 'material', value: 'native-glass' });
+    await waitFor(() => telemetry?.material === 'native-glass', 'liquid variant controls');
+    if (telemetry.nativeGlassAvailable) {
+      for (const variant of ['clear', 'regular']) {
+        commands.push({ kind: 'liquid-variant' });
+        await waitFor(
+          () => telemetry?.open === true && telemetry.nativeGlassStyle === variant,
+          'expanded native ' + variant,
         );
+        materialChecks.push({
+          material: 'native-glass',
+          variant,
+          actual: telemetry.nativeGlassStyle,
+        });
+      }
     }
-    const appearanceDifferences = [];
-    for (const theme of ['light', 'dark']) {
-      const rows = results.filter((r) => r.theme === theme);
-      for (let i = 0; i < rows.length; i++)
-        for (let j = i + 1; j < rows.length; j++) {
-          const a = [...rows[i].red.rgb, ...rows[i].blue.rgb],
-            b = [...rows[j].red.rgb, ...rows[j].blue.rgb];
-          const delta = Math.hypot(...a.map((v, k) => v - b[k]));
-          appearanceDifferences.push({ theme, pair: [rows[i].material, rows[j].material], delta });
-          if (delta < 0.025)
-            throw Error(
-              'Native appearances are indistinguishable: ' +
-                JSON.stringify(appearanceDifferences.at(-1)),
-            );
-        }
+    // Reparenting the WebView must preserve its viewport while rejecting collapse and switching materials.
+    for (const material of ['native-glass', 'matte', 'frosted', 'native-glass']) {
+      commands.push({ kind: 'material', value: material });
+      await waitFor(() => telemetry?.material === material, 'native material selection');
+      const effective =
+        material === 'frosted'
+          ? 'native-frosted'
+          : material === 'native-glass' && telemetry.nativeGlassAvailable
+            ? 'native-glass'
+            : 'matte';
+      await waitFor(() => telemetry?.effectiveMaterial === effective, 'native capability fallback');
+      commands.push({ kind: 'open', value: false });
+      await delay(500);
+      await waitFor(
+        () => telemetry?.open === true && telemetry?.rect?.width > 390 && !telemetry.animations,
+        'popout must ignore collapse',
+      );
+      const expanded = telemetry.rect;
+      const expandedStyle = telemetry.nativeGlassStyle;
+      for (const [width, height] of [
+        [524, 504],
+        [428, 444],
+      ]) {
+        commands.push({ kind: 'viewport', width, height });
+        await waitFor(
+          () =>
+            telemetry?.viewport?.[0] === width &&
+            telemetry?.viewport?.[1] === height &&
+            Math.abs(telemetry?.rect?.width - width + 24) < 1 &&
+            Math.abs(telemetry?.rect?.height - height + 24) < 1,
+          'native viewport resize ' + material,
+        );
+      }
+      geometryChecks.push({
+        material,
+        effective,
+        ignoresCollapse: true,
+        expanded,
+        expandedStyle,
+        resized: telemetry.rect,
+      });
     }
-    if (telemetry.native !== true || telemetry.nativeDataset !== 'true')
-      throw Error('Native backdrop capability is absent');
     if (telemetry.headHeight !== 48 || telemetry.eyeBox !== 'border-box')
       throw Error('WebKit capsule baseline differs from embedded layout');
     if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
-    writeFileSync(
-      output + '/report.json',
-      JSON.stringify(
-        {
-          artifact,
-          backgroundCheck,
-          themeChecks,
-          materialChecks,
-          results,
-          appearanceDifferences,
-          expanded,
-          telemetry,
-          events: events.length,
-          log,
-        },
-        null,
-        2,
-      ),
-    );
-    rmSync(join(output, 'failure.json'), { force: true });
-    console.log(
-      JSON.stringify(
-        {
-          artifact,
-          results: results.map((x) => ({
-            theme: x.theme,
-            material: x.material,
-            gray: x.gray.rgb,
-            red: x.red.rgb,
-            blue: x.blue.rgb,
-            elapsedMs: x.elapsedMs,
-          })),
-          errors: telemetry.errors,
-          output,
-        },
-        null,
-        2,
-      ),
-    );
+    if (appearanceOnly) {
+      writeFileSync(
+        output + '/report.json',
+        JSON.stringify(
+          {
+            artifact,
+            scope: 'appearance-only',
+            backgroundCheck,
+            themeChecks,
+            materialChecks,
+            geometryChecks,
+            telemetry,
+            log,
+          },
+          null,
+          2,
+        ),
+      );
+      rmSync(join(output, 'failure.json'), { force: true });
+      console.log(
+        JSON.stringify(
+          {
+            artifact,
+            scope: 'appearance-only',
+            backgroundCheck,
+            themeChecks,
+            materialChecks,
+            geometryChecks,
+            output,
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      const results = [];
+      for (const theme of [telemetry.nativeDark ? 'dark' : 'light']) {
+        await waitFor(() => telemetry?.theme === theme, 'theme');
+        for (const material of ['frosted', 'matte', 'native-glass']) {
+          commands.push({ kind: 'material', value: material });
+          await waitFor(() => telemetry?.material === material, 'material');
+          await delay(350);
+          writeFileSync(dir + '/color', 'gray');
+          await delay(350);
+          const gray = capture(theme + '-' + material + '-gray');
+          writeFileSync(dir + '/color', 'red');
+          await delay(350);
+          const red = capture(theme + '-' + material + '-red');
+          writeFileSync(dir + '/color', 'blue');
+          const begin = Date.now();
+          await delay(180);
+          const blue = capture(theme + '-' + material + '-blue');
+          results.push({ theme, material, gray, red, blue, elapsedMs: Date.now() - begin });
+        }
+      }
+      commands.push({ kind: 'open', value: false });
+      await delay(500);
+      await waitFor(
+        () => telemetry?.open === true && telemetry?.rect?.width > 390 && !telemetry.animations,
+        'popout stays expanded',
+      );
+      const expanded = capture('expanded-after-collapse-request');
+      for (const r of results) {
+        const delta = Math.hypot(...r.red.rgb.map((v, i) => v - r.blue.rgb[i]));
+        if (r.material === 'matte' ? delta > 0.02 : delta < 0.08)
+          throw Error(
+            'Backdrop color check failed: ' + r.theme + ' ' + r.material + ' delta=' + delta,
+          );
+      }
+      const appearanceDifferences = [];
+      for (const theme of ['light', 'dark']) {
+        const rows = results.filter((r) => r.theme === theme);
+        for (let i = 0; i < rows.length; i++)
+          for (let j = i + 1; j < rows.length; j++) {
+            const a = [...rows[i].red.rgb, ...rows[i].blue.rgb],
+              b = [...rows[j].red.rgb, ...rows[j].blue.rgb];
+            const delta = Math.hypot(...a.map((v, k) => v - b[k]));
+            appearanceDifferences.push({
+              theme,
+              pair: [rows[i].material, rows[j].material],
+              delta,
+            });
+            if (delta < 0.025)
+              throw Error(
+                'Native appearances are indistinguishable: ' +
+                  JSON.stringify(appearanceDifferences.at(-1)),
+              );
+          }
+      }
+      if (telemetry.native !== true || telemetry.nativeDataset !== 'true')
+        throw Error('Native backdrop capability is absent');
+      if (telemetry.headHeight !== 48 || telemetry.eyeBox !== 'border-box')
+        throw Error('WebKit capsule baseline differs from embedded layout');
+      if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
+      writeFileSync(
+        output + '/report.json',
+        JSON.stringify(
+          {
+            artifact,
+            backgroundCheck,
+            themeChecks,
+            materialChecks,
+            results,
+            appearanceDifferences,
+            expanded,
+            telemetry,
+            events: events.length,
+            log,
+          },
+          null,
+          2,
+        ),
+      );
+      rmSync(join(output, 'failure.json'), { force: true });
+      console.log(
+        JSON.stringify(
+          {
+            artifact,
+            results: results.map((x) => ({
+              theme: x.theme,
+              material: x.material,
+              gray: x.gray.rgb,
+              red: x.red.rgb,
+              blue: x.blue.rgb,
+              elapsedMs: x.elapsedMs,
+            })),
+            errors: telemetry.errors,
+            output,
+          },
+          null,
+          2,
+        ),
+      );
+    }
   }
+  if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
+  const readyAt = requests.find((request) => request.path === '/api/panel/ready')?.at;
+  const presentedAt = requests.find((request) => request.path === '/api/panel/presented')?.at;
+  if (!readyAt || !presentedAt || presentedAt < readyAt)
+    throw Error('Native presentation was not acknowledged after readiness');
+  const closingAt = Date.now();
+  commands.push({ kind: motionOnly ? 'dock' : 'close' });
+  for (let i = 0; i < 50 && panel.exitCode === null; i++) await delay(50);
+  if (panel.exitCode !== 0) throw Error('Native fade-out did not close cleanly: ' + log);
+  const reduced = motionSamples[0]?.reduceMotion;
+  if (reduced === undefined) throw Error('No native window alpha samples');
+  const intermediate = (sample) => sample.alpha > 0 && sample.alpha < 1;
+  if (!reduced) {
+    if (genieOnly) {
+      const entry = motionSamples.filter(
+        (s) => s.at <= entryFinishedAt && s.alpha > 0 && s.bounds?.Height,
+      );
+      const sourceHeight = (chipAnchor ? 46 : 376) + 24;
+      if (!entry.length || entry[0].bounds.Height > sourceHeight + 16)
+        throw Error('Genie first visible frame was not at the source');
+      if (
+        crossScreen &&
+        Math.hypot(
+          entry[0].bounds.X - (sourceAnchor.x - 12),
+          entry[0].bounds.Y - (sourceAnchor.y - 12),
+        ) > 16
+      )
+        throw Error('Cross-screen entry started on the wrong display');
+      const growing = entry.filter(
+        (s) => s.bounds.Height > sourceHeight + 16 && s.bounds.Height < 625,
+      );
+      if (new Set(growing.map((s) => Math.round(s.bounds.Height))).size < 3)
+        throw Error('Genie entry skipped the visible expansion');
+    } else if (!motionSamples.some((s) => s.at < presentedAt && intermediate(s)))
+      throw Error('Native window did not fade in before presentation');
+    if (!motionSamples.some((s) => s.at > closingAt && intermediate(s)))
+      throw Error('Native window did not fade out before exit');
+  }
+  if (motionOnly && !reduced) {
+    const entry = motionSamples.filter(
+      (s) => s.at < closingAt && s.alpha > 0 && s.bounds?.X !== undefined,
+    );
+    const span = (axis) =>
+      Math.max(...entry.map((s) => s.bounds[axis])) - Math.min(...entry.map((s) => s.bounds[axis]));
+    if (Math.hypot(span('X'), span('Y')) < 40)
+      throw Error('Native handoff had no spatial movement');
+  }
+  if (
+    motionOnly &&
+    requests.some(
+      (r) => r.path === '/api/panel/preferences' && r.height !== undefined && r.height !== 625,
+    )
+  )
+    throw Error('Animation saved a transient panel height');
+  const motionCheck = {
+    readyAt,
+    presentedAt,
+    entryFinishedAt,
+    closingAt,
+    reduced,
+    samples: motionSamples,
+  };
+  const reportPath = output + '/report.json';
+  const report = JSON.parse(readFileSync(reportPath, 'utf8'));
+  writeFileSync(reportPath, JSON.stringify({ ...report, motionCheck }, null, 2));
+  console.log('原生窗口呈现确认、几何与透明度轨迹、退出检查通过。');
 } catch (e) {
+  rmSync(join(output, 'report.json'), { force: true });
   console.error(e);
   writeFileSync(
     output + '/failure.json',
     JSON.stringify(
-      { telemetry, log, dir, requests: requests.slice(-80), events: events.slice(-20) },
+      {
+        telemetry,
+        log,
+        dir,
+        motionSamples,
+        requests: requests.slice(-80),
+        events: events.slice(-20),
+      },
       null,
       2,
     ),
@@ -527,6 +767,7 @@ try {
   process.exitCode = 1;
 } finally {
   panel.kill();
+  motionProbe.kill();
   background?.kill();
   server.closeAllConnections();
   server.close();

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 稳定常量、初始化偏好与页面桥接。
- * [OUTPUT]: 五组状态（弹出初始化展开）、兼容调试投影、文本工具和能力判断。
+ * [OUTPUT]: 五组状态（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、文本工具和能力判断。
  * [POS]: 无上层依赖的状态基础层，初始化由 lifecycle 显式调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -185,10 +185,16 @@ function createShellState(preferences) {
     pinnedOnTop: false,
     detachPending: false,
     detachedRecoveryTimer: 0,
+    handoffAnimation: null,
+    handoffGeneration: 0,
+    handoffPromise: null,
+    handoffTarget: null,
     themeObserver: null,
     typographyObserver: null,
     promptPreviewTimer: 0,
     promptClickTimer: 0,
+    lastFaceClick: null,
+    faceClickTimer: 0,
     promptPreviewIndex: 0,
     expressionTimer: 0,
     completionBeamTimer: 0,

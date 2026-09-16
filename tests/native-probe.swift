@@ -1,11 +1,16 @@
 // [INPUT]: 合成背景颜色文件，或指定测试进程的窗口信息/测试截图。
-// [OUTPUT]: 原生背景窗口、指定 PID 的窗口几何及截图平均颜色。
+// [OUTPUT]: 原生背景窗口、指定 PID 的窗口几何/透明度轨迹及截图平均颜色。
 // [POS]: native-check.mjs 的 macOS 验收辅助程序，仅编译到临时目录。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 import AppKit
 import Foundation
-if CommandLine.arguments[1] == "sample" {
+if CommandLine.arguments[1] == "screens" {
+    let top = NSScreen.screens.first!.frame.maxY
+    let rows = NSScreen.screens.map { s in ["x": s.frame.minX, "y": top - s.frame.maxY,
+        "width": s.frame.width, "height": s.frame.height, "scale": s.backingScaleFactor] }
+    print(String(data: try! JSONSerialization.data(withJSONObject: rows), encoding: .utf8)!)
+} else if CommandLine.arguments[1] == "sample" {
     let bitmap = NSBitmapImageRep(data: try! Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[2])))!
     var rgb = [Double](repeating: 0, count: 3); var count = 0.0
     let x0 = Int(Double(bitmap.pixelsWide) * 0.25), x1 = Int(Double(bitmap.pixelsWide) * 0.75)
@@ -15,6 +20,30 @@ if CommandLine.arguments[1] == "sample" {
         rgb[0] += c.redComponent; rgb[1] += c.greenComponent; rgb[2] += c.blueComponent; count += 1
     }}
     print(String(data:try! JSONSerialization.data(withJSONObject:rgb.map{$0/count}),encoding:.utf8)!)
+} else if CommandLine.arguments[1] == "motion" {
+    let pid = Int(CommandLine.arguments[2])!
+    var previous = ""
+    let timer = Timer.scheduledTimer(withTimeInterval: 0.008, repeats: true) { _ in
+        let rows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        let own = rows.filter { ($0[kCGWindowOwnerPID as String] as? Int) == pid }
+        func area(_ row: [String: Any]) -> Double {
+            let bounds = row[kCGWindowBounds as String] as? [String: Double] ?? [:]
+            return (bounds["Width"] ?? 0) * (bounds["Height"] ?? 0)
+        }
+        let main = own.max { area($0) < area($1) }
+        let alpha = main?[kCGWindowAlpha as String] as? Double ?? 0
+        let bounds = main?[kCGWindowBounds as String] as? [String: Double] ?? [:]
+        let signature = "\(alpha):\(bounds["X"] ?? 0):\(bounds["Y"] ?? 0):\(bounds["Width"] ?? 0):\(bounds["Height"] ?? 0)"
+        if signature != previous {
+            previous = signature
+            let row: [String: Any] = ["at": Date().timeIntervalSince1970 * 1000, "alpha": alpha, "bounds": bounds,
+                "reduceMotion": NSWorkspace.shared.accessibilityDisplayShouldReduceMotion]
+            let data = try! JSONSerialization.data(withJSONObject: row)
+            FileHandle.standardOutput.write(data + Data([10]))
+        }
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    RunLoop.main.run()
 } else if CommandLine.arguments[1] == "windows" {
     let pid = Int(CommandLine.arguments[2])!
     let rows = CGWindowListCopyWindowInfo(.optionOnScreenOnly,kCGNullWindowID) as! [[String:Any]]

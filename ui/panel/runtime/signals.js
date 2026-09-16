@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
-/** @typedef {{render: {preserveMorph?: boolean,allowDuringTransition?:boolean,viewIndicatorFrom?:string}|undefined, scan: number, context: undefined, runtime: boolean, complete: number, settings: undefined, preview: undefined, generationControl: {mode:string,busy:boolean}, verify: undefined, theme: undefined}} SignalMap */
+/** @typedef {{render: {preserveMorph?: boolean,allowDuringTransition?:boolean,viewIndicatorFrom?:string}|undefined, scan: number, context: undefined, runtime: boolean, complete: number, settings: undefined, preview: undefined, generationControl: {mode:string,busy:boolean}, verify: undefined, theme: undefined, windowToggle: undefined}} SignalMap */
 /** @type {Map<keyof SignalMap, Set<Function>>} */
 const listeners = new Map();
 

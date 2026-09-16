@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: CSS 过渡、关键帧与减少动态效果规则；几何手势仍由 geometry.js 控制。
+ * [OUTPUT]: CSS 过渡、一次性完成反馈、关键帧与减少动态效果规则；几何手势仍由 geometry.js 控制。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -77,8 +77,8 @@
   animation-delay: 0s;
 }
 
-:is(.csw-fab, .csw-head-face)[data-expression='ready'] .csw-fab-eye {
-  animation: csw-face-happy-lift 1.8s ease-in-out infinite;
+.csw-fab[data-expression='ready'] .csw-fab-eye {
+  animation: csw-face-happy-lift 720ms cubic-bezier(0.2, 0.72, 0.2, 1) 1 both;
 }
 
 :is(.csw-fab, .csw-head-face)[data-expression='empty'] .csw-fab-eye {

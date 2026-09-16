@@ -1,5 +1,5 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
-// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；debug 快照与受鉴权的无正文开发状态。
+// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态。
 // [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -135,6 +135,8 @@ fn router(service: Service) -> Router {
         .route("/appearance", get(appearance).post(save_appearance))
         .route("/appearance/theme", post(panel_theme))
         .route("/panel/ready", post(panel_ready))
+        .route("/panel/anchor", post(panel_anchor))
+        .route("/panel/presented", post(panel_presented))
         .route("/panel/dock", post(panel_dock))
         .route("/panel/preferences", post(panel_preferences))
         .route("/panel/command", post(panel_command))
@@ -292,6 +294,18 @@ async fn panel_ready(
     Json(input): Json<crate::panel::Input>,
 ) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.ready_panel(&input).await?))
+}
+async fn panel_anchor(
+    State(service): State<Service>,
+    Json(input): Json<crate::panel::Input>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.panel_anchor(&input).await?))
+}
+async fn panel_presented(
+    State(service): State<Service>,
+    Json(input): Json<crate::panel::Input>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.presented_panel(&input).await?))
 }
 async fn panel_dock(
     State(service): State<Service>,

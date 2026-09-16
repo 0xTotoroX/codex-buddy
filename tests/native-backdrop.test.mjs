@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 实际窗口 boot 脚本与暂停动画帧的合成浏览器环境。
- * [OUTPUT]: 原生外观与收放状态通知不依赖动画帧、相同状态不重复发送及重叠尺寸请求不丢失的回归。
+ * [OUTPUT]: 不依赖动画帧的原生外观通知、正文变更不测量背景、同批几何合并及重叠尺寸请求不丢失的回归。
  * [POS]: 原生 IPC 时序契约，不截图或连接真实宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -11,7 +11,9 @@ import { runInNewContext } from 'node:vm';
 
 test('native backdrop updates even while animation frames are suspended', () => {
   const messages = [],
-    frames = [];
+    frames = [],
+    microtasks = [];
+  let measurements = 0;
   let changed;
   const state = {
     runtimeActive: true,
@@ -20,7 +22,10 @@ test('native backdrop updates even while animation frames are suspended', () => 
     liquidVariant: 'regular',
     theme: 'light',
     glass: {
-      getBoundingClientRect: () => ({ x: 12, y: 12, width: 404, height: 420 }),
+      getBoundingClientRect: () => {
+        measurements += 1;
+        return { x: 12, y: 12, width: 404, height: 420 };
+      },
       getAnimations: () => [{ playState: 'running' }],
     },
   };
@@ -51,6 +56,7 @@ test('native backdrop updates even while animation frames are suspended', () => 
       frames.push(callback);
       return frames.length;
     },
+    queueMicrotask: (callback) => microtasks.push(callback),
     setTimeout: () => 1,
     clearTimeout() {},
     fetch: () => new Promise(() => {}),
@@ -59,30 +65,34 @@ test('native backdrop updates even while animation frames are suspended', () => 
     readFileSync(new URL('../ui/panel/popout/boot.js', import.meta.url), 'utf8'),
     environment,
   );
+  const notify = () => {
+    changed([{ type: 'attributes', target: state.glass }]);
+    microtasks.shift()?.();
+  };
   assert.equal(messages.at(-1)?.material, 'native-glass');
   assert.equal('theme' in messages.at(-1), false, 'backdrop must inherit system appearance');
   assert.equal(messages.at(-1)?.open, true);
   state.open = false;
-  changed([]);
+  notify();
   assert.equal(messages.at(-1)?.open, false, 'collapse reaches AppKit without geometry or a frame');
   state.open = true;
-  changed([]);
+  notify();
   assert.equal(messages.at(-1)?.open, true, 'expand restores Regular without a frame');
   state.liquidVariant = 'clear';
-  changed([]);
+  notify();
   assert.equal(
     messages.at(-1)?.liquidVariant,
     'clear',
     'expanded Clear reaches AppKit without waiting for animation frames',
   );
   state.liquidVariant = 'regular';
-  changed([]);
+  notify();
   assert.equal(messages.at(-1)?.liquidVariant, 'regular');
   state.theme = 'dark';
-  changed([]);
+  notify();
   assert.equal('theme' in messages.at(-1), false);
   state.material = 'frosted';
-  changed([]);
+  notify();
   assert.equal(
     messages.at(-1)?.material,
     'frosted',
@@ -90,13 +100,21 @@ test('native backdrop updates even while animation frames are suspended', () => 
   );
   assert.equal('glassStyle' in messages.at(-1), false);
   state.material = 'matte';
-  changed([]);
+  notify();
   assert.equal(messages.at(-1)?.material, 'matte');
   const count = messages.length;
-  changed([]);
-  changed([]);
+  notify();
+  notify();
   assert.equal(messages.length, count, 'unchanged geometry should not send repeated IPC');
   assert.equal(frames.length, 1, 'only animation geometry needs one pending frame');
+  const beforeMeasurements = measurements;
+  changed([{ type: 'attributes', target: {} }]);
+  assert.equal(microtasks.length, 0, 'content mutations do not measure the backdrop');
+  for (let i = 0; i < 5; i++) changed([{ type: 'attributes', target: state.glass }]);
+  assert.equal(microtasks.length, 1, 'geometry changes in one turn are coalesced');
+  microtasks.shift()();
+  assert.equal(measurements, beforeMeasurements + 1);
+  assert.equal(messages.length, count, 'coalescing does not resend unchanged geometry');
   window.__companionPopout.toggleTheme();
   assert.deepEqual(messages.at(-1), { kind: 'system-theme', dark: true });
   const pending = messages.length;

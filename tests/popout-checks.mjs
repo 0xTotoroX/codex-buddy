@@ -1,6 +1,6 @@
 /*
  * [INPUT]: e2e.mjs 提供的浏览器、宿主、本机 API 和合成建议。
- * [OUTPUT]: checkPopout 的状态投影、宿主强调色同步、收回、受限操作、隐藏像素与表面偏色检查。
+ * [OUTPUT]: checkPopout 的状态投影、宿主强调色同步、呈现握手、阅读接续、交接反转、受限操作及像素检查。
  * [POS]: 端到端测试的弹出窗口子流程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -39,7 +39,17 @@ export async function checkPopout({
     style.setProperty('--color-token-charts-blue', 'rgb(48, 164, 108)');
     return old;
   });
-  await desktop.locator('[data-action="detach"]').click();
+  await desktop.locator('.csw-head-face').dblclick({ delay: 80 });
+  await waitFor(
+    async () =>
+      !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detachPending)),
+    'Double-click detach did not finish',
+  );
+  assert.equal(
+    await desktop.evaluate(() => window.__companionFloatingPanel.state.open),
+    true,
+    'Double click must reverse collapse and leave the panel expanded',
+  );
   const opened = await api('panel/open', {});
   assert.equal(opened.status, 200, JSON.stringify(opened.body));
   const lease = opened.body.lease;
@@ -57,6 +67,7 @@ export async function checkPopout({
   const pop = await context.newPage();
   pop.on('pageerror', (error) => errors.push(`popout: ${error.message}`));
   const native = [];
+  let acknowledgeShow = false;
   const commandResults = [];
   pop.on('response', async (response) => {
     if (response.url().endsWith('/panel/command'))
@@ -76,6 +87,9 @@ export async function checkPopout({
     if (message.kind === 'size') {
       await pop.setViewportSize({ width: message.width, height: message.height });
       await pop.evaluate((id) => window.__companionPopout.resized(id), message.id);
+    }
+    if (message.kind === 'show' && acknowledgeShow) {
+      await pop.evaluate(() => window.__companionPopout.presented());
     }
   });
   await pop.addInitScript(() => {
@@ -108,6 +122,42 @@ export async function checkPopout({
       'Popout did not become ready',
     );
     assert.equal(pop.url(), `${base}/panel`);
+    const prepared = (await api('panel/state', { lease })).body;
+    assert.equal(prepared.ready, true);
+    assert.equal(prepared.presented, false);
+    assert.notEqual(
+      await desktop
+        .locator('[data-companion-stepwise-root]')
+        .evaluate((node) => getComputedStyle(node).visibility),
+      'hidden',
+      'ready must not hide the source',
+    );
+    acknowledgeShow = true;
+    await pop.evaluate(() => window.__companionPopout.presented());
+    assert.equal((await api('panel/state', { lease })).body.presented, true);
+    const home = await api('panel/anchor', { lease });
+    assert.equal(home.status, 200);
+    assert.ok(
+      home.body.anchor?.width >= 300 && home.body.anchor?.height >= 340,
+      'Hidden embedded panel must retain a nonzero return anchor',
+    );
+    assert.ok(Number.isFinite(home.body.anchor.x) && Number.isFinite(home.body.anchor.y));
+    await desktop.evaluate(() =>
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true }),
+    );
+    try {
+      const occluded = (await api('panel/anchor', { lease })).body.anchor;
+      assert.deepEqual(
+        occluded,
+        home.body.anchor,
+        'An occluded host must retain the return coordinates',
+      );
+    } finally {
+      await desktop.evaluate(() => delete document.hidden);
+    }
+    assert.notEqual((await api('panel/anchor', { lease: 'expired' })).status, 200);
+    record('内容就绪保留内嵌，原生呈现确认后才交接');
+
     const accent = (page) =>
       page
         .locator('[data-companion-stepwise-root]')
@@ -484,7 +534,7 @@ export async function checkPopout({
         }),
       );
       assert.equal(await pop.locator('.csw-displacement-texture, .csw-clear-texture').count(), 0);
-      if (material !== 'matte') {
+      {
         const decoration = await pop.locator('.csw-glass').evaluate((el) => {
           const rim = el.parentElement.querySelector('.csw-rim');
           const effect = getComputedStyle(el, '::before');
@@ -496,8 +546,8 @@ export async function checkPopout({
             glassRadius: parseFloat(getComputedStyle(el).borderTopLeftRadius),
           };
         });
-        assert.equal(decoration.overlay, 'none');
-        if (material === 'frosted') {
+        if (material !== 'matte') assert.equal(decoration.overlay, 'none');
+        if (material !== 'native-glass') {
           assert.equal(decoration.radius, decoration.glassRadius);
           assert.ok(decoration.radius > 0);
           assert.match(decoration.shadow, /0px 2px 6px/);
@@ -621,9 +671,10 @@ export async function checkPopout({
     assert.equal(await pop.evaluate(() => window.__companionFloatingPanel.state.open), true);
     assert.deepEqual(pop.viewportSize(), expandedViewport);
     const appearance = (await api('appearance')).body;
+    const currentUi = await pop.evaluate(() => window.__companionFloatingPanel.panelPreferences());
     await api('appearance', {
       expectedRevision: appearance.revision,
-      ui: { ...appearance.ui, open: false },
+      ui: { ...currentUi, open: false },
     });
     await settle();
     assert.equal(
@@ -633,9 +684,66 @@ export async function checkPopout({
     );
     await pop.locator('.csw-row').first().waitFor();
     record('弹出固定展开：点眼睛、Esc、旧接口和偏好更新均不收起，仍可调整窗口尺寸');
+    // 强制一次初始投影用于复现同内容阅读接续；后续常规投影不得覆盖用户位置。
+    const source = (await api('panel/state', { lease })).body;
+    source.snapshot.readingState = {
+      ...source.snapshot.readingState,
+      activeTab: 'next',
+      promptPreviewIndex: 2,
+      scrollTop: 0,
+      promptScrollTop: 0,
+    };
+    source.snapshot.readingState.contentToken = await pop.evaluate(
+      () => window.__companionFloatingPanel.panelReadingState().contentToken,
+    );
+    source.preferences.ui.activeTab = 'next';
+    await pop.evaluate(
+      (value) => window.__companionFloatingPanel.receivePanelState(value, true),
+      source,
+    );
+    assert.equal(
+      await pop.evaluate(() => window.__companionFloatingPanel.state.promptPreviewIndex),
+      2,
+      JSON.stringify(
+        await pop.evaluate(() => window.__companionFloatingPanel.panelReadingState()),
+      ) +
+        ' expected ' +
+        JSON.stringify(source.snapshot.readingState),
+    );
+    await pop.locator('.csw-row').first().hover();
+    await pop.waitForFunction(() => window.__companionFloatingPanel.state.promptPreviewIndex === 0);
+    await pop.locator('.csw-body').evaluate((body) => {
+      body.scrollTop = Math.min(40, body.scrollHeight - body.clientHeight);
+    });
+    const reading = await pop.evaluate(() => window.__companionFloatingPanel.panelReadingState());
+    source.snapshot.accentColor = 'rgb(48, 164, 108)';
+    await pop.evaluate(
+      (value) => window.__companionFloatingPanel.receivePanelState(value, false),
+      source,
+    );
+    assert.deepEqual(
+      await pop.evaluate(() => window.__companionFloatingPanel.panelReadingState()),
+      reading,
+    );
+    const staleReading = structuredClone(source);
+    staleReading.snapshot.readingState.contentToken = 'stale-content';
+    await pop.evaluate(
+      (value) => window.__companionFloatingPanel.receivePanelState(value, true),
+      staleReading,
+    );
+    assert.equal(
+      await pop.evaluate(() => window.__companionFloatingPanel.state.promptPreviewIndex),
+      0,
+    );
+    record('阅读接续保留预览条目与滚动位置，常规投影和过期内容不会覆盖当前阅读');
 
+    await pop.locator('.csw-row').nth(2).hover();
+    await pop.waitForFunction(() => window.__companionFloatingPanel.state.promptPreviewIndex === 2);
+    const dockReading = await pop.evaluate(() =>
+      window.__companionFloatingPanel.panelReadingState(),
+    );
     await pop.locator('.csw-head').hover();
-    await pop.locator('[data-action="detach"]').click();
+    await pop.locator('.csw-head-face').dblclick({ delay: 80 });
     await waitFor(
       async () =>
         (await desktop
@@ -643,10 +751,25 @@ export async function checkPopout({
           .evaluate((node) => getComputedStyle(node).visibility)) !== 'hidden',
       'Dock did not restore embedded UI',
     );
+    await waitFor(
+      async () => native.some((item) => item.kind === 'close'),
+      'Dock did not finish handoff',
+    );
     assert.equal(
       await desktop.locator('[data-companion-stepwise-root]').evaluate((node) => node.inert),
       false,
     );
+    assert.equal(
+      await desktop.evaluate(() => window.__companionFloatingPanel.state.open),
+      true,
+      'Double-click dock must restore an expanded panel',
+    );
+    record('表情双击弹出与收回复用交接流程，100ms 内第二击取消收放，复用窗口交接');
+    const restoredReading = await desktop.evaluate(() =>
+      window.__companionFloatingPanel.panelReadingState(),
+    );
+    for (const key of ['viewToken', 'contentToken', 'activeTab', 'promptPreviewIndex'])
+      assert.equal(restoredReading[key], dockReading[key], `dock restores ${key}`);
     assert.deepEqual(
       await desktop.evaluate(() => window.__companionFloatingPanel.state.position),
       position,
@@ -658,13 +781,76 @@ export async function checkPopout({
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'panel.json'))).detached, false);
     assert.equal((await api('panel/state', { lease })).status, 400);
     record('收回恢复原位置并同步偏好，关闭后的窗口不能继续操作');
+    const handoff = await desktop.evaluate(async () => {
+      const panel = window.__companionFloatingPanel;
+      for (let i = 0; i < 3; i++) {
+        const hiding = panel.setDetached(true);
+        if (i === 1) await new Promise((resolve) => setTimeout(resolve, 40));
+        const showing = panel.setDetached(false);
+        await Promise.all([hiding, showing]);
+      }
+      const root = panel.state.root;
+      return {
+        opacity: getComputedStyle(root).opacity,
+        inert: root.inert,
+        detached: root.dataset.detached,
+        animations: root.getAnimations().length,
+      };
+    });
+    assert.deepEqual(handoff, { opacity: '1', inert: false, detached: 'false', animations: 0 });
+    await desktop.emulateMedia({ reducedMotion: 'reduce' });
+    await desktop.evaluate(async () => {
+      const p = window.__companionFloatingPanel;
+      await p.setDetached(true);
+      await p.setDetached(false);
+    });
+    assert.equal(
+      await desktop
+        .locator('[data-companion-stepwise-root]')
+        .evaluate((node) => node.getAnimations().length),
+      0,
+    );
+    await desktop.emulateMedia({ reducedMotion: 'no-preference' });
+    record('快速反转与减少动态效果均恢复可操作面板，无透明动画残留');
+
+    // 胶囊出发时首击可能已在 100ms 后展开；双击仍须记住首击前的形态。
+    await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(false));
+    await settle();
+    await desktop.locator('.csw-fab').dblclick({ delay: 180 });
+    await waitFor(
+      async () =>
+        !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detachPending)),
+      'chip detach pending',
+    );
+    const chipLease = (await api('panel/open', {})).body.lease;
+    assert.equal((await api('appearance')).body.returnOpen, false);
+    await pop.goto('about:blank');
+    await pop.goto(`${base}/panel#token=${runtime.token}&lease=${chipLease}`);
+    await waitFor(
+      async () => (await api('panel/state', { lease: chipLease })).body.presented,
+      'chip popout not presented',
+    );
+    assert.equal(await pop.evaluate(() => window.__companionFloatingPanel.state.open), true);
+    const chipAnchor = (await api('panel/anchor', { lease: chipLease })).body.anchor;
+    assert.ok(chipAnchor.width >= 40 && chipAnchor.height >= 20 && chipAnchor.height < 100);
+    await pop.locator('.csw-head-face').dblclick({ delay: 80 });
+    await waitFor(
+      async () => !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detached)),
+      'chip dock not restored',
+    );
+    assert.equal(await desktop.evaluate(() => window.__companionFloatingPanel.state.open), false);
+    assert.equal(JSON.parse(readFileSync(join(dataDir, 'panel.json'))).ui.open, false);
+    record('胶囊态双击直接弹出：180ms 慢双击保存首击前状态，收回恢复胶囊且动画锚点为胶囊区域');
 
     const recoveryLease = (await api('panel/open', {})).body.lease;
     await pop.goto('about:blank');
     await pop.goto(`${base}/panel#token=${runtime.token}&lease=${recoveryLease}`);
     await waitFor(
-      async () => (await api('panel/state', { lease: recoveryLease })).body.ready,
-      'Recovery window not ready',
+      async () =>
+        (await desktop
+          .locator('[data-companion-stepwise-root]')
+          .evaluate((node) => getComputedStyle(node).visibility)) === 'hidden',
+      'Recovery window did not complete presentation',
     );
     await pop.close();
     await waitFor(

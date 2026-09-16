@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立功能视图、外壳状态、交互和设置视图。
- * [OUTPUT]: 胶囊 DOM 创建、组合渲染与建议预览事件；弹出头部保留拖动、取消收起。
+ * [OUTPUT]: 胶囊 DOM 创建、组合渲染与建议预览事件；表情支持单击收放和双击切换窗口，弹出不收起。
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -89,6 +89,8 @@ import {
   installResize,
   installViewTabReorder,
   onFabClick,
+  onFaceDoubleClick,
+  onFaceSecondPress,
   onFabPointerDown,
   onGlassClick,
   onHeadFaceClick,
@@ -288,7 +290,12 @@ function renderFloat(options = {}) {
   shellState.fabExpression = expression;
   shellState.fab.dataset.expression = expression;
   shellState.fab.dataset.count = String(expressionCount);
-  shellState.fab.title = shellState.open ? '收起' : `${featureLabel} · ${expressionLabel}`;
+  const faceHint = IS_POPOUT
+    ? '双击收回 Codex；拖动移动窗口'
+    : runtimeState.settings?.popoutSupported === true
+      ? '单击展开或收起；双击弹出到桌面；拖动移动'
+      : '单击展开或收起；拖动移动';
+  shellState.fab.title = `${featureLabel} · ${expressionLabel} · ${faceHint}`;
   shellState.fab.setAttribute(
     'aria-label',
     shellState.open
@@ -319,7 +326,7 @@ function renderFloat(options = {}) {
             ${viewTabs}
           </div>
         </div>
-        <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" title="${IS_POPOUT ? '拖动窗口' : '收起'}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
+        <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" title="${faceHint}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
         <div class="csw-head-side csw-head-right">
           ${panelWindowControls()}
           <button class="csw-icon" type="button" data-action="refresh" title="${escapeAttr(refreshTitle)}" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
@@ -664,6 +671,8 @@ function installFloat() {
   document.body.appendChild(shellState.root);
 
   shellState.fab.addEventListener('pointerdown', onFabPointerDown);
+  shellState.popover.addEventListener('pointerdown', onFaceSecondPress, true);
+  shellState.popover.addEventListener('click', onFaceDoubleClick, true);
   shellState.fab.addEventListener('click', onFabClick);
   bindGlassPointerSurface(shellState.fab);
   shellState.panel.addEventListener('wheel', onPanelWheel, { passive: false });

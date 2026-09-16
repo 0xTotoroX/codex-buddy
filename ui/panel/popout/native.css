@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 实际生效材质与原生背景能力。
- * [OUTPUT]: 原生磨砂/液态共用的透明内容表面及确认弹窗；胶囊复用公共布局。
+ * [OUTPUT]: 与原生事务同步切换的材质前景及确认弹窗；胶囊复用公共布局。
  * [POS]: 原生覆盖，不实现玻璃折射，按顺序放在共享样式之后。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -21,6 +21,11 @@ html[data-native-backdrop='true']
   background: transparent;
   box-shadow: none;
 }
+/* AppKit 与网页前景同步切换，避免旧背景颜色在新材质上继续过渡。 */
+html[data-native-backdrop='true'] .csw-glass {
+  transition: none;
+}
+
 .csw-popout-confirm {
   max-width: 280px;
   border: 1px solid #ffffff25;

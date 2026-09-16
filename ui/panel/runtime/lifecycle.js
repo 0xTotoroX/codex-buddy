@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、运行启停、通知订阅及带开发标志及材质 setter 的胶囊接口。
+ * [OUTPUT]: 扫描、运行启停、通知订阅及带阅读接续、开发标志和材质 setter 的胶囊接口。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -76,7 +76,11 @@ import {
   syncSettings,
 } from './settings-sync.js';
 import {
+  togglePanelWindow,
   exportPanelState,
+  panelReadingState,
+  panelWindowAnchor,
+  blinkHandoff,
   panelCommand,
   panelDisconnected,
   receivePanelState,
@@ -92,7 +96,7 @@ import {
   resetOutlineFeature,
 } from '../outline.js';
 import { nativeGestureEnded, panelPreferences } from '../popout/transport.js';
-import { onResize } from '../core/interaction.js';
+import { cancelFaceClick, onResize } from '../core/interaction.js';
 import { onSignal } from './signals.js';
 import { pushDiagnostic, readDiagnostics } from './diagnostics.js';
 import {
@@ -279,6 +283,7 @@ function installObserver() {
 }
 
 function stopRuntime() {
+  cancelFaceClick();
   window.dispatchEvent(
     new CustomEvent('codex-buddy:stop', { detail: { destroy: runtimeState.destroyed } }),
   );
@@ -313,6 +318,11 @@ function stopRuntime() {
   cancelViewAnimation();
   cancelSourceCueAnimation();
   cancelMorphAnimations();
+  shellState.handoffGeneration += 1;
+  shellState.handoffAnimation?.cancel?.();
+  shellState.handoffAnimation = null;
+  shellState.handoffPromise = null;
+  shellState.handoffTarget = null;
   shellState.dragCleanup?.();
   shellState.resizeCleanup?.();
   shellState.viewReorderCleanup?.();
@@ -493,6 +503,7 @@ function install() {
     onSignal('generationControl', ({ mode, busy }) => updateGenerationModeControl(mode, busy)),
     onSignal('verify', () => scan()),
     onSignal('theme', () => syncTheme()),
+    onSignal('windowToggle', () => void togglePanelWindow()),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
   window[API_KEY] = {
@@ -515,6 +526,9 @@ function install() {
     renderFloat,
     panelPreferences,
     exportPanelState,
+    panelReadingState,
+    panelWindowAnchor,
+    blinkHandoff,
     panelCommand,
     setDetached,
     setThemeMode: setCodexThemeMode,

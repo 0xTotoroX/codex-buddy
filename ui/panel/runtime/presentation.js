@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 弹出强制展开、窗口/材质偏好同步、含宿主主题色且不覆盖系统明暗的状态投影、受限业务命令及弹出/收回入口。
- * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态。
+ * [OUTPUT]: 按钮/手势共用 togglePanelWindow、弹出强制展开且内嵌恢复出发形态、带阅读位置和呈现确认的窗口交接、窗口/材质偏好同步、状态投影及受限业务命令。
+ * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
@@ -41,13 +41,72 @@ import {
 } from './state.js';
 import { chatBusy, contextMatches, contextSnapshot } from '../host/context.js';
 import { clampFontOffset, clampPanelWidth, normalizeMaterial } from '../core/panel-appearance.js';
-import { defaultPosition } from '../core/geometry.js';
+import { defaultPosition, shellLayout } from '../core/geometry.js';
 import { emitSignal } from './signals.js';
 import { fillComposer, forceRefreshStepwise } from '../stepwise.js';
 import { outlineJumpTo, outlineJumpToAnchor, refreshOutline } from '../outline.js';
 import { panelPreferences, sizeNativePanel } from '../popout/transport.js';
 
 let preferencesRevision = -1;
+
+// 仅在交接时读取；屏幕坐标不写入偏好，也不包含宿主正文。
+function panelWindowAnchor() {
+  if (IS_POPOUT || !shellState.glass?.isConnected) return null;
+  const layout = shellLayout();
+  // 弹出后玻璃背景层 display:none；从同一套布局计算收回位置，不能读取零尺寸 DOM。
+  const rect = !shellState.open
+    ? {
+        left: layout.anchor.x,
+        top: layout.anchor.y,
+        width: layout.chip.width,
+        height: layout.chip.height,
+        right: layout.anchor.x + layout.chip.width,
+        bottom: layout.anchor.y + layout.chip.height,
+      }
+    : shellState.detached || document.hidden
+      ? {
+          left: layout.left,
+          top: layout.top,
+          width: layout.width,
+          height: layout.height,
+          right: layout.left + layout.width,
+          bottom: layout.top + layout.height,
+        }
+      : shellState.glass.getBoundingClientRect();
+  const border = Math.max(0, (window.outerWidth - window.innerWidth) / 2);
+  const titlebar = Math.max(0, window.outerHeight - window.innerHeight - border);
+  if (
+    border > 20 ||
+    titlebar > 140 ||
+    rect.width < 40 ||
+    rect.height < 20 ||
+    rect.left < 0 ||
+    rect.top < 0 ||
+    rect.right > innerWidth ||
+    rect.bottom > innerHeight
+  )
+    return null;
+  return {
+    x: screenX + border + rect.left,
+    y: screenY + titlebar + rect.top,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function blinkHandoff() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const eye of shellState.panel?.querySelectorAll('.csw-fab-eye') || []) {
+    eye.animate(
+      [
+        { transform: 'scaleY(1)' },
+        { transform: 'scaleY(.14)', offset: 0.45 },
+        { transform: 'scaleY(1)' },
+      ],
+      { duration: 180, easing: 'ease-in-out' },
+    );
+  }
+}
 
 function applyPanelPreferences(ui) {
   if (!ui) return;
@@ -84,10 +143,123 @@ function syncPanelPreferences(ui, revision, detached) {
     if (revision > 0 && JSON.stringify(panelPreferences()) !== JSON.stringify(ui))
       applyPanelPreferences(ui);
   }
-  setDetached(detached, ui);
+  void setDetached(detached, ui, null);
 }
 
-function setDetached(value, ui) {
+function readingContentToken(tab) {
+  return hashText(
+    JSON.stringify(
+      tab === 'next'
+        ? [
+            runtimeState.settings?.generationRevision,
+            stepwiseState.prompts.map(({ label, summary, prompt }) => [label, summary, prompt]),
+          ]
+        : tab === 'outline'
+          ? outlineState.outlineItems.map(({ id, text }) => [id, text])
+          : 'settings',
+    ),
+  );
+}
+
+function readingState(viewToken) {
+  const body = shellState.panel?.querySelector('.csw-body[data-view-body]');
+  const promptScroll = body?.querySelector('.csw-prompt-preview-scroll');
+  return {
+    viewToken,
+    contentToken: readingContentToken(shellState.activeTab),
+    activeTab: shellState.activeTab,
+    scrollTop: Number(body?.scrollTop) || 0,
+    promptPreviewIndex: Number(shellState.promptPreviewIndex) || 0,
+    promptScrollTop: Number(promptScroll?.scrollTop) || 0,
+  };
+}
+
+function panelReadingState() {
+  const viewToken = IS_POPOUT ? shellState.remoteSource?.viewToken : exportPanelState()?.viewToken;
+  return viewToken ? readingState(viewToken) : null;
+}
+
+function validReadingState(value, viewToken) {
+  return (
+    Boolean(value && viewToken) &&
+    value.viewToken === viewToken &&
+    ['next', 'outline', 'settings'].includes(value.activeTab) &&
+    value.contentToken === readingContentToken(value.activeTab) &&
+    Number.isFinite(value.scrollTop) &&
+    Number.isInteger(value.promptPreviewIndex) &&
+    Number.isFinite(value.promptScrollTop)
+  );
+}
+
+function applyReadingSelection(value, viewToken) {
+  if (!validReadingState(value, viewToken)) return false;
+  shellState.activeTab = normalizeActiveTab(value.activeTab);
+  shellState.promptPreviewIndex = clamp(
+    value.promptPreviewIndex,
+    0,
+    Math.max(0, stepwiseState.prompts.length - 1),
+  );
+  return true;
+}
+
+function restoreReadingScroll(value, viewToken) {
+  if (!validReadingState(value, viewToken)) return;
+  const body = shellState.panel?.querySelector('.csw-body[data-view-body]');
+  if (
+    !body ||
+    body.dataset.viewBody !== value.activeTab ||
+    shellState.activeTab !== value.activeTab
+  )
+    return;
+  body.scrollTop = clamp(value.scrollTop, 0, Math.max(0, body.scrollHeight - body.clientHeight));
+  const promptScroll = body.querySelector('.csw-prompt-preview-scroll');
+  if (promptScroll)
+    promptScroll.scrollTop = clamp(
+      value.promptScrollTop,
+      0,
+      Math.max(0, promptScroll.scrollHeight - promptScroll.clientHeight),
+    );
+}
+
+async function animateHandoff(next) {
+  const root = shellState.root;
+  if (!root) return;
+  const from = root.dataset.detached === 'true' ? 0 : Number(getComputedStyle(root).opacity);
+  shellState.handoffAnimation?.cancel?.();
+  const generation = ++shellState.handoffGeneration;
+  root.style.pointerEvents = 'none';
+  root.inert = true;
+  if (!next) {
+    root.style.visibility = '';
+    root.setAttribute('data-detached', 'false');
+  }
+  window.dispatchEvent(new Event('codex-buddy:appearance'));
+  if (document.hidden || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    root.style.opacity = '';
+  } else {
+    const animation = root.animate([{ opacity: from }, { opacity: next ? 0 : 1 }], {
+      duration: next ? 110 : 120,
+      easing: 'cubic-bezier(.2, .72, .2, 1)',
+      fill: 'forwards',
+    });
+    shellState.handoffAnimation = animation;
+    await animation.finished.catch(() => null);
+    if (generation !== shellState.handoffGeneration) return;
+    // 先落实可见性，再取消 fill，避免透明动画留在根节点。
+    root.style.visibility = next ? 'hidden' : '';
+    animation.cancel();
+    shellState.handoffAnimation = null;
+    root.style.opacity = '';
+  }
+  if (generation !== shellState.handoffGeneration) return;
+  root.style.visibility = next ? 'hidden' : '';
+  root.style.pointerEvents = next ? 'none' : '';
+  root.setAttribute('data-detached', String(next));
+  root.inert = next;
+  if (!next) blinkHandoff();
+}
+
+async function setDetached(value, ui = null, presentation = null) {
   if (IS_POPOUT || !isCurrentRuntime()) return;
   const next = value === true;
   const fingerprint = JSON.stringify(ui);
@@ -99,17 +271,30 @@ function setDetached(value, ui) {
   clearTimeout(shellState.detachedRecoveryTimer);
   shellState.detachedRecoveryTimer = next
     ? window.setTimeout(() => {
-        if (isCurrentRuntime() && shellState.detached) setDetached(false, null);
+        if (isCurrentRuntime() && shellState.detached) void setDetached(false, null, null);
       }, 15000)
     : 0;
   sessionStorage.setItem(DETACHED_KEY, String(next));
-  if (shellState.root && shellState.root.getAttribute('data-detached') !== String(next)) {
-    shellState.root.style.visibility = next ? 'hidden' : '';
-    shellState.root.style.pointerEvents = next ? 'none' : '';
-    shellState.root.setAttribute('data-detached', String(next));
-    shellState.root.inert = next;
-    window.dispatchEvent(new Event('codex-buddy:appearance'));
+  const currentToken = presentation ? exportPanelState()?.viewToken : null;
+  if (!next && applyReadingSelection(presentation, currentToken)) emitSignal('render', undefined);
+  if (!next) restoreReadingScroll(presentation, currentToken);
+  if (
+    shellState.root &&
+    (shellState.handoffPromise || shellState.root.getAttribute('data-detached') !== String(next))
+  ) {
+    if (shellState.handoffTarget !== next) {
+      shellState.handoffTarget = next;
+      const handoff = animateHandoff(next).finally(() => {
+        if (shellState.handoffPromise === handoff) {
+          shellState.handoffPromise = null;
+          shellState.handoffTarget = null;
+        }
+      });
+      shellState.handoffPromise = handoff;
+    }
+    await shellState.handoffPromise;
   }
+  window.dispatchEvent(new Event('codex-buddy:appearance'));
 }
 
 /** @returns {import("../../contracts").PanelSnapshot|null} */
@@ -131,6 +316,7 @@ function exportPanelState() {
     JSON.stringify([runtimeState.settings?.generationRevision, stepwiseState.prompts]),
   );
   const outlineToken = hashText(JSON.stringify(outline));
+  const panelReading = readingState(viewToken);
   return {
     instanceId: INSTANCE_ID,
     context,
@@ -138,6 +324,7 @@ function exportPanelState() {
     viewToken,
     promptToken,
     outlineToken,
+    readingState: panelReading,
     prompts: stepwiseState.prompts,
     outlineItems: outline,
     outlineStatus: outlineState.outlineStatus,
@@ -246,7 +433,9 @@ async function receivePanelState(result, initial) {
   runtimeState.settingsLoaded = true;
   contextState.lastAssistantHash = source.answerHash;
   stepwiseState.promptContext = source.context;
+  if (initial) applyReadingSelection(source.readingState, source.viewToken);
   emitSignal('render', undefined);
+  if (initial) restoreReadingScroll(source.readingState, source.viewToken);
 }
 
 function panelDisconnected(message) {
@@ -278,23 +467,37 @@ function panelWindowControls() {
   return `${pin}<button class="csw-icon" type="button" data-action="detach" title="${label}" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
 }
 
-function bindPanelWindowControls() {
-  shellState.panel.querySelector('[data-action="detach"]')?.addEventListener('click', async () => {
-    if (IS_POPOUT) {
-      await POPOUT.dock();
-      return;
+async function togglePanelWindow() {
+  if (IS_POPOUT && shellState.detachPending) {
+    POPOUT.cancelDock?.();
+    return;
+  }
+  if (shellState.detachPending || (!IS_POPOUT && runtimeState.settings?.popoutSupported !== true))
+    return;
+  shellState.detachPending = true;
+  emitSignal('render', undefined);
+  try {
+    if (IS_POPOUT) await POPOUT.dock();
+    else {
+      const result = await bridgeCall('/panel/detach', { ui: panelPreferences() });
+      if (result.error) throw new Error(result.error);
     }
-    if (shellState.detachPending || runtimeState.settings?.popoutSupported !== true) return;
-    shellState.detachPending = true;
-    emitSignal('render', undefined);
-    const result = await bridgeCall('/panel/detach', { ui: panelPreferences() });
-    shellState.detachPending = false;
-    if (result.error) {
-      stepwiseState.bridgeError = result.error;
+  } catch (error) {
+    if (IS_POPOUT) POPOUT.notice(error.message);
+    else {
+      stepwiseState.bridgeError = error.message;
       stepwiseState.bridgeStatus = 'failed';
     }
+  } finally {
+    shellState.detachPending = false;
     emitSignal('render', undefined);
-  });
+  }
+}
+
+function bindPanelWindowControls() {
+  shellState.panel
+    .querySelector('[data-action="detach"]')
+    ?.addEventListener('click', () => void togglePanelWindow());
   shellState.panel.querySelector('[data-action="pin"]')?.addEventListener('click', async () => {
     try {
       await POPOUT.pin(!shellState.pinnedOnTop);
@@ -308,10 +511,14 @@ function bindPanelWindowControls() {
 }
 
 export {
+  togglePanelWindow,
   bindPanelWindowControls,
   exportPanelState,
   panelCommand,
   panelDisconnected,
+  panelReadingState,
+  panelWindowAnchor,
+  blinkHandoff,
   panelWindowControls,
   receivePanelState,
   setDetached,

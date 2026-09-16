@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 共用 CSS 哑光、近似 HUDWindow 的网页磨砂与原生磨砂/液态共用的透明网页表面；以实际生效材质选择规则，网页表面以柔光与浅阴影定位，不使用硬描边。
+ * [OUTPUT]: 共用 CSS 哑光、近似 HUDWindow 的网页磨砂与原生磨砂/液态共用的透明网页表面；以实际生效材质选择规则，网页表面以柔光与浅阴影定位；弹出哑光/磨砂共用留白内的浅阴影，不使用硬描边。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -174,6 +174,9 @@
 }
 
 /* Keep the rounded shadow inside the native window's 12px transparent gutter. */
+[data-companion-stepwise-root][data-presentation='popout']
+  .csw-popover[data-effective-material='matte']
+  .csw-rim,
 [data-companion-stepwise-root] .csw-popover[data-effective-material='native-frosted'] .csw-rim {
   display: block;
   padding: 0;

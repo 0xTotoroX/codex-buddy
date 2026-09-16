@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 注入环境与兼容标识。
- * [OUTPUT]: 稳定 DOM、按构建环境隔离的存储键、尺寸和时间参数。
+ * [OUTPUT]: 稳定 DOM、按构建环境隔离的存储键、尺寸及收放/完成反馈时间参数。
  * [POS]: 无业务依赖的运行常量。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -13,7 +13,7 @@ const STYLE_ID = 'companion-stepwise-panel-style';
 const ROOT_ATTR = 'data-companion-stepwise-root';
 const MARK_ATTR = 'data-companion-stepwise-outline-id';
 const HIGHLIGHT_CLASS = 'companion-stepwise-outline-target-flash';
-const SCRIPT_VERSION = 'companion-0.3.0-materials-4';
+const SCRIPT_VERSION = 'companion-0.3.0-genie-trial-1';
 const PAGE_BRIDGE = '__companionDesktopRequest';
 const CONVERSATION_TURN_SELECTOR = 'div.contents[data-content-search-turn-key]';
 const POPOVER_ID = 'companion-stepwise-popover';
@@ -58,7 +58,7 @@ const NEW_ANSWER_EXPRESSION_MS = 700;
 const BRIDGE_TIMEOUT_MS = 310000;
 const SETTINGS_SYNC_INTERVAL_MS = 15000;
 const FLASH_MS = 1200;
-const COMPLETION_BEAM_MS = 1600;
+const COMPLETION_BEAM_MS = 900;
 const MIN_OUTLINE_TEXT_LEN = 280;
 const MIN_OUTLINE_ITEMS = 2;
 const MAX_OUTLINE_ITEMS = 24;
@@ -108,13 +108,13 @@ const ITEM_FONT_RATIO = 13 / 15;
 const CHROME_FONT_RATIO = 12 / 15;
 const ICON_FONT_RATIO = 16 / 15;
 const HOST_FONT_FAMILY_FALLBACK = '-apple-system, "system-ui", "Segoe UI", sans-serif';
-const MIN_MORPH_MS = 840;
-const MAX_MORPH_MS = 1450;
-const MIN_PHASE_MS = 420;
-const MIN_REVERSE_MS = 120;
-const MORPH_FALLBACK_BUFFER_MS = 180;
+const MIN_MORPH_MS = 320;
+const MAX_MORPH_MS = 420;
+const MIN_PHASE_MS = 150;
+const MIN_REVERSE_MS = 100;
+const MORPH_FALLBACK_BUFFER_MS = 120;
 const HORIZONTAL_PHASE = 0.5;
-const MORPH_EDGE_SPEED = 0.18;
+const MORPH_EDGE_SPEED = 1.8;
 const UNFOLD_SAMPLES = 28;
 const VIEW_SLIDE_MS = 240;
 const VIEW_SLIDE_DISTANCE = 12;

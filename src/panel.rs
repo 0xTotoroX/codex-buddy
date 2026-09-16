@@ -1,6 +1,6 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、Preferences、带版本的 Web 材质更新及旧玻璃样式迁移及弹出/收回/受限命令。
-// [POS]: 后台系统浮窗管理层，窗口就绪后才隐藏内嵌胶囊。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、含 returnOpen 的 Preferences、带呈现确认和阅读位置接续的弹出/收回/受限命令。
+// [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -77,6 +77,7 @@ pub struct Preferences {
     pub revision: u64,
     pub web_revision: u64,
     pub detached: bool,
+    pub return_open: Option<bool>,
     pub always_on_top: bool,
     pub position: Option<Position>,
     pub ui: Ui,
@@ -139,6 +140,8 @@ pub struct Panel {
     pub prefs: Preferences,
     pub lease: String,
     pub ready: bool,
+    pub presented: bool,
+    docking: bool,
     child: Option<Child>,
     restore_attempted: bool,
     heartbeat: Instant,
@@ -151,6 +154,8 @@ impl Panel {
             prefs: Preferences::read(paths),
             lease: String::new(),
             ready: false,
+            presented: false,
+            docking: false,
             child: None,
             restore_attempted: false,
             heartbeat: Instant::now(),
@@ -173,9 +178,38 @@ pub struct Input {
     pub ui: Option<Ui>,
     pub always_on_top: Option<bool>,
     pub position: Option<Position>,
+    pub presentation: Option<ReadingState>,
     #[serde(default)]
     pub command: Value,
     pub request: Option<crate::requests::Request>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadingState {
+    pub view_token: String,
+    pub content_token: String,
+    pub active_tab: String,
+    pub scroll_top: f64,
+    pub prompt_preview_index: usize,
+    pub prompt_scroll_top: f64,
+}
+
+impl ReadingState {
+    fn validate(&self) -> Result<()> {
+        if self.view_token.len() > 128
+            || self.content_token.len() > 128
+            || !["next", "outline", "settings"].contains(&self.active_tab.as_str())
+            || !self.scroll_top.is_finite()
+            || !(0. ..=1_000_000.).contains(&self.scroll_top)
+            || self.prompt_preview_index > 24
+            || !self.prompt_scroll_top.is_finite()
+            || !(0. ..=1_000_000.).contains(&self.prompt_scroll_top)
+        {
+            bail!("阅读位置无效");
+        }
+        Ok(())
+    }
 }
 
 impl App {
@@ -190,6 +224,7 @@ impl App {
         }
         if let Some(ui) = ui {
             ui.validate()?;
+            panel.prefs.return_open = Some(ui.open);
             panel.prefs.ui = ui;
         }
         panel.prefs.ui.open = true;
@@ -197,6 +232,9 @@ impl App {
             let _ = child.kill().await;
         }
         panel.child = None;
+        panel.ready = false;
+        panel.presented = false;
+        panel.docking = false;
         panel.restore_attempted = true;
         panel.lease = uuid::Uuid::new_v4().simple().to_string();
         panel.heartbeat = Instant::now();
@@ -223,7 +261,7 @@ impl App {
                 .context("无法启动桌面浮窗")?;
             panel.child = Some(child);
         }
-        // 只有 ready 握手成功后才隐藏宿主，失败时保留原胶囊。
+        // 网页 ready 只表示内容可用；原生窗口已呈现并确认 presented 后才隐藏宿主。
         Ok(())
     }
 
@@ -243,11 +281,11 @@ impl App {
     }
 
     pub async fn panel_snapshot(&self, input: &Input) -> Result<Value> {
-        let (prefs, ready) = {
+        let (prefs, ready, presented) = {
             let mut panel = self.panel.lock().await;
             panel.validate_lease(&input.lease)?;
             panel.heartbeat = Instant::now();
-            (panel.prefs.clone(), panel.ready)
+            (panel.prefs.clone(), panel.ready, panel.presented)
         };
         let snapshot = if let Some(client) = self.desktop_client().await {
             client
@@ -258,7 +296,7 @@ impl App {
             Value::Null
         };
         Ok(
-            json!({"preferences":prefs,"ready":ready,"snapshot":snapshot,
+            json!({"preferences":prefs,"ready":ready,"presented":presented,"snapshot":snapshot,
             "connection":self.view().connection.status}),
         )
     }
@@ -272,24 +310,68 @@ impl App {
             panel.ready = true;
             panel.heartbeat = Instant::now();
         }
-        self.sync_panel_host().await;
+        self.panel_anchor(input).await
+    }
+
+    pub async fn panel_anchor(&self, input: &Input) -> Result<Value> {
+        self.panel.lock().await.validate_lease(&input.lease)?;
+        let anchor = if let Some(client) = self.desktop_client().await {
+            client
+                .evaluate("window.__companionFloatingPanel?.panelWindowAnchor() ?? null".into())
+                .await
+                .unwrap_or(Value::Null)
+        } else {
+            Value::Null
+        };
+        Ok(json!({"ok":true,"anchor":anchor}))
+    }
+
+    pub async fn presented_panel(&self, input: &Input) -> Result<Value> {
+        {
+            let mut panel = self.panel.lock().await;
+            panel.validate_lease(&input.lease)?;
+            if !panel.ready || panel.docking {
+                bail!("浮窗尚未就绪或正在收回");
+            }
+            panel.presented = true;
+            panel.heartbeat = Instant::now();
+        }
+        self.sync_panel_host(None).await?;
         Ok(json!({"ok":true}))
     }
 
     pub async fn dock_panel(&self, input: &Input) -> Result<Value> {
-        {
+        if let Some(presentation) = &input.presentation {
+            presentation.validate()?;
+        }
+        let needs_host = {
             let mut panel = self.panel.lock().await;
             panel.validate_lease(&input.lease)?;
+            if panel.docking {
+                bail!("窗口正在收回");
+            }
             if let Some(ui) = &input.ui {
                 ui.validate()?;
                 panel.prefs.ui = ui.clone();
             }
-            panel.prefs.detached = false;
-            panel.prefs.save(&self.paths)?;
-            panel.ready = false;
-            panel.lease.clear();
+            panel.docking = true;
+            panel.ready
+        };
+        let restored = self.sync_panel_host(input.presentation.as_ref()).await;
+        let mut panel = self.panel.lock().await;
+        panel.validate_lease(&input.lease)?;
+        panel.docking = false;
+        if needs_host {
+            restored.context("内嵌面板尚未恢复，浮窗保持打开，请重试")?;
         }
-        self.sync_panel_host().await;
+        let mut prefs = panel.prefs.clone();
+        prefs.detached = false;
+        prefs.ui.open = prefs.return_open.unwrap_or(true);
+        prefs.save(&self.paths)?;
+        panel.prefs = prefs;
+        panel.ready = false;
+        panel.presented = false;
+        panel.lease.clear();
         Ok(json!({"ok":true}))
     }
 
@@ -368,6 +450,8 @@ impl App {
                     let _ = child.kill().await;
                 }
                 panel.ready = false;
+                panel.presented = false;
+                panel.docking = false;
                 panel.lease.clear();
             }
             panel.popout_supported && panel.prefs.detached && !panel.restore_attempted
@@ -438,6 +522,7 @@ impl App {
             ui: None,
             always_on_top: None,
             position: None,
+            presentation: None,
             command: Value::Null,
             request: None,
         })
@@ -475,31 +560,80 @@ impl App {
 
     pub(crate) async fn panel_host_state(&self) -> (bool, Value, u64, u64) {
         let panel = self.panel.lock().await;
+        let mut ui = panel.prefs.ui.clone();
+        if panel.prefs.detached || panel.ready || !panel.lease.is_empty() {
+            ui.open = panel.prefs.return_open.unwrap_or(true);
+        }
         (
-            panel.ready,
-            json!(panel.prefs.ui),
+            panel.presented && !panel.docking,
+            json!(ui),
             panel.prefs.revision,
             panel.prefs.web_revision,
         )
     }
 
-    async fn sync_panel_host(&self) {
+    async fn sync_panel_host(&self, presentation: Option<&ReadingState>) -> Result<()> {
         let (hidden, ui, _, _) = self.panel_host_state().await;
-        if let Some(client) = self.desktop_client().await {
-            let _ = client
-                .evaluate(format!(
-                    "window.__companionFloatingPanel?.setDetached({}, {}); true",
-                    hidden,
-                    json!(ui)
-                ))
-                .await;
-        }
+        let client = self.desktop_client().await.context("Codex 连接已断开")?;
+        let restored = client.evaluate(format!(
+            "(async()=>{{const p=window.__companionFloatingPanel; if (!p?.state.runtimeActive || !p.state.root?.isConnected) return false; await p.setDetached({}, {}, {}); return p.state.root?.isConnected && p.state.detached === {};}})()",
+            hidden, json!(ui), json!(presentation), hidden
+        )).await?;
+        anyhow::ensure!(restored == true, "Codex 面板未确认显示状态");
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn panel_input(lease: String) -> Input {
+        Input {
+            lease,
+            expected_revision: None,
+            ui: None,
+            always_on_top: None,
+            position: None,
+            presentation: None,
+            command: Value::Null,
+            request: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn host_waits_for_presentation_and_failed_dock_preserves_window() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let app = App::new(paths, crate::config::Config::default(), None, true);
+        {
+            let mut panel = app.panel.lock().await;
+            panel.popout_supported = true;
+            panel.test_window = true;
+        }
+        app.detach_panel(Some(Ui::default())).await.unwrap();
+        let lease = app.panel.lock().await.lease.clone();
+        let mut input = panel_input(lease);
+        assert!(!app.panel_host_state().await.0);
+        app.ready_panel(&input).await.unwrap();
+        assert!(app.panel.lock().await.ready);
+        assert!(!app.panel_host_state().await.0);
+        assert!(app.presented_panel(&input).await.is_err());
+        assert!(app.panel_host_state().await.0);
+        input.presentation = Some(ReadingState {
+            view_token: "view".into(),
+            content_token: "content".into(),
+            active_tab: "outline".into(),
+            scroll_top: 240.,
+            prompt_preview_index: 0,
+            prompt_scroll_top: 12.,
+        });
+        assert!(app.dock_panel(&input).await.is_err());
+        let panel = app.panel.lock().await;
+        assert!(panel.ready && panel.presented && !panel.lease.is_empty());
+        assert!(panel.prefs.detached && !panel.docking);
+    }
+
     #[test]
     fn popout_requires_macos_15_and_apple_silicon() {
         for (os, arch, major, expected) in [
@@ -561,11 +695,14 @@ mod tests {
         prefs.detached = true;
         prefs.ui.open = false;
         prefs.ui.width = 510.;
+        prefs.return_open = Some(false);
         prefs.save(&paths).unwrap();
         let app = App::new(paths, crate::config::Config::default(), None, true);
         let before = app.appearance().await;
         assert!(before.ui.open);
         assert_eq!(before.ui.width, 510.);
+        assert_eq!(before.return_open, Some(false));
+        assert_eq!(app.panel_host_state().await.1["open"], false);
         app.observe_panel_ui(before.revision, json!(Ui::default()))
             .await
             .unwrap();
@@ -577,6 +714,8 @@ mod tests {
             .unwrap();
         assert!(changed.ui.open);
         assert_eq!(changed.ui.liquid_variant, "clear");
+        assert_eq!(changed.return_open, Some(false));
+        assert_eq!(Preferences::read(&app.paths).return_open, Some(false));
     }
 
     #[test]

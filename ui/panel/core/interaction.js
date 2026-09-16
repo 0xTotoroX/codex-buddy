@@ -1,12 +1,11 @@
 /*
  * [INPUT]: 胶囊 DOM、几何、外观与指针/键盘事件。
- * [OUTPUT]: 拖拽、缩放、排序和快捷键处理；仅内嵌可收起，原生视口变化保存展开尺寸。
+ * [OUTPUT]: 表情 100ms 单击/外层双击识别和首击前形态记忆、拖拽、固定对角缩放、排序和快捷键处理；仅内嵌可收起，原生视口变化保存展开尺寸。
  * [POS]: 外壳交互层；效果在 effects，原生手势经 popout/transport 转发。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import {
-  CHIP_HEIGHT,
   HEIGHT_KEY,
   IS_POPOUT,
   PANEL_HEIGHT,
@@ -32,7 +31,14 @@ import {
 import { bumpFontSize, clampPanelHeight, clampPanelWidth } from './panel-appearance.js';
 import { emitSignal } from '../runtime/signals.js';
 import { nativePanelDrag, panelPreferences } from '../popout/transport.js';
-import { outlineEnabled, persistViewOrder, shellState, storage } from '../runtime/state.js';
+import {
+  isCurrentRuntime,
+  runtimeState,
+  outlineEnabled,
+  persistViewOrder,
+  shellState,
+  storage,
+} from '../runtime/state.js';
 import { refreshOutline } from '../outline.js';
 import { resetEyePointer, syncEyeTracking } from './effects.js';
 import { syncViewTabSelection } from './shell.js';
@@ -43,7 +49,7 @@ function onResize() {
     if (shellState.open && !shellState.nativeSizeChanging) {
       shellState.width = clampPanelWidth(window.innerWidth - 24);
       shellState.height = clampPanelHeight(window.innerHeight - 24);
-      if (shellState.popover?.dataset.resizing !== 'true') {
+      if (shellState.popover?.dataset.resizing !== 'true' && !POPOUT.motionActive?.()) {
         storage.set(WIDTH_KEY, String(shellState.width));
         storage.set(HEIGHT_KEY, String(shellState.height));
         POPOUT.save(panelPreferences());
@@ -124,6 +130,7 @@ function beginDrag(event, source) {
     if (!drag.moved && Math.hypot(dx, dy) < 3) return;
     if (!drag.moved) {
       drag.moved = true;
+      cancelFaceClick();
       handle?.setAttribute?.('data-dragging', 'true');
       try {
         handle?.setPointerCapture?.(drag.pointerId);
@@ -152,6 +159,7 @@ function beginDrag(event, source) {
   const onPointerEnd = (endEvent) => {
     if (shellState.drag !== drag || endEvent.pointerId !== drag.pointerId) return;
     cleanup();
+    if (endEvent.type === 'pointercancel') cancelFaceClick();
     if (!drag.moved) {
       shellState.drag = null;
       return;
@@ -288,11 +296,11 @@ function installViewTabReorder() {
   shellState.viewReorderCleanup = () => finish(false);
 }
 
-function resizePositionFromFace(nextHeight, resize) {
-  const panelTop = resize.faceCenterY - resize.faceOffsetY;
+function resizePositionFromCorner(width, height, resize) {
+  const left = resize.corner === 'bl' ? resize.right - width : resize.left;
   return {
-    x: resize.faceCenterX - resize.chipWidth / 2,
-    y: resize.lockedOpensDown ? panelTop : panelTop + nextHeight - resize.chipHeight,
+    x: left + (width - resize.chipWidth) / 2,
+    y: resize.lockedOpensDown ? resize.top : resize.top + height - resize.chipHeight,
   };
 }
 
@@ -323,21 +331,16 @@ function installResize() {
       const startHeight = shellState.layout.height;
       const startX = event.clientX;
       const startY = event.clientY;
-      const faceRect = shellState.panel?.querySelector('.csw-head-face')?.getBoundingClientRect();
-      const faceCenterX = faceRect
-        ? faceRect.left + faceRect.width / 2
-        : startRect.left + startRect.width / 2;
-      const faceCenterY = faceRect
-        ? faceRect.top + faceRect.height / 2
-        : startRect.top + CHIP_HEIGHT / 2;
+      cancelFaceClick();
       const resize = {
         pointerId: event.pointerId,
         corner,
         chipHeight: shellState.layout.chip.height,
         chipWidth: shellState.layout.chip.width,
-        faceCenterX,
-        faceCenterY,
-        faceOffsetY: faceCenterY - startRect.top,
+        left: startRect.left,
+        right: startRect.right,
+        top: startRect.top,
+        bounds: shellState.layout.bounds,
         lockedOpensDown: shellState.layout.opensDown,
       };
       shellState.resizeDrag = resize;
@@ -348,13 +351,21 @@ function installResize() {
         moveEvent.preventDefault();
         const dx = moveEvent.clientX - startX;
         const dy = moveEvent.clientY - startY;
-        const nextWidth = clampPanelWidth(
-          corner === 'bl' ? startWidth - dx * 2 : startWidth + dx * 2,
+        const availableWidth =
+          corner === 'bl' ? resize.right - resize.bounds.left : resize.bounds.right - resize.left;
+        const nextWidth = Math.min(
+          availableWidth,
+          clampPanelWidth(corner === 'bl' ? startWidth - dx : startWidth + dx),
         );
-        const nextHeight = clampPanelHeight(startHeight + dy);
+        const nextHeight = Math.min(
+          resize.bounds.bottom - resize.top,
+          clampPanelHeight(startHeight + dy),
+        );
         shellState.width = nextWidth;
         shellState.height = nextHeight;
-        shellState.position = clampPosition(resizePositionFromFace(nextHeight, resize));
+        shellState.position = clampPosition(
+          resizePositionFromCorner(nextWidth, nextHeight, resize),
+        );
         applyPosition();
       };
 
@@ -370,10 +381,16 @@ function installResize() {
 
       const finishResize = () => {
         cleanup();
-        if (shellState.resizeDrag === resize) shellState.resizeDrag = null;
+        if (shellState.resizeDrag === resize) {
+          // 调整尺寸后以当前面板顶边作为收放锚点，避免向上展开的面板在松手时翻转。
+          const layout = shellLayout();
+          shellState.resizeDrag = null;
+          shellState.position = clampPosition({ x: shellState.position.x, y: layout.top });
+        }
         shellState.popover?.removeAttribute('data-resizing');
         storage.set(WIDTH_KEY, String(shellState.width));
         storage.set(HEIGHT_KEY, String(shellState.height));
+        persistPosition();
         applyPosition();
         try {
           handle.releasePointerCapture(resize.pointerId);
@@ -419,27 +436,97 @@ function installResize() {
   });
 }
 
-function onFabClick(event) {
-  if (shellState.suppressFabClick || shellState.drag?.moved) {
-    shellState.suppressFabClick = false;
+// 鼠标单击等待 100ms；更慢的第二击仍可跨越形变中的表情/玻璃命中层。
+function cancelFaceClick() {
+  window.clearTimeout(shellState.faceClickTimer);
+  shellState.faceClickTimer = 0;
+  shellState.lastFaceClick = null;
+  window.removeEventListener('blur', cancelFaceClick);
+}
+
+function consumeFaceDoubleClick(event) {
+  if (shellState.suppressFabClick || shellState.suppressHeadFaceClick || shellState.drag?.moved) {
+    cancelFaceClick();
+    return false;
+  }
+  const previous = shellState.lastFaceClick;
+  const canSwitchWindow = IS_POPOUT || runtimeState.settings?.popoutSupported === true;
+  const matched =
+    event.detail !== 0 &&
+    previous &&
+    performance.now() - previous.time <= 500 &&
+    Math.hypot(event.clientX - previous.x, event.clientY - previous.y) <= 6;
+  cancelFaceClick();
+  if (!matched || !canSwitchWindow) return false;
+  if (!IS_POPOUT) settleMorph(previous.open ? 1 : 0);
+  emitSignal('windowToggle', undefined);
+  return true;
+}
+
+function onFaceClick(event, source) {
+  const suppressed = source === 'fab' ? 'suppressFabClick' : 'suppressHeadFaceClick';
+  if (shellState[suppressed] || shellState.drag?.moved) {
+    cancelFaceClick();
     event.preventDefault();
     event.stopPropagation();
     return;
   }
-  setOpen(!shellState.open, shellState.open ? 'chip' : event.detail === 0 ? 'panel' : '');
+  if (consumeFaceDoubleClick(event)) return;
+  if (event.detail > 2) return;
+  if (event.detail !== 0) {
+    shellState.lastFaceClick = {
+      time: performance.now(),
+      x: event.clientX,
+      y: event.clientY,
+      open: shellState.open,
+    };
+    window.addEventListener('blur', cancelFaceClick, { once: true });
+  }
+  const expanded = source === 'fab' ? !shellState.open : false;
+  const singleClick = () => {
+    shellState.faceClickTimer = 0;
+    if (!IS_POPOUT && isCurrentRuntime() && !shellState.detached && !shellState.detachPending) {
+      setOpen(expanded, expanded ? (event.detail === 0 ? 'panel' : '') : 'chip');
+    }
+  };
+  if (event.detail === 0 || runtimeState.settings?.popoutSupported !== true) singleClick();
+  else if (!IS_POPOUT) shellState.faceClickTimer = window.setTimeout(singleClick, 100);
+}
+
+function onFaceSecondPress(event) {
+  const previous = shellState.lastFaceClick;
+  if (
+    event.button !== 0 ||
+    !previous ||
+    performance.now() - previous.time > 500 ||
+    Math.hypot(event.clientX - previous.x, event.clientY - previous.y) > 6
+  )
+    return;
+  // 第二击已按下时，不让单击计时器在按下与松开之间改变命中区域。
+  window.clearTimeout(shellState.faceClickTimer);
+  shellState.faceClickTimer = 0;
+}
+
+function onFaceDoubleClick(event) {
+  if (!consumeFaceDoubleClick(event)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+}
+
+function onFabClick(event) {
+  onFaceClick(event, 'fab');
 }
 
 function onHeadFaceClick(event) {
-  if (shellState.suppressHeadFaceClick || shellState.drag?.moved) {
-    shellState.suppressHeadFaceClick = false;
+  onFaceClick(event, 'head');
+}
+
+function onGlassClick(event) {
+  if (consumeFaceDoubleClick(event)) {
     event.preventDefault();
     event.stopPropagation();
     return;
   }
-  setOpen(false, 'chip');
-}
-
-function onGlassClick(event) {
   if (shellState.popover?.dataset.morphing !== 'true') return;
   event.preventDefault();
   event.stopPropagation();
@@ -448,6 +535,7 @@ function onGlassClick(event) {
 }
 
 function onKeyDown(event) {
+  if (event.key === 'Escape') cancelFaceClick();
   if (event.key === 'Escape' && shellState.open && !IS_POPOUT) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -478,10 +566,13 @@ function onKeyDown(event) {
 }
 
 export {
+  cancelFaceClick,
   installPanelDrag,
   installResize,
   installViewTabReorder,
   onFabClick,
+  onFaceDoubleClick,
+  onFaceSecondPress,
   onFabPointerDown,
   onGlassClick,
   onHeadFaceClick,
