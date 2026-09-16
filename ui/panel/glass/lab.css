@@ -1,0 +1,43 @@
+/*
+ * [INPUT]: SVG 生效状态、Regular/Clear 偏好、宿主明暗与共享指针高光变量。
+ * [OUTPUT]: B 版 Regular/Clear 的染色、反光与深度。
+ * [POS]: 正式与开发构建共用的内嵌液态样式；不覆盖磨砂和弹出 AppKit。
+ * [PROTOCOL]: 变更时核对 AGENTS.md。
+ */
+[data-companion-stepwise-root='true'][data-glass-backend='svg'] .csw-glass {
+  clip-path: inset(0 round var(--buddy-liquid-radius, 26px));
+  background: #ffffff47;
+  box-shadow: inset 0 0 20px -5px #ffffff80;
+}
+[data-companion-stepwise-root='true'][data-glass-backend='svg'][data-theme='dark'] .csw-glass {
+  background: #1212123d;
+}
+[data-companion-stepwise-root='true'][data-glass-backend='svg'] .csw-rim {
+  box-shadow:
+    0 4px 16px #0000001f,
+    inset 0 1px 0 #ffffff66,
+    inset 0 -1px 0 #ffffff0f,
+    inset 0 0 0 1px #ffffff21;
+}
+[data-companion-stepwise-root='true'][data-glass-backend='svg'] .csw-glass::before {
+  display: block;
+  background: radial-gradient(
+    circle 160px at var(--csw-glass-x, 50%) var(--csw-glass-y, 50%),
+    #ffffff38,
+    transparent 70%
+  );
+  opacity: var(--csw-glass-strength, 0);
+}
+.csw-glass > svg[data-csw-optics] {
+  position: absolute;
+  pointer-events: none;
+}
+
+[data-companion-stepwise-root='true'][data-glass-backend='svg'][data-liquid-variant='clear']
+  .csw-glass {
+  background: #ffffff0f;
+}
+[data-companion-stepwise-root='true'][data-glass-backend='svg'][data-liquid-variant='clear'][data-theme='dark']
+  .csw-glass {
+  background: #1212120f;
+}

@@ -1,0 +1,81 @@
+# CodexBuddy
+
+Map: required
+
+Map 系统用项目地图、模块地图和文件契约说明职责与依赖；不是产品功能或运行依赖。当前维护入口为 Map skill，仅在结构或接口变化时同步受影响地图；历史 GEB 名称只作来源记录。
+
+独立的 Rust + TypeScript 桌面浮窗与网页配置工具。维护资料统一放在维护者的 Obsidian 项目目录；本机通过 `git config --local buddy.docsPath` 定位，构建、测试和分发不读取该目录。
+
+- 材质统一为哑光、磨砂、液态（内部标识保留 native-glass）。内嵌哑光/磨砂使用 CSS；哑光共用样式，磨砂用中性染色与均匀模糊近似弹出 HUDWindow。正式与开发构建的内嵌液态共用自有 SVG 边缘折射，无页面采集或额外渲染依赖；采用 B 版凸面透镜，Regular/Clear 共用几何与动效，通过独立星星切换共享 liquidVariant；A/B 对比入口已移除。弹出哑光关闭原生背景，磨砂使用 NSVisualEffectView HUDWindow + BehindWindow + Active，保持激活外观；液态使用 NSGlassEffectView，始终展开，由 liquidVariant 选择 Regular / Clear（默认 Regular），由 AppKit 跟随系统 Liquid Glass 偏好及焦点，不提供独立通透度条或 glassStyle。网页表面用阴影与反光定位；内嵌液态两变体共用阴影和内侧反光；原生液态自身光学边缘由 AppKit 绘制，不叠加网页定位层；原生磨砂仅保留一层圆角浅阴影，范围限于窗口透明留白。保留圆角外溢裁切。macOS 26 以下仅弹出液态回退哑光，传统磨砂与内嵌 SVG 液态仍可用。保留已有材质偏好与历史迁移。
+- 胶囊继续使用原生 CSS，styles/ 按变量、布局、内容、控件、材质、动画分层；native.css 只处理原生覆盖。Web 设置页使用 Tailwind CSS v4 与本地 shadcn/ui 基础组件；工具类及 Preflight 仅进入设置页构建。ui/tokens.css 共享语义色和通用尺寸，两种界面不共享 reset。
+- `npm run dev` 只连接已开启调试端口的真实 Codex，默认内嵌；开发配置在 target/dev/real，首次复制日常模型配置并采用手动生成，不写回日常配置。占用同一窗口的安装版连接会暂停，退出后恢复；不重启或另开 ChatGPT。CSS 原位更新，胶囊逻辑清理后重新加载，Rust 编译成功后重启开发后台；release 忽略开发资源环境变量。示例宿主和模拟数据仅用于 tests 下的自动测试。
+- 应用最低目标为 macOS 14.0+ Apple Silicon；桌面弹出功能由后台单独检测 macOS 15.0+ Apple Silicon。不满足弹出条件时禁用界面入口、拒绝弹出请求及窗口子进程启动，并跳过旧弹出偏好的自动恢复，内嵌面板仍可使用。Windows 暂不适配，其他平台不宣称已支持。最低版本与实测版本分开记录。
+- 源码构建最低 Rust 1.88、Node.js 22.16；分别由 Cargo `rust-version` 和 npm `engines.node` 声明，CI 覆盖最低组合。release 的构建辅助库不 strip，避免 macOS 加载失败；最终程序仍 strip。
+- 自有源码采用 MIT；第三方依赖保留各自的版权与许可原文。维护者在私人资料中保留来源审计记录。
+- 应用独立构建与运行，通过本机协议连接宿主，不修改官方应用包。macOS 本地安装生成 CodexBuddy.app 作为双击入口，调用已安装 CLI 连接和弹出；已有普通宿主无可用连接时提示退出后再开，不自动结束任务或创建隔离实例。
+- 产品名称为 CodexBuddy，源码目录、Cargo/npm 包、CLI 和分发前缀为 `codex-buddy`。默认数据目录为 `codex-buddy`，环境变量使用 `CODEX_BUDDY_*`；安装器迁移旧默认目录并保留配置，内部页面存储键暂保持兼容。启动器默认安装到 `/Applications/CodexBuddy.app`。
+- `src/` 为 Rust 应用源码，包含后台、CLI 与系统窗口；网页相关源码统一在 `ui/`：`panel/` 为内嵌与弹出共用的胶囊，`bridge/` 为受限 CDP binding，`settings/` 为 React 设置页。`scripts/` 保存开发、构建与分发工具，`tests/` 集中保存独立测试、测试辅助和合成数据；Rust 单元测试保留在源码旁。`ui/icon.png` 是用户选定的产品图标源图。开发计划、验收报告、设计过程图片、讨论及审计材料不在公开仓库维护。
+- 结构命名按职责区分：settings/ 是完整设置网页，settings-view 是胶囊内设置视图，settings-sync 是设置同步；panel-appearance 计算胶囊外观，host-appearance 适配宿主，install-styles 安装 CSS。requests 在前端桥与 Rust 分发端分别使用；标准 main/index/state 名称由目录界定。已有协议、存储键和环境变量不随文件重命名。
+- 构建中间产物与测试报告统一在 `target/`（网页为 `target/web/`，报告为 `target/reports/`），分发包和许可汇总在 `dist/`；npm 依赖使用标准 `node_modules/`。临时实验使用系统临时目录，需要保留的历史材料按全局归档规则移出项目，不再创建 `output/`、`outputs/` 或 `work/`。
+- 弹出强调色随宿主投影同步，和内嵌共用 Codex 的实际主题色；明暗跟随 macOS，标题栏按钮经 System Events 公共脚本接口切换系统明暗，失败明确提示；不再执行宿主 theme 命令或采用投影明暗。内嵌仍控制 Codex。弹出所有展开视图共用可调整尺寸，原生窗口变化同步 WebView，再保存宽高；设置页也允许左右下角缩放。
+- 弹出窗口只接收建议、大纲和状态投影；宿主保留任务识别与写入校验。就绪后才隐藏内嵌胶囊，窗口退出恢复宿主；弹出只保留展开态，点击眼睛、Esc 和旧收起偏好均不能折叠，仍支持拖动和调整尺寸；`panel.json` 只保存窗口与外观偏好。
+- `configurationRevision` 处理并发设置保存；`generationRevision` 仅在有效生成输入变化时递增。大纲开关不使建议或生成中请求失效。窗口的上下文、建议和大纲分别校验身份。
+- 写入宿主前重新核对目标及上下文；默认仅填入，已有草稿经用户确认追加；发送只响应用户明确选择的发送操作。
+- 只在本机监听。日志、截图和测试产物不得包含真实聊天全文或凭据。
+- 变更行为后运行有关测试；`npm run verify` 统一执行格式、类型/边界、Rust、端到端与生命周期检查，自动准备构建产物；原生窗口验收单独选择。
+- Web 设置覆盖胶囊全部可配置项，panel 保留现有入口；外观偏好逐项保存并双向同步；开发内嵌和弹出在“外观”选项框内的液态旁独立星星切换 Clear，点亮为 Clear；Web 设置同步该偏好，安装版内嵌回退时隐藏星星。Web 保留现有布局、图标和视觉样式；用留白代替重复说明，只保留影响操作判断的小字提示。
+- 文档默认中文；代码标识符英文。结构变更同步公开 README、模块地图及 Obsidian 内的相关维护记录；不建立插件框架或额外桌面管理器。
+- 长期项目决策先查本地 `buddy.docsPath` 所指资料目录的 `AGENTS.md` 与关联笔记；其中只记录稳定约定和导航，详细讨论、验收及审查分别成文。可复用操作步骤进入已有 Runbook；私人资料不参与构建或分发。
+
+## 版本与发布约定
+
+- 版本统一使用 `X.Y.Z`，当前为 `0.3.0（早期开发阶段）`。`0.x.x` 表示尚在早期开发，不代表完成比例。
+- 早期阶段的项目约定：兼容修复递增修订号（如 `0.3.1`），新增功能或较大调整递增次版本号（如 `0.4.0`）；测试预发布使用 `-beta.1` 等后缀。示例不代表排期，破坏性调整仍需说明影响和迁移方法。
+- 核心功能与兼容边界稳定后再进入 `1.0.0`；此后遵循[语义化版本](https://semver.org/lang/zh-CN/)的主版本、次版本、修订号规则。
+- 升版时同步 Cargo/npm 包版本与锁文件中的本项目版本；公开发布时，`vX.Y.Z` 标签、发布说明和产物版本必须对应。已发布版本不替换内容，修正通过新版本发布。
+- DMG 安装包和 Homebrew 一键安装延后实现；当前继续源码安装，不把现有轻量启动器描述为可独立分发的完整安装包。
+
+## 架构地图（L1）
+
+开发材质对照：`npm run dev:materials` 打开独立 AppKit 窗口，同步比较 14 种传统原生材质的背景、明暗及焦点效果；仅用于选材，不替代真实 Codex 调试，不扩展产品三材质菜单。Swift 工具不连接宿主、不修改系统外观或产品偏好，构建产物位于 `target/material-preview/`。
+
+对照工具通过 `npm run dev:materials -- --package` 在 `dist/material-preview/` 生成自带可执行程序、许可和使用说明的独立 App，并在 dist 输出 ZIP；ZIP 的 source/ 附带 Swift、原构建脚本、独立 package.json、README 与 MIT 许可，可脱离主仓库重建。运行该 App 无需开发依赖，不与 CodexBuddy 产品启动器混淆。
+
+Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + Tailwind CSS v4/shadcn/ui 设置页。
+
+- [src/AGENTS.md](src/AGENTS.md)：命令、后台、CDP、模型和系统窗口；macOS 手势内联于 `src/panel_window.rs`。
+- [ui/bridge/AGENTS.md](ui/bridge/AGENTS.md)：受限 CDP binding 与请求生命周期。
+- [ui/panel/AGENTS.md](ui/panel/AGENTS.md)：共享胶囊；core 外壳、host 宿主适配、runtime 协调、stepwise.js 建议、outline.js 大纲、popout 窗口页面；静态依赖无环。
+- `components.json`：shadcn/ui 的设置页路径与组件别名配置。
+- [ui/settings/AGENTS.md](ui/settings/AGENTS.md)：React 配置页、基础组件与 Vite 入口，构建输出到 `target/web/`。
+- `ui/contracts.ts`：设置、字体、上下文与投影命令的共享类型；保存版本和生成版本各司其职。
+- `ui/tokens.css`：设置页与胶囊共享的颜色、间距、圆角和控件尺寸变量。
+- `ui/icon.png`：启动器图标唯一源图；安装时由系统工具生成多尺寸 ICNS，不修改原始构图。
+- [scripts/AGENTS.md](scripts/AGENTS.md)：开发、构建、来源/许可、安装、打包与统一验证编排。
+- [tests/AGENTS.md](tests/AGENTS.md)：Node 契约测试、端到端/生命周期/原生验收，以及测试辅助和合成宿主 fixture。
+
+根文件与配置：
+
+- `AGENTS.md`：项目约定和 L1 地图的唯一正文。
+- `README.md`：只说明功能、安装使用、更新卸载、二次开发入口及必要的隐私/兼容限制；材质实现、内部机制、详细验收和维护过程留在 Obsidian。全量文档同步不扩大公开 README。
+- `build.rs`：拒绝非 macOS arm64 构建目标，调用 `scripts/build-panel.mjs` 解析胶囊模块并生成 Rust 内嵌脚本。
+- `Cargo.toml`：Rust 包、最低编译器版本、MIT 元数据、按平台依赖及 release 配置。
+- `Cargo.lock`：固定 Rust 依赖解析结果。
+- `package.json`：最低 Node 版本、网页依赖和开发命令。
+- `package-lock.json`：固定 npm 依赖解析结果。
+- `tsconfig.json`：网页、共享类型与 Vite 配置的 TypeScript 检查范围。
+- `.prettierrc.json`：JS/TS/CSS 与验收脚本的统一格式配置。
+- `.cargo/config.toml`：macOS 14.0 最低部署目标。
+- `.github/workflows/ci.yml`：分开验证 macOS 14 最低工具链与内嵌路径、macOS 15 桌面浮窗门槛、macOS 26 原生液态编译路径；CI 不生成重复发布包。
+- `.github/workflows/release.yml`：仅由版本标签或指定标签的手动重跑触发；完整验证后在 macOS 26 构建唯一一套向下部署到 macOS 14 的归档，并创建或覆盖同标签 Release 的三个资产。
+- `.github/release-notes/v*.md`：对应标签的公开发行说明；CD 要求版本、标签和说明文件一致。
+- `.gitignore`：隔离构建产物、测试证据和私有运行数据。
+- `LICENSE`：自有源码 MIT 许可。
+
+分发生成物不提交 Git：`npm run notices` 在 `dist/licenses/` 生成第三方许可与依赖清单；`npm run package` 自动在分发目录生成，并重新导出通过公开检查的当前源码归档及 SHA-256 校验文件；不复用旧源码包。源码检查和打包支持 Git 工作树与不含 .git 的源码解压目录，共用公开文件清单。递归收集依赖包内许可与署名，保留相对路径并合入固定来源补充；缺少元数据、许可文档或文档为空时停止。清单包含其他平台和开发依赖，不证明最终链接范围或源码内许可已穷尽。
+
+## Map 系统：架构同步约定
+
+修改前从根到目标目录读取适用的 AGENTS.md；不假设客户端自动加载所有子目录。结构、职责或接口变化时，依次同步源码 L3 的 INPUT/OUTPUT/POS/PROTOCOL、所属模块 L2、受影响的 L1。JSON、锁文件、生成物和第三方许可原文不添加源码头部。当前不需要另建 CLAUDE.md。
+
+[PROTOCOL]: 变更时核对受影响模块地图、真实成员与依赖方向；文档一致后完成，不扩大到无关项目。

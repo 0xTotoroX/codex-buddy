@@ -1,0 +1,71 @@
+/*
+ * [INPUT]: 系统深浅偏好；胶囊的 data-theme 可显式覆盖。
+ * [OUTPUT]: 设置页和胶囊共用的语义颜色、间距、圆角与控件尺寸。
+ * [POS]: 仅声明命名空间变量，不重置宿主元素；两条构建入口共同加载。
+ * [PROTOCOL]: 变更时更新此头部，然后检查项目 AGENTS.md。
+ */
+:root,
+[data-companion-stepwise-root='true'] {
+  --buddy-space-1: 4px;
+  --buddy-space-2: 8px;
+  --buddy-space-3: 12px;
+  --buddy-space-4: 16px;
+  --buddy-space-5: 20px;
+  --buddy-radius-control: 12px;
+  --buddy-radius-small: 8px;
+  --buddy-radius-pill: 999px;
+  --buddy-control-height: 32px;
+  --buddy-font-ui: 12px;
+  --buddy-icon-size: 16px;
+}
+:root,
+[data-companion-stepwise-root='true'][data-theme='light'] {
+  --buddy-page: #f6f6f8;
+  --buddy-surface: #fff;
+  --buddy-text: #25252a;
+  --buddy-muted: #81818b;
+  --buddy-border: #e8e8ed;
+  --buddy-input: #fafafb;
+  --buddy-accent: #33333b;
+  --buddy-focus: #77778c;
+  --buddy-subtle: #f1f1f5;
+  --buddy-elevated: #fafafa;
+  --buddy-panel-text: #202020;
+  --buddy-panel-muted: #6f6f6f;
+  --buddy-action: #4d8dff;
+  --buddy-danger: #dc5d67;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --buddy-page: #171719;
+    --buddy-surface: #202023;
+    --buddy-text: #e2e2e7;
+    --buddy-muted: #90909b;
+    --buddy-border: #323237;
+    --buddy-input: #242427;
+    --buddy-accent: #737384;
+    --buddy-focus: #a2a2bb;
+    --buddy-subtle: #2b2b31;
+    --buddy-elevated: #2b2b2b;
+    --buddy-panel-text: #f3f3f3;
+    --buddy-panel-muted: #aaaaaa;
+    --buddy-action: #4d8dff;
+    --buddy-danger: #ff7f89;
+  }
+}
+[data-companion-stepwise-root='true'][data-theme='dark'] {
+  --buddy-page: #171719;
+  --buddy-surface: #202023;
+  --buddy-text: #e2e2e7;
+  --buddy-muted: #90909b;
+  --buddy-border: #323237;
+  --buddy-input: #242427;
+  --buddy-accent: #737384;
+  --buddy-focus: #a2a2bb;
+  --buddy-subtle: #2b2b31;
+  --buddy-elevated: #2b2b2b;
+  --buddy-panel-text: #f3f3f3;
+  --buddy-panel-muted: #aaaaaa;
+  --buddy-action: #4d8dff;
+  --buddy-danger: #ff7f89;
+}

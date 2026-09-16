@@ -1,0 +1,68 @@
+/*
+ * [INPUT]: 实际生效材质与原生背景能力。
+ * [OUTPUT]: 原生磨砂/液态共用的透明内容表面及确认弹窗；胶囊复用公共布局。
+ * [POS]: 原生覆盖，不实现玻璃折射，按顺序放在共享样式之后。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
+ */
+html[data-native-backdrop='true'] .csw-material-layer,
+html[data-native-backdrop='true'] .csw-material-layer *,
+html[data-native-backdrop='true'] .csw-material-layer *::before,
+html[data-native-backdrop='true'] .csw-material-layer *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-native-backdrop='true']
+  [data-companion-stepwise-root]
+  .csw-popover:is(
+    [data-effective-material='native-glass'],
+    [data-effective-material='native-frosted']
+  )
+  .csw-glass {
+  background: transparent;
+  box-shadow: none;
+}
+.csw-popout-confirm {
+  max-width: 280px;
+  border: 1px solid #ffffff25;
+  border-radius: 18px;
+  padding: 20px;
+  background: #252b35;
+  color: #f4f5f7;
+  font:
+    13px/1.6 -apple-system,
+    system-ui,
+    sans-serif;
+  box-shadow: 0 8px 40px #0005;
+}
+.csw-popout-confirm::backdrop {
+  background: #0005;
+}
+.csw-popout-confirm p {
+  margin: 0 0 18px;
+}
+.csw-popout-confirm div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.csw-popout-confirm button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #ffffff15;
+  color: inherit;
+  cursor: pointer;
+}
+.csw-popout-confirm button[data-append] {
+  background: #617ae7;
+}
+
+html[data-presentation='popout'] .csw-resize-handle {
+  bottom: 8px;
+}
+html[data-presentation='popout'] .csw-resize-handle[data-corner='bl'] {
+  left: 8px;
+}
+html[data-presentation='popout'] .csw-resize-handle[data-corner='br'] {
+  right: 8px;
+}

@@ -1,0 +1,348 @@
+// [INPUT]: App、有效模型配置与私有配置/密钥文件。
+// [OUTPUT]: 设置读取/保存、只读弹出能力、并发保存版本与独立生成版本。
+// [POS]: 设置事务边界；无关大纲开关不取消生成。
+// [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
+
+use crate::{model::Model, state::App};
+use anyhow::{Result, bail};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Options {
+    pub enabled: bool,
+    pub answer_outline_enabled: bool,
+    pub generation_mode: String,
+    pub protocol: String,
+    pub api_key_env: String,
+    pub max_items: usize,
+    pub max_input_chars: usize,
+    pub max_output_tokens: usize,
+    pub timeout_ms: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::{Config, Paths};
+
+    #[tokio::test]
+    async fn outline_and_noop_saves_do_not_cancel_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = App::new(
+            Paths::new(Some(dir.path().into())).unwrap(),
+            Config::default(),
+            None,
+            false,
+        );
+        let initial = app.settings().await;
+        let outline = app
+            .save_settings(Update {
+                answer_outline_enabled: Some(false),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_ne!(
+            outline["configurationRevision"],
+            initial["configurationRevision"]
+        );
+        assert_eq!(outline["generationRevision"], initial["generationRevision"]);
+        let noop = app.save_settings(Update::default()).await.unwrap();
+        assert_eq!(noop["generationRevision"], initial["generationRevision"]);
+        let generation = app
+            .save_settings(Update {
+                max_items: Some(3),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_ne!(
+            generation["generationRevision"],
+            initial["generationRevision"]
+        );
+        assert_eq!(generation["answerOutlineEnabled"], false);
+        let disabled = app
+            .save_settings(Update {
+                enabled: Some(false),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_ne!(
+            disabled["generationRevision"],
+            generation["generationRevision"]
+        );
+        assert_eq!(disabled["answerOutlineEnabled"], false);
+    }
+
+    #[tokio::test]
+    async fn preserves_keys_unrelated_fields_and_rejects_stale_updates() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let mut config = Config {
+            provider: Some("api".into()),
+            model: Some("example-model".into()),
+            cdp_endpoint: Some("http://127.0.0.1:9229".into()),
+            ..Default::default()
+        };
+        config
+            .extra
+            .insert("futureOption".into(), json!({"keep":true}));
+        let app = App::new(paths.clone(), config, None, false);
+        let saved = app
+            .save_settings(Update {
+                api_key: Some("fixture-secret".into()),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        assert_eq!(saved["storedApiKey"], true);
+        assert!(!saved.to_string().contains("fixture-secret"));
+        app.save_settings(Update {
+            api_key: Some(String::new()),
+            max_items: Some(2),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        assert_eq!(paths.load_key().unwrap().as_deref(), Some("fixture-secret"));
+        assert_eq!(paths.load().unwrap().extra["futureOption"]["keep"], true);
+        assert_eq!(
+            paths.load().unwrap().cdp_endpoint.as_deref(),
+            Some("http://127.0.0.1:9229")
+        );
+        assert!(
+            app.save_settings(Update {
+                expected_revision: Some(1),
+                model: Some("stale".into()),
+                ..Default::default()
+            })
+            .await
+            .is_err()
+        );
+        assert!(
+            app.save_settings(Update {
+                max_items: Some(99),
+                api_key: Some("must-not-save".into()),
+                ..Default::default()
+            })
+            .await
+            .is_err()
+        );
+        assert_eq!(paths.load_key().unwrap().as_deref(), Some("fixture-secret"));
+        assert_eq!(
+            paths.load().unwrap().model.as_deref(),
+            Some("example-model")
+        );
+        app.save_settings(Update {
+            clear_api_key: true,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        assert!(paths.load_key().unwrap().is_none());
+    }
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            answer_outline_enabled: true,
+            generation_mode: "manual".into(),
+            protocol: "responses".into(),
+            api_key_env: "CODEX_BUDDY_API_KEY".into(),
+            max_items: 4,
+            max_input_chars: 12000,
+            max_output_tokens: 2000,
+            timeout_ms: 120000,
+        }
+    }
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct Update {
+    pub expected_revision: Option<u64>,
+    pub enabled: Option<bool>,
+    pub answer_outline_enabled: Option<bool>,
+    pub generation_mode: Option<String>,
+    pub provider: Option<String>,
+    pub model: Option<String>,
+    pub base_url: Option<String>,
+    pub protocol: Option<String>,
+    pub api_key: Option<String>,
+    pub clear_api_key: bool,
+    pub api_key_env: Option<String>,
+    pub max_items: Option<usize>,
+    pub max_input_chars: Option<usize>,
+    pub max_output_tokens: Option<usize>,
+    pub timeout_ms: Option<u64>,
+}
+
+impl App {
+    pub async fn settings(&self) -> Value {
+        let config = self.config.lock().await;
+        let model = self.model.read().await;
+        let info = model.info();
+        let mut value = serde_json::to_value(&config.stepwise).expect("settings serialize");
+        let fields = value.as_object_mut().expect("settings object");
+        fields.extend(json!({
+            "popoutSupported": self.panel.lock().await.popout_supported,
+            "provider": model.provider, "model": model.name,
+            "baseUrl": model.base_url, "available": info.available, "reason": info.reason,
+            "apiKeyConfigured": model.has_key() || model.provider == "codex" && info.available,
+            "storedApiKey": self.paths.load_key().ok().flatten().is_some(),
+            "baseUrlConfigured": model.provider == "codex" || !model.base_url.is_empty(),
+            "configurationRevision": self.settings_revision.load(std::sync::atomic::Ordering::SeqCst),
+            "generationRevision": self.generation_revision.load(std::sync::atomic::Ordering::SeqCst),
+            "environmentOverrides": model.environment_overrides(),
+        }).as_object().unwrap().clone());
+        value
+    }
+
+    pub async fn save_settings(&self, patch: Update) -> Result<Value> {
+        let _guard = self.transition.lock().await;
+        let mut config = self.config.lock().await;
+        if patch.expected_revision.is_some_and(|revision| {
+            revision
+                != self
+                    .settings_revision
+                    .load(std::sync::atomic::Ordering::SeqCst)
+        }) {
+            bail!("设置已在其他窗口更新，请重新载入后再保存");
+        }
+        let mut next = config.clone();
+        if let Some(value) = patch.provider {
+            if !["codex", "api"].contains(&value.as_str()) {
+                bail!("不支持的模型来源");
+            }
+            next.provider = Some(value);
+        }
+        if let Some(value) = patch.model {
+            next.model = Some(value.trim().to_owned());
+        }
+        if let Some(value) = patch.base_url {
+            let value = value.trim();
+            if !value.is_empty() {
+                crate::model::api_base(value)?;
+            }
+            next.base_url = Some(value.trim_end_matches('/').to_owned());
+        }
+        let options = &mut next.stepwise;
+        if let Some(value) = patch.enabled {
+            options.enabled = value;
+        }
+        if let Some(value) = patch.answer_outline_enabled {
+            options.answer_outline_enabled = value;
+        }
+        if let Some(value) = patch.generation_mode {
+            if !["manual", "auto"].contains(&value.as_str()) {
+                bail!("生成模式无效");
+            }
+            options.generation_mode = value;
+        }
+        if let Some(value) = patch.protocol {
+            if ![
+                "responses",
+                "chat_completions",
+                "anthropic_messages",
+                "auto",
+            ]
+            .contains(&value.as_str())
+            {
+                bail!("API 协议无效");
+            }
+            options.protocol = value;
+        }
+        if let Some(value) = patch.api_key_env {
+            let value = value.trim();
+            if !value.is_empty()
+                && (!value.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                    || value.starts_with(|c: char| c.is_ascii_digit()))
+            {
+                bail!("密钥环境变量名无效");
+            }
+            options.api_key_env = value.to_owned();
+        }
+        if let Some(value) = patch.max_items {
+            if !(1..=6).contains(&value) {
+                bail!("建议数量应为 1–6");
+            }
+            options.max_items = value;
+        }
+        if let Some(value) = patch.max_input_chars {
+            if !(500..=32000).contains(&value) {
+                bail!("输入字符上限应为 500–32000");
+            }
+            options.max_input_chars = value;
+        }
+        if let Some(value) = patch.max_output_tokens {
+            if !(128..=16000).contains(&value) {
+                bail!("输出 token 上限应为 128–16000");
+            }
+            options.max_output_tokens = value;
+        }
+        if let Some(value) = patch.timeout_ms {
+            if !(1000..=300000).contains(&value) {
+                bail!("超时应为 1–300 秒");
+            }
+            options.timeout_ms = value;
+        }
+        let old_key = self.paths.load_key()?;
+        let key = if patch.clear_api_key {
+            None
+        } else {
+            patch
+                .api_key
+                .filter(|key| !key.trim().is_empty())
+                .or(old_key.clone())
+        };
+        if key
+            .as_ref()
+            .is_some_and(|key| key.len() > 8192 || key.contains(['\r', '\n']))
+        {
+            bail!("API 密钥格式无效");
+        }
+        self.paths.save_key(key.as_deref())?;
+        if let Err(error) = self.paths.save(&next) {
+            self.paths.save_key(old_key.as_deref())?;
+            return Err(error);
+        }
+        let model = Model::load(&next).with_key(key);
+        {
+            let mut current = self.model.write().await;
+            if !current.same_generation_config(&model) {
+                self.generation_revision
+                    .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            *current = model.clone();
+        }
+        *config = next;
+        self.settings_revision
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.views.send_modify(|view| {
+            view.model = model.info();
+            view.configuration_revision = self
+                .settings_revision
+                .load(std::sync::atomic::Ordering::SeqCst);
+        });
+        drop(config);
+        let settings = self.settings().await;
+        self.sync_desktop_settings(&settings).await;
+        Ok(settings)
+    }
+
+    pub async fn test_settings(&self) -> Result<Value> {
+        let model = self.model.read().await.clone();
+        let suggestions = self.until_shutdown(model.generate("这是一条连接测试。一个本机 Codex 工具将回答大纲和下一步建议显示在桌面浮窗，用户通过浏览器配置模型。请为验收桌面显示、模型连接和草稿保护生成后续提问。")).await?;
+        Ok(json!({"ok":true,"status":"ok","items":crate::requests::items(suggestions)}))
+    }
+
+    pub async fn list_models(&self) -> Result<Value> {
+        let model = self.model.read().await.clone();
+        Ok(json!({"models":self.until_shutdown(model.list_models()).await?}))
+    }
+}

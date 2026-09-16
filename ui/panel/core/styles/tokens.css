@@ -1,0 +1,93 @@
+/*
+ * [INPUT]: 胶囊 DOM、状态属性与共享变量。
+ * [OUTPUT]: 胶囊颜色、字体与尺寸变量；优先宿主语义色，回退到共享设计变量。
+ * [POS]: 样式分层，由 install-styles 按顺序安装。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
+ */
+
+[data-companion-stepwise-root='true'] {
+  --csw-depth-shadow: 0 2px 5px #0000000d, 0 7px 20px #00000014;
+  --csw-edge-light: #ffffff80;
+  --csw-edge-shade: #00000012;
+  --csw-frost-blur: 24px;
+  --csw-frost-tint: #ededed;
+  --csw-frost-opacity: 72%;
+  --csw-surface-opaque: var(
+    --color-background-elevated-primary-opaque,
+    var(--color-token-dropdown-background, var(--main-surface-primary, var(--buddy-elevated)))
+  );
+  --csw-text: var(
+    --color-token-text-primary,
+    var(--color-token-foreground, var(--text-primary, var(--buddy-panel-text)))
+  );
+  --csw-muted: var(
+    --color-token-text-tertiary,
+    var(--color-token-description-foreground, var(--buddy-panel-muted))
+  );
+  --csw-faint: color-mix(in srgb, var(--csw-text) 34%, transparent);
+  --csw-accent: var(--color-token-charts-blue, var(--buddy-action));
+  --csw-danger: var(--buddy-danger);
+  --csw-ready: var(--csw-accent);
+  --csw-hover: var(
+    --color-token-list-hover-background,
+    color-mix(in srgb, var(--csw-text) 6%, transparent)
+  );
+  --csw-divider: color-mix(in srgb, var(--csw-text) 9%, transparent);
+  --csw-glass-x: 28%;
+  --csw-glass-y: 22%;
+  --csw-glass-strength: 0;
+  --csw-glass-rim-width: 140%;
+  --csw-glass-rim-height: 120%;
+  --csw-glass-px: 0px;
+  --csw-glass-py: 0px;
+  --csw-glass-angle: -40deg;
+  --csw-glass-edge: rgba(108, 128, 152, 0.4);
+  --csw-glass-edge-hi: rgba(168, 190, 214, 0.7);
+  --csw-hover-core: 0.13;
+  --csw-hover-mid: 0.04;
+  --csw-hover-layer-opacity: 0.85;
+  --csw-hover-rim-gain: 10%;
+  --csw-hover-core-color: 255, 255, 255;
+  --csw-hover-mid-color: 190, 210, 230;
+  --csw-eye-x: 0px;
+  --csw-eye-y: 0px;
+  --csw-curious-eye-x: 0px;
+  --csw-curious-eye-y: 0px;
+  --csw-panel-width: var(--csw-default-panel-width);
+  --csw-panel-height: var(--csw-default-panel-height);
+  --csw-item-font: var(--csw-default-default-font);
+  --csw-chrome-font: var(--buddy-font-ui);
+  --csw-icon-font: var(--buddy-icon-size);
+}
+
+[data-companion-stepwise-root='true'][data-theme='dark'] {
+  --csw-surface-opaque: var(
+    --color-background-elevated-primary-opaque,
+    var(--color-token-dropdown-background, var(--buddy-elevated))
+  );
+  --csw-text: var(
+    --color-token-text-primary,
+    var(--color-token-foreground, var(--buddy-panel-text))
+  );
+  --csw-muted: var(
+    --color-token-text-tertiary,
+    var(--color-token-description-foreground, var(--buddy-panel-muted))
+  );
+  --csw-faint: color-mix(in srgb, var(--csw-text) 32%, transparent);
+  --csw-accent: var(--color-token-charts-blue, var(--buddy-action));
+  --csw-danger: var(--buddy-danger);
+  --csw-ready: var(--csw-accent);
+  --csw-hover: var(--color-token-list-hover-background, rgba(255, 255, 255, 0.078));
+  --csw-divider: rgba(255, 255, 255, 0.09);
+  --csw-glass-strength: 0;
+  --csw-glass-edge: rgba(132, 154, 180, 0.36);
+  --csw-glass-edge-hi: rgba(178, 200, 224, 0.62);
+}
+
+[data-companion-stepwise-root='true'][data-theme='dark'] {
+  --csw-depth-shadow: 0 2px 5px #00000024, 0 7px 20px #00000030;
+  --csw-edge-light: #ffffff28;
+  --csw-edge-shade: #00000024;
+  --csw-frost-tint: #252525;
+  --csw-frost-opacity: 72%;
+}

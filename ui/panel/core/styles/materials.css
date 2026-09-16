@@ -1,0 +1,190 @@
+/*
+ * [INPUT]: 胶囊 DOM、状态属性与共享变量。
+ * [OUTPUT]: 共用 CSS 哑光、近似 HUDWindow 的网页磨砂与原生磨砂/液态共用的透明网页表面；以实际生效材质选择规则，网页表面以柔光与浅阴影定位，不使用硬描边。
+ * [POS]: 样式分层，由 install-styles 按顺序安装。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
+ */
+
+.csw-glass {
+  -webkit-backdrop-filter: blur(18px) saturate(165%) contrast(1.04) brightness(1.04);
+  backdrop-filter: blur(18px) saturate(165%) contrast(1.04) brightness(1.04);
+  background-color: color-mix(in srgb, var(--csw-surface-opaque) 68%, transparent);
+  background-image: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.11) 0%,
+    rgba(255, 255, 255, 0.032) 48%,
+    rgba(150, 170, 195, 0.032) 100%
+  );
+  box-shadow: none;
+}
+
+.csw-rim {
+  display: block;
+  padding: 0;
+  background: transparent;
+  box-shadow:
+    var(--csw-depth-shadow),
+    inset 0 1px 2px var(--csw-edge-light),
+    inset 0 -1px 2px var(--csw-edge-shade);
+}
+
+[data-companion-stepwise-root='true'][data-theme='dark'] .csw-glass {
+  -webkit-backdrop-filter: blur(18px) saturate(165%) contrast(1.05) brightness(1.08);
+  backdrop-filter: blur(18px) saturate(165%) contrast(1.05) brightness(1.08);
+  background-color: color-mix(in srgb, var(--csw-surface-opaque) 60%, transparent);
+  background-image: linear-gradient(
+    160deg,
+    rgba(160, 185, 215, 0.055) 0%,
+    rgba(255, 255, 255, 0.012) 48%,
+    rgba(30, 45, 70, 0.045) 100%
+  );
+}
+
+.csw-popover[data-effective-material='matte'] {
+  --csw-hover-core: 0.07;
+  --csw-hover-mid: 0.022;
+  --csw-hover-layer-opacity: 0.75;
+  --csw-hover-rim-gain: 6%;
+  --csw-hover-core-color: 255, 255, 255;
+  --csw-hover-mid-color: 205, 215, 225;
+  --csw-row-surface: color-mix(in srgb, var(--csw-surface-opaque) 82%, transparent);
+  --csw-row-selected: color-mix(in srgb, var(--csw-accent) 7%, transparent);
+}
+
+.csw-popover[data-effective-material='frosted'] {
+  --csw-hover-core: 0.13;
+  --csw-hover-mid: 0.04;
+  --csw-hover-layer-opacity: 0.85;
+  --csw-hover-rim-gain: 10%;
+  --csw-hover-core-color: 255, 255, 255;
+  --csw-hover-mid-color: 190, 210, 230;
+  --csw-row-surface: color-mix(in srgb, var(--csw-surface-opaque) 28%, transparent);
+  --csw-row-selected: color-mix(in srgb, var(--csw-accent) 8.5%, transparent);
+}
+
+[data-companion-stepwise-root='true'][data-theme='dark']
+  .csw-popover[data-effective-material='frosted'] {
+  --csw-hover-core: 0.11;
+  --csw-hover-mid: 0.034;
+}
+
+.csw-popover[data-effective-material='frosted'] .csw-glass,
+[data-companion-stepwise-root='true'][data-theme='dark']
+  .csw-popover[data-effective-material='frosted']
+  .csw-glass {
+  -webkit-backdrop-filter: blur(var(--csw-frost-blur)) saturate(110%);
+  backdrop-filter: blur(var(--csw-frost-blur)) saturate(110%);
+  background: color-mix(in srgb, var(--csw-frost-tint) var(--csw-frost-opacity), transparent);
+  box-shadow: none;
+}
+.csw-popover[data-material='frosted'] .csw-glass::before {
+  display: none;
+}
+
+.csw-popover[data-effective-material='matte'] .csw-glass {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: var(--csw-surface-opaque);
+  background-image: none;
+}
+
+.csw-glass::before {
+  background: radial-gradient(
+    var(--csw-glass-rim-width, 140%) var(--csw-glass-rim-height, 120%) at var(--csw-glass-x, 28%)
+      var(--csw-glass-y, 22%),
+    rgba(
+        var(--csw-hover-core-color, 255, 255, 255),
+        calc(var(--csw-hover-core, 0.13) * var(--csw-glass-strength, 0))
+      )
+      0%,
+    rgba(
+        var(--csw-hover-mid-color, 190, 210, 230),
+        calc(var(--csw-hover-mid, 0.04) * var(--csw-glass-strength, 0))
+      )
+      22%,
+    transparent 50%
+  );
+}
+
+.csw-popover[data-open='true'][data-morphing='false'] .csw-glass {
+  box-shadow: none;
+}
+
+.csw-popover[data-effective-material='matte'] .csw-settings-surface {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #000 1.5%, transparent) 0%,
+      transparent 18%,
+      transparent 82%,
+      color-mix(in srgb, #fff 5%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--csw-surface-opaque) 98%, transparent);
+}
+
+[data-companion-stepwise-root='true'][data-theme='dark']
+  .csw-popover[data-effective-material='matte']
+  .csw-settings-surface {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, #000 8%, transparent) 0%,
+      transparent 18%,
+      transparent 82%,
+      color-mix(in srgb, #fff 3%, transparent) 100%
+    ),
+    color-mix(in srgb, var(--csw-surface-opaque) 96%, #000 2%);
+}
+
+.csw-popover[data-effective-material='matte'] .csw-prompt-preview::before {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--csw-text) 2.5%, transparent), transparent),
+    color-mix(in srgb, var(--csw-surface-opaque) 14%, transparent);
+  border-color: color-mix(in srgb, var(--csw-text) 4.5%, transparent);
+}
+
+[data-companion-stepwise-root]
+  .csw-popover:is(
+    [data-effective-material='native-glass'],
+    [data-effective-material='native-frosted']
+  )
+  .csw-glass {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+[data-companion-stepwise-root]
+  .csw-popover:is(
+    [data-effective-material='native-glass'],
+    [data-effective-material='native-frosted']
+  )
+  .csw-glass::before,
+[data-companion-stepwise-root]
+  .csw-popover:is(
+    [data-effective-material='native-glass'],
+    [data-effective-material='native-frosted']
+  )
+  .csw-rim {
+  display: none;
+  box-shadow: none;
+}
+
+/* Keep the rounded shadow inside the native window's 12px transparent gutter. */
+[data-companion-stepwise-root] .csw-popover[data-effective-material='native-frosted'] .csw-rim {
+  display: block;
+  padding: 0;
+  background: transparent;
+  box-shadow: 0 2px 6px #0000001f;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-companion-stepwise-root] .csw-popover[data-effective-material='frosted'] .csw-glass {
+    background: var(--csw-surface-opaque);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

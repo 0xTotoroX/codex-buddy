@@ -1,0 +1,16 @@
+/target/
+/node_modules/
+/dist/
+*.log
+.DS_Store
+.env
+.env.*
+*.pem
+*.key
+/config.json
+/secrets.json
+/runtime.json
+/panel.json
+/desktop-profile/
+/docs/
+/private/

@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to rebuild and publish
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Verify, package, and publish
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Validate tag and release notes
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          test "$RELEASE_TAG" = "v$version"
+          test -f ".github/release-notes/$RELEASE_TAG.md"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install browser runtime
+        run: npx playwright install chromium
+
+      - name: Run the release verification gate
+        run: |
+          npm run verify
+          npm run test:glass
+
+      - name: Build release archives and checksums
+        run: npm run package
+
+      - name: Publish or replace release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          notes=".github/release-notes/$RELEASE_TAG.md"
+          assets=(
+            "dist/codex-buddy-$version-darwin-arm64.tar.gz"
+            "dist/codex-buddy-$version-source.tar.gz"
+            "dist/SHA256SUMS"
+          )
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --title "CodexBuddy $RELEASE_TAG" --notes-file "$notes" --latest
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --title "CodexBuddy $RELEASE_TAG" --notes-file "$notes" --latest
+          fi
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+
+      - name: Preserve release reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-failure-reports-${{ inputs.tag || github.ref_name }}
+          path: target/reports/
+          if-no-files-found: ignore
+          retention-days: 7

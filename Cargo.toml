@@ -1,0 +1,50 @@
+[package]
+name = "codex-buddy"
+version = "0.3.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Codex desktop floating panels with a local web settings page"
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+futures-util = "0.3"
+fs2 = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+rust-embed = { version = "8", features = ["debug-embed"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-tungstenite = "0.28"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4"] }
+webbrowser = "1"
+tao = "0.37"
+wry = "0.57"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSWindow", "NSView", "NSGlassEffectView", "NSVisualEffectView", "NSGraphics", "NSAppearance", "objc2-quartz-core"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSProcessInfo"] }
+
+objc2 = "0.6"
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer", "CATransaction", "objc2-core-foundation"] }
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+
+[profile.release]
+lto = "thin"
+strip = true
+
+# macOS dyld may reject stripped proc-macro dylibs; only strip the shipped program.
+[profile.release.build-override]
+strip = false
