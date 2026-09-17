@@ -8,6 +8,8 @@
 
 成员清单：
 
+- [bridge-requests.test.mjs](bridge-requests.test.mjs)：弹出请求失联后的超时释放、重试与迟到响应隔离，保留模型请求的长超时。
+
 - [dock-appearance.test.mjs](dock-appearance.test.mjs)：停靠场景默认外观、独立本地偏好与星星选中表现，覆盖共享窗口偏好不受污染。
 
 - [workbench-layout.test.mjs](workbench-layout.test.mjs)：纯布局决策、双向最低尺寸、滞回和旧偏好迁移。

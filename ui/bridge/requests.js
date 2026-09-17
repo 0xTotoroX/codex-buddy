@@ -35,10 +35,21 @@
     if (!paths.has(path) || requests.size >= 8)
       return Promise.resolve({ error: '请求不可用，请稍后重试' });
     const id = `${prefix}:${++sequence}`;
+    // 弹出只等待后台启动窗口的确认，不应沿用模型生成的长超时。
+    const timeout = path === '/panel/detach' ? 10000 : 310000;
     return new Promise((resolve) => {
       requests.set(id, {
         resolve,
-        timer: setTimeout(() => complete(id, { error: '请求超时，请重试' }), 310000),
+        timer: setTimeout(
+          () =>
+            complete(id, {
+              error:
+                path === '/panel/detach'
+                  ? '弹出请求未收到响应，请检查 CodexBuddy 后台连接后重试'
+                  : '请求超时，请重试',
+            }),
+          timeout,
+        ),
       });
       try {
         window.__companionHostRequest(JSON.stringify({ id, path, payload }));
