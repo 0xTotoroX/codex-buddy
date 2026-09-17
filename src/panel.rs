@@ -95,8 +95,10 @@ impl Ui {
             || !["frosted", "matte", "native-glass"].contains(&self.material.as_str())
             || !["regular", "clear"].contains(&self.liquid_variant.as_str())
             || !["fill", "direct", "hybrid"].contains(&self.prompt_click_mode.as_str())
-            || !(300. ..=640.).contains(&self.width)
-            || !(340. ..=720.).contains(&self.height)
+            || !self.width.is_finite()
+            || self.width < 300.
+            || !self.height.is_finite()
+            || self.height < 340.
             || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
             || !(300. ..=460.).contains(&self.dock_width)
             || !(0.2..=0.8).contains(&self.split_ratio)
@@ -1119,14 +1121,17 @@ mod tests {
             position: Some(Position { x: -320., y: 40. }),
             ui: Ui {
                 open: true,
+                width: 1400.,
+                height: 1000.,
                 ..Default::default()
             },
             ..Default::default()
         };
+        prefs.ui.validate().unwrap();
         prefs.save(&paths).unwrap();
         assert_eq!(Preferences::read(&paths), prefs);
         let mut invalid = Ui::default();
-        invalid.width = 90000.;
+        invalid.width = f64::INFINITY;
         assert!(invalid.validate().is_err());
         let extra: Ui = serde_json::from_value(json!({"chat":"must not persist"})).unwrap();
         assert!(

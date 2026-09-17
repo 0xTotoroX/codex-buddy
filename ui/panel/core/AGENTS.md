@@ -6,7 +6,7 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 
 成员清单：
 
-- [panel-appearance.js](panel-appearance.js)：三材质、liquidVariant（Regular/Clear）、字号与尺寸偏好；停靠主侧栏默认液态 Clear，独立前景聊天默认哑光，两类选择按宿主场景单独存于本地，不覆盖胶囊与原生窗口共享偏好，弹出明暗读取并监听系统颜色方案；内嵌液态发出 appearance 事件，由 glass 模块接管背景，弹出磨砂映射 native-frosted，液态按能力映射 native-glass 或哑光。
+- [panel-appearance.js](panel-appearance.js)：三材质、liquidVariant（Regular/Clear）、字号与尺寸偏好；保存尺寸不截断浮窗大尺寸，最大尺寸仅约束内嵌渲染与拖拽；停靠主侧栏默认液态 Clear，独立前景聊天默认哑光，两类选择按宿主场景单独存于本地，不覆盖胶囊与原生窗口共享偏好，弹出明暗读取并监听系统颜色方案；内嵌液态发出 appearance 事件，由 glass 模块接管背景，弹出磨砂映射 native-frosted，液态按能力映射 native-glass 或哑光。
 - [install-styles.js](install-styles.js)：将共享变量、styles/ 的职责层、native.css 与内嵌 glass/lab.css 按顺序安装为单个样式节点；开发时可强制替换样式而不重建胶囊。
 - [styles/AGENTS.md](styles/AGENTS.md)：变量、布局、内容、控件、材质与动画分层。
 - [effects.js](effects.js)：高光和视线跟踪；不读取业务正文。

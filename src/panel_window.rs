@@ -548,9 +548,8 @@ mod macos {
             let (dx, dy) = (mouse.x - self.mouse.x, mouse.y - self.mouse.y);
             let mut frame = self.frame;
             if let Some(left) = self.resize_left {
-                frame.size.width =
-                    (self.frame.size.width + if left { -dx } else { dx }).clamp(324., 664.);
-                frame.size.height = (self.frame.size.height - dy).clamp(364., 744.);
+                frame.size.width = (self.frame.size.width + if left { -dx } else { dx }).max(324.);
+                frame.size.height = (self.frame.size.height - dy).max(364.);
                 frame.origin.y += self.frame.size.height - frame.size.height;
                 if left {
                     frame.origin.x += self.frame.size.width - frame.size.width;
@@ -592,7 +591,6 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
         .with_always_on_top(prefs.always_on_top)
         .with_inner_size(LogicalSize::new(size.0, size.1))
         .with_min_inner_size(LogicalSize::new(324., 364.))
-        .with_max_inner_size(LogicalSize::new(664., 744.))
         .build(&event_loop)?;
     {
         use tao::platform::macos::WindowExtMacOS;
@@ -796,8 +794,8 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
                     let _ = webview.evaluate_script(&format!("window.__companionPopout?.resized({});", message["id"]));
                 }
                 "size" => {
-                    let width = message["width"].as_f64().unwrap_or(428.).clamp(324., 664.);
-                    let height = message["height"].as_f64().unwrap_or(444.).clamp(364., 744.);
+                    let width = message["width"].as_f64().filter(|n| n.is_finite()).unwrap_or(428.).max(324.);
+                    let height = message["height"].as_f64().filter(|n| n.is_finite()).unwrap_or(444.).max(364.);
                     window.set_min_inner_size(Some(LogicalSize::new(324., 364.)));
                     let old = window.outer_size();
                     let position = window.outer_position().ok();

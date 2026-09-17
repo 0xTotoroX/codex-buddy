@@ -15,9 +15,6 @@ import {
   LABEL_ONLY_KEY,
   MATERIAL_KEY,
   LIQUID_VARIANT_KEY,
-  PANEL_HEIGHT,
-  PANEL_MAX_HEIGHT,
-  PANEL_MIN_HEIGHT,
   POPOUT,
   PROMPT_CLICK_MODE_KEY,
   VIEW_ORDER_KEY,
@@ -42,7 +39,12 @@ import {
 } from './state.js';
 import { chatBusy, contextMatches, contextSnapshot } from '../host/context.js';
 import { foregroundSurface } from '../host/surfaces.js';
-import { clampFontOffset, clampPanelWidth, normalizeMaterial } from '../core/panel-appearance.js';
+import {
+  clampFontOffset,
+  clampPanelWidth,
+  clampPanelHeight,
+  normalizeMaterial,
+} from '../core/panel-appearance.js';
 import { defaultPosition, shellLayout } from '../core/geometry.js';
 import { emitSignal } from './signals.js';
 import { fillComposer, forceRefreshStepwise, normalizePromptState } from '../stepwise.js';
@@ -126,8 +128,9 @@ function applyWorkbenchPreferences(ui) {
 function applyPanelPreferences(ui) {
   if (!ui) return;
   applyWorkbenchPreferences(ui);
-  shellState.width = clampPanelWidth(ui.width);
-  shellState.height = clamp(Number(ui.height) || PANEL_HEIGHT, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
+  // 保留浮窗请求尺寸；内嵌只在布局时收敛，避免收回后丢失大窗口偏好。
+  shellState.width = clampPanelWidth(ui.width, Infinity);
+  shellState.height = clampPanelHeight(ui.height, Infinity);
   shellState.fontOffset = clampFontOffset(
     ui.fontOffset,
     shellState.hostTypography.baseItemFontSize,

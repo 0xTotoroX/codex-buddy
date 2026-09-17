@@ -514,6 +514,7 @@ try {
       assertLayout();
       const sizes = [];
       for (const [width, height] of [
+        [924, 824],
         [664, 564],
         [524, 624],
         [324, 464],

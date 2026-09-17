@@ -1185,6 +1185,50 @@ const cases = [
     },
   ],
   [
+    'large popout dimensions survive embedded rendering and preference handoff',
+    async (page) => {
+      const saved = await page.evaluate(() => ({
+        ...window.__companionFloatingPanel.panelPreferences(),
+        width: 1200,
+        height: 900,
+        open: true,
+        layoutMode: 'capsule',
+        activeTab: 'outline',
+      }));
+      await page.evaluate(
+        (ui) => window.__companionFloatingPanel.syncPanelPreferences(ui, 1, false),
+        saved,
+      );
+      await settle(page);
+      const embedded = await box(page, '[data-companion-stepwise-root] .csw-glass');
+      assert.ok(embedded.width <= 640 && embedded.height <= 720, 'embedded stays bounded');
+      const retained = await page.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      assert.equal(retained.width, 1200);
+      assert.equal(retained.height, 900);
+      const popout = await createPopout(page);
+      await popout.page.setViewportSize({ width: 1224, height: 924 });
+      await settle(popout.page);
+      const enlarged = await box(popout.page, '[data-companion-stepwise-root] .csw-glass');
+      near(enlarged.width, 1200, 'native content expands past old width cap');
+      near(enlarged.height, 900, 'native content expands past old height cap');
+      const updated = await popout.page.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      await page.evaluate(
+        (ui) => window.__companionFloatingPanel.syncPanelPreferences(ui, 2, false),
+        updated,
+      );
+      const returned = await page.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      assert.equal(returned.width, 1200);
+      assert.equal(returned.height, 900);
+      await popout.page.close();
+    },
+  ],
+  [
     'initial webRevision zero restores workbench layout and exported preferences',
     async (page) => {
       const saved = await page.evaluate(() => ({

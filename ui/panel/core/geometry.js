@@ -26,7 +26,7 @@ import {
   UNFOLD_SAMPLES,
 } from '../runtime/constants.js';
 import { clamp, isCurrentRuntime, runtimeState, shellState } from '../runtime/state.js';
-import { clampPanelHeight } from './panel-appearance.js';
+import { clampPanelHeight, clampPanelWidth } from './panel-appearance.js';
 import { clearCompletionBeam, flushDeferredRender, prefersReducedMotion } from './shell.js';
 import { contentSafeBounds } from '../host/host-appearance.js';
 import { emitSignal } from '../runtime/signals.js';
@@ -137,7 +137,7 @@ function shellLayout() {
       : null;
   const width = dockRect
     ? dockRect.width
-    : Math.max(CHIP_WIDTH, Math.min(shellState.width, bounds.width));
+    : Math.max(CHIP_WIDTH, Math.min(clampPanelWidth(shellState.width), bounds.width));
   const anchor = clampPosition(shellState.position || defaultPosition());
   const chipWidth = Math.min(CHIP_WIDTH, width);
   const chipHeight = Math.min(CHIP_HEIGHT, bounds.height);
@@ -157,7 +157,7 @@ function shellLayout() {
     ? panelDrag.panelHeight
     : !IS_POPOUT && shellState.activeTab === 'settings'
       ? clampPanelHeight(SETTINGS_PANEL_HEIGHT)
-      : shellState.height;
+      : clampPanelHeight(shellState.height);
   const height = dockRect
     ? dockRect.height
     : Math.max(CHIP_HEIGHT, Math.min(requestedHeight, bounds.height, availableHeight));

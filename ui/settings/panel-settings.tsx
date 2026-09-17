@@ -88,7 +88,7 @@ export function PanelSettings({
     label: string,
     value: number,
     min: number,
-    max: number,
+    max: number | undefined,
     commit: (value: number) => void,
   ) => (
     <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
@@ -109,7 +109,7 @@ export function PanelSettings({
         }}
         onBlur={(e) => {
           const next = e.currentTarget.valueAsNumber;
-          if (Number.isFinite(next) && next >= min && next <= max) {
+          if (Number.isFinite(next) && next >= min && (max === undefined || next <= max)) {
             if (next !== value) commit(next);
           } else {
             e.currentTarget.value = String(value);
@@ -311,8 +311,8 @@ export function PanelSettings({
               ['outline', '大纲'],
               ['settings', '设置'],
             ])}
-            {number('宽度（px）', ui.width, 300, 640, (v) => change('width', v))}
-            {number('高度（px）', ui.height, 340, 720, (v) => change('height', v))}
+            {number('宽度（px）', ui.width, 300, undefined, (v) => change('width', v))}
+            {number('高度（px）', ui.height, 340, undefined, (v) => change('height', v))}
           </div>
           <Check label="展开胶囊" checked={ui.open} onChange={(v) => change('open', v)} />
           <Check

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: runtime/state.js、宿主主题及 presentation.js 的主题投影。
- * [OUTPUT]: 弹出跟随系统明暗； 三材质、停靠场景独立偏好及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数。
+ * [OUTPUT]: 弹出跟随系统明暗； 三材质、停靠场景独立偏好及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数（浮窗无固定上限，内嵌按渲染空间约束）。
  * [POS]: 共享胶囊外观计算层；内嵌模式通过 appearance 事件通知 SVG 液态运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -47,19 +47,19 @@ import {
 import { emitSignal } from '../runtime/signals.js';
 import { resetGlassPointer } from './effects.js';
 
-function clampPanelWidth(value) {
+function clampPanelWidth(value, maximum = IS_POPOUT ? Infinity : PANEL_MAX_WIDTH) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return PANEL_WIDTH;
-  return Math.round(clamp(parsed, PANEL_MIN_WIDTH, PANEL_MAX_WIDTH));
+  return Math.round(clamp(parsed, PANEL_MIN_WIDTH, maximum));
 }
 
 function readPanelWidth() {
   const raw = storage.get(WIDTH_KEY);
-  return raw == null || raw === '' ? PANEL_WIDTH : clampPanelWidth(raw);
+  return raw == null || raw === '' ? PANEL_WIDTH : clampPanelWidth(raw, Infinity);
 }
 
 function panelHeightCap() {
-  if (IS_POPOUT) return PANEL_MAX_HEIGHT;
+  if (IS_POPOUT) return Infinity;
   const viewportCap = Math.max(
     PANEL_MIN_HEIGHT,
     Math.floor((window.innerHeight || PANEL_MAX_HEIGHT) - PANEL_SAFE_MARGIN * 2),
@@ -67,15 +67,17 @@ function panelHeightCap() {
   return Math.min(PANEL_MAX_HEIGHT, viewportCap);
 }
 
-function clampPanelHeight(value) {
+function clampPanelHeight(value, maximum = panelHeightCap()) {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return Math.min(PANEL_HEIGHT, panelHeightCap());
-  return Math.round(clamp(parsed, PANEL_MIN_HEIGHT, panelHeightCap()));
+  if (!Number.isFinite(parsed)) return Math.min(PANEL_HEIGHT, maximum);
+  return Math.round(clamp(parsed, PANEL_MIN_HEIGHT, maximum));
 }
 
 function readPanelHeight() {
   const raw = storage.get(HEIGHT_KEY);
-  return raw == null || raw === '' ? clampPanelHeight(PANEL_HEIGHT) : clampPanelHeight(raw);
+  return raw == null || raw === ''
+    ? clampPanelHeight(PANEL_HEIGHT)
+    : clampPanelHeight(raw, Infinity);
 }
 
 function clampFontSize(value) {
