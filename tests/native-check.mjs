@@ -307,7 +307,7 @@ writeFileSync(
     pid: process.pid,
     port: server.address().port,
     token: 'synthetic-native-token',
-    version: '0.3.0',
+    version: '0.4.0',
     executable: artifact.binary,
   }),
 );
