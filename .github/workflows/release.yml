@@ -19,8 +19,15 @@ permissions:
   contents: write
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ inputs.tag || github.ref }}
+      full: true
+
   publish:
-    name: Verify, package, and publish
+    needs: verify
+    name: Package and publish
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -53,14 +60,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Install browser runtime
-        run: npx playwright install chromium
-
-      - name: Run the release verification gate
-        run: |
-          npm run verify
-          npm run test:glass
-
       - name: Build release archives and checksums
         run: npm run package
 
@@ -78,11 +77,11 @@ jobs:
             "dist/SHA256SUMS"
           )
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release edit "$RELEASE_TAG" --title "CodexBuddy $RELEASE_TAG" --notes-file "$notes" --latest
-          else
-            gh release create "$RELEASE_TAG" --verify-tag --title "CodexBuddy $RELEASE_TAG" --notes-file "$notes" --latest
+            echo 'Release already exists; refusing to overwrite published assets.' >&2
+            exit 1
           fi
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          gh release create "$RELEASE_TAG" "${assets[@]}" --verify-tag --draft --title "CodexBuddy $RELEASE_TAG" --notes-file "$notes"
+          gh release edit "$RELEASE_TAG" --draft=false --latest
 
       - name: Preserve release reports on failure
         if: failure()

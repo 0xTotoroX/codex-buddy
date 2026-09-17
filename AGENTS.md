@@ -70,8 +70,9 @@ Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + 
 - `tsconfig.json`：网页、共享类型与 Vite 配置的 TypeScript 检查范围。
 - `.prettierrc.json`：JS/TS/CSS 与验收脚本的统一格式配置。
 - `.cargo/config.toml`：macOS 14.0 最低部署目标。
-- `.github/workflows/ci.yml`：分开验证 macOS 14 最低工具链与内嵌路径、macOS 15 桌面浮窗门槛、macOS 26 原生液态编译路径；CI 不生成重复发布包。
-- `.github/workflows/release.yml`：仅由版本标签或指定标签的手动重跑触发；完整验证后在 macOS 26 构建唯一一套向下部署到 macOS 14 的归档，并创建或覆盖同标签 Release 的三个资产。
+- `.github/workflows/ci.yml`：普通推送与 PR 运行 macOS 26 全套检查，手动 full 运行全部兼容组合；不生成发布包。
+- `.github/workflows/verify.yml`：CI/CD 共用验证矩阵；完整模式覆盖 macOS 14 最低工具链、macOS 15 浮窗与 macOS 26，全部通过才允许发布。
+- `.github/workflows/release.yml`：版本标签或手动指定标签触发共用完整验证；打包阶段不重复测试，三个资产上传到草稿后才公开；拒绝覆盖已有 Release。
 - `.github/release-notes/v*.md`：对应标签的公开发行说明；CD 要求版本、标签和说明文件一致。
 - `.gitignore`：隔离构建产物、测试证据和私有运行数据。
 - `LICENSE`：自有源码 MIT 许可。
