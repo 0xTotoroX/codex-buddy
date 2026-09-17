@@ -7,6 +7,7 @@ runtime/lifecycle.js 是组合入口：读取宿主上下文、协调独立的 S
 成员清单：
 
 - [glass/AGENTS.md](glass/AGENTS.md)：正式与开发构建共用的内嵌液态，自有 SVG 实时背景与 B 版 Regular/Clear 液态变体。
+- [workbench/AGENTS.md](workbench/AGENTS.md)：真实右侧占位、双面板、独立阅读与弹出接续。
 - [core/AGENTS.md](core/AGENTS.md)：外壳视图、几何、交互、效果和 CSS。
 - [host/AGENTS.md](host/AGENTS.md)：宿主任务、输入框和外观适配。
 - [runtime/AGENTS.md](runtime/AGENTS.md)：分域状态、设置同步、运行协调与投影。

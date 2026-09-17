@@ -682,7 +682,10 @@ function invalidateOutline(message = null, sourceHash = '') {
   outlineState.outlineFingerprint = '';
   outlineState.outlineSourceHash = '';
   outlineState.outlineMessage = message?.node || null;
-  if (shellState.activeTab === 'outline' && shellState.panel)
+  if (
+    (shellState.layoutMode === 'workbench' || shellState.activeTab === 'outline') &&
+    shellState.panel
+  )
     emitSignal('render', { preserveMorph: true });
 }
 
@@ -698,7 +701,8 @@ async function refreshOutline(options = {}) {
     contextMatches(requestContext);
   outlineState.outlineStatus = 'pending';
   outlineState.outlineError = '';
-  if (shellState.activeTab === 'outline') emitSignal('render', { preserveMorph: true });
+  if (shellState.layoutMode === 'workbench' || shellState.activeTab === 'outline')
+    emitSignal('render', { preserveMorph: true });
 
   const task = Promise.resolve()
     .then(() => {
@@ -730,7 +734,8 @@ async function refreshOutline(options = {}) {
     .finally(() => {
       if (!requestCurrent()) return;
       if (outlineState.outlineRefreshPromise === task) outlineState.outlineRefreshPromise = null;
-      if (shellState.activeTab === 'outline') emitSignal('render', { preserveMorph: true });
+      if (shellState.layoutMode === 'workbench' || shellState.activeTab === 'outline')
+        emitSignal('render', { preserveMorph: true });
     });
   outlineState.outlineRefreshPromise = task;
   return task;
@@ -803,8 +808,8 @@ function outlineHtml() {
     </div>`;
 }
 
-function attachOutlineEvents() {
-  shellState.panel.querySelectorAll('[data-outline-id]').forEach((button) => {
+function attachOutlineEvents(root = shellState.panel) {
+  root.querySelectorAll('[data-outline-id]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!outlineJumpTo(button.dataset.outlineId)) {
         outlineState.outlineStatus = 'error';
@@ -813,7 +818,7 @@ function attachOutlineEvents() {
       }
     });
   });
-  shellState.panel.querySelectorAll('[data-outline-anchor]').forEach((button) => {
+  root.querySelectorAll('[data-outline-anchor]').forEach((button) => {
     button.addEventListener('click', () => {
       if (!outlineJumpToAnchor(button.dataset.outlineAnchor)) {
         outlineState.outlineStatus = 'error';

@@ -14,6 +14,6 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 - [shell.js](shell.js)：表情派生、完成光效与视图过渡；不负责识别宿主。
 - [interaction.js](interaction.js)：表情鼠标单击等待 100ms 收放、稳定外层识别双击窗口切换，记录首击前 open 并取消首击触发的收放后直接弹出，拖拽、固定对角 1:1 缩放、排序和快捷键；原生手势交给 popout/transport；连续缩放仅更新几何，结束时保存尺寸；窗口交接缩放不保存中间尺寸。
 - [settings-view.js](settings-view.js)：胶囊设置模板和内嵌与弹出“外观”框内液态旁中性色星星（空心 Regular、实心 Clear）等控件绑定；网络操作交给 runtime/settings-sync。
-- [views.js](views.js)：创建胶囊 DOM、组合视图与下一步预览交互；表情提示单/双击及拖动，弹出眼睛单击不收起、双击收回。
+- [views.js](views.js)：创建胶囊 DOM、组合视图与下一步预览交互，选择工作台时委托双面板渲染；表情提示单/双击及拖动，弹出眼睛单击不收起、双击收回。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。

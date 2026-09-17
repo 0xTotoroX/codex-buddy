@@ -136,6 +136,33 @@ try {
   cli(['stop']);
   assert.equal(JSON.parse(cli(['status'])).running, false);
   assert.equal(existsSync(join(dataDir, 'runtime.json')), false);
+  // Cold starts read persisted layout independently of the currently mounted host.
+  for (const ui of [
+    { width: 510, height: 600, material: 'matte' },
+    { layoutMode: 'workbench', dockWidth: 380, splitRatio: 0.6, dockOpen: true },
+    { layoutMode: 'workbench', dockWidth: 300, splitRatio: 0.4, dockOpen: false },
+  ]) {
+    writeFileSync(join(dataDir, 'panel.json'), JSON.stringify({ ui }));
+    let previousPid;
+    for (let boot = 0; boot < 2; boot += 1) {
+      cli(['start', '--port', '0', '--no-open']);
+      const active = runtime();
+      assert.notEqual(active.pid, previousPid);
+      previousPid = active.pid;
+      const response = await fetch(`http://127.0.0.1:${active.port}/api/appearance`, {
+        headers: { Authorization: `Bearer ${active.token}` },
+      });
+      assert.equal(response.status, 200);
+      const saved = await response.json();
+      for (const [key, value] of Object.entries(ui)) assert.equal(saved.ui[key], value, key);
+      assert.equal(saved.ui.layoutMode, ui.layoutMode || 'capsule');
+      assert.equal(saved.detached, false);
+      cli(['stop']);
+      assert.equal(existsSync(join(dataDir, 'runtime.json')), false);
+    }
+  }
+  record('正式程序冷启动保留旧胶囊偏好、工作台展开意图及独立宽度/比例');
+  rmSync(join(dataDir, 'panel.json'), { force: true });
   // Exercise real HTTP requests against a local stalled model, not a timer-only stub.
   const asyncExec = promisify(execFile);
   let arrived;

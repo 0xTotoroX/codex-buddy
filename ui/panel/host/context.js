@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主 DOM、上下文状态和基础可见性工具。
- * [OUTPUT]: 任务、回答、输入目标识别及上下文变更通知。
+ * [OUTPUT]: 前景聊天关联与限定容器内的输入目标； 任务、回答、输入目标识别及上下文变更通知。
  * [POS]: 宿主读取边界，不修改 Stepwise 或大纲的内部状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -32,6 +32,8 @@ import {
   visibleRect,
 } from '../runtime/diagnostics.js';
 
+import { foregroundSurface } from './surfaces.js';
+
 function roleFromElement(node) {
   if (!(node instanceof Element)) return '';
   const explicit = node.getAttribute('data-message-author-role');
@@ -56,6 +58,8 @@ function threadRootOf(node) {
 
 function stablePaneKeyForRoot(root) {
   if (!(root instanceof Element)) return '';
+  const dialog = root.closest('section[role="dialog"][class*="floatingSurface"]');
+  if (dialog) return `pane:${nodeIdentity(dialog, 'dialog')}`;
   let current = root;
   for (let depth = 0; current && depth < 10; depth += 1, current = current.parentElement) {
     const controller = current.getAttribute('data-app-shell-tab-panel-controller');
@@ -273,7 +277,12 @@ function contextMatches(snapshot) {
 }
 
 function pinThreadFromTarget(target, reason) {
-  if (!(target instanceof Element) || shellState.root?.contains(target)) return false;
+  if (
+    !(target instanceof Element) ||
+    shellState.root?.contains(target) ||
+    target.closest('[data-codex-buddy-dock]')
+  )
+    return false;
   const root = threadRootOf(target);
   if (!root) return false;
   contextState.pinnedPaneKey = stablePaneKeyForRoot(root);
@@ -303,6 +312,13 @@ function resolveActiveThreadRoot() {
   if (!roots.length) {
     contextState.activeContext.paneRoot = null;
     return null;
+  }
+  if (shellState.layoutMode === 'workbench') {
+    const foreground = foregroundSurface();
+    if (foreground?.thread instanceof HTMLElement && roots.includes(foreground.thread)) {
+      setActiveThreadRoot(foreground.thread, 'foreground-chat');
+      return foreground.thread;
+    }
   }
   const current = contextState.activeContext.paneRoot;
   if (current?.isConnected && roots.includes(current)) {
@@ -434,9 +450,14 @@ function horizontalOverlapRatio(left, right) {
 function ignoredComposerContainer(node, targetRoot = null) {
   if (!(node instanceof Element)) return true;
   if (shellState.root?.contains(node)) return true;
+  const activeRoot = targetRoot || chatRoot();
+  const surface = foregroundSurface();
+  const allowedDialog = surface?.thread === activeRoot ? surface.dialog : null;
+  if (surface && (!allowedDialog || !allowedDialog.contains(node))) return true;
   const blockedAncestor = node.closest(
     [
       `[${ROOT_ATTR}="true"]`,
+      '[data-codex-buddy-dock]',
       'nav',
       "[role='dialog']",
       "[aria-modal='true']",
@@ -444,9 +465,8 @@ function ignoredComposerContainer(node, targetRoot = null) {
       "[role='listbox']",
     ].join(','),
   );
-  if (blockedAncestor) return true;
+  if (blockedAncestor && blockedAncestor !== allowedDialog) return true;
 
-  const activeRoot = targetRoot || chatRoot();
   if (activeRoot?.contains(node)) return false;
 
   const nodeAside = node.closest('aside');
@@ -530,7 +550,9 @@ function globalComposerCandidateScore(node) {
 }
 
 function composerCandidates(targetRoot = null) {
-  const scope = targetRoot || document;
+  const surface = foregroundSurface();
+  const scope =
+    surface?.thread === targetRoot ? surface.content || surface.dialog : targetRoot || document;
   return Array.from(
     scope.querySelectorAll(
       ['textarea', "[contenteditable='true']", "[role='textbox']", 'div.ProseMirror'].join(','),
@@ -540,7 +562,8 @@ function composerCandidates(targetRoot = null) {
     const rect = node.getBoundingClientRect();
     if (rect.width < 120 || rect.height < 20) return false;
     if (rect.bottom < window.innerHeight * 0.35) return false;
-    if (targetRoot && threadRootOf(node) !== targetRoot) return false;
+    if (targetRoot && threadRootOf(node) !== targetRoot && surface?.thread !== targetRoot)
+      return false;
     if (ignoredComposerContainer(node, targetRoot)) return false;
     return true;
   });

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊状态、DOM 尺寸、滚动容器与原生窗口偏好。
- * [OUTPUT]: 位置、内嵌收放形变、弹出保持展开、吸边、尺寸及滚动状态保存恢复。
+ * [OUTPUT]: 停靠时使用宿主预留区域；位置、内嵌收放形变、弹出保持展开、吸边、尺寸及滚动状态保存恢复。
  * [POS]: 交互与视图共用的空间计算层。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -131,7 +131,13 @@ function snapRightIfNear(persist = false, animate = false) {
 
 function shellLayout() {
   const bounds = contentSafeBounds();
-  const width = Math.max(CHIP_WIDTH, Math.min(shellState.width, bounds.width));
+  const dockRect =
+    !IS_POPOUT && shellState.layoutMode === 'workbench' && shellState.dockStatus === 'open'
+      ? shellState.dockRect
+      : null;
+  const width = dockRect
+    ? dockRect.width
+    : Math.max(CHIP_WIDTH, Math.min(shellState.width, bounds.width));
   const anchor = clampPosition(shellState.position || defaultPosition());
   const chipWidth = Math.min(CHIP_WIDTH, width);
   const chipHeight = Math.min(CHIP_HEIGHT, bounds.height);
@@ -152,15 +158,21 @@ function shellLayout() {
     : !IS_POPOUT && shellState.activeTab === 'settings'
       ? clampPanelHeight(SETTINGS_PANEL_HEIGHT)
       : shellState.height;
-  const height = Math.max(CHIP_HEIGHT, Math.min(requestedHeight, bounds.height, availableHeight));
+  const height = dockRect
+    ? dockRect.height
+    : Math.max(CHIP_HEIGHT, Math.min(requestedHeight, bounds.height, availableHeight));
   const compressionProgress =
     shellState.activeTab === 'settings'
       ? 0
       : clamp((requestedHeight - height) / Math.max(1, requestedHeight - chipHeight), 0, 1);
   const desiredLeft = anchor.x - (width - chipWidth) / 2;
-  const left = clamp(desiredLeft, bounds.left, Math.max(bounds.left, bounds.right - width));
+  const left = dockRect
+    ? dockRect.left
+    : clamp(desiredLeft, bounds.left, Math.max(bounds.left, bounds.right - width));
   const desiredTop = opensDown ? anchor.y : anchor.y + chipHeight - height;
-  const top = clamp(desiredTop, bounds.top, Math.max(bounds.top, bounds.bottom - height));
+  const top = dockRect
+    ? dockRect.top
+    : clamp(desiredTop, bounds.top, Math.max(bounds.top, bounds.bottom - height));
   const chipLeft = clamp(anchor.x - left, 0, Math.max(0, width - chipWidth));
   const chipTop = clamp(anchor.y - top, 0, Math.max(0, height - chipHeight));
   const collapsedShell = {
@@ -544,6 +556,7 @@ function startMorph(expanded, focusTarget = '') {
 function setOpen(expanded, focusTarget = '') {
   if (!isCurrentRuntime()) return;
   resetEyePointer();
+  if (shellState.layoutMode === 'workbench' && shellState.dockStatus !== 'unsupported') return;
   const target = IS_POPOUT || Boolean(expanded);
   if (target === shellState.open) return;
   clearCompletionBeam();

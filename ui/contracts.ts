@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 设置、字体、含宿主主题色与阅读位置的投影、呈现确认及操作身份的共享类型。
+ * [OUTPUT]: 独立胶囊/工作台偏好、字体、含分栏阅读位置的投影、呈现确认及操作身份的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -87,6 +87,11 @@ export interface PanelReadingState {
   scrollTop: number;
   promptPreviewIndex: number;
   promptScrollTop: number;
+  panes?: Partial<Record<'outline' | 'next', PanelPaneReadingState>>;
+}
+export interface PanelPaneReadingState {
+  contentToken: string;
+  scrollTop: number;
 }
 export interface PanelCommand {
   kind: 'fill' | 'generate' | 'outline-refresh' | 'outline-jump' | 'outline-anchor';
@@ -114,6 +119,10 @@ export interface PanelPreferences {
   activeTab: string;
   width: number;
   height: number;
+  layoutMode: 'capsule' | 'workbench';
+  dockWidth: number;
+  splitRatio: number;
+  dockOpen: boolean;
   material: string;
   liquidVariant: 'regular' | 'clear';
   fontOffset: number;

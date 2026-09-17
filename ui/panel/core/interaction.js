@@ -30,7 +30,7 @@ import {
 } from './geometry.js';
 import { bumpFontSize, clampPanelHeight, clampPanelWidth } from './panel-appearance.js';
 import { emitSignal } from '../runtime/signals.js';
-import { nativePanelDrag, panelPreferences } from '../popout/transport.js';
+import { nativePanelDrag, panelPreferences, sizeNativePanel } from '../popout/transport.js';
 import {
   isCurrentRuntime,
   runtimeState,
@@ -49,6 +49,14 @@ function onResize() {
     if (shellState.open && !shellState.nativeSizeChanging) {
       shellState.width = clampPanelWidth(window.innerWidth - 24);
       shellState.height = clampPanelHeight(window.innerHeight - 24);
+      if (
+        shellState.layoutMode === 'workbench' &&
+        shellState.height < 440 &&
+        !POPOUT.motionActive?.()
+      ) {
+        void sizeNativePanel(true);
+        return;
+      }
       if (shellState.popover?.dataset.resizing !== 'true' && !POPOUT.motionActive?.()) {
         storage.set(WIDTH_KEY, String(shellState.width));
         storage.set(HEIGHT_KEY, String(shellState.height));
@@ -535,6 +543,19 @@ function onGlassClick(event) {
 }
 
 function onKeyDown(event) {
+  if (shellState.layoutMode === 'workbench' && shellState.dockStatus !== 'unsupported') {
+    if (
+      event.key === 'Escape' &&
+      shellState.root?.contains(event.target) &&
+      shellState.workbenchSettings
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      shellState.workbenchSettings = false;
+      emitSignal('render', undefined);
+    }
+    return;
+  }
   if (event.key === 'Escape') cancelFaceClick();
   if (event.key === 'Escape' && shellState.open && !IS_POPOUT) {
     event.preventDefault();

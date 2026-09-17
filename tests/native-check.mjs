@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
  * [OUTPUT]: target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
- * [POS]: 原生合成验收；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
+ * [POS]: 原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { prepareTestBinary } from '../scripts/verify.mjs';
@@ -16,29 +16,32 @@ if (process.platform !== 'darwin')
   throw Error('Native backdrop acceptance requires macOS and Screen Recording permission.');
 const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
+const workbenchOnly = process.argv.includes('--workbench-only');
 const genieOnly = process.argv.includes('--genie-only');
 const chipAnchor = genieOnly && process.argv.includes('--chip-anchor');
 const crossScreen = genieOnly && process.argv.includes('--cross-screen');
 const reverseScreens = crossScreen && process.argv.includes('--reverse-screens');
 const motionOnly = genieOnly || process.argv.includes('--motion-only');
-const appearanceOnly = motionOnly || process.argv.includes('--appearance-only');
+const appearanceOnly = workbenchOnly || motionOnly || process.argv.includes('--appearance-only');
 const dir = mkdtempSync(join(tmpdir(), 'buddy-native-'));
 const output =
   root +
   '/target/reports/' +
-  (genieOnly
-    ? crossScreen
-      ? reverseScreens
-        ? 'native-genie-cross-reverse'
-        : 'native-genie-cross'
-      : chipAnchor
-        ? 'native-genie-chip'
-        : 'native-genie'
-    : motionOnly
-      ? 'native-motion'
-      : appearanceOnly
-        ? 'native-appearance'
-        : 'native');
+  (workbenchOnly
+    ? 'native-workbench'
+    : genieOnly
+      ? crossScreen
+        ? reverseScreens
+          ? 'native-genie-cross-reverse'
+          : 'native-genie-cross'
+        : chipAnchor
+          ? 'native-genie-chip'
+          : 'native-genie'
+      : motionOnly
+        ? 'native-motion'
+        : appearanceOnly
+          ? 'native-appearance'
+          : 'native');
 mkdirSync(output, { recursive: true });
 rmSync(join(output, 'report.json'), { force: true });
 const helper = join(dir, 'native-probe');
@@ -65,7 +68,10 @@ const settings = fixtureSettings;
 let ui = {
   open: true,
   width: 404,
-  height: motionOnly ? 625 : 420,
+  height: workbenchOnly ? 540 : motionOnly ? 625 : 420,
+  ...(workbenchOnly
+    ? { layoutMode: 'workbench', dockWidth: 340, splitRatio: 0.45, dockOpen: true }
+    : {}),
   activeTab: genieOnly ? 'settings' : 'next',
   material: 'frosted',
   fontOffset: 0,
@@ -99,6 +105,20 @@ let state = {
 };
 let commands = [],
   telemetry = null;
+if (workbenchOnly) {
+  state.snapshot.prompts = Array.from({ length: 4 }, (_, i) => ({
+    label: `合成建议 ${i + 1}`,
+    summary: '用于检查原生工作台独立滚动与布局。',
+    prompt: '合成提示词内容，用于滚动验收。\n'.repeat(30),
+  }));
+  state.snapshot.outlineItems = Array.from({ length: 40 }, (_, i) => ({
+    id: `outline-${i}`,
+    text: `合成大纲条目 ${i + 1}`,
+    displayLevel: 1,
+    numberPrefix: `${i + 1}.`,
+    labelText: `合成大纲条目 ${i + 1}`,
+  }));
+}
 const events = [];
 const requests = [];
 const script = await buildPanel();
@@ -110,6 +130,19 @@ function probePage() {
     try {
       const panel = window.__companionFloatingPanel;
       const current = panel?.state;
+      const measure = (node) =>
+        node
+          ? {
+              rect: node.getBoundingClientRect(),
+              visible:
+                node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden',
+              scrollTop: node.scrollTop,
+              scrollHeight: node.scrollHeight,
+              clientHeight: node.clientHeight,
+              textLength: node.textContent.trim().length,
+            }
+          : null;
+      const workbench = document.querySelector('.csw-workbench');
       const response = await fetch('/probe', {
         method: 'POST',
         body: JSON.stringify({
@@ -120,6 +153,30 @@ function probePage() {
           material: current?.material,
           viewport: [innerWidth, innerHeight],
           activeTab: current?.activeTab,
+          commandId: window.probeCommandId,
+          workbench: workbench && {
+            layoutMode: current?.layoutMode,
+            dockWidth: current?.dockWidth,
+            splitRatio: current?.splitRatio,
+            dockOpen: current?.dockOpen,
+            layout: getComputedStyle(workbench).display,
+            rect: workbench.getBoundingClientRect(),
+            panesVisible: measure(workbench.querySelector('.csw-workbench-panes'))?.visible,
+            panes: Object.fromEntries(
+              ['outline', 'next'].map((kind) => [
+                kind,
+                {
+                  ...measure(workbench.querySelector(`[data-pane="${kind}"]`)),
+                  body: measure(workbench.querySelector(`[data-view-body="${kind}"]`)),
+                },
+              ]),
+            ),
+            settings: measure(workbench.querySelector('.csw-workbench-settings')),
+            settingsButton: measure(workbench.querySelector('[data-workbench-settings]')),
+            settingsLabel: workbench
+              .querySelector('[data-workbench-settings]')
+              ?.getAttribute('aria-label'),
+          },
           glassStyleButton: Boolean(document.querySelector('[data-action=glass-style]')),
           materialLabel: document.querySelector('[data-material-value]')?.textContent,
           nativeGlassStyle: window.__companionNativeGlassStyle,
@@ -144,6 +201,12 @@ function probePage() {
         }),
       });
       for (const cmd of await response.json()) {
+        if (cmd.kind === 'workbench-settings')
+          document.querySelector('[data-workbench-settings]')?.click();
+        if (cmd.kind === 'pane-scroll') {
+          const body = document.querySelector(`[data-view-body="${cmd.pane}"]`);
+          if (body) body.scrollTop = cmd.top;
+        }
         if (cmd.kind === 'tab') document.querySelector('button[data-view="settings"]')?.click();
         if (cmd.kind === 'open') panel.setOpen(cmd.value);
         if (cmd.kind === 'viewport')
@@ -168,6 +231,7 @@ function probePage() {
         if (cmd.kind === 'dock') void window.__companionPopout.dock();
         if (cmd.kind === 'cancel-dock') window.__companionPopout.cancelDock();
         if (cmd.kind === 'close') window.ipc.postMessage(JSON.stringify({ kind: 'close' }));
+        if (cmd.id !== undefined) window.probeCommandId = cmd.id;
       }
     } finally {
       busy = false;
@@ -311,7 +375,182 @@ try {
     () => telemetry?.active && telemetry?.sourceTheme && telemetry?.rect?.width > 300,
     'no native panel',
   );
-  if (motionOnly) {
+  if (workbenchOnly) {
+    let commandId = 0;
+    const command = async (value) => {
+      commands.push({ ...value, id: ++commandId });
+      await waitFor(() => telemetry?.commandId === commandId, 'workbench command not acknowledged');
+    };
+    const assertLayout = () => {
+      const bench = telemetry.workbench;
+      if (!bench || bench.layoutMode !== 'workbench' || bench.layout !== 'flex' || !bench.dockOpen)
+        throw Error('Native workbench layout is missing');
+      if (!bench.panesVisible || bench.settings?.visible || !bench.settingsButton?.visible)
+        throw Error('Workbench panes/settings visibility is incorrect');
+      if (bench.dockWidth !== 340 || bench.splitRatio !== 0.45)
+        throw Error('Native resizing changed independent dock preferences');
+      for (const kind of ['outline', 'next']) {
+        const pane = bench.panes[kind];
+        if (
+          !pane?.visible ||
+          pane.rect.height < 180 ||
+          !pane.body?.visible ||
+          !pane.body.textLength
+        )
+          throw Error(`${kind} pane is missing, empty or below 180px: ${JSON.stringify(pane)}`);
+        if (
+          pane.rect.left < bench.rect.left - 1 ||
+          pane.rect.right > bench.rect.right + 1 ||
+          pane.rect.top < bench.rect.top - 1 ||
+          pane.rect.bottom > bench.rect.bottom + 1
+        )
+          throw Error(`${kind} pane extends outside the native workbench`);
+      }
+      if (bench.panes.outline.rect.bottom > bench.panes.next.rect.top)
+        throw Error('Native workbench panes overlap');
+      const outlineHeight = bench.panes.outline.rect.height;
+      const paneHeight = outlineHeight + bench.panes.next.rect.height;
+      const expectedOutline = Math.max(
+        180,
+        Math.min(paneHeight - 180, paneHeight * bench.splitRatio),
+      );
+      if (Math.abs(outlineHeight - expectedOutline) > 1)
+        throw Error(
+          `Native split ratio mismatch: outline ${outlineHeight}px, expected ${expectedOutline}px for ${bench.splitRatio}`,
+        );
+      if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
+      return bench;
+    };
+    await waitFor(
+      () =>
+        telemetry?.workbench?.panes?.next?.body?.textLength > 0 &&
+        !telemetry.animations &&
+        telemetry.viewport[1] === 564 &&
+        Math.abs(telemetry.rect.height - 540) < 1,
+      'native workbench not ready',
+    );
+    const workbenchChecks = [];
+    for (const material of ['matte', 'frosted', 'native-glass']) {
+      await command({ kind: 'material', value: material });
+      const effective =
+        material === 'frosted'
+          ? 'native-frosted'
+          : material === 'native-glass' && telemetry.nativeGlassAvailable
+            ? 'native-glass'
+            : 'matte';
+      await waitFor(
+        () =>
+          telemetry.material === material &&
+          telemetry.effectiveMaterial === effective &&
+          !telemetry.animations,
+        'native workbench material mapping',
+      );
+      const initial = assertLayout();
+      const nextScroll = Math.min(
+        60,
+        initial.panes.next.body.scrollHeight - initial.panes.next.body.clientHeight,
+      );
+      if (
+        nextScroll <= 0 ||
+        initial.panes.outline.body.scrollHeight - initial.panes.outline.body.clientHeight < 80
+      )
+        throw Error('Synthetic content must overflow to verify independent scrolling');
+      await command({ kind: 'pane-scroll', pane: 'outline', top: 0 });
+      await command({ kind: 'pane-scroll', pane: 'next', top: 0 });
+      await command({ kind: 'pane-scroll', pane: 'outline', top: 80 });
+      if (
+        telemetry.workbench.panes.outline.body.scrollTop !== 80 ||
+        telemetry.workbench.panes.next.body.scrollTop !== 0
+      )
+        throw Error('Outline does not scroll independently');
+      await command({ kind: 'pane-scroll', pane: 'next', top: nextScroll });
+      if (
+        telemetry.workbench.panes.outline.body.scrollTop !== 80 ||
+        telemetry.workbench.panes.next.body.scrollTop !== nextScroll
+      )
+        throw Error('Stepwise does not scroll independently');
+      const scrolled = assertLayout();
+      await command({ kind: 'workbench-settings' });
+      await waitFor(
+        () => telemetry.workbench.settings?.visible && !telemetry.workbench.panesVisible,
+        'explicit workbench settings button did not open overlay',
+      );
+      const overlay = telemetry.workbench.settings;
+      if (
+        !overlay.textLength ||
+        overlay.rect.height <= 0 ||
+        telemetry.workbench.settingsLabel !== '返回工作台'
+      )
+        throw Error('Workbench settings overlay/return control is empty');
+      await command({ kind: 'workbench-settings' });
+      await waitFor(
+        () => telemetry.workbench.panesVisible && !telemetry.workbench.settings.visible,
+        'settings button did not return to workbench',
+      );
+      assertLayout();
+      if (
+        telemetry.workbench.panes.outline.body.scrollTop !== 80 ||
+        telemetry.workbench.panes.next.body.scrollTop !== nextScroll
+      )
+        throw Error('Settings round trip lost pane scroll positions');
+      await command({ kind: 'open', value: false });
+      await delay(500);
+      if (!telemetry.open) throw Error('Native workbench accepted setOpen(false)');
+      assertLayout();
+      const sizes = [];
+      for (const [width, height] of [
+        [524, 624],
+        [324, 464],
+      ]) {
+        await command({ kind: 'viewport', width, height });
+        await waitFor(
+          () =>
+            telemetry.viewport[0] === width &&
+            telemetry.viewport[1] === height &&
+            Math.abs(telemetry.rect.width - width + 24) < 1 &&
+            Math.abs(telemetry.rect.height - height + 24) < 1 &&
+            !telemetry.animations,
+          'native workbench viewport resize',
+        );
+        const resized = assertLayout();
+        const native = windows().find(
+          (window) =>
+            Math.abs(window.kCGWindowBounds.Width - width) <= 1 &&
+            Math.abs(window.kCGWindowBounds.Height - height) <= 1,
+        );
+        if (!native) throw Error('Wry window bounds do not match resized DOM viewport');
+        sizes.push({
+          viewport: telemetry.viewport,
+          native: native.kCGWindowBounds,
+          workbench: resized,
+        });
+      }
+      workbenchChecks.push({
+        material,
+        effective,
+        initial,
+        scrolled,
+        overlay,
+        ignoresCollapse: true,
+        sizes,
+      });
+    }
+    writeFileSync(
+      join(output, 'report.json'),
+      JSON.stringify(
+        {
+          artifact,
+          scope: 'workbench-only',
+          workbenchChecks,
+          telemetry,
+          log,
+        },
+        null,
+        2,
+      ),
+    );
+    rmSync(join(output, 'failure.json'), { force: true });
+  } else if (motionOnly) {
     await waitFor(
       () => requests.some((r) => r.path === '/api/panel/presented'),
       'presentation missing',

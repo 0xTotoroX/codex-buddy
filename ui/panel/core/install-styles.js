@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 运行尺寸常量、分层 styles/*.css、弹出 native.css 与内嵌 glass/lab.css。
- * [OUTPUT]: installStyle 按共享变量、布局、内容、控件、材质、动画、原生覆盖的顺序安装胶囊样式。
+ * [OUTPUT]: installStyle 按共享变量、布局、内容、控件、材质、动画、原生覆盖与工作台布局的顺序安装胶囊样式。
  * [POS]: 胶囊样式装配层，通过版本标记复用或替换样式节点；开发时 force 原位更新。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -11,6 +11,7 @@ import contentCss from './styles/content.css';
 import controlsCss from './styles/controls.css';
 import materialsCss from './styles/materials.css';
 import motionCss from './styles/motion.css';
+import workbenchCss from '../workbench/styles.css';
 import nativeCss from '../popout/native.css';
 import embeddedGlassCss from '../glass/lab.css';
 
@@ -55,6 +56,7 @@ export function installStyle(force = false) {
     materialsCss +
     motionCss +
     nativeCss +
-    embeddedGlassCss;
+    embeddedGlassCss +
+    workbenchCss;
   document.head.appendChild(style);
 }

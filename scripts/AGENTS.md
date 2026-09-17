@@ -12,7 +12,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 - [dev-host.mjs](dev-host.mjs)：选择真实窗口，首次复制独立开发配置，暂停并恢复安装版连接；不创建浏览器或修改官方应用。
 - [dev-panel.mjs](dev-panel.mjs)：原子发布开发资源快照，CSS 更新保留实例，逻辑更新销毁并恢复胶囊，页面引导变化重载窗口页面；共享 measurePanel 仅采集两端几何、材质能力和实例计数。
 - [dev-runtime.mjs](dev-runtime.mjs)：受控子进程与稳定鉴权代理；后台重启后设置页会话保持有效；模型超时由后台控制，客户端断开时取消上游代理请求。
-- [verify.mjs](verify.mjs)：统一检查、构建、端到端与生命周期验收；按源码/工具链摘要验证产物新鲜度，排除 Markdown 与 Finder 的 .DS_Store；原生检查显式选择。
+- [verify.mjs](verify.mjs)：统一检查、工作台浏览器行为、构建、端到端与生命周期验收；按源码/工具链摘要验证产物新鲜度，排除 Markdown 与 Finder 的 .DS_Store；原生检查显式选择。
 
 - [build-panel.mjs](build-panel.mjs)：从 lifecycle 入口解析 ES modules，输出可重复注入的脚本，供 Cargo 内嵌。
 - [install.mjs](install.mjs)：源码安装入口，不修改 shell PATH；本地 CLI / .app 启动器安装、旧默认数据目录迁移、旧程序保留和服务恢复；App 默认位于 /Applications。

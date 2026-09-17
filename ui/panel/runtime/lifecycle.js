@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、运行启停、通知订阅及带阅读接续、开发标志和材质 setter 的胶囊接口。
+ * [OUTPUT]: 扫描、运行启停、通知订阅及带阅读接续、开发标志和材质 setter 的胶囊及可选工作台接口。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -97,6 +97,7 @@ import {
 } from '../outline.js';
 import { nativeGestureEnded, panelPreferences } from '../popout/transport.js';
 import { cancelFaceClick, onResize } from '../core/interaction.js';
+import { stopWorkbench, setWorkbench } from '../workbench/layout.js';
 import { onSignal } from './signals.js';
 import { pushDiagnostic, readDiagnostics } from './diagnostics.js';
 import {
@@ -283,6 +284,7 @@ function installObserver() {
 }
 
 function stopRuntime() {
+  stopWorkbench();
   cancelFaceClick();
   window.dispatchEvent(
     new CustomEvent('codex-buddy:stop', { detail: { destroy: runtimeState.destroyed } }),
@@ -519,6 +521,7 @@ function install() {
     loadSettings,
     syncSettings,
     setOpen,
+    setWorkbench,
     setMaterial: writeMaterial,
     toggleMaterial,
     dockRight: dockRightKeepHeight,

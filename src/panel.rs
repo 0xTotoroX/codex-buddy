@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、含 returnOpen 的 Preferences、带呈现确认和阅读位置接续的弹出/收回/受限命令。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸偏好、带分栏阅读位置接续的弹出/收回/受限命令。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -23,6 +23,12 @@ pub struct Ui {
     pub active_tab: String,
     pub width: f64,
     pub height: f64,
+    pub layout_mode: String,
+    #[serde(deserialize_with = "deserialize_dock_width")]
+    pub dock_width: f64,
+    #[serde(deserialize_with = "deserialize_split_ratio")]
+    pub split_ratio: f64,
+    pub dock_open: bool,
     pub material: String,
     pub liquid_variant: String,
     pub font_offset: f64,
@@ -37,6 +43,10 @@ impl Default for Ui {
             active_tab: "next".into(),
             width: 404.,
             height: 420.,
+            layout_mode: "capsule".into(),
+            dock_width: 340.,
+            split_ratio: 0.45,
+            dock_open: true,
             material: "frosted".into(),
             liquid_variant: "regular".into(),
             font_offset: 0.,
@@ -54,6 +64,9 @@ impl Ui {
             || !["fill", "direct", "hybrid"].contains(&self.prompt_click_mode.as_str())
             || !(300. ..=640.).contains(&self.width)
             || !(340. ..=720.).contains(&self.height)
+            || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
+            || !(300. ..=460.).contains(&self.dock_width)
+            || !(0.2..=0.8).contains(&self.split_ratio)
             || !(-14. ..=14.).contains(&self.font_offset)
             || self.view_order.len() != 2
             || !self.view_order.contains(&"next".into())
@@ -63,6 +76,18 @@ impl Ui {
         }
         Ok(())
     }
+}
+
+fn deserialize_dock_width<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f64, D::Error> {
+    Ok(f64::deserialize(deserializer)?.clamp(300., 460.))
+}
+
+fn deserialize_split_ratio<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<f64, D::Error> {
+    Ok(f64::deserialize(deserializer)?.clamp(0.2, 0.8))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -193,6 +218,24 @@ pub struct ReadingState {
     pub scroll_top: f64,
     pub prompt_preview_index: usize,
     pub prompt_scroll_top: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panes: Option<ReadingPanes>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReadingPanes {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outline: Option<PaneReadingState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<PaneReadingState>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaneReadingState {
+    pub content_token: String,
+    pub scroll_top: f64,
 }
 
 impl ReadingState {
@@ -207,6 +250,16 @@ impl ReadingState {
             || !(0. ..=1_000_000.).contains(&self.prompt_scroll_top)
         {
             bail!("阅读位置无效");
+        }
+        if let Some(panes) = &self.panes {
+            for pane in [&panes.outline, &panes.next].into_iter().flatten() {
+                if pane.content_token.len() > 128
+                    || !pane.scroll_top.is_finite()
+                    || !(0. ..=1_000_000.).contains(&pane.scroll_top)
+                {
+                    bail!("阅读位置无效");
+                }
+            }
         }
         Ok(())
     }
@@ -627,6 +680,7 @@ mod tests {
             scroll_top: 240.,
             prompt_preview_index: 0,
             prompt_scroll_top: 12.,
+            panes: None,
         });
         assert!(app.dock_panel(&input).await.is_err());
         let panel = app.panel.lock().await;
@@ -673,6 +727,149 @@ mod tests {
         assert!(!panel.ready && !panel.restore_attempted);
         assert!(panel.lease.is_empty() && panel.child.is_none());
         assert_eq!(Preferences::read(&app.paths), prefs);
+    }
+
+    #[test]
+    fn workbench_defaults_and_clamps_preserve_capsule_geometry() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        std::fs::write(
+            paths.root.join("panel.json"),
+            json!({"ui":{"width":510,"height":600,"material":"matte"}}).to_string(),
+        )
+        .unwrap();
+        let legacy = Preferences::read(&paths);
+        assert_eq!(legacy.ui.layout_mode, "capsule");
+        assert_eq!(legacy.ui.dock_width, 340.);
+        assert_eq!(legacy.ui.split_ratio, 0.45);
+        assert!(legacy.ui.dock_open);
+        assert_eq!((legacy.ui.width, legacy.ui.height), (510., 600.));
+        assert_eq!(legacy.ui.material, "matte");
+        for (width, ratio, expected_width, expected_ratio) in [
+            (10., -1., 300., 0.2),
+            (900., 2., 460., 0.8),
+            (380., 0.6, 380., 0.6),
+        ] {
+            let ui: Ui = serde_json::from_value(json!({
+                "layoutMode":"workbench", "dockWidth":width, "splitRatio":ratio,
+                "dockOpen":false, "width":510, "height":600
+            }))
+            .unwrap();
+            assert!(ui.validate().is_ok());
+            assert_eq!(
+                (ui.dock_width, ui.split_ratio),
+                (expected_width, expected_ratio)
+            );
+            let prefs = Preferences {
+                ui,
+                ..Default::default()
+            };
+            prefs.save(&paths).unwrap();
+            assert_eq!(Preferences::read(&paths), prefs);
+            assert_eq!((prefs.ui.width, prefs.ui.height), (510., 600.));
+            assert!(!prefs.ui.dock_open);
+        }
+        let invalid: Ui = serde_json::from_value(json!({"layoutMode":"unknown"})).unwrap();
+        assert!(invalid.validate().is_err());
+        for patch in [
+            json!({"dockWidth":"340"}),
+            json!({"splitRatio":null}),
+            json!({"dockOpen":1}),
+        ] {
+            assert!(serde_json::from_value::<Ui>(patch).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn workbench_patches_are_independent_and_preserve_feature_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let app = App::new(paths, crate::config::Config::default(), None, true);
+        let settings = app.settings().await;
+        let before = app.appearance().await;
+        let changed = app
+            .save_appearance(json!({"expectedRevision":before.revision,
+                "ui":{"layoutMode":"workbench","dockWidth":900,"splitRatio":-1,"dockOpen":false}
+            }))
+            .await
+            .unwrap();
+        assert_eq!((changed.ui.dock_width, changed.ui.split_ratio), (460., 0.2));
+        assert_eq!(
+            (changed.ui.width, changed.ui.height),
+            (before.ui.width, before.ui.height)
+        );
+        assert_eq!(changed.ui.material, before.ui.material);
+        let resized = app
+            .save_appearance(json!({"expectedRevision":changed.revision,
+                "ui":{"width":510,"height":600}
+            }))
+            .await
+            .unwrap();
+        assert_eq!((resized.ui.dock_width, resized.ui.split_ratio), (460., 0.2));
+        assert_eq!(resized.ui.layout_mode, "workbench");
+        assert!(!resized.ui.dock_open);
+        assert_eq!(app.settings().await, settings);
+        assert_eq!(Preferences::read(&app.paths), resized);
+        assert!(
+            app.save_appearance(json!({"expectedRevision":resized.revision,
+                "ui":{"layoutMode":"unknown"}
+            }))
+            .await
+            .is_err()
+        );
+        assert_eq!(app.appearance().await, resized);
+    }
+
+    #[test]
+    fn reading_panes_are_optional_and_validate_each_content_identity() {
+        let legacy = json!({"viewToken":"view","contentToken":"content","activeTab":"outline",
+            "scrollTop":240.,"promptPreviewIndex":2,"promptScrollTop":12.});
+        let old: ReadingState = serde_json::from_value(legacy.clone()).unwrap();
+        assert!(old.validate().is_ok());
+        assert_eq!(json!(old), legacy);
+        let mut value = legacy;
+        value["panes"] = json!({
+            "outline":{"contentToken":"outline-content","scrollTop":320.},
+            "next":{"contentToken":"prompt-content","scrollTop":120.}
+        });
+        let valid: ReadingState = serde_json::from_value(value.clone()).unwrap();
+        assert!(valid.validate().is_ok());
+        assert_eq!(json!(valid), value);
+        for key in ["outline", "next"] {
+            for invalid in [
+                json!({"contentToken":"x".repeat(129),"scrollTop":0}),
+                json!({"contentToken":"ok","scrollTop":-1}),
+                json!({"contentToken":"ok","scrollTop":1_000_001}),
+            ] {
+                let mut bad = value.clone();
+                bad["panes"][key] = invalid;
+                assert!(
+                    serde_json::from_value::<ReadingState>(bad)
+                        .unwrap()
+                        .validate()
+                        .is_err()
+                );
+            }
+        }
+        let mut nonfinite = valid.clone();
+        nonfinite
+            .panes
+            .as_mut()
+            .unwrap()
+            .next
+            .as_mut()
+            .unwrap()
+            .scroll_top = f64::NAN;
+        assert!(nonfinite.validate().is_err());
+        value["panes"] = json!({"outline":{"contentToken":"x".repeat(128),"scrollTop":1_000_000}});
+        assert!(
+            serde_json::from_value::<ReadingState>(value.clone())
+                .unwrap()
+                .validate()
+                .is_ok()
+        );
+        value["panes"] = json!({"settings":{"contentToken":"unknown","scrollTop":0}});
+        assert!(serde_json::from_value::<ReadingState>(value).is_err());
     }
 
     #[test]

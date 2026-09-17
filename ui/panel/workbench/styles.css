@@ -1,0 +1,172 @@
+/*
+ * [INPUT]: 工作台状态与共享材质/控件变量。
+ * [OUTPUT]: 同时可见的双面板、设置页、分隔线及停靠尺寸规则。
+ * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
+ */
+[data-codex-buddy-chat-row='true'] {
+  flex-direction: row !important;
+}
+[data-codex-buddy-chat-content='true'] {
+  flex: 1 1 0% !important;
+  min-width: 0 !important;
+}
+[data-companion-stepwise-root][data-dock-mounted='true'] {
+  position: absolute;
+  z-index: 0;
+  top: var(--csw-dock-inset, 0px);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+[data-codex-buddy-dock]::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--csw-dock-inset, 0px) + 20px) auto 20px 0;
+  width: 1px;
+  z-index: 6;
+  pointer-events: none;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+[data-companion-stepwise-root][data-dock-mounted='true'] .csw-popover {
+  position: absolute;
+  left: 0 !important;
+  top: 0 !important;
+}
+[data-companion-stepwise-root][data-dock-mounted='true'] :is(.csw-glass, .csw-rim, .csw-panel) {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+[data-companion-stepwise-root][data-workbench='true'] .csw-fab,
+[data-companion-stepwise-root][data-workbench='true'][data-presentation='embedded']
+  .csw-resize-handle {
+  display: none;
+}
+[data-companion-stepwise-root][data-workbench='true'] .csw-panel {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  clip-path: none;
+}
+[data-companion-stepwise-root][data-workbench='true'][data-dock-visible='false'] {
+  display: none;
+}
+.csw-workbench {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+.csw-workbench .csw-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 48px;
+  height: 48px;
+  padding: 8px 12px;
+}
+.csw-workbench-source {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--csw-muted);
+}
+.csw-workbench-controls {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+.csw-workbench .csw-icon {
+  width: 28px;
+  height: 28px;
+}
+.csw-workbench-panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px 10px;
+}
+.csw-workbench-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.csw-workbench-pane > header {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+.csw-workbench-pane > header strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.csw-workbench .csw-body {
+  padding: 2px 8px 8px;
+  overscroll-behavior: contain;
+}
+.csw-workbench .csw-row {
+  padding: 9px 8px;
+  min-height: 48px;
+}
+.csw-workbench .csw-row-prompt {
+  -webkit-line-clamp: 2;
+}
+.csw-workbench .csw-next-layout {
+  grid-template-rows: max-content minmax(140px, auto);
+  gap: 10px;
+}
+.csw-workbench-split {
+  position: relative;
+  cursor: row-resize;
+  touch-action: none;
+}
+.csw-workbench-split::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 10px;
+  right: 10px;
+  height: 1px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.csw-workbench-resize {
+  position: absolute;
+  left: 0;
+  top: 48px;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+[data-presentation='popout'] .csw-workbench-resize {
+  display: none;
+}
+.csw-workbench [role='separator']:focus-visible {
+  outline: 2px solid var(--csw-accent);
+  outline-offset: -2px;
+}
+.csw-workbench-settings {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.csw-workbench [hidden] {
+  display: none !important;
+}
+
+.csw-dock-warning {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--csw-muted);
+}

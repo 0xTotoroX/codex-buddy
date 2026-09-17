@@ -1,6 +1,6 @@
 /*
  * [INPUT]: SSE 外观快照、后台弹出能力与经过认证的外观 API。
- * [OUTPUT]: Web 全量胶囊设置（三材质单入口）；逐项保存并处理其他窗口的并发更新。
+ * [OUTPUT]: Web 胶囊设置与工作台布局偏好；逐项保存并处理其他窗口的并发更新，不改变功能开关。
  * [POS]: 设置页外观、交互与窗口控件；不接收聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -127,6 +127,14 @@ export function PanelSettings({
       </div>
       <fieldset className="m-0 min-w-0 border-0 p-0" disabled={busy}>
         <div className="grid grid-cols-2 gap-5">
+          <div className="col-span-full grid grid-cols-2 gap-5">
+            {select('布局模式', 'layoutMode', [
+              ['capsule', '胶囊'],
+              ['workbench', '工作台'],
+            ])}
+            {number('侧栏宽度（px）', ui.dockWidth, 300, 460, (v) => change('dockWidth', v))}
+            {number('大纲分栏比例', ui.splitRatio, 0.2, 0.8, (v) => change('splitRatio', v))}
+          </div>
           <div className="flex items-end gap-2 [&>label]:flex-1">
             {select('材质', 'material', [
               ['matte', '哑光'],

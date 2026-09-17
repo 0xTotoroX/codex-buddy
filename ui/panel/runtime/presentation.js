@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 按钮/手势共用 togglePanelWindow、弹出强制展开且内嵌恢复出发形态、带阅读位置和呈现确认的窗口交接、窗口/材质偏好同步、状态投影及受限业务命令。
+ * [OUTPUT]: 按钮/手势共用 togglePanelWindow、弹出强制展开且内嵌恢复出发形态、带独立分栏阅读位置和呈现确认的窗口交接、窗口/材质偏好同步、状态投影及受限业务命令。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -40,10 +40,11 @@ import {
   storage,
 } from './state.js';
 import { chatBusy, contextMatches, contextSnapshot } from '../host/context.js';
+import { foregroundSurface } from '../host/surfaces.js';
 import { clampFontOffset, clampPanelWidth, normalizeMaterial } from '../core/panel-appearance.js';
 import { defaultPosition, shellLayout } from '../core/geometry.js';
 import { emitSignal } from './signals.js';
-import { fillComposer, forceRefreshStepwise } from '../stepwise.js';
+import { fillComposer, forceRefreshStepwise, normalizePromptState } from '../stepwise.js';
 import { outlineJumpTo, outlineJumpToAnchor, refreshOutline } from '../outline.js';
 import { panelPreferences, sizeNativePanel } from '../popout/transport.js';
 
@@ -54,25 +55,28 @@ function panelWindowAnchor() {
   if (IS_POPOUT || !shellState.glass?.isConnected) return null;
   const layout = shellLayout();
   // 弹出后玻璃背景层 display:none；从同一套布局计算收回位置，不能读取零尺寸 DOM。
-  const rect = !shellState.open
-    ? {
-        left: layout.anchor.x,
-        top: layout.anchor.y,
-        width: layout.chip.width,
-        height: layout.chip.height,
-        right: layout.anchor.x + layout.chip.width,
-        bottom: layout.anchor.y + layout.chip.height,
-      }
-    : shellState.detached || document.hidden
+  const dock = shellState.layoutMode === 'workbench' && shellState.dockRect;
+  const rect = dock
+    ? dock.anchor
+    : !shellState.open
       ? {
-          left: layout.left,
-          top: layout.top,
-          width: layout.width,
-          height: layout.height,
-          right: layout.left + layout.width,
-          bottom: layout.top + layout.height,
+          left: layout.anchor.x,
+          top: layout.anchor.y,
+          width: layout.chip.width,
+          height: layout.chip.height,
+          right: layout.anchor.x + layout.chip.width,
+          bottom: layout.anchor.y + layout.chip.height,
         }
-      : shellState.glass.getBoundingClientRect();
+      : shellState.detached || document.hidden
+        ? {
+            left: layout.left,
+            top: layout.top,
+            width: layout.width,
+            height: layout.height,
+            right: layout.left + layout.width,
+            bottom: layout.top + layout.height,
+          }
+        : shellState.glass.getBoundingClientRect();
   const border = Math.max(0, (window.outerWidth - window.innerWidth) / 2);
   const titlebar = Math.max(0, window.outerHeight - window.innerHeight - border);
   if (
@@ -108,8 +112,16 @@ function blinkHandoff() {
   }
 }
 
+function applyWorkbenchPreferences(ui) {
+  shellState.layoutMode = ui.layoutMode === 'workbench' ? 'workbench' : 'capsule';
+  shellState.dockWidth = clamp(Number(ui.dockWidth) || 340, 300, 460);
+  shellState.splitRatio = clamp(Number(ui.splitRatio) || 0.45, 0.2, 0.8);
+  shellState.dockOpen = ui.dockOpen !== false;
+}
+
 function applyPanelPreferences(ui) {
   if (!ui) return;
+  applyWorkbenchPreferences(ui);
   shellState.width = clampPanelWidth(ui.width);
   shellState.height = clamp(Number(ui.height) || PANEL_HEIGHT, PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT);
   shellState.fontOffset = clampFontOffset(
@@ -139,7 +151,12 @@ function applyPanelPreferences(ui) {
 
 function syncPanelPreferences(ui, revision, detached) {
   if (preferencesRevision !== revision) {
+    const initial = preferencesRevision === -1;
     preferencesRevision = revision;
+    if (initial && revision === 0 && ui) {
+      applyWorkbenchPreferences(ui);
+      emitSignal('render', undefined);
+    }
     if (revision > 0 && JSON.stringify(panelPreferences()) !== JSON.stringify(ui))
       applyPanelPreferences(ui);
   }
@@ -162,8 +179,10 @@ function readingContentToken(tab) {
 }
 
 function readingState(viewToken) {
-  const body = shellState.panel?.querySelector('.csw-body[data-view-body]');
-  const promptScroll = body?.querySelector('.csw-prompt-preview-scroll');
+  const body = shellState.panel?.querySelector(
+    `.csw-body[data-view-body="${shellState.activeTab}"]`,
+  );
+  const promptScroll = shellState.panel?.querySelector('.csw-prompt-preview-scroll');
   return {
     viewToken,
     contentToken: readingContentToken(shellState.activeTab),
@@ -171,6 +190,23 @@ function readingState(viewToken) {
     scrollTop: Number(body?.scrollTop) || 0,
     promptPreviewIndex: Number(shellState.promptPreviewIndex) || 0,
     promptScrollTop: Number(promptScroll?.scrollTop) || 0,
+    ...(shellState.layoutMode === 'workbench'
+      ? {
+          panes: Object.fromEntries(
+            ['outline', 'next'].map((kind) => [
+              kind,
+              {
+                contentToken: readingContentToken(kind),
+                scrollTop:
+                  Number(
+                    shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`)
+                      ?.scrollTop,
+                  ) || 0,
+              },
+            ]),
+          ),
+        }
+      : {}),
   };
 }
 
@@ -184,7 +220,9 @@ function validReadingState(value, viewToken) {
     Boolean(value && viewToken) &&
     value.viewToken === viewToken &&
     ['next', 'outline', 'settings'].includes(value.activeTab) &&
-    value.contentToken === readingContentToken(value.activeTab) &&
+    (shellState.layoutMode === 'workbench' && value.panes
+      ? true
+      : value.contentToken === readingContentToken(value.activeTab)) &&
     Number.isFinite(value.scrollTop) &&
     Number.isInteger(value.promptPreviewIndex) &&
     Number.isFinite(value.promptScrollTop)
@@ -194,8 +232,11 @@ function validReadingState(value, viewToken) {
 function applyReadingSelection(value, viewToken) {
   if (!validReadingState(value, viewToken)) return false;
   shellState.activeTab = normalizeActiveTab(value.activeTab);
+  shellState.restoringWorkbench = shellState.layoutMode === 'workbench';
   shellState.promptPreviewIndex = clamp(
-    value.promptPreviewIndex,
+    value.panes && value.panes.next?.contentToken !== readingContentToken('next')
+      ? 0
+      : value.promptPreviewIndex,
     0,
     Math.max(0, stepwiseState.prompts.length - 1),
   );
@@ -203,7 +244,20 @@ function applyReadingSelection(value, viewToken) {
 }
 
 function restoreReadingScroll(value, viewToken) {
+  shellState.restoringWorkbench = false;
   if (!validReadingState(value, viewToken)) return;
+  if (shellState.layoutMode === 'workbench' && value.panes) {
+    for (const kind of ['outline', 'next']) {
+      if (value.panes[kind]?.contentToken !== readingContentToken(kind)) continue;
+      const pane = shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`);
+      if (pane) pane.scrollTop = value.panes[kind].scrollTop;
+    }
+    if (value.panes.next?.contentToken === readingContentToken('next')) {
+      const preview = shellState.panel?.querySelector('.csw-prompt-preview-scroll');
+      if (preview) preview.scrollTop = value.promptScrollTop;
+    }
+    return;
+  }
   const body = shellState.panel?.querySelector('.csw-body[data-view-body]');
   if (
     !body ||
@@ -268,6 +322,7 @@ async function setDetached(value, ui = null, presentation = null) {
     applyPanelPreferences(ui);
   }
   shellState.detached = next;
+  if (shellState.layoutMode === 'workbench') emitSignal('render', undefined);
   clearTimeout(shellState.detachedRecoveryTimer);
   shellState.detachedRecoveryTimer = next
     ? window.setTimeout(() => {
@@ -302,6 +357,11 @@ function exportPanelState() {
   if (IS_POPOUT || !isCurrentRuntime()) return null;
 
   const context = contextSnapshot();
+  const foreground = foregroundSurface();
+  const chatTitle =
+    foreground?.thread === contextState.activeContext.paneRoot
+      ? foreground?.dialog.querySelector('header')?.textContent?.trim().slice(0, 100)
+      : '';
   const outline = outlineState.outlineItems.map(
     ({ id, text, displayLevel, numberPrefix, labelText }) => ({
       id,
@@ -337,9 +397,11 @@ function exportPanelState() {
     accentColor: getComputedStyle(shellState.root).getPropertyValue('--csw-accent').trim(),
     hostTypography: shellState.hostTypography,
     settings: runtimeState.settings,
-    sourceLabel: context.sessionId
-      ? `Codex · 任务 ${context.sessionId.slice(-8)}`
-      : 'Codex · 未选择任务',
+    sourceLabel: chatTitle
+      ? `聊天 · ${chatTitle}`
+      : context.sessionId
+        ? `Codex · 任务 ${context.sessionId.slice(-8)}`
+        : 'Codex · 未选择任务',
   };
 }
 
@@ -420,7 +482,7 @@ async function receivePanelState(result, initial) {
   } else {
     shellState.root.style.removeProperty('--csw-accent');
   }
-  stepwiseState.prompts = source.prompts;
+  normalizePromptState(source.prompts);
   outlineState.outlineItems = source.outlineItems;
   outlineState.outlineStatus = source.outlineStatus;
   outlineState.outlineError = source.outlineError;
@@ -517,6 +579,7 @@ export {
   panelCommand,
   panelDisconnected,
   panelReadingState,
+  readingContentToken,
   panelWindowAnchor,
   blinkHandoff,
   panelWindowControls,

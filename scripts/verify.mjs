@@ -87,6 +87,7 @@ export function prepareTestBinary(profile) {
 async function verify() {
   rmSync(join(root, 'target/reports/verify.json'), { force: true });
   run('npm', ['run', 'check']);
+  run(process.execPath, ['tests/workbench.mjs']);
   run('cargo', ['fmt', '--check']);
   const artifact = prepareTestBinary();
   run('cargo', ['test', '--locked']);

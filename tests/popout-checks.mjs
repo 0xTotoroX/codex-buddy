@@ -840,6 +840,11 @@ export async function checkPopout({
     );
     assert.equal(await desktop.evaluate(() => window.__companionFloatingPanel.state.open), false);
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'panel.json'))).ui.open, false);
+    // 宿主先恢复可见，后台随后才释放本次窗口；下一次打开等待交接真正结束。
+    await waitFor(
+      async () => (await api('panel/state', { lease: chipLease })).status === 400,
+      'chip window lease was not released',
+    );
     record('胶囊态双击直接弹出：180ms 慢双击保存首击前状态，收回恢复胶囊且动画锚点为胶囊区域');
 
     const recoveryLease = (await api('panel/open', {})).body.lease;

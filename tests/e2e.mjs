@@ -1139,6 +1139,9 @@ try {
       record('macOS 14 保持内嵌并跳过不可用的桌面浮窗用例');
     }
 
+    // 弹出回归最终恢复胶囊态；后续正文生成用例先显式展开。
+    await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(true));
+    await settle();
     await desktop.evaluate(() => {
       const example = document.createElement('pre');
       example.id = 'legacy-payload-example';

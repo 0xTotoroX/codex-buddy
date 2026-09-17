@@ -8,7 +8,7 @@ main 挂载设置视图并调用 api；类型来自 ../contracts.ts，API 层处
 
 - [index.html](index.html)：设置页 HTML 入口，加载同目录 main.tsx；标签页图标复用 ../icon.png。
 - [main.tsx](main.tsx)：页面入口、设置表单、Field/Toggle 业务组合及操作反馈；页头复用产品图标；开发构建标明真实调试并固定启动端点和窗口。
-- [panel-settings.tsx](panel-settings.tsx)：哑光/磨砂/液态材质、液态旁的 Clear 星星按钮、字号、摘要、点击、顺序及窗口设置；依据后台 popoutSupported 禁用不支持设备的桌面选项；按版本逐项保存，冲突时读取新状态；说明三材质在内嵌、弹出与旧系统下的实际效果。
+- [panel-settings.tsx](panel-settings.tsx)：哑光/磨砂/液态材质、液态旁的 Clear 星星按钮、字号、摘要、点击、顺序及窗口设置，另提供布局模式、侧栏宽度和大纲分栏比例，保存偏好不启用功能或更改主题；依据后台 popoutSupported 禁用不支持设备的桌面选项；按版本逐项保存，冲突时读取新状态；说明三材质在内嵌、弹出与旧系统下的实际效果。
 - [api.ts](api.ts)：公开数据类型、认证请求、错误和 SSE 状态订阅。
 - [styles.css](styles.css)：Tailwind v4 入口、共享语义变量及必要的全局焦点/减少动效规则；只扫描本目录，布局和控件样式均由 TSX 工具类负责。
 - [vite.config.ts](vite.config.ts)：React/Tailwind 构建插件、@ 别名、本机开发代理与 target/web 输出；仅代理 /api/ 请求，保留 api.ts 模块加载；依赖优化不等待全量模块遍历结束，避免冷启动后关闭卡住；只重写当前开发 HTTP 端口的来源，外部 Origin 交由后台拒绝。

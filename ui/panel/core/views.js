@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立功能视图、外壳状态、交互和设置视图。
- * [OUTPUT]: 胶囊 DOM 创建、组合渲染与建议预览事件；表情支持单击收放和双击切换窗口，弹出不收起。
+ * [OUTPUT]: 胶囊 DOM 创建、胶囊/工作台组合渲染与建议预览事件；表情支持单击收放和双击切换窗口，弹出不收起。
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -102,6 +102,14 @@ import { installStyle } from './install-styles.js';
 import { pushDiagnostic } from '../runtime/diagnostics.js';
 import { reloadSettings } from '../runtime/settings-sync.js';
 import { toggleCodexTheme } from '../host/host-appearance.js';
+
+import {
+  isWorkbench,
+  syncWorkbench,
+  setWorkbench,
+  attachWorkbenchRoot,
+} from '../workbench/layout.js';
+import { renderWorkbench } from '../workbench/view.js';
 
 function faceEyeHtml() {
   return `<span class="csw-fab-eye"><svg class="csw-fab-happy-arc" viewBox="0 0 18 12" aria-hidden="true" focusable="false"><path d="M1.5 9 C4.6 3.2 13.4 3.2 16.5 9"></path></svg></span>`;
@@ -264,6 +272,27 @@ function renderFloat(options = {}) {
     return;
   }
   shellState.activeTab = normalizeActiveTab();
+  syncWorkbench();
+  if (isWorkbench() && (IS_POPOUT || shellState.dockStatus !== 'unsupported')) {
+    installStyle();
+    installFloat();
+    attachWorkbenchRoot();
+    syncTheme();
+    normalizePromptState();
+    shellState.root.dataset.workbench = 'true';
+    shellState.root.dataset.dockVisible = String(IS_POPOUT || shellState.dockStatus === 'open');
+    shellState.root.dataset.hidden = 'false';
+    shellState.open = true;
+    shellState.popover.dataset.open = 'true';
+    applyPosition();
+    settleMorph(1);
+    renderWorkbench(nextHtml, attachNextEvents, clearPromptInteractionTimers);
+    return;
+  }
+  if (shellState.root) {
+    delete shellState.root.dataset.workbench;
+    delete shellState.root.dataset.dockVisible;
+  }
   const viewScroll = captureViewScroll();
   clearPromptInteractionTimers();
   shellState.viewReorderCleanup?.();
@@ -329,11 +358,13 @@ function renderFloat(options = {}) {
         <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" title="${faceHint}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
         <div class="csw-head-side csw-head-right">
           ${panelWindowControls()}
+          ${IS_POPOUT ? '' : '<button class="csw-icon" data-action="workbench" title="停靠工作台" aria-label="停靠工作台">◫</button>'}
           <button class="csw-icon" type="button" data-action="refresh" title="${escapeAttr(refreshTitle)}" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
           <button class="csw-icon" type="button" data-action="theme" title="${escapeAttr(themeLabel())}" aria-label="${escapeAttr(themeLabel())}">${themeIcon()}</button>
           <button class="csw-icon" type="button" data-view="settings" data-active="${shellState.activeTab === 'settings'}" aria-pressed="${shellState.activeTab === 'settings'}" title="设置" aria-label="设置">${iconSvg('settings')}</button>
         </div>
       </div>
+      ${isWorkbench() ? '<p class="csw-dock-warning" role="status">当前页面暂不支持停靠，请切回胶囊或弹出。</p>' : ''}
       <div class="csw-body" data-view-body="${shellState.activeTab}">
         <div class="csw-mouth-stage" data-mouth-stage="${shellState.activeTab}">${shellState.activeTab === 'settings' ? settingsHtml() : shellState.activeTab === 'outline' ? outlineHtml() : nextHtml()}</div>
       </div>
@@ -357,6 +388,9 @@ function renderFloat(options = {}) {
       void switchView(nextTab);
     });
   });
+  shellState.panel
+    .querySelector('[data-action="workbench"]')
+    ?.addEventListener('click', () => setWorkbench(!isWorkbench()));
   const headFace = shellState.panel.querySelector('.csw-head-face');
   headFace?.addEventListener('click', onHeadFaceClick);
   bindGlassPointerSurface(headFace);
@@ -478,8 +512,8 @@ function nextEmptyState() {
   };
 }
 
-function attachNextEvents() {
-  shellState.panel.querySelectorAll('.csw-row').forEach((button) => {
+function attachNextEvents(root = shellState.panel) {
+  root.querySelectorAll('.csw-row').forEach((button) => {
     button.addEventListener('pointerenter', () => schedulePromptPreview(button));
     button.addEventListener('pointerleave', cancelScheduledPromptPreview);
     button.addEventListener('focus', () => showPromptPreview(button, true));
