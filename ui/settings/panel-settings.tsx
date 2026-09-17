@@ -121,6 +121,8 @@ export function PanelSettings({
   );
   const workbenchLayout = (key: 'dockLayout' | 'popoutLayout', title: string) => {
     const layout: WorkbenchLayout = ui[key] ?? {
+      group: 'split',
+      active: 'outline',
       mode: 'auto',
       first: 'outline',
       verticalRatio: ui.splitRatio,
@@ -132,6 +134,28 @@ export function PanelSettings({
       <details className="col-span-full group">
         <summary className="cursor-pointer text-xs font-[550] group-open:mb-5">{title}布局</summary>
         <div className="grid grid-cols-2 gap-5">
+          <label className="min-w-0 text-xs">
+            <span className="mb-2 block">编排</span>
+            <NativeSelect
+              aria-label={`${title}编排`}
+              value={layout.group || 'split'}
+              onChange={(e) => set('group', e.target.value as WorkbenchLayout['group'])}
+            >
+              <option value="split">分栏</option>
+              <option value="tabs">标签组</option>
+            </NativeSelect>
+          </label>
+          <label className="min-w-0 text-xs">
+            <span className="mb-2 block">选中标签</span>
+            <NativeSelect
+              aria-label={`${title}选中标签`}
+              value={layout.active || 'outline'}
+              onChange={(e) => set('active', e.target.value as WorkbenchLayout['active'])}
+            >
+              <option value="outline">大纲</option>
+              <option value="next">下一步</option>
+            </NativeSelect>
+          </label>
           <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
             <span>排列</span>
             <NativeSelect
@@ -173,6 +197,8 @@ export function PanelSettings({
             className="col-span-full text-xs text-muted-foreground text-left"
             onClick={() =>
               change(key, {
+                group: 'split',
+                active: 'outline',
                 mode: 'auto',
                 first: 'outline',
                 verticalRatio: 0.45,

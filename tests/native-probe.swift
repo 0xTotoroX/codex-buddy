@@ -5,7 +5,25 @@
 
 import AppKit
 import Foundation
-if CommandLine.arguments[1] == "screens" {
+if CommandLine.arguments[1] == "drag" {
+    if !CGPreflightPostEventAccess() { fatalError("Native drag test requires event posting access") }
+    if CommandLine.arguments.count > 6, let pid = Int32(CommandLine.arguments[6]) {
+        NSRunningApplication(processIdentifier: pid)?.activate(options: [])
+        usleep(300000)
+    }
+    let x1 = Double(CommandLine.arguments[2])!, y1 = Double(CommandLine.arguments[3])!
+    let x2 = Double(CommandLine.arguments[4])!, y2 = Double(CommandLine.arguments[5])!
+    func send(_ type: CGEventType, _ x: Double, _ y: Double) {
+        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x:x,y:y), mouseButton: .left)?.post(tap: .cghidEventTap)
+    }
+    send(.mouseMoved, x1, y1); usleep(80000)
+    send(.leftMouseDown, x1, y1); usleep(80000)
+    for i in 1...18 {
+        let t = Double(i) / 18
+        send(.leftMouseDragged, x1 + (x2-x1)*t, y1 + (y2-y1)*t); usleep(16000)
+    }
+    send(.leftMouseUp, x2, y2)
+} else if CommandLine.arguments[1] == "screens" {
     let top = NSScreen.screens.first!.frame.maxY
     let rows = NSScreen.screens.map { s in ["x": s.frame.minX, "y": top - s.frame.maxY,
         "width": s.frame.width, "height": s.frame.height, "scale": s.backingScaleFactor] }

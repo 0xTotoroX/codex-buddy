@@ -322,7 +322,8 @@ async function createPopout(host, preserveSnapshot = false) {
   await page.waitForFunction(() => window.__companionFloatingPanel?.state.runtimeActive);
   await project(page, projection, true);
   assert.equal(await page.locator(slotSelector).count(), 0, 'popout never installs a host slot');
-  for (const kind of ['outline', 'next']) await box(page, `[data-pane="${kind}"]`);
+  for (const kind of ['outline', 'next'])
+    await page.locator(`[data-pane="${kind}"]`).waitFor({ state: 'attached' });
   return { page, projection, errors };
 }
 
@@ -386,6 +387,203 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'arrangement menus tabs focus and hidden reading retain the same business nodes',
+    async (host) => {
+      await mode(host, true);
+      const { page, projection, errors } = await createPopout(host);
+      await page.setViewportSize({ width: 924, height: 824 });
+      await settle(page);
+      await page.evaluate(() => {
+        window.originalPanes = [...document.querySelectorAll('[data-pane]')];
+      });
+      const before = await scrollPanes(page, 100, 30, 80);
+      const arrange = (pane, action) =>
+        page.locator(`[data-pane-arrange="${pane}"]`).selectOption(action);
+      await arrange('outline', 'merge');
+      assert.equal(await page.locator('[data-pane="next"]').isVisible(), false);
+      assert.equal((await reading(page)).promptScrollTop, before.preview);
+      await page.getByRole('tab', { name: '下一步', exact: true }).click();
+      assert.equal(await page.locator('[data-pane="next"]').isVisible(), true);
+      await page.getByRole('tab', { name: '大纲', exact: true }).click();
+      assert.equal(await page.locator('[data-pane="outline"]').isVisible(), true);
+      await page.setViewportSize({ width: 1200, height: 824 });
+      await settle(page);
+      assert.equal(await page.locator('.csw-workbench-tabs').isVisible(), true);
+      const outlineTab = page.getByRole('tab', { name: '大纲', exact: true });
+      await outlineTab.focus();
+      await outlineTab.press('ArrowRight');
+      assert.equal(
+        await page
+          .getByRole('tab', { name: '下一步', exact: true })
+          .evaluate((n) => n === document.activeElement),
+        true,
+      );
+      assert.equal(
+        await outlineTab.getAttribute('aria-selected'),
+        'true',
+        'arrow only moves focus',
+      );
+      await page.keyboard.press('Enter');
+      assert.equal(await page.locator('[data-pane="outline"]').isVisible(), false);
+      assert.equal(await page.locator('[data-pane="outline"]').evaluate((n) => n.inert), true);
+      near(
+        await page.locator('.csw-prompt-preview-scroll').evaluate((n) => n.scrollTop),
+        before.preview,
+        'preview survives hidden tab',
+      );
+      await arrange('next', 'reorder');
+      assert.equal(
+        await page.locator('[role="tab"]').first().getAttribute('data-pane-tab'),
+        'next',
+      );
+      const prefs = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
+      await page.locator('[data-pane-focus="next"]').click();
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'focus');
+      assert.deepEqual(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences()),
+        prefs,
+      );
+      assert.equal(await page.locator('[data-pane-arrange="next"]').isDisabled(), true);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'tabs');
+      await arrange('next', 'left');
+      assert.equal(
+        await page.locator('.csw-workbench-panes').getAttribute('data-axis'),
+        'horizontal',
+      );
+      assert.equal(await page.locator('[data-pane="outline"]').isVisible(), true);
+      const restoredOutline = await page
+        .locator('[data-view-body="outline"]')
+        .evaluate((n) => ({ top: n.scrollTop, max: n.scrollHeight - n.clientHeight }));
+      near(
+        restoredOutline.top,
+        Math.min(before.outline, restoredOutline.max),
+        'outline restores as far as current viewport allows',
+      );
+      near(
+        (await reading(page)).panes.outline.scrollTop,
+        before.outline,
+        'requested reading survives a larger viewport',
+      );
+      assert.equal(
+        await page.evaluate(() => window.originalPanes.every((n) => n.isConnected)),
+        true,
+      );
+      assert.deepEqual(errors, []);
+      assert.deepEqual(await page.evaluate(() => window.popoutFixture.unexpected), []);
+      await page.screenshot({ path: resolve(output, 'arrangement-split.png') });
+      await arrange('outline', 'merge');
+      await page.screenshot({ path: resolve(output, 'arrangement-tabs.png') });
+      await page.getByRole('tab', { name: '下一步', exact: true }).click();
+      const away = structuredClone(projection);
+      away.snapshot.viewToken = 'fixture-other-chat';
+      away.snapshot.context.sessionId = 'fixture-other-chat';
+      await project(page, away, false);
+      near((await reading(page)).panes.outline.scrollTop, 0, 'new chat has its own reading');
+      await project(page, projection, false);
+      near(
+        (await reading(page)).panes.outline.scrollTop,
+        before.outline,
+        'hidden reading returns with original chat',
+      );
+      await page.getByRole('tab', { name: '大纲', exact: true }).click();
+      const savedTabs = await page.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      await host.evaluate(
+        (ui) => window.__companionFloatingPanel.syncPanelPreferences(ui, 8, false),
+        savedTabs,
+      );
+      await page.close();
+      const reopened = await createPopout(host);
+      assert.equal(
+        await reopened.page.locator('.csw-workbench').getAttribute('data-composition'),
+        'tabs',
+      );
+      assert.equal(
+        await reopened.page
+          .getByRole('tab', { name: '大纲', exact: true })
+          .getAttribute('aria-selected'),
+        'true',
+      );
+      assert.deepEqual(
+        await reopened.page.evaluate(
+          () => window.__companionFloatingPanel.panelPreferences().popoutLayout,
+        ),
+        savedTabs.popoutLayout,
+      );
+      await reopened.page.close();
+    },
+  ],
+  [
+    'arrangement drag previews commits only on drop and cancels without reverting new content',
+    async (host) => {
+      await mode(host, true);
+      const { page, projection, errors } = await createPopout(host);
+      await page.setViewportSize({ width: 924, height: 824 });
+      await settle(page);
+      const pref = () =>
+        page.evaluate(() => window.__companionFloatingPanel.panelPreferences().popoutLayout);
+      const original = await pref();
+      async function dragOver() {
+        const header = await box(page, '[data-pane="outline"] > header strong');
+        const target = await box(page, '[data-pane="next"]');
+        await page.mouse.move(header.x + 20, header.y + header.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, {
+          steps: 8,
+        });
+        assert.equal(await page.locator('.csw-drop-preview').isVisible(), true);
+      }
+      await dragOver();
+      assert.deepEqual(await pref(), original);
+      projection.snapshot.outlineItems[0].text = '拖动期间完成的新内容';
+      projection.snapshot.outlineItems[0].labelText = '拖动期间完成的新内容';
+      await project(page, projection, false);
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      assert.deepEqual(await pref(), original);
+      assert.equal(await page.locator('.csw-drop-preview').isVisible(), false);
+      assert.match(
+        await page.locator('[data-view-body="outline"]').innerText(),
+        /拖动期间完成的新内容/,
+      );
+      await dragOver();
+      await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+      await page.mouse.up();
+      assert.deepEqual(await pref(), original);
+      await dragOver();
+      await page.setViewportSize({ width: 880, height: 780 });
+      await settle(page);
+      await page.mouse.up();
+      assert.deepEqual(await pref(), original);
+      await dragOver();
+      await page.mouse.up();
+      assert.equal((await pref()).group, 'tabs');
+      assert.equal((await pref()).active, 'outline');
+      const tab = await box(page, '[data-pane-tab="outline"]');
+      const panes = await box(page, '.csw-workbench-panes');
+      await page.mouse.move(tab.x + tab.width / 2, tab.y + tab.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(panes.x + panes.width - 12, panes.y + panes.height / 2, { steps: 8 });
+      assert.equal((await pref()).group, 'tabs', 'tab drag only previews before drop');
+      await page.mouse.up();
+      assert.equal((await pref()).group, 'split');
+      assert.equal((await pref()).mode, 'horizontal');
+      assert.equal((await pref()).first, 'next', 'outline dropped on the right');
+      const split = await pref();
+      await dragOver();
+      await page.mouse.move(1, 1);
+      await page.mouse.up();
+      assert.deepEqual(await pref(), split, 'outside drop retains layout');
+      assert.equal(await page.locator('.csw-drop-preview').isVisible(), false);
+      assert.deepEqual(errors, []);
+      assert.deepEqual(await page.evaluate(() => window.popoutFixture.unexpected), []);
+      await page.close();
+    },
+  ],
+
+  [
     'layout enhancement keeps panes alive, remembers each surface and adapts without overwriting intent',
     async (host) => {
       await mode(host, true);
@@ -444,7 +642,7 @@ const cases = [
       assert.equal((await pref()).popoutLayout.verticalRatio, vertical);
       await chooseLayout(page, 'swap');
       assert.equal(
-        await page.locator('.csw-workbench-panes > :first-child').getAttribute('data-pane'),
+        await page.locator('.csw-workbench-panes > [data-pane]').first().getAttribute('data-pane'),
         'next',
       );
       assert.equal(
@@ -513,6 +711,8 @@ const cases = [
         window.__companionFloatingPanel.panelPreferences(),
       );
       assert.deepEqual(reset.popoutLayout, {
+        group: 'split',
+        active: 'outline',
         mode: 'auto',
         first: 'outline',
         verticalRatio: 0.45,
@@ -604,7 +804,7 @@ const cases = [
       });
       await page.locator('[data-refresh="next"]').click();
       await page.waitForFunction(() => window.workbenchFixture.deferred.length === 1);
-      for (const action of ['horizontal', 'swap', 'vertical', 'auto', 'swap'])
+      for (const action of ['horizontal', 'swap', 'vertical', 'auto', 'swap', 'merge', 'split'])
         await chooseLayout(page, action);
       assert.equal(
         await page.evaluate(
@@ -1430,7 +1630,7 @@ const cases = [
         await mode(page, true);
         await layout(page);
         const pane = page.locator(`[data-pane="${disabled}"]`);
-        assert.equal(await pane.locator('button').isDisabled(), true);
+        assert.equal(await pane.locator('[data-refresh]').isDisabled(), true);
         assert.match(await pane.locator('.csw-body').innerText(), /功能已关闭/);
         const other = disabled === 'next' ? 'outline' : 'next';
         assert.equal(await page.locator(`[data-refresh="${other}"]`).isDisabled(), false);

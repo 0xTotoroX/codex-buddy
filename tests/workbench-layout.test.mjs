@@ -7,6 +7,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  arrangeWorkbench,
   activeWorkbenchPanels,
   workbenchPanels,
   normalizeWorkbenchLayout,
@@ -23,6 +24,8 @@ test('legacy ratio migrates without coupling presentation preferences', () => {
   assert.deepEqual(
     normalizeWorkbenchLayout({ mode: 'bad', verticalRatio: NaN, horizontalRatio: 9 }),
     {
+      group: 'split',
+      active: 'outline',
       mode: 'auto',
       first: 'outline',
       verticalRatio: 0.45,
@@ -77,4 +80,22 @@ test('registering another panel does not implicitly open or generate it', () => 
     resolveWorkbenchLayout(normalizeWorkbenchLayout(null), 600, 500, '', registry).axis,
     'horizontal',
   );
+});
+
+test('arrangement commands preserve group order and ratios while rejecting impossible drops', () => {
+  const initial = normalizeWorkbenchLayout(null);
+  const tabs = arrangeWorkbench(initial, 'next', 'merge', 340, 500);
+  assert.equal(tabs.group, 'tabs');
+  assert.equal(tabs.active, 'next');
+  assert.equal(initial.group, 'split');
+  assert.equal(arrangeWorkbench(tabs, 'outline', 'right', 340, 500), null);
+  const moved = arrangeWorkbench(tabs, 'next', 'left', 800, 500);
+  assert.equal(moved.group, 'split');
+  assert.equal(moved.mode, 'horizontal');
+  assert.equal(moved.first, 'next');
+  assert.equal(moved.horizontalRatio, 0.6);
+  assert.equal(arrangeWorkbench(tabs, 'outline', 'bottom', 800, 200), null);
+  assert.equal(arrangeWorkbench(tabs, 'unknown', 'merge', 800, 500), null);
+  assert.equal(arrangeWorkbench({ ...tabs, mode: 'vertical' }, 'outline', 'split', 800, 200), null);
+  assert.equal(arrangeWorkbench(tabs, 'outline', 'split', 800, 200).group, 'split');
 });

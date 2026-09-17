@@ -123,6 +123,22 @@ const events = [];
 const requests = [];
 const script = await buildPanel();
 function probePage() {
+  const pointerEvents = [];
+  for (const name of ['pointerdown', 'pointerup', 'pointercancel', 'lostpointercapture']) {
+    window.addEventListener(
+      name,
+      (event) => {
+        pointerEvents.push({
+          type: name,
+          x: event.clientX,
+          y: event.clientY,
+          tag: event.target?.tagName,
+        });
+        if (pointerEvents.length > 12) pointerEvents.shift();
+      },
+      true,
+    );
+  }
   let busy = false;
   setInterval(async () => {
     if (busy) return;
@@ -146,6 +162,7 @@ function probePage() {
       const response = await fetch('/probe', {
         method: 'POST',
         body: JSON.stringify({
+          pointerEvents,
           sentAt: Date.now(),
           visibility: document.visibilityState,
           active: current?.runtimeActive,
@@ -155,12 +172,13 @@ function probePage() {
           activeTab: current?.activeTab,
           commandId: window.probeCommandId,
           workbench: workbench && {
+            composition: workbench.dataset.composition,
             layoutMode: current?.layoutMode,
             dockWidth: current?.dockWidth,
             splitRatio: current?.splitRatio,
             popoutLayout: current?.popoutLayout,
             axis: workbench.querySelector('.csw-workbench-panes')?.dataset.axis,
-            first: workbench.querySelector('.csw-workbench-panes > :first-child')?.dataset.pane,
+            first: workbench.querySelector('.csw-workbench-panes > [data-pane]')?.dataset.pane,
             dockOpen: current?.dockOpen,
             layout: getComputedStyle(workbench).display,
             rect: workbench.getBoundingClientRect(),
@@ -208,6 +226,13 @@ function probePage() {
           document
             .querySelector(`[data-layout-mode="${cmd.value}"], [data-layout-action="${cmd.value}"]`)
             ?.click();
+        if (cmd.kind === 'pane-focus')
+          document.querySelector(`[data-pane-focus="${cmd.pane}"]`)?.click();
+        if (cmd.kind === 'pane-arrange') {
+          const select = document.querySelector(`[data-pane-arrange="${cmd.pane}"]`);
+          select.value = cmd.action;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         if (cmd.kind === 'workbench-settings')
           document.querySelector('[data-workbench-settings]')?.click();
         if (cmd.kind === 'pane-scroll') {
@@ -540,6 +565,38 @@ try {
           if (assertLayout().first !== 'next') throw Error('Native swap failed');
           await command({ kind: 'workbench-layout', value: 'reset' });
           if (assertLayout().axis !== 'horizontal') throw Error('Native layout reset failed');
+          const beforeWindow = windows().find(
+            (w) => Math.abs(w.kCGWindowBounds.Width - width) <= 1,
+          );
+          const origin = beforeWindow.kCGWindowBounds;
+          const from = telemetry.workbench.panes.outline.rect;
+          const to = telemetry.workbench.panes.next.rect;
+          execFileSync(helper, [
+            'drag',
+            String(origin.X + from.left + 22),
+            String(origin.Y + from.top + 18),
+            String(origin.X + to.left + to.width / 2),
+            String(origin.Y + to.top + to.height / 2),
+            String(panel.pid),
+          ]);
+          await waitFor(
+            () => telemetry.workbench.composition === 'tabs',
+            'native pointer drag did not merge panes',
+          );
+          const afterWindow = windows().find((w) => Math.abs(w.kCGWindowBounds.Width - width) <= 1);
+          if (
+            !afterWindow ||
+            afterWindow.kCGWindowBounds.X !== origin.X ||
+            afterWindow.kCGWindowBounds.Y !== origin.Y
+          )
+            throw Error('Dragging a pane moved the native window');
+          await command({ kind: 'pane-focus', pane: 'outline' });
+          if (telemetry.workbench.composition !== 'focus') throw Error('Native focus mode missing');
+          await command({ kind: 'pane-focus', pane: 'outline' });
+          if (telemetry.workbench.composition !== 'tabs')
+            throw Error('Native focus did not restore tabs');
+          await command({ kind: 'pane-arrange', pane: 'outline', action: 'split' });
+          assertLayout();
         }
         const native = windows().find(
           (window) =>

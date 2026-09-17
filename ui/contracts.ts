@@ -115,6 +115,8 @@ export interface CommandResult {
 }
 
 export interface WorkbenchLayout {
+  group: 'split' | 'tabs';
+  active: 'outline' | 'next';
   mode: 'auto' | 'vertical' | 'horizontal';
   first: 'outline' | 'next';
   verticalRatio: number;

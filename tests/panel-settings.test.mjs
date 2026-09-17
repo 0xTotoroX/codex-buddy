@@ -98,7 +98,14 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       {
         expectedRevision: 2,
         ui: {
-          dockLayout: { mode: 'auto', first: 'outline', verticalRatio: 0.6, horizontalRatio: 0.4 },
+          dockLayout: {
+            group: 'split',
+            active: 'outline',
+            mode: 'auto',
+            first: 'outline',
+            verticalRatio: 0.6,
+            horizontalRatio: 0.4,
+          },
         },
       },
     ]);
@@ -113,6 +120,13 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     }
     assert.equal(saves.length, 3);
     await page.getByText('浮窗布局', { exact: true }).click();
+    await page.getByLabel('浮窗编排', { exact: true }).selectOption('tabs');
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    await page.getByLabel('浮窗选中标签', { exact: true }).selectOption('next');
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    assert.equal(prefs.ui.popoutLayout.group, 'tabs');
+    assert.equal(prefs.ui.popoutLayout.active, 'next');
+    assert.equal(prefs.ui.dockLayout.group, 'split');
     await page.getByLabel('浮窗排列', { exact: true }).selectOption('horizontal');
     await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
     assert.equal(prefs.ui.popoutLayout.mode, 'horizontal');

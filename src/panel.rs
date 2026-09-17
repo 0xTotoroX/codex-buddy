@@ -19,6 +19,8 @@ use tokio::process::{Child, Command};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkbenchLayout {
+    pub group: String,
+    pub active: String,
     pub mode: String,
     pub first: String,
     #[serde(deserialize_with = "deserialize_split_ratio")]
@@ -29,6 +31,8 @@ pub struct WorkbenchLayout {
 impl Default for WorkbenchLayout {
     fn default() -> Self {
         Self {
+            group: "split".into(),
+            active: "outline".into(),
             mode: "auto".into(),
             first: "outline".into(),
             vertical_ratio: 0.45,
@@ -38,7 +42,9 @@ impl Default for WorkbenchLayout {
 }
 impl WorkbenchLayout {
     fn valid(&self) -> bool {
-        ["auto", "vertical", "horizontal"].contains(&self.mode.as_str())
+        ["split", "tabs"].contains(&self.group.as_str())
+            && ["outline", "next"].contains(&self.active.as_str())
+            && ["auto", "vertical", "horizontal"].contains(&self.mode.as_str())
             && ["outline", "next"].contains(&self.first.as_str())
             && (0.2..=0.8).contains(&self.vertical_ratio)
             && (0.2..=0.8).contains(&self.horizontal_ratio)
@@ -893,13 +899,16 @@ mod tests {
         let settings = app.settings().await;
         let dock =
             json!({"mode":"vertical","first":"next","verticalRatio":0.55,"horizontalRatio":0.6});
-        let popout = json!({"mode":"horizontal","first":"outline","verticalRatio":0.65,"horizontalRatio":0.4});
+        let popout = json!({"group":"tabs","active":"next","mode":"horizontal","first":"outline","verticalRatio":0.65,"horizontalRatio":0.4});
         let saved = app
             .save_appearance(json!({"expectedRevision":initial.revision,
             "ui":{"dockLayout":dock,"popoutLayout":popout}}))
             .await
             .unwrap();
         assert_eq!(saved.ui.split_ratio, 0.55);
+        assert_eq!(saved.ui.dock_layout.as_ref().unwrap().group, "split");
+        assert_eq!(saved.ui.popout_layout.as_ref().unwrap().group, "tabs");
+        assert_eq!(saved.ui.popout_layout.as_ref().unwrap().active, "next");
         assert_eq!(saved.ui.material, "matte");
         assert_eq!(
             (saved.ui.width, saved.ui.height, saved.ui.font_offset),
@@ -916,6 +925,8 @@ mod tests {
         assert_eq!(app.settings().await, settings);
         for invalid in [
             json!({"mode":"diagonal"}),
+            json!({"group":"floating"}),
+            json!({"active":"unknown"}),
             json!({"first":"unknown"}),
             json!({"verticalRatio":"0.5"}),
             json!({"horizontalRatio":null}),

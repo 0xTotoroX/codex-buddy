@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前容器内容尺寸、面板尺寸声明与按呈现方式保存的布局偏好。
- * [OUTPUT]: 内置面板元数据、偏好迁移、无副作用的分栏布局计算。
+ * [OUTPUT]: 内置面板元数据、偏好迁移、纯分栏计算与统一编排命令。
  * [POS]: 工作台布局模型；不依赖 DOM、业务状态或窗口生命周期。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -21,6 +21,8 @@ const bound = (value, fallback) =>
 /** @returns {import('../../contracts').WorkbenchLayout} */
 export function normalizeWorkbenchLayout(value, legacyRatio = 0.45) {
   return {
+    group: value?.group === 'tabs' ? 'tabs' : 'split',
+    active: value?.active === 'next' ? 'next' : 'outline',
     mode: ['auto', 'vertical', 'horizontal'].includes(value?.mode) ? value.mode : 'auto',
     first: value?.first === 'next' ? 'next' : 'outline',
     verticalRatio: bound(value?.verticalRatio, bound(legacyRatio, 0.45)),
@@ -50,7 +52,7 @@ export function resolveWorkbenchLayout(
   const maximum = fits ? 1 - ordered[1][size] / available : 0.5;
   const ratio = Math.max(minimum, Math.min(maximum, preference[`${axis}Ratio`]));
   return {
-    type: 'split',
+    type: preference.group === 'tabs' ? 'tabs' : 'split',
     axis,
     ratio,
     available,
@@ -59,4 +61,38 @@ export function resolveWorkbenchLayout(
     minSizes: ordered.map((pane) => pane[size]),
     children: ordered.map((pane) => ({ type: 'panel', id: pane.id })),
   };
+}
+
+// 菜单与拖拽共用命令；无效落点返回 null，不改变任何业务或持久状态。
+export function arrangeWorkbench(preference, pane, action, width, height) {
+  if (!['outline', 'next'].includes(pane)) return null;
+  const next = normalizeWorkbenchLayout(preference);
+  const other = pane === 'outline' ? 'next' : 'outline';
+  if (action === 'merge') {
+    next.group = 'tabs';
+    next.active = pane;
+  } else if (action === 'activate') next.active = pane;
+  else if (action === 'reorder') {
+    next.first = next.first === 'outline' ? 'next' : 'outline';
+    next.verticalRatio = 1 - next.verticalRatio;
+    next.horizontalRatio = 1 - next.horizontalRatio;
+  } else if (action === 'split') {
+    const split = resolveWorkbenchLayout(next, width, height);
+    if (split.available < split.minSizes.reduce((sum, size) => sum + size, 0)) return null;
+    next.group = 'split';
+  } else if (['left', 'right', 'top', 'bottom'].includes(action)) {
+    const horizontal = ['left', 'right'].includes(action);
+    const size = horizontal ? 'minWidth' : 'minHeight';
+    const minimum = activeWorkbenchPanels().reduce((sum, panel) => sum + panel[size], SPLIT_SIZE);
+    if ((horizontal ? width : height) < minimum) return null;
+    next.group = 'split';
+    next.mode = horizontal ? 'horizontal' : 'vertical';
+    const first = ['left', 'top'].includes(action) ? pane : other;
+    if (next.first !== first) {
+      next.verticalRatio = 1 - next.verticalRatio;
+      next.horizontalRatio = 1 - next.horizontalRatio;
+    }
+    next.first = first;
+  } else return null;
+  return next;
 }

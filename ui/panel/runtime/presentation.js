@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { readWorkbenchScroll, writeWorkbenchScroll } from '../workbench/reading.js';
 import { normalizeWorkbenchLayout } from '../workbench/model.js';
 import {
   DETACHED_KEY,
@@ -194,9 +195,9 @@ function readingState(viewToken) {
     viewToken,
     contentToken: readingContentToken(shellState.activeTab),
     activeTab: shellState.activeTab,
-    scrollTop: Number(body?.scrollTop) || 0,
+    scrollTop: readWorkbenchScroll(body),
     promptPreviewIndex: Number(shellState.promptPreviewIndex) || 0,
-    promptScrollTop: Number(promptScroll?.scrollTop) || 0,
+    promptScrollTop: readWorkbenchScroll(promptScroll),
     ...(shellState.layoutMode === 'workbench'
       ? {
           panes: Object.fromEntries(
@@ -204,11 +205,9 @@ function readingState(viewToken) {
               kind,
               {
                 contentToken: readingContentToken(kind),
-                scrollTop:
-                  Number(
-                    shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`)
-                      ?.scrollTop,
-                  ) || 0,
+                scrollTop: readWorkbenchScroll(
+                  shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`),
+                ),
               },
             ]),
           ),
@@ -257,11 +256,11 @@ function restoreReadingScroll(value, viewToken) {
     for (const kind of ['outline', 'next']) {
       if (value.panes[kind]?.contentToken !== readingContentToken(kind)) continue;
       const pane = shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`);
-      if (pane) pane.scrollTop = value.panes[kind].scrollTop;
+      writeWorkbenchScroll(pane, value.panes[kind].scrollTop);
     }
     if (value.panes.next?.contentToken === readingContentToken('next')) {
       const preview = shellState.panel?.querySelector('.csw-prompt-preview-scroll');
-      if (preview) preview.scrollTop = value.promptScrollTop;
+      writeWorkbenchScroll(preview, value.promptScrollTop);
     }
     return;
   }
@@ -272,14 +271,14 @@ function restoreReadingScroll(value, viewToken) {
     shellState.activeTab !== value.activeTab
   )
     return;
-  body.scrollTop = clamp(value.scrollTop, 0, Math.max(0, body.scrollHeight - body.clientHeight));
+  writeWorkbenchScroll(
+    body,
+    body.clientHeight
+      ? clamp(value.scrollTop, 0, Math.max(0, body.scrollHeight - body.clientHeight))
+      : value.scrollTop,
+  );
   const promptScroll = body.querySelector('.csw-prompt-preview-scroll');
-  if (promptScroll)
-    promptScroll.scrollTop = clamp(
-      value.promptScrollTop,
-      0,
-      Math.max(0, promptScroll.scrollHeight - promptScroll.clientHeight),
-    );
+  if (promptScroll) writeWorkbenchScroll(promptScroll, value.promptScrollTop);
 }
 
 async function animateHandoff(next) {

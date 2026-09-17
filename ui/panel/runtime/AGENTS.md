@@ -4,7 +4,7 @@
 
 constants/state 为下层基础；host 和功能模块各自工作；settings-sync 协调开关，presentation 生成投影，lifecycle 订阅通知并组合运行。状态分为 runtime、context、stepwise、outline、shell 五组；旧调试 state 只提供兼容投影。
 
-presentation 的 panelReadingState 由 lifecycle 导出，记录标签、预览条目及滚动位置；工作台额外记录 outline/next 各自的内容 token 与滚动位置，并以任务/内容 token 校验；只在初次呈现或收回时恢复。panelWindowAnchor 提供临时屏幕矩形，隐藏内嵌或宿主页面不可见时由 shellLayout 计算，按出发形态返回胶囊或展开矩形；blinkHandoff 在交接结束眨眼一次。setDetached 是可等待、可反向中断的淡化交接，shell 保存临时动画与完成 promise，lifecycle 停用时回收。后台不可见页面或减少动态效果时立即交接，避免等待被浏览器暂停的帧；常规投影不重置阅读位置。
+presentation 的 panelReadingState 由 lifecycle 导出，记录标签、预览条目及滚动位置；工作台额外记录 outline/next 各自的内容 token 与滚动位置，通过 workbench/reading 保存隐藏标签的滚动意图，并以任务/内容 token 校验；只在初次呈现或收回时恢复。panelWindowAnchor 提供临时屏幕矩形，隐藏内嵌或宿主页面不可见时由 shellLayout 计算，按出发形态返回胶囊或展开矩形；blinkHandoff 在交接结束眨眼一次。setDetached 是可等待、可反向中断的淡化交接，shell 保存临时动画与完成 promise，lifecycle 停用时回收。后台不可见页面或减少动态效果时立即交接，避免等待被浏览器暂停的帧；常规投影不重置阅读位置。
 
 工作台的屏幕交接使用宿主适配提供的 `dockRect.anchor`：展开时匹配实际栏宽，收起时定位到44px入口范围；弹出期间仍按可恢复的布局计算，不能由保存的 `dockOpen` 单独推断。
 
