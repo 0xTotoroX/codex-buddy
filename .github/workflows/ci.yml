@@ -3,9 +3,13 @@ name: Verify
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      full:
+        description: Run all supported macOS and toolchain combinations
+        type: boolean
+        default: true
 
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
@@ -15,59 +19,8 @@ permissions:
   contents: read
 
 jobs:
-  compatibility:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: macOS 14 · minimum toolchain · embedded only
-            os: macos-14
-            node: 22.16.0
-            rust: 1.88.0
-          - name: macOS 15 · desktop popout
-            os: macos-15
-            node: 24
-            rust: stable
-          - name: macOS 26 · native Liquid Glass
-            os: macos-26
-            node: 24
-            rust: stable
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v7
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node }}
-          cache: npm
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ matrix.rust }}
-          components: rustfmt, clippy
-
-      - name: Install locked dependencies
-        run: npm ci
-
-      - name: Install browser runtime
-        run: npx playwright install chromium
-
-      - name: Verify source, Rust, web, lifecycle, and compatibility gates
-        run: npm run verify
-
-      - name: Verify embedded SVG Liquid Glass
-        run: npm run test:glass
-
-      - name: Preserve failure reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: failure-reports-${{ matrix.os }}
-          path: target/reports/
-          if-no-files-found: ignore
-          retention-days: 7
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ github.sha }}
+      full: ${{ inputs.full == true }}

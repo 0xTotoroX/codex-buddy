@@ -82,6 +82,8 @@ export async function checkPopout({
     if (message.kind === 'resize') {
       await pop.setViewportSize({ width: 524, height: 504 });
       await pop.waitForFunction(() => window.__companionFloatingPanel.state.height === 480);
+      // Model an asynchronous native mouse-up; dimensions can arrive before the gesture ends.
+      await delay(150);
       await pop.evaluate(() => window.__companionFloatingPanel.nativeGestureEnded());
     }
     if (message.kind === 'size') {
@@ -486,6 +488,10 @@ export async function checkPopout({
           480,
         'Settings resize ignored',
       );
+      await pop.waitForFunction(() => {
+        const panel = window.__companionFloatingPanel.state;
+        return panel.popover.dataset.resizing !== 'true' && !panel.nativeSizeChanging;
+      });
       const saved = () => JSON.parse(readFileSync(join(dataDir, 'panel.json'))).ui;
       await waitFor(
         () => saved().width === 500 && saved().height === 480,
