@@ -767,12 +767,9 @@ function alignOutlineNestedText() {
 }
 
 function outlineHtml() {
-  if (outlineState.outlineStatus === 'pending') {
-    return `<div class="csw-progress" aria-label="正在整理大纲">
-        <span class="csw-progress-ring" aria-hidden="true"></span>
-        <span class="csw-progress-copy">
-          <span class="csw-progress-title">正在整理大纲</span>
-        </span>
+  if (outlineState.outlineStatus === 'pending' && !outlineState.outlineItems.length) {
+    return `<div class="csw-empty" data-kind="outline" role="status">
+        <div class="csw-empty-title">等待回答完成</div>
       </div>`;
   }
   if (outlineState.outlineStatus === 'error') {

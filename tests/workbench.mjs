@@ -375,6 +375,60 @@ async function splitGeometry(page) {
 
 const cases = [
   [
+    '回答生成期间大纲静态等待，完成后恢复，弹出使用同一状态',
+    async (page) => {
+      await mode(page, true);
+      await page.evaluate(() => {
+        const stop = document.createElement('button');
+        stop.id = 'fixture-stop';
+        stop.setAttribute('aria-label', '停止');
+        stop.textContent = '停止';
+        document.querySelector('#answer').prepend(stop);
+        document.querySelector('#answer h2').textContent = '新的回答正在生成';
+        window.__companionFloatingPanel.scan();
+      });
+      const body = page.locator('[data-view-body="outline"]');
+      await page.waitForFunction(() =>
+        document.querySelector('[data-view-body="outline"]')?.textContent.includes('等待回答完成'),
+      );
+      assert.equal(await body.locator('.csw-progress-ring').count(), 0);
+      assert.equal(
+        await body.locator('[data-outline-id]').count(),
+        0,
+        'new answer clears old outline',
+      );
+      const popout = await createPopout(page, true);
+      try {
+        assert.match(
+          await popout.page.locator('[data-view-body="outline"]').innerText(),
+          /等待回答完成/,
+        );
+        assert.equal(
+          await popout.page.locator('[data-view-body="outline"] .csw-progress-ring').count(),
+          0,
+        );
+        await page.screenshot({ path: resolve(output, 'outline-waiting.png') });
+        await page.evaluate(() => {
+          document.querySelector('#fixture-stop').remove();
+          window.__companionFloatingPanel.scan();
+        });
+        await page.waitForFunction(() =>
+          document.querySelector('[data-view-body="outline"] [data-outline-id]'),
+        );
+        popout.projection.snapshot = await page.evaluate(() =>
+          window.__companionFloatingPanel.exportPanelState(),
+        );
+        await project(popout.page, popout.projection, false);
+        assert.ok(
+          await popout.page.locator('[data-view-body="outline"] [data-outline-id]').count(),
+        );
+        assert.deepEqual(popout.errors, []);
+      } finally {
+        await popout.page.close();
+      }
+    },
+  ],
+  [
     'complete workbench flow isolates late results and preserves layout and reading',
     async (page, baseline) => {
       await page.evaluate(() => {

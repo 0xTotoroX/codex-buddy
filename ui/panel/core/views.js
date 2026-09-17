@@ -249,7 +249,7 @@ function refreshControlState() {
   }
   if (shellState.activeTab === 'outline') {
     const blocked = outlineState.outlineStatus === 'pending';
-    return { blocked, title: blocked ? '正在整理大纲' : '刷新大纲' };
+    return { blocked, title: blocked ? '等待回答完成' : '刷新大纲' };
   }
   const blocked = stepwiseState.bridgeStatus === 'pending' || chatBusy();
   return { blocked, title: blocked ? '等待回答完成' : '刷新建议' };

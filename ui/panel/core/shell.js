@@ -78,7 +78,7 @@ function resolveStepwiseExpression(now = Date.now()) {
 
 function resolveOutlineExpression(now = Date.now()) {
   if (!outlineEnabled()) return 'hidden';
-  if (outlineState.outlineStatus === 'pending') return 'generating';
+  if (outlineState.outlineStatus === 'pending') return 'answering';
   if (contextState.scanBusy) return 'answering';
   if (shellState.surpriseUntil > now) return 'surprise';
   if (outlineState.outlineStatus === 'error') return 'error';
