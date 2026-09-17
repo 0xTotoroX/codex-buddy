@@ -18,6 +18,7 @@ import {
   effectiveFontSize,
   fontSizeLabel,
   iconSvg,
+  currentAppearance,
   materialButtonLabel,
   materialValueLabel,
   toggleLabelOnly,
@@ -159,13 +160,14 @@ function togglePromptClickMode(event) {
 }
 
 function appearanceSettingsHtml() {
+  const appearance = currentAppearance();
   return `
       <div class="csw-control-deck" aria-label="外观、字号与显示">
         <div class="csw-control-group">
           <span class="csw-control-label">外观</span>
           <span class="csw-control-row">
-            <button class="csw-control-button" type="button" data-action="material" data-material="${shellState.material}" title="${escapeAttr(materialButtonLabel())}" aria-label="${escapeAttr(materialButtonLabel())}"><span data-material-value>${materialValueLabel()}</span></button>
-            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${shellState.liquidVariant === 'clear'}" title="Regular 标准 / Clear 通透" ${shellState.material === 'native-glass' ? '' : 'hidden'}>${iconSvg('star')}</button>
+            <button class="csw-control-button" type="button" data-action="material" data-material="${appearance.material}" title="${escapeAttr(materialButtonLabel())}" aria-label="${escapeAttr(materialButtonLabel())}"><span data-material-value>${materialValueLabel()}</span></button>
+            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${appearance.liquidVariant === 'clear'}" title="Regular 标准 / Clear 通透" ${appearance.material === 'native-glass' ? '' : 'hidden'}>${iconSvg('star')}</button>
           </span>
         </div>
         <div class="csw-control-group">

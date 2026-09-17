@@ -8,6 +8,8 @@
 
 成员清单：
 
+- [dock-appearance.test.mjs](dock-appearance.test.mjs)：停靠场景默认外观、独立本地偏好与星星选中表现，覆盖共享窗口偏好不受污染。
+
 - [embedded-glass.mjs](embedded-glass.mjs)：真实 Chromium 中用固定高对比背景验证正式构建的 SVG 背景像素、实时更新、B 版 Regular/Clear 液态变体与原生变体隔离、清理及正式构建集成；系统合成器允许透明时要求可见像素差，CI 主机启用“减少透明度”时核对不同效果契约，产品回退由 e2e 单独覆盖；独立命令 test:glass，不读取真实聊天。
 
 - [e2e.mjs](e2e.mjs)：端到端测试入口；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。

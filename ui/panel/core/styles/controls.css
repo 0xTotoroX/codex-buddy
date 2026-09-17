@@ -737,14 +737,15 @@ button.csw-metric-action:disabled {
   padding: 4px;
   border-radius: 7px;
   color: var(--csw-muted);
+  background: transparent;
 }
 .csw-liquid-star svg {
   width: 17px;
   height: 17px;
 }
-.csw-liquid-star[aria-pressed='true'] {
-  color: var(--csw-accent);
-  background: color-mix(in srgb, var(--csw-accent) 9%, transparent);
+.csw-control-button.csw-liquid-star:hover {
+  color: var(--csw-text);
+  background: color-mix(in srgb, currentColor 5%, transparent);
 }
 .csw-liquid-star[aria-pressed='true'] svg path {
   fill: currentColor;

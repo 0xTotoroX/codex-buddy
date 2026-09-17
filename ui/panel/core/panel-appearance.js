@@ -1,6 +1,6 @@
 /*
  * [INPUT]: runtime/state.js、宿主主题及 presentation.js 的主题投影。
- * [OUTPUT]: 弹出跟随系统明暗； 三材质及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数。
+ * [OUTPUT]: 弹出跟随系统明暗； 三材质、停靠场景独立偏好及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数。
  * [POS]: 共享胶囊外观计算层；内嵌模式通过 appearance 事件通知 SVG 液态运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -209,7 +209,34 @@ function migrateMaterialStorageV3() {
     : { material: DEFAULT_MATERIAL, origin: 'default' };
 }
 
-function materialLabel(value = shellState.material) {
+// 停靠外观只属于当前宿主场景，不写入胶囊/原生窗口的共享偏好。
+function dockAppearanceScope() {
+  if (IS_POPOUT || shellState.root?.dataset.workbench !== 'true') return '';
+  const slot = shellState.root?.closest('[data-codex-buddy-dock]');
+  if (!slot) return '';
+  return slot.closest('[data-codex-buddy-chat-row]') ? 'chat' : 'main';
+}
+
+function currentAppearance() {
+  const scope = dockAppearanceScope();
+  if (!scope) return { material: shellState.material, liquidVariant: shellState.liquidVariant };
+  const material = storage.get(`${MATERIAL_KEY}:dock-${scope}`);
+  const liquidVariant = storage.get(`${LIQUID_VARIANT_KEY}:dock-${scope}`);
+  return {
+    material: MATERIAL_MODES.includes(material)
+      ? material
+      : scope === 'main'
+        ? 'native-glass'
+        : 'matte',
+    liquidVariant: ['regular', 'clear'].includes(liquidVariant)
+      ? liquidVariant
+      : scope === 'main'
+        ? 'clear'
+        : 'regular',
+  };
+}
+
+function materialLabel(value = currentAppearance().material) {
   return {
     frosted: '磨砂',
     'native-glass': '液态',
@@ -217,7 +244,7 @@ function materialLabel(value = shellState.material) {
   }[normalizeMaterial(value)];
 }
 
-function nextMaterial(value = shellState.material) {
+function nextMaterial(value = currentAppearance().material) {
   const index = MATERIAL_MODES.indexOf(normalizeMaterial(value));
   return MATERIAL_MODES[(index + 1) % MATERIAL_MODES.length];
 }
@@ -260,17 +287,17 @@ function materialValueLabel() {
 }
 
 function applyMaterial(options = {}) {
-  const mode = normalizeMaterial(shellState.material);
+  const appearance = currentAppearance();
+  const mode = normalizeMaterial(appearance.material);
   const animate = options.animate !== false;
-  shellState.material = mode;
   shellState.root?.setAttribute('data-material', mode);
-  shellState.root?.setAttribute('data-liquid-variant', shellState.liquidVariant);
+  shellState.root?.setAttribute('data-liquid-variant', appearance.liquidVariant);
   const variant = shellState.panel?.querySelector('[data-action=liquid-variant]');
   if (variant) {
     variant.hidden = mode !== 'native-glass';
     variant.title =
-      shellState.liquidVariant === 'clear' ? '已开启通透液态，点击恢复标准' : '开启通透液态';
-    variant.setAttribute('aria-pressed', String(shellState.liquidVariant === 'clear'));
+      appearance.liquidVariant === 'clear' ? '已开启通透液态，点击恢复标准' : '开启通透液态';
+    variant.setAttribute('aria-pressed', String(appearance.liquidVariant === 'clear'));
   }
   const nativeGlass = Boolean(window.__companionNativeGlass);
   const effective = IS_POPOUT
@@ -314,6 +341,13 @@ function applyMaterial(options = {}) {
 }
 
 function writeMaterial(value) {
+  const scope = dockAppearanceScope();
+  if (scope) {
+    const material = normalizeMaterial(value);
+    storage.set(`${MATERIAL_KEY}:dock-${scope}`, material);
+    applyMaterial();
+    return material;
+  }
   shellState.material = normalizeMaterial(value);
   storage.set(MATERIAL_KEY, shellState.material);
   storage.set(MATERIAL_ORIGIN_KEY, 'user');
@@ -328,8 +362,13 @@ function readLiquidVariant() {
 function toggleLiquidVariant(event) {
   event?.preventDefault();
   event?.stopPropagation();
-  shellState.liquidVariant = shellState.liquidVariant === 'clear' ? 'regular' : 'clear';
-  storage.set(LIQUID_VARIANT_KEY, shellState.liquidVariant);
+  const liquidVariant = currentAppearance().liquidVariant === 'clear' ? 'regular' : 'clear';
+  const scope = dockAppearanceScope();
+  if (scope) storage.set(`${LIQUID_VARIANT_KEY}:dock-${scope}`, liquidVariant);
+  else {
+    shellState.liquidVariant = liquidVariant;
+    storage.set(LIQUID_VARIANT_KEY, liquidVariant);
+  }
   applyMaterial({ animate: false });
   emitSignal('render', { preserveMorph: true });
 }
@@ -455,6 +494,7 @@ function installThemeObserver() {
 
 export {
   applyMaterial,
+  currentAppearance,
   bumpFontSize,
   clampFontOffset,
   clampPanelHeight,
