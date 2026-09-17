@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 同时可见的双面板、设置页、分隔线及停靠尺寸规则。
+ * [OUTPUT]: 上下/左右双面板、布局菜单、设置页、双向分隔线及停靠尺寸规则。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -168,5 +168,71 @@
 .csw-dock-warning {
   padding: 8px 16px;
   font-size: 12px;
+  color: var(--csw-muted);
+}
+
+.csw-workbench-panes[data-axis='horizontal'] .csw-workbench-split {
+  cursor: col-resize;
+}
+.csw-workbench-panes[data-axis='horizontal'] .csw-workbench-split::after {
+  inset: 10px auto 10px 3px;
+  width: 1px;
+  height: auto;
+}
+.csw-layout-menu {
+  position: relative;
+}
+.csw-layout-menu > summary {
+  list-style: none;
+  cursor: pointer;
+}
+.csw-layout-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.csw-layout-menu svg {
+  width: 17px;
+  height: 17px;
+}
+.csw-layout-options {
+  position: absolute;
+  z-index: 20;
+  right: 0;
+  top: 34px;
+  width: 164px;
+  display: grid;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 12px;
+  background: var(--csw-surface-opaque);
+  color: var(--csw-text);
+  box-shadow: 0 4px 14px #0002;
+}
+.csw-layout-options button {
+  appearance: none;
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.csw-layout-options button:hover,
+.csw-layout-options button[aria-pressed='true'] {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.csw-layout-options button[aria-pressed='true']::after {
+  content: '✓';
+  float: right;
+}
+.csw-layout-menu :is(button, summary):focus-visible {
+  outline: 2px solid var(--csw-accent);
+  outline-offset: -2px;
+}
+.csw-layout-hint {
+  padding: 6px 10px;
+  font-size: 11px;
   color: var(--csw-muted);
 }

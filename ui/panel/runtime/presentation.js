@@ -1,10 +1,11 @@
 /*
- * [INPUT]: 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
+ * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
  * [OUTPUT]: 按钮/手势共用 togglePanelWindow、弹出强制展开且内嵌恢复出发形态、带独立分栏阅读位置和呈现确认的窗口交接、窗口/材质偏好同步、状态投影及受限业务命令。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { normalizeWorkbenchLayout } from '../workbench/model.js';
 import {
   DETACHED_KEY,
   FONT_OFFSET_KEY,
@@ -116,6 +117,9 @@ function applyWorkbenchPreferences(ui) {
   shellState.layoutMode = ui.layoutMode === 'workbench' ? 'workbench' : 'capsule';
   shellState.dockWidth = clamp(Number(ui.dockWidth) || 340, 300, 460);
   shellState.splitRatio = clamp(Number(ui.splitRatio) || 0.45, 0.2, 0.8);
+  shellState.dockLayout = normalizeWorkbenchLayout(ui.dockLayout, shellState.splitRatio);
+  shellState.popoutLayout = normalizeWorkbenchLayout(ui.popoutLayout, shellState.splitRatio);
+  shellState.splitRatio = shellState.dockLayout.verticalRatio;
   shellState.dockOpen = ui.dockOpen !== false;
 }
 

@@ -158,6 +158,9 @@ function probePage() {
             layoutMode: current?.layoutMode,
             dockWidth: current?.dockWidth,
             splitRatio: current?.splitRatio,
+            popoutLayout: current?.popoutLayout,
+            axis: workbench.querySelector('.csw-workbench-panes')?.dataset.axis,
+            first: workbench.querySelector('.csw-workbench-panes > :first-child')?.dataset.pane,
             dockOpen: current?.dockOpen,
             layout: getComputedStyle(workbench).display,
             rect: workbench.getBoundingClientRect(),
@@ -201,6 +204,10 @@ function probePage() {
         }),
       });
       for (const cmd of await response.json()) {
+        if (cmd.kind === 'workbench-layout')
+          document
+            .querySelector(`[data-layout-mode="${cmd.value}"], [data-layout-action="${cmd.value}"]`)
+            ?.click();
         if (cmd.kind === 'workbench-settings')
           document.querySelector('[data-workbench-settings]')?.click();
         if (cmd.kind === 'pane-scroll') {
@@ -406,18 +413,26 @@ try {
         )
           throw Error(`${kind} pane extends outside the native workbench`);
       }
-      if (bench.panes.outline.rect.bottom > bench.panes.next.rect.top)
+      const horizontal = bench.axis === 'horizontal';
+      const first = bench.panes[bench.first];
+      const second = bench.panes[bench.first === 'outline' ? 'next' : 'outline'];
+      if (first.rect[horizontal ? 'right' : 'bottom'] > second.rect[horizontal ? 'left' : 'top'])
         throw Error('Native workbench panes overlap');
-      const outlineHeight = bench.panes.outline.rect.height;
-      const paneHeight = outlineHeight + bench.panes.next.rect.height;
-      const expectedOutline = Math.max(
-        180,
-        Math.min(paneHeight - 180, paneHeight * bench.splitRatio),
+      if (horizontal && (bench.panes.outline.rect.width < 219 || bench.panes.next.rect.width < 259))
+        throw Error('Horizontal panes are below their minimum width');
+      const dimension = horizontal ? 'width' : 'height';
+      const total = first.rect[dimension] + second.rect[dimension];
+      const minimum = horizontal ? (bench.first === 'outline' ? 220 : 260) : 180;
+      const otherMinimum = horizontal ? (bench.first === 'outline' ? 260 : 220) : 180;
+      const expected = Math.max(
+        minimum,
+        Math.min(
+          total - otherMinimum,
+          total * bench.popoutLayout[horizontal ? 'horizontalRatio' : 'verticalRatio'],
+        ),
       );
-      if (Math.abs(outlineHeight - expectedOutline) > 1)
-        throw Error(
-          `Native split ratio mismatch: outline ${outlineHeight}px, expected ${expectedOutline}px for ${bench.splitRatio}`,
-        );
+      if (Math.abs(first.rect[dimension] - expected) > 1)
+        throw Error(`Native split ratio mismatch: ${first.rect[dimension]} vs ${expected}`);
       if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
       return bench;
     };
@@ -499,6 +514,7 @@ try {
       assertLayout();
       const sizes = [];
       for (const [width, height] of [
+        [664, 564],
         [524, 624],
         [324, 464],
       ]) {
@@ -513,6 +529,17 @@ try {
           'native workbench viewport resize',
         );
         const resized = assertLayout();
+        if (width === 664) {
+          if (resized.axis !== 'horizontal')
+            throw Error('Wide native workbench did not become horizontal');
+          await command({ kind: 'workbench-layout', value: 'vertical' });
+          if (assertLayout().axis !== 'vertical') throw Error('Manual vertical failed');
+          await command({ kind: 'workbench-layout', value: 'horizontal' });
+          await command({ kind: 'workbench-layout', value: 'swap' });
+          if (assertLayout().first !== 'next') throw Error('Native swap failed');
+          await command({ kind: 'workbench-layout', value: 'reset' });
+          if (assertLayout().axis !== 'horizontal') throw Error('Native layout reset failed');
+        }
         const native = windows().find(
           (window) =>
             Math.abs(window.kCGWindowBounds.Width - width) <= 1 &&

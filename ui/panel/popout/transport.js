@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 原生窗口桥接、窗口偏好与远端命令身份。
- * [OUTPUT]: 保留最新请求且所有展开视图共用的窗口尺寸（工作台最低 440）/拖动、三材质及 liquidVariant 偏好投影和受限远端操作。
+ * [OUTPUT]: 保留最新请求且所有展开视图共用的窗口尺寸（工作台最低 440）/拖动、停靠/浮窗独立布局、三材质及 liquidVariant 偏好投影和受限远端操作。
  * [POS]: 窗口通信底层，不读取宿主正文或渲染业务视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -14,7 +14,9 @@ function panelPreferences() {
     activeTab: shellState.activeTab,
     layoutMode: shellState.layoutMode,
     dockWidth: shellState.dockWidth,
-    splitRatio: shellState.splitRatio,
+    splitRatio: shellState.dockLayout.verticalRatio,
+    dockLayout: { ...shellState.dockLayout },
+    popoutLayout: { ...shellState.popoutLayout },
     dockOpen: shellState.dockOpen,
     width: shellState.width,
     height: shellState.height,

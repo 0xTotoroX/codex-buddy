@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 独立胶囊/工作台偏好、字体、含分栏阅读位置的投影、呈现确认及操作身份的共享类型。
+ * [OUTPUT]: 独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -114,6 +114,13 @@ export interface CommandResult {
   draftFingerprint?: string;
 }
 
+export interface WorkbenchLayout {
+  mode: 'auto' | 'vertical' | 'horizontal';
+  first: 'outline' | 'next';
+  verticalRatio: number;
+  horizontalRatio: number;
+}
+
 export interface PanelPreferences {
   open: boolean;
   activeTab: string;
@@ -121,7 +128,9 @@ export interface PanelPreferences {
   height: number;
   layoutMode: 'capsule' | 'workbench';
   dockWidth: number;
-  splitRatio: number;
+  splitRatio: number; // Legacy dock vertical ratio.
+  dockLayout: WorkbenchLayout | null;
+  popoutLayout: WorkbenchLayout | null;
   dockOpen: boolean;
   material: string;
   liquidVariant: 'regular' | 'clear';

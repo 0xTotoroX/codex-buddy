@@ -10,7 +10,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import { request } from './api';
-import type { AppearanceSettings, PanelPreferences } from '../contracts';
+import type { AppearanceSettings, PanelPreferences, WorkbenchLayout } from '../contracts';
 
 export function PanelSettings({
   value,
@@ -119,6 +119,73 @@ export function PanelSettings({
       />
     </label>
   );
+  const workbenchLayout = (key: 'dockLayout' | 'popoutLayout', title: string) => {
+    const layout: WorkbenchLayout = ui[key] ?? {
+      mode: 'auto',
+      first: 'outline',
+      verticalRatio: ui.splitRatio,
+      horizontalRatio: 0.4,
+    };
+    const set = <K extends keyof WorkbenchLayout>(field: K, value: WorkbenchLayout[K]) =>
+      change(key, { ...layout, [field]: value });
+    return (
+      <details className="col-span-full group">
+        <summary className="cursor-pointer text-xs font-[550] group-open:mb-5">{title}布局</summary>
+        <div className="grid grid-cols-2 gap-5">
+          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
+            <span>排列</span>
+            <NativeSelect
+              aria-label={`${title}排列`}
+              value={layout.mode}
+              onChange={(e) => set('mode', e.target.value as WorkbenchLayout['mode'])}
+            >
+              <option value="auto">自动</option>
+              <option value="vertical">上下</option>
+              <option value="horizontal">左右</option>
+            </NativeSelect>
+          </label>
+          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
+            <span>首个面板</span>
+            <NativeSelect
+              aria-label={`${title}首个面板`}
+              value={layout.first}
+              onChange={(e) =>
+                change(key, {
+                  ...layout,
+                  first: e.target.value as WorkbenchLayout['first'],
+                  verticalRatio: 1 - layout.verticalRatio,
+                  horizontalRatio: 1 - layout.horizontalRatio,
+                })
+              }
+            >
+              <option value="outline">大纲</option>
+              <option value="next">下一步</option>
+            </NativeSelect>
+          </label>
+          {number(`${title}上下比例`, layout.verticalRatio, 0.2, 0.8, (v) =>
+            set('verticalRatio', v),
+          )}
+          {number(`${title}左右比例`, layout.horizontalRatio, 0.2, 0.8, (v) =>
+            set('horizontalRatio', v),
+          )}
+          <button
+            type="button"
+            className="col-span-full text-xs text-muted-foreground text-left"
+            onClick={() =>
+              change(key, {
+                mode: 'auto',
+                first: 'outline',
+                verticalRatio: 0.45,
+                horizontalRatio: 0.4,
+              })
+            }
+          >
+            恢复{title}默认布局
+          </button>
+        </div>
+      </details>
+    );
+  };
   return (
     <Card aria-label="胶囊设置">
       <div className="mb-[22px] flex items-center justify-between [&>span]:text-[11px] [&>span]:text-muted-foreground">
@@ -133,7 +200,8 @@ export function PanelSettings({
               ['workbench', '工作台'],
             ])}
             {number('侧栏宽度（px）', ui.dockWidth, 300, 460, (v) => change('dockWidth', v))}
-            {number('大纲分栏比例', ui.splitRatio, 0.2, 0.8, (v) => change('splitRatio', v))}
+            {workbenchLayout('dockLayout', '停靠')}
+            {workbenchLayout('popoutLayout', '浮窗')}
           </div>
           <div className="flex items-end gap-2 [&>label]:flex-1">
             {select('材质', 'material', [

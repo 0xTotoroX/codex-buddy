@@ -1,10 +1,11 @@
 /*
- * [INPUT]: 稳定常量、初始化偏好与页面桥接。
+ * [INPUT]: 工作台纯布局模型的默认偏好； 稳定常量、初始化偏好与页面桥接。
  * [OUTPUT]: 五组状态（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、文本工具和能力判断。
  * [POS]: 无上层依赖的状态基础层，初始化由 lifecycle 显式调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { normalizeWorkbenchLayout } from '../workbench/model.js';
 import {
   DETACHED_KEY,
   API_KEY,
@@ -228,6 +229,8 @@ function createShellState(preferences) {
     layoutMode: /** @type {'capsule'|'workbench'} */ ('capsule'),
     dockWidth: 340,
     splitRatio: 0.45,
+    dockLayout: normalizeWorkbenchLayout(null),
+    popoutLayout: normalizeWorkbenchLayout(null),
     dockOpen: true,
     dockRect: null,
     dockStatus: '',

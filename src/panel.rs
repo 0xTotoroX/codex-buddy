@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸偏好、带分栏阅读位置接续的弹出/收回/受限命令。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -17,6 +17,35 @@ use std::{
 use tokio::process::{Child, Command};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct WorkbenchLayout {
+    pub mode: String,
+    pub first: String,
+    #[serde(deserialize_with = "deserialize_split_ratio")]
+    pub vertical_ratio: f64,
+    #[serde(deserialize_with = "deserialize_split_ratio")]
+    pub horizontal_ratio: f64,
+}
+impl Default for WorkbenchLayout {
+    fn default() -> Self {
+        Self {
+            mode: "auto".into(),
+            first: "outline".into(),
+            vertical_ratio: 0.45,
+            horizontal_ratio: 0.4,
+        }
+    }
+}
+impl WorkbenchLayout {
+    fn valid(&self) -> bool {
+        ["auto", "vertical", "horizontal"].contains(&self.mode.as_str())
+            && ["outline", "next"].contains(&self.first.as_str())
+            && (0.2..=0.8).contains(&self.vertical_ratio)
+            && (0.2..=0.8).contains(&self.horizontal_ratio)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Ui {
     pub open: bool,
@@ -28,6 +57,8 @@ pub struct Ui {
     pub dock_width: f64,
     #[serde(deserialize_with = "deserialize_split_ratio")]
     pub split_ratio: f64,
+    pub dock_layout: Option<WorkbenchLayout>,
+    pub popout_layout: Option<WorkbenchLayout>,
     pub dock_open: bool,
     pub material: String,
     pub liquid_variant: String,
@@ -46,6 +77,8 @@ impl Default for Ui {
             layout_mode: "capsule".into(),
             dock_width: 340.,
             split_ratio: 0.45,
+            dock_layout: None,
+            popout_layout: None,
             dock_open: true,
             material: "frosted".into(),
             liquid_variant: "regular".into(),
@@ -67,6 +100,14 @@ impl Ui {
             || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
             || !(300. ..=460.).contains(&self.dock_width)
             || !(0.2..=0.8).contains(&self.split_ratio)
+            || self
+                .dock_layout
+                .as_ref()
+                .is_some_and(|layout| !layout.valid())
+            || self
+                .popout_layout
+                .as_ref()
+                .is_some_and(|layout| !layout.valid())
             || !(-14. ..=14.).contains(&self.font_offset)
             || self.view_order.len() != 2
             || !self.view_order.contains(&"next".into())
@@ -532,7 +573,17 @@ impl App {
                 }
                 ui[key] = value.clone();
             }
+            // Legacy ratio clients still update only the dock's vertical ratio.
+            if patch.get("splitRatio").is_some()
+                && patch.get("dockLayout").is_none()
+                && ui["dockLayout"].is_object()
+            {
+                ui["dockLayout"]["verticalRatio"] = ui["splitRatio"].clone();
+            }
             next.ui = serde_json::from_value(ui)?;
+            if patch["dockLayout"].is_object() {
+                next.ui.split_ratio = next.ui.dock_layout.as_ref().unwrap().vertical_ratio;
+            }
             next.ui.validate()?;
         }
         if let Some(value) = input.get("alwaysOnTop") {
@@ -818,6 +869,64 @@ mod tests {
             .is_err()
         );
         assert_eq!(app.appearance().await, resized);
+    }
+
+    #[tokio::test]
+    async fn workbench_layouts_persist_independently_and_reject_invalid_updates() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        std::fs::write(
+            paths.root.join("panel.json"),
+            json!({"ui":{
+                "splitRatio":0.6,"width":510,"height":600,"material":"matte","fontOffset":2
+            }})
+            .to_string(),
+        )
+        .unwrap();
+        let app = App::new(paths, crate::config::Config::default(), None, true);
+        let initial = app.appearance().await;
+        assert!(initial.ui.dock_layout.is_none());
+        assert!(initial.ui.popout_layout.is_none());
+        assert_eq!(initial.ui.split_ratio, 0.6);
+        let settings = app.settings().await;
+        let dock =
+            json!({"mode":"vertical","first":"next","verticalRatio":0.55,"horizontalRatio":0.6});
+        let popout = json!({"mode":"horizontal","first":"outline","verticalRatio":0.65,"horizontalRatio":0.4});
+        let saved = app
+            .save_appearance(json!({"expectedRevision":initial.revision,
+            "ui":{"dockLayout":dock,"popoutLayout":popout}}))
+            .await
+            .unwrap();
+        assert_eq!(saved.ui.split_ratio, 0.55);
+        assert_eq!(saved.ui.material, "matte");
+        assert_eq!(
+            (saved.ui.width, saved.ui.height, saved.ui.font_offset),
+            (510., 600., 2.)
+        );
+        assert_eq!(Preferences::read(&app.paths), saved);
+        let changed = app
+            .save_appearance(json!({"expectedRevision":saved.revision,
+            "ui":{"splitRatio":0.7}}))
+            .await
+            .unwrap();
+        assert_eq!(changed.ui.dock_layout.as_ref().unwrap().vertical_ratio, 0.7);
+        assert_eq!(changed.ui.popout_layout, saved.ui.popout_layout);
+        assert_eq!(app.settings().await, settings);
+        for invalid in [
+            json!({"mode":"diagonal"}),
+            json!({"first":"unknown"}),
+            json!({"verticalRatio":"0.5"}),
+            json!({"horizontalRatio":null}),
+            json!({"unexpected":true}),
+        ] {
+            assert!(
+                app.save_appearance(json!({"expectedRevision":changed.revision,
+                "ui":{"popoutLayout":invalid}}))
+                    .await
+                    .is_err()
+            );
+            assert_eq!(app.appearance().await, changed);
+        }
     }
 
     #[test]

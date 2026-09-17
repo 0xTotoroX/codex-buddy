@@ -83,9 +83,10 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.equal(await mode.inputValue(), 'capsule');
     await mode.selectOption('workbench');
     await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    await page.getByText('停靠布局', { exact: true }).click();
     for (const [label, value] of [
       ['侧栏宽度（px）', '380'],
-      ['大纲分栏比例', '0.6'],
+      ['停靠上下比例', '0.6'],
     ]) {
       await page.getByLabel(label, { exact: true }).fill(value);
       await page.getByLabel(label, { exact: true }).press('Tab');
@@ -94,11 +95,16 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.deepEqual(saves, [
       { expectedRevision: 0, ui: { layoutMode: 'workbench' } },
       { expectedRevision: 1, ui: { dockWidth: 380 } },
-      { expectedRevision: 2, ui: { splitRatio: 0.6 } },
+      {
+        expectedRevision: 2,
+        ui: {
+          dockLayout: { mode: 'auto', first: 'outline', verticalRatio: 0.6, horizontalRatio: 0.4 },
+        },
+      },
     ]);
     for (const [label, invalid, restored] of [
       ['侧栏宽度（px）', '299', '380'],
-      ['大纲分栏比例', '0.9', '0.6'],
+      ['停靠上下比例', '0.9', '0.6'],
     ]) {
       const input = page.getByLabel(label, { exact: true });
       await input.fill(invalid);
@@ -106,6 +112,20 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       assert.equal(await input.inputValue(), restored);
     }
     assert.equal(saves.length, 3);
+    await page.getByText('浮窗布局', { exact: true }).click();
+    await page.getByLabel('浮窗排列', { exact: true }).selectOption('horizontal');
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    assert.equal(prefs.ui.popoutLayout.mode, 'horizontal');
+    assert.equal(prefs.ui.dockLayout.verticalRatio, 0.6);
+    await page.getByLabel('浮窗首个面板', { exact: true }).selectOption('next');
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    assert.equal(prefs.ui.popoutLayout.first, 'next');
+    assert.equal(prefs.ui.popoutLayout.horizontalRatio, 0.6);
+    await page.getByRole('button', { name: '恢复浮窗默认布局' }).click();
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    assert.equal(prefs.ui.popoutLayout.mode, 'auto');
+    assert.equal(prefs.ui.dockLayout.verticalRatio, 0.6);
+
     assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).inputValue(), 'dark');
     assert.equal(prefs.ui.width, 510);
     assert.equal(prefs.ui.height, 600);

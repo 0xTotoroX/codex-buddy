@@ -373,7 +373,159 @@ async function splitGeometry(page) {
   });
 }
 
+async function chooseLayout(page, action) {
+  const menu = page.locator('.csw-layout-menu');
+  if (!(await menu.getAttribute('open'))) {
+    // Empty-string open attribute is present on a native details element.
+    if (!(await menu.evaluate((node) => node.open))) await menu.locator('summary').click();
+  }
+  await menu.locator(`[data-layout-mode="${action}"], [data-layout-action="${action}"]`).click();
+  await menu.locator('summary').press('Escape');
+  await settle(page);
+}
+
 const cases = [
+  [
+    'layout enhancement keeps panes alive, remembers each surface and adapts without overwriting intent',
+    async (host) => {
+      await mode(host, true);
+      await chooseLayout(host, 'horizontal');
+      assert.equal(
+        await host.locator('.csw-workbench-panes').getAttribute('data-axis'),
+        'vertical',
+      );
+      const dockPrefs = await host.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      assert.equal(dockPrefs.dockLayout.mode, 'horizontal');
+      await layout(host);
+      const { page, projection, errors } = await createPopout(host);
+      await page.setViewportSize({ width: 664, height: 564 });
+      await page.waitForFunction(
+        () => document.querySelector('.csw-workbench-panes').dataset.axis === 'horizontal',
+      );
+      const before = await scrollPanes(page, 43, 37, 31);
+      await page.evaluate(() => {
+        window.layoutBodies = [...document.querySelectorAll('.csw-workbench-pane')].map((node) => [
+          node,
+          node.querySelector('.csw-body').firstElementChild,
+        ]);
+      });
+      const pref = () => page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
+      const horizontal = (await pref()).popoutLayout.horizontalRatio;
+      // 布局入口在设置覆盖页打开时也应立即显示选中状态。
+      await page.locator('[data-workbench-settings]').click();
+      await chooseLayout(page, 'vertical');
+      assert.equal(
+        await page.locator('[data-layout-mode="vertical"]').getAttribute('aria-pressed'),
+        'true',
+      );
+      await page.locator('[data-workbench-settings]').click();
+
+      await chooseLayout(page, 'vertical');
+      await page.getByRole('separator', { name: '调整大纲与下一步比例' }).press('ArrowDown');
+      const vertical = (await pref()).popoutLayout.verticalRatio;
+      await chooseLayout(page, 'horizontal');
+      const handle = page.getByRole('separator', { name: '调整大纲与下一步比例' });
+      assert.equal(await handle.getAttribute('aria-orientation'), 'vertical');
+      await handle.press('ArrowRight');
+      assert.ok((await pref()).popoutLayout.horizontalRatio > horizontal);
+      const startRatio = (await pref()).popoutLayout.horizontalRatio;
+      const rect = await handle.boundingBox();
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(rect.x + rect.width / 2 + 12, rect.y + rect.height / 2, { steps: 4 });
+      await page.mouse.up();
+      assert.ok(
+        (await pref()).popoutLayout.horizontalRatio > startRatio,
+        'pointer follows the horizontal divider',
+      );
+
+      assert.equal((await pref()).popoutLayout.verticalRatio, vertical);
+      await chooseLayout(page, 'swap');
+      assert.equal(
+        await page.locator('.csw-workbench-panes > :first-child').getAttribute('data-pane'),
+        'next',
+      );
+      assert.equal(
+        await page.evaluate(() =>
+          window.layoutBodies.every(
+            ([node, child]) =>
+              node.isConnected && node.querySelector('.csw-body').firstElementChild === child,
+          ),
+        ),
+        true,
+      );
+      const now = await reading(page);
+      near(now.panes.outline.scrollTop, before.outline, 'layout keeps outline reading');
+      near(now.panes.next.scrollTop, before.next, 'layout keeps next reading');
+      near(now.promptScrollTop, before.preview, 'layout keeps preview reading');
+      assert.deepEqual((await pref()).dockLayout, dockPrefs.dockLayout);
+      await page.setViewportSize({ width: 424, height: 564 });
+      await page.waitForFunction(
+        () => document.querySelector('.csw-workbench-panes').dataset.axis === 'vertical',
+      );
+      assert.equal((await pref()).popoutLayout.mode, 'horizontal');
+      await page.setViewportSize({ width: 664, height: 564 });
+      await page.waitForFunction(
+        () => document.querySelector('.csw-workbench-panes').dataset.axis === 'horizontal',
+      );
+      await chooseLayout(page, 'auto');
+      // 16px pane padding + 24px native inset: exit below 528, enter at 560.
+      for (const [width, axis] of [
+        [527, 'vertical'],
+        [540, 'vertical'],
+        [561, 'horizontal'],
+        [540, 'horizontal'],
+      ]) {
+        await page.setViewportSize({ width, height: 564 });
+        await settle(page);
+        assert.equal(await page.locator('.csw-workbench-panes').getAttribute('data-axis'), axis);
+      }
+      await page.setViewportSize({ width: 664, height: 564 });
+      await settle(page);
+      await page.screenshot({ path: resolve(output, 'layout-horizontal.png') });
+      projection.preferences.ui = await pref();
+      const saved = projection.preferences.ui;
+      await host.evaluate(
+        (ui) => window.__companionFloatingPanel.syncPanelPreferences(ui, 4, false),
+        saved,
+      );
+      await settle(host);
+      assert.deepEqual(
+        await host.evaluate(() => window.__companionFloatingPanel.panelPreferences().popoutLayout),
+        saved.popoutLayout,
+      );
+      assert.equal(
+        await host.locator('.csw-workbench-panes').getAttribute('data-axis'),
+        'vertical',
+      );
+      await page.close();
+      const reopened = await createPopout(host);
+      assert.deepEqual(
+        await reopened.page.evaluate(
+          () => window.__companionFloatingPanel.panelPreferences().popoutLayout,
+        ),
+        saved.popoutLayout,
+      );
+      await chooseLayout(reopened.page, 'reset');
+      const reset = await reopened.page.evaluate(() =>
+        window.__companionFloatingPanel.panelPreferences(),
+      );
+      assert.deepEqual(reset.popoutLayout, {
+        mode: 'auto',
+        first: 'outline',
+        verticalRatio: 0.45,
+        horizontalRatio: 0.4,
+      });
+      assert.deepEqual(reset.dockLayout, saved.dockLayout);
+      await chooseLayout(host, 'vertical');
+      await host.locator('.csw-layout-menu summary').click();
+      await host.screenshot({ path: resolve(output, 'layout-docked-menu.png') });
+      assert.deepEqual(errors, []);
+      assert.deepEqual(await reopened.page.evaluate(() => window.popoutFixture.unexpected), []);
+    },
+  ],
   [
     '回答生成期间大纲静态等待，完成后恢复，弹出使用同一状态',
     async (page) => {
@@ -452,6 +604,18 @@ const cases = [
       });
       await page.locator('[data-refresh="next"]').click();
       await page.waitForFunction(() => window.workbenchFixture.deferred.length === 1);
+      for (const action of ['horizontal', 'swap', 'vertical', 'auto', 'swap'])
+        await chooseLayout(page, action);
+      assert.equal(
+        await page.evaluate(
+          () =>
+            window.workbenchFixture.requests.filter(({ path }) => path === '/stepwise/generate')
+              .length,
+        ),
+        1,
+        'layout during generation does not request again',
+      );
+
       assert.equal(
         await page.evaluate(
           () =>
@@ -1028,6 +1192,8 @@ const cases = [
         layoutMode: 'workbench',
         dockWidth: 380,
         splitRatio: 0.6,
+        dockLayout: null,
+        popoutLayout: null,
         dockOpen: true,
       }));
       await page.evaluate(
