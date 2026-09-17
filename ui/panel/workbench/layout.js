@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台偏好、宿主占位适配、运行时通知。
- * [OUTPUT]: 停靠生命周期、独立宽度与分隔比例保存、与临时收起分离的用户开关偏好。
+ * [OUTPUT]: 停靠生命周期与独立偏好；退出回到紧凑胶囊，浮动工作台不清理交互监听。
  * [POS]: 工作台布局控制器；不导入视图和业务模块。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -8,7 +8,7 @@ import { createDock } from '../host/dock.js';
 import { IS_POPOUT, POPOUT } from '../runtime/constants.js';
 import { clamp, shellState } from '../runtime/state.js';
 import { emitSignal } from '../runtime/signals.js';
-import { cancelMorphAnimations } from '../core/geometry.js';
+import { cancelMorphAnimations, settleMorph } from '../core/geometry.js';
 import { cancelViewAnimation } from '../core/shell.js';
 import { panelPreferences } from '../popout/transport.js';
 import { rememberWorkbenchReading } from './reading.js';
@@ -30,11 +30,12 @@ export function setWorkbench(enabled) {
   shellState.contentFadeCleanup = null;
   shellState.layoutMode = enabled ? 'workbench' : 'capsule';
   shellState.dockOpen = true;
-  shellState.open = true;
+  shellState.open = enabled || IS_POPOUT;
   shellState.workbenchSettings = false;
   if (!enabled) stopWorkbench();
   else dock?.reopen();
   emitSignal('render', { allowDuringTransition: true });
+  if (!enabled && !IS_POPOUT) settleMorph(0, 'chip');
   saveWorkbench();
 }
 export function closeWorkbench() {
@@ -43,11 +44,11 @@ export function closeWorkbench() {
   saveWorkbench();
 }
 export function syncWorkbench() {
+  if (IS_POPOUT) return;
   if (!isWorkbench()) {
-    stopWorkbench();
+    if (dock) stopWorkbench();
     return;
   }
-  if (IS_POPOUT) return;
   syncing = true;
   if (!dock)
     dock = createDock(
@@ -81,6 +82,7 @@ export function attachWorkbenchRoot() {
 export function stopWorkbench() {
   shellState.workbenchLayoutCleanup?.();
   shellState.workbenchLayoutCleanup = null;
+  shellState.panel?.querySelector('.csw-workbench')?.remove();
   dock?.destroy();
   dock = null;
   shellState.dockRect = null;

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立功能视图、外壳状态、交互和设置视图。
- * [OUTPUT]: 胶囊 DOM 创建、胶囊/工作台组合渲染与建议预览事件；表情支持单击收放和双击切换窗口，弹出不收起。
+ * [OUTPUT]: 紧凑胶囊及唯一展开工作台的组合渲染与建议预览；未知停靠宿主保留紧凑入口。
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -30,6 +30,7 @@ import {
   fabExpressionLabel,
   prefersReducedMotion,
   resolveFabExpression,
+  statusStageHtml,
   switchView,
   usesOutlineExpression,
 } from './shell.js';
@@ -110,23 +111,6 @@ import {
   attachWorkbenchRoot,
 } from '../workbench/layout.js';
 import { renderWorkbench } from '../workbench/view.js';
-
-function faceEyeHtml() {
-  return `<span class="csw-fab-eye"><svg class="csw-fab-happy-arc" viewBox="0 0 18 12" aria-hidden="true" focusable="false"><path d="M1.5 9 C4.6 3.2 13.4 3.2 16.5 9"></path></svg></span>`;
-}
-
-function faceHtml() {
-  return `
-      <span class="csw-fab-face" aria-hidden="true">
-        ${faceEyeHtml()}
-        ${faceEyeHtml()}
-      </span>
-    `;
-}
-
-function statusStageHtml() {
-  return `<span class="csw-status-stage">${faceHtml()}</span>`;
-}
 
 function viewTabHtml(view) {
   const isNext = view === 'next';
@@ -273,14 +257,21 @@ function renderFloat(options = {}) {
   }
   shellState.activeTab = normalizeActiveTab();
   syncWorkbench();
-  if (isWorkbench() && (IS_POPOUT || shellState.dockStatus !== 'unsupported')) {
+  const unsupportedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'unsupported';
+  if (unsupportedDock) shellState.open = false;
+  if (!unsupportedDock && (IS_POPOUT || shellState.open || isWorkbench())) {
     installStyle();
     installFloat();
     attachWorkbenchRoot();
     syncTheme();
     normalizePromptState();
     shellState.root.dataset.workbench = 'true';
-    shellState.root.dataset.dockVisible = String(IS_POPOUT || shellState.dockStatus === 'open');
+    shellState.root.dataset.dockVisible = String(
+      IS_POPOUT ||
+        !isWorkbench() ||
+        shellState.dockStatus === 'unsupported' ||
+        shellState.dockStatus === 'open',
+    );
     shellState.root.dataset.hidden = 'false';
     shellState.open = true;
     shellState.popover.dataset.open = 'true';

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 外壳与功能状态、窗口尺寸通信。
- * [OUTPUT]: 表情派生、完成光效与视图过渡。
+ * [OUTPUT]: 共享表情模板、表情状态派生、完成光效与视图过渡。
  * [POS]: 外壳状态表现层，不识别宿主页面或发起设置请求。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -27,6 +27,23 @@ import {
 } from '../runtime/state.js';
 import { emitSignal } from '../runtime/signals.js';
 import { sizeNativePanel } from '../popout/transport.js';
+
+function faceEyeHtml() {
+  return `<span class="csw-fab-eye"><svg class="csw-fab-happy-arc" viewBox="0 0 18 12" aria-hidden="true" focusable="false"><path d="M1.5 9 C4.6 3.2 13.4 3.2 16.5 9"></path></svg></span>`;
+}
+
+function faceHtml() {
+  return `
+      <span class="csw-fab-face" aria-hidden="true">
+        ${faceEyeHtml()}
+        ${faceEyeHtml()}
+      </span>
+    `;
+}
+
+function statusStageHtml() {
+  return `<span class="csw-status-stage">${faceHtml()}</span>`;
+}
 
 function expressionError() {
   const settings = runtimeState.settings;
@@ -373,6 +390,7 @@ async function switchView(nextTab) {
 }
 
 export {
+  statusStageHtml,
   animateViewTabSelection,
   cancelViewAnimation,
   clearCompletionBeam,

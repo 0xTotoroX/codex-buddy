@@ -20,4 +20,6 @@ presentation 的 panelReadingState 由 lifecycle 导出，记录标签、预览�
 
 state 从独立宿主存储恢复聊天关联元数据；presentation 投影来源状态并接收关联命令，viewToken 使用逻辑上下文而非物理栏位。lifecycle 接收 bindingUnavailable 使在途请求失效并保留已完成结果，恢复时重验来源。
 
+双面板阅读投影依据当前实际 workbench DOM，不再由旧 layoutMode 决定；胶囊偏好弹出后同样接续两面板阅读，返回仍恢复出发形态。
+
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。

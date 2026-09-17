@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共享大纲与 Stepwise 视图、当前聊天身份、工作台布局偏好。
- * [OUTPUT]: 双面板增量渲染、布局与来源菜单；失联时保留阅读并禁用业务操作。
+ * [OUTPUT]: 唯一展开外壳、常驻共享表情与来源菜单、双面板编排和明确收起/收回入口。
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -24,7 +24,7 @@ import {
 } from '../outline.js';
 import { forceRefreshStepwise } from '../stepwise.js';
 import { settingsHtml, attachSettingsEvents } from '../core/settings-view.js';
-import { iconSvg, applyMaterial } from '../core/panel-appearance.js';
+import { iconSvg, applyMaterial, themeIcon, themeLabel } from '../core/panel-appearance.js';
 import {
   bindPanelWindowControls,
   panelWindowControls,
@@ -32,7 +32,7 @@ import {
   readingContentToken,
 } from '../runtime/presentation.js';
 import { closeWorkbench, setWorkbench, saveWorkbench } from './layout.js';
-import { installPanelDrag } from '../core/interaction.js';
+import { installPanelDrag, onWorkbenchFaceClick } from '../core/interaction.js';
 import {
   workbenchReading,
   rememberWorkbenchReading,
@@ -46,6 +46,10 @@ import {
   resolveWorkbenchLayout,
   activeWorkbenchPanels,
 } from './model.js';
+
+import { statusStageHtml, resolveFabExpression } from '../core/shell.js';
+import { setOpen } from '../core/geometry.js';
+import { toggleCodexTheme } from '../host/host-appearance.js';
 
 import { installAssociation, updateAssociation } from './association.js';
 import { installArrangement } from './arrangement.js';
@@ -145,7 +149,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (!panel.querySelector('.csw-workbench')) {
     shellState.workbenchLayoutCleanup?.();
     panel.innerHTML = `<div class="csw-workbench">
-      <header class="csw-head csw-workbench-head"><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
+      <header class="csw-head csw-workbench-head"><button type="button" class="csw-head-face csw-workbench-face" aria-label="${IS_POPOUT ? '双击收回 Codex' : '双击弹出到桌面'}" title="${IS_POPOUT ? '双击收回 Codex' : '双击弹出到桌面'}">${statusStageHtml()}</button><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
       <div class="csw-workbench-panes">
         <div class="csw-workbench-tabs" role="tablist" aria-label="工作台面板" hidden>${registry.map((pane) => `<button type="button" role="tab" id="csw-tab-${pane.id}" data-pane-tab="${pane.id}" aria-controls="csw-pane-${pane.id}">${pane.title}</button>`).join('')}</div>
         ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong>${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" aria-label="${pane.id === 'outline' ? '刷新大纲' : '刷新建议'}">${iconSvg('refresh')}</button><button class="csw-icon" data-pane-focus="${pane.id}" aria-label="专注查看" title="专注查看"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></svg></button><select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">⋯</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
@@ -154,6 +158,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
     </div>`;
     installAssociation(panel.querySelector('.csw-workbench-head'));
+    panel.querySelector('.csw-workbench-face').addEventListener('click', onWorkbenchFaceClick);
     for (const pane of registry) {
       panel.querySelector(`[data-refresh="${pane.id}"]`).addEventListener('click', () => {
         if (pane.enabled()) void pane.refresh();
@@ -235,12 +240,17 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (root.dataset.contextToken !== token) arrangements.get(root)?.cancel();
   root.dataset.contextToken = token;
   updateAssociation(panel.querySelector('.csw-workbench-head'), source);
+  const face = panel.querySelector('.csw-workbench-face');
+  face.dataset.expression = resolveFabExpression();
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu}${panelWindowControls()}<button class="csw-icon" data-workbench-settings aria-label="${shellState.workbenchSettings ? '返回工作台' : '设置'}" title="${shellState.workbenchSettings ? '返回工作台' : '设置'}">${iconSvg(shellState.workbenchSettings ? 'outline' : 'settings')}</button>${IS_POPOUT ? '' : '<button class="csw-icon" data-workbench-close aria-label="收起工作台" title="收起工作台">›</button><button class="csw-icon" data-workbench-exit aria-label="切回胶囊" title="切回胶囊">◉</button>'}`;
+  const controlsHtml = `${layoutMenu}${panelWindowControls()}<button class="csw-icon" data-action="theme" aria-label="${themeLabel()}" title="${themeLabel()}">${themeIcon()}</button><button class="csw-icon" data-workbench-settings aria-label="${shellState.workbenchSettings ? '返回工作台' : '设置'}" title="${shellState.workbenchSettings ? '返回工作台' : '设置'}">${iconSvg(shellState.workbenchSettings ? 'outline' : 'settings')}</button>${IS_POPOUT ? '' : '<button class="csw-icon" data-workbench-close aria-label="收起工作台" title="收起工作台">›</button><button class="csw-icon" data-workbench-exit aria-label="切回胶囊" title="切回胶囊">◉</button>'}`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
     paneContent.set(controls, controlsHtml);
     bindPanelWindowControls();
+    controls
+      .querySelector('[data-action=theme]')
+      .addEventListener('click', IS_POPOUT ? () => POPOUT.toggleTheme() : toggleCodexTheme);
     controls.querySelectorAll('[data-layout-mode], [data-layout-action]').forEach((button) => {
       button.addEventListener('click', () =>
         changeLayout(button.dataset.layoutMode || button.dataset.layoutAction),
@@ -250,11 +260,14 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       shellState.workbenchSettings = !shellState.workbenchSettings;
       emitSignal('render', undefined);
     });
-    controls.querySelector('[data-workbench-close]')?.addEventListener('click', closeWorkbench);
-    controls
-      .querySelector('[data-workbench-exit]')
-      ?.addEventListener('click', () => setWorkbench(false));
-    if (IS_POPOUT) installPanelDrag();
+    controls.querySelector('[data-workbench-close]')?.addEventListener('click', () => {
+      if (shellState.layoutMode === 'workbench') closeWorkbench();
+      else setOpen(false, 'chip');
+    });
+    controls.querySelector('[data-workbench-exit]')?.addEventListener('click', () => {
+      setWorkbench(false);
+    });
+    if (IS_POPOUT || shellState.layoutMode !== 'workbench') installPanelDrag();
   }
   root.querySelector('.csw-workbench-panes').hidden = shellState.workbenchSettings;
   const settings = root.querySelector('.csw-workbench-settings');

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 原生窗口桥接、窗口偏好与远端命令身份。
- * [OUTPUT]: 保留最新请求且所有展开视图共用的窗口尺寸（工作台最低 440）/拖动、停靠/浮窗独立布局、三材质及 liquidVariant 偏好投影和受限远端操作。
+ * [OUTPUT]: 强制展开的偏好和窗口尺寸、受限远端操作；浮窗统一工作台最低高度，保留返回形态。
  * [POS]: 窗口通信底层，不读取宿主正文或渲染业务视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -88,7 +88,7 @@ let requestedNativeSize = null;
 
 function sizeNativePanel(expanded) {
   if (!IS_POPOUT) return Promise.resolve();
-  if (shellState.layoutMode === 'workbench') shellState.height = Math.max(440, shellState.height);
+  shellState.height = Math.max(440, shellState.height);
   requestedNativeSize = [shellState.width + 24, shellState.height + 24];
   if (!nativeSizeTask) {
     shellState.nativeSizeChanging = true;

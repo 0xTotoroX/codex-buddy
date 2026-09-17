@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊状态、DOM 尺寸、滚动容器与原生窗口偏好。
- * [OUTPUT]: 停靠时使用宿主预留区域；位置、内嵌收放形变、弹出保持展开、吸边、尺寸及滚动状态保存恢复。
+ * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换；保留胶囊位置与原生尺寸同步。
  * [POS]: 交互与视图共用的空间计算层。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -27,7 +27,12 @@ import {
 } from '../runtime/constants.js';
 import { clamp, isCurrentRuntime, runtimeState, shellState } from '../runtime/state.js';
 import { clampPanelHeight, clampPanelWidth } from './panel-appearance.js';
-import { clearCompletionBeam, flushDeferredRender, prefersReducedMotion } from './shell.js';
+import {
+  clearCompletionBeam,
+  deferRender,
+  flushDeferredRender,
+  prefersReducedMotion,
+} from './shell.js';
 import { contentSafeBounds } from '../host/host-appearance.js';
 import { emitSignal } from '../runtime/signals.js';
 import { panelPreferences, sizeNativePanel } from '../popout/transport.js';
@@ -460,7 +465,9 @@ function settleMorph(progress, focusTarget = '') {
   if (focusTarget === 'panel' && expanded) {
     window.requestAnimationFrame(() => {
       if (isCurrentRuntime(runtimeGeneration)) {
-        shellState.panel?.querySelector("[data-action='collapse']")?.focus({ preventScroll: true });
+        shellState.panel
+          ?.querySelector("[data-workbench-close], [data-action='collapse']")
+          ?.focus({ preventScroll: true });
       }
     });
   }
@@ -557,6 +564,9 @@ function setOpen(expanded, focusTarget = '') {
   if (!isCurrentRuntime()) return;
   resetEyePointer();
   if (shellState.layoutMode === 'workbench' && shellState.dockStatus !== 'unsupported') return;
+  // 停靠不可用时，显式展开紧凑入口改用浮动工作台，不再反复尝试占位。
+  if (expanded && shellState.layoutMode === 'workbench' && shellState.dockStatus === 'unsupported')
+    shellState.layoutMode = 'capsule';
   const target = IS_POPOUT || Boolean(expanded);
   if (target === shellState.open) return;
   clearCompletionBeam();
@@ -565,6 +575,7 @@ function setOpen(expanded, focusTarget = '') {
     return;
   }
   emitSignal('render', { preserveMorph: true });
+  deferRender();
   startMorph(target, focusTarget);
 }
 

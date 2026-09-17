@@ -37,8 +37,7 @@
   box-shadow: none !important;
 }
 [data-companion-stepwise-root][data-workbench='true'] .csw-fab,
-[data-companion-stepwise-root][data-workbench='true'][data-presentation='embedded']
-  .csw-resize-handle {
+[data-companion-stepwise-root][data-dock-mounted='true'] .csw-resize-handle {
   display: none;
 }
 [data-companion-stepwise-root][data-workbench='true'] .csw-panel {
@@ -365,4 +364,13 @@
   outline: 2px solid var(--csw-accent);
   outline-offset: 3px;
   border-radius: 4px;
+}
+
+.csw-workbench .csw-workbench-face {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 28px;
+}
+.csw-workbench-face .csw-status-stage {
+  transform: scale(0.72);
 }

@@ -158,8 +158,8 @@ test('popout size stays expanded and retains the latest resize request', async (
   acknowledge();
   await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(requests, [
-    [428, 444],
-    [428, 444],
+    [428, 464],
+    [428, 464],
   ]);
   assert.equal(shellState.nativeSizeChanging, true);
   acknowledge();

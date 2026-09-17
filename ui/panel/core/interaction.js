@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、几何、外观与指针/键盘事件。
- * [OUTPUT]: 表情 100ms 单击/外层双击识别和首击前形态记忆、拖拽、固定对角缩放、排序和快捷键处理；仅内嵌可收起，原生视口变化保存展开尺寸。
+ * [OUTPUT]: 紧凑表情单击展开、展开表情仅双击切换窗口；拖动、缩放与键盘操作。
  * [POS]: 外壳交互层；效果在 effects，原生手势经 popout/transport 转发。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -490,6 +490,7 @@ function onFaceClick(event, source) {
     };
     window.addEventListener('blur', cancelFaceClick, { once: true });
   }
+  if (source === 'workbench') return;
   const expanded = source === 'fab' ? !shellState.open : false;
   const singleClick = () => {
     shellState.faceClickTimer = 0;
@@ -523,6 +524,10 @@ function onFaceDoubleClick(event) {
 
 function onFabClick(event) {
   onFaceClick(event, 'fab');
+}
+
+function onWorkbenchFaceClick(event) {
+  onFaceClick(event, 'workbench');
 }
 
 function onHeadFaceClick(event) {
@@ -597,6 +602,7 @@ export {
   onFabPointerDown,
   onGlassClick,
   onHeadFaceClick,
+  onWorkbenchFaceClick,
   onKeyDown,
   onPanelWheel,
   onResize,

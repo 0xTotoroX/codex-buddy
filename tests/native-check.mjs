@@ -315,7 +315,8 @@ const server = createServer(async (req, res) => {
   }
   if (req.url === '/api/panel/preferences') {
     if (data.ui) ui = state.preferences.ui = data.ui;
-    res.end('{}');
+    state.preferences.revision = (state.preferences.revision || 0) + 1;
+    res.end(JSON.stringify({ revision: state.preferences.revision }));
     return;
   }
   if (req.url === '/api/panel/state') {

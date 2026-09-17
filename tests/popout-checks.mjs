@@ -4,6 +4,7 @@
  * [POS]: 端到端测试的弹出窗口子流程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { showWorkbenchView } from './workbench-actions.mjs';
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -32,6 +33,7 @@ export async function checkPopout({
   const preferences = await desktop.evaluate(() =>
     window.__companionFloatingPanel.panelPreferences(),
   );
+  const popoutHeight = Math.max(440, preferences.height);
   const detachIcon = await desktop.locator('[data-action="detach"] svg').innerHTML();
   const originalAccent = await desktop.evaluate(() => {
     const style = document.documentElement.style;
@@ -61,7 +63,7 @@ export async function checkPopout({
     'hidden',
   );
   const context = await browser.newContext({
-    viewport: { width: preferences.width + 24, height: preferences.height + 24 },
+    viewport: { width: preferences.width + 24, height: popoutHeight + 24 },
     colorScheme: 'light',
   });
   const pop = await context.newPage();
@@ -195,7 +197,7 @@ export async function checkPopout({
       'Embedded capsule stayed visible',
     );
     // The host has a global border-box reset; the standalone page deliberately does not.
-    // Both must compute the same dimensions from the capsule's scoped baseline.
+    // Shared controls keep the same geometry; pane sizes follow independent layouts.
     await settle();
     const geometry = () => {
       const names = ['.csw-head', '.csw-head-face', '.csw-body', '.csw-icon'];
@@ -204,6 +206,7 @@ export async function checkPopout({
           style = getComputedStyle(element);
         const rect = element.getBoundingClientRect();
         return {
+          name,
           width: rect.width,
           height: rect.height,
           font: style.fontSize,
@@ -215,14 +218,16 @@ export async function checkPopout({
     const hostGeometry = await desktop.evaluate(geometry);
     const popGeometry = await pop.evaluate(geometry);
     for (let i = 0; i < hostGeometry.length; i++) {
-      assert.ok(
-        Math.abs(hostGeometry[i].width - popGeometry[i].width) < 1,
-        'host/popout width differs',
-      );
-      assert.ok(
-        Math.abs(hostGeometry[i].height - popGeometry[i].height) < 1,
-        'host/popout height differs',
-      );
+      if (hostGeometry[i].name !== '.csw-body') {
+        assert.ok(
+          Math.abs(hostGeometry[i].width - popGeometry[i].width) < 1,
+          `host/popout ${hostGeometry[i].name} width differs`,
+        );
+        assert.ok(
+          Math.abs(hostGeometry[i].height - popGeometry[i].height) < 1,
+          `host/popout ${hostGeometry[i].name} height differs`,
+        );
+      }
       assert.equal(hostGeometry[i].font, popGeometry[i].font);
       assert.equal(hostGeometry[i].padding, popGeometry[i].padding);
       assert.equal(popGeometry[i].box, 'border-box');
@@ -335,14 +340,15 @@ export async function checkPopout({
       ).status,
       400,
     );
+    await showWorkbenchView(pop, 'next');
     const headerTop = (await pop.locator('.csw-head').boundingBox()).y;
-    await pop.locator('.csw-body').evaluate((body) => {
+    await pop.locator('[data-view-body=next]').evaluate((body) => {
       body.scrollTop = body.scrollHeight;
     });
     assert.equal((await pop.locator('.csw-head').boundingBox()).y, headerTop);
     const preview = await pop.locator('.csw-prompt-preview').boundingBox();
     assert.ok(preview.y + preview.height <= pop.viewportSize().height);
-    await pop.locator('.csw-body').evaluate((body) => {
+    await pop.locator('[data-view-body=next]').evaluate((body) => {
       body.scrollTop = 0;
     });
     record('弹出窗口就绪后隐藏宿主、独立页面无重复实例、旧窗口凭据拒绝');
@@ -378,7 +384,7 @@ export async function checkPopout({
     record('独立浮窗填入、取消／确认追加、追加前再次修改草稿均保持保护');
 
     await pop.locator('.csw-head').hover();
-    await pop.locator('button[data-view="outline"]').click();
+    await showWorkbenchView(pop, 'outline');
     await settle();
     const beforeWeb = (await api('appearance')).body;
     const webUi = {
@@ -440,7 +446,7 @@ export async function checkPopout({
       'Popout outline did not navigate host',
     );
     await pop.locator('.csw-head').hover();
-    await pop.locator('button[data-view="next"]').click();
+    await showWorkbenchView(pop, 'next');
     await settle();
     const stale = await desktop.evaluate(() => window.__companionFloatingPanel.exportPanelState());
     await desktop.evaluate(() => {
@@ -464,7 +470,7 @@ export async function checkPopout({
     assert.equal(await composer.textContent(), '');
     await waitFor(async () => (await state()).count === 0, 'Old suggestions remained in popout');
     await delay(1600);
-    await pop.locator('[data-action="refresh"]').click();
+    await pop.locator('[data-refresh="next"]').click();
     await waitFor(async () => (await state()).count === 4, 'Generation from popout failed');
     record('大纲回到关联宿主定位，回答变化拒绝旧操作并从桌面窗口重新生成');
 
@@ -474,9 +480,9 @@ export async function checkPopout({
       'Pin setting not saved',
     );
     await pop.locator('.csw-head').hover();
-    await pop.locator('button[data-view="settings"]').click();
+    await showWorkbenchView(pop, 'settings');
     await settle();
-    assert.equal(pop.viewportSize().height, preferences.height + 24);
+    assert.equal(pop.viewportSize().height, popoutHeight + 24);
     for (const corner of ['bl', 'br']) {
       await pop
         .locator(`.csw-resize-handle[data-corner=${corner}]`)
@@ -497,8 +503,8 @@ export async function checkPopout({
         () => saved().width === 500 && saved().height === 480,
         'Resized settings dimensions not saved',
       );
-      await pop.setViewportSize({ width: preferences.width + 24, height: preferences.height + 24 });
-      await waitFor(() => saved().height === preferences.height, 'Resize did not restore');
+      await pop.setViewportSize({ width: preferences.width + 24, height: popoutHeight + 24 });
+      await waitFor(() => saved().height === popoutHeight, 'Resize did not restore');
     }
     record('弹出设置页左右下角可缩放，尺寸同步布局并持久保存');
     await pop.evaluate(() => {
@@ -665,9 +671,9 @@ export async function checkPopout({
     await desktop.evaluate(() => document.documentElement.classList.remove('dark'));
     record('原生液态透明前景 × 明暗模式：中性灰背景没有被网页前景额外染色');
     await pop.locator('.csw-head').hover();
-    await pop.locator('button[data-view="next"]').click();
+    await showWorkbenchView(pop, 'next');
     await settle();
-    assert.equal(pop.viewportSize().height, preferences.height + 24);
+    assert.equal(pop.viewportSize().height, popoutHeight + 24);
     const expandedViewport = pop.viewportSize();
     assert.equal(await pop.locator('[data-action=collapse]').count(), 0);
     await pop.locator('.csw-head-face').click();
@@ -718,7 +724,7 @@ export async function checkPopout({
     );
     await pop.locator('.csw-row').first().hover();
     await pop.waitForFunction(() => window.__companionFloatingPanel.state.promptPreviewIndex === 0);
-    await pop.locator('.csw-body').evaluate((body) => {
+    await pop.locator('[data-view-body=next]').evaluate((body) => {
       body.scrollTop = Math.min(40, body.scrollHeight - body.clientHeight);
     });
     const reading = await pop.evaluate(() => window.__companionFloatingPanel.panelReadingState());
@@ -733,6 +739,8 @@ export async function checkPopout({
     );
     const staleReading = structuredClone(source);
     staleReading.snapshot.readingState.contentToken = 'stale-content';
+    if (staleReading.snapshot.readingState.panes)
+      staleReading.snapshot.readingState.panes.next.contentToken = 'stale-content';
     await pop.evaluate(
       (value) => window.__companionFloatingPanel.receivePanelState(value, true),
       staleReading,

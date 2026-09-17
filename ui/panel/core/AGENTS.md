@@ -16,4 +16,6 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 - [settings-view.js](settings-view.js)：胶囊设置模板和内嵌与弹出“外观”框内液态旁中性色星星（空心 Regular、实心 Clear）等控件绑定；网络操作交给 runtime/settings-sync。
 - [views.js](views.js)：创建胶囊 DOM、组合视图与下一步预览交互，选择工作台时委托双面板渲染；表情提示单/双击及拖动，弹出眼睛单击不收起、双击收回。
 
+展开后由 views 统一委托 workbench，不再显示旧的大号胶囊外壳；shell 提供唯一表情模板。紧凑表情单击展开/双击弹出，展开表情只响应双击弹出或收回，收起使用明确按钮。geometry 在形变完成后刷新对应外壳。
+
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。

@@ -4,6 +4,7 @@
  * [POS]: 端到端测试入口，委托 popout-checks 验证窗口协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { showWorkbenchView } from './workbench-actions.mjs';
 
 import assert from 'node:assert/strict';
 import { prepareTestBinary } from '../scripts/verify.mjs';
@@ -252,7 +253,11 @@ try {
             open: p.state.open,
             transitioning:
               !!p.state.morphAnimation || !!p.state.viewTransitioning || !!p.state.faceClickTimer,
-            tab: p.state.activeTab,
+            tab: p.state.workbenchSettings
+              ? 'settings'
+              : document
+                  .querySelector('.csw-workbench[data-composition=focus] [data-pane]:not([hidden])')
+                  ?.getAttribute('data-pane') || p.state.activeTab,
             outline: p.state.outlineItems.map((item) => ({ text: item.text, id: item.id })),
             count: p.state.prompts.length,
             status: p.state.bridgeStatus,
@@ -271,15 +276,13 @@ try {
       return p && !p.transitioning;
     }, 'Floating panel transition did not settle');
   const switchView = async (tab) => {
-    await desktop.locator('.csw-head').hover();
-    await desktop.locator(`[data-companion-stepwise-root] button[data-view="${tab}"]`).click();
-    await waitFor(async () => (await panelState())?.tab === tab, `View ${tab} did not activate`);
+    await showWorkbenchView(desktop, tab);
     await settle();
   };
   const generate = async () => {
     if ((await panelState()).tab !== 'next') await switchView('next');
     await desktop.locator('.csw-head').hover();
-    await desktop.locator('[data-companion-stepwise-root] [data-action="refresh"]').click();
+    await desktop.locator('[data-companion-stepwise-root] [data-refresh="next"]').click();
     await waitFor(
       async () => (await panelState()).status === 'ok',
       'Desktop generation did not complete',
@@ -505,7 +508,7 @@ try {
     await switchView('next');
     modelDelay = 1600;
     const independentRequest = calls.length;
-    await desktop.locator('[data-action="refresh"]').click();
+    await desktop.locator('[data-refresh="next"]').click();
     await waitFor(
       () => calls.length > independentRequest,
       'Independent delayed request did not start',
@@ -775,17 +778,13 @@ try {
     assert.ok(Math.abs(leftResizedBox.y - resizedBox.y) < 2, 'Left resize must keep the top fixed');
     assert.ok(Math.abs(leftResizedBox.width - resizedBox.width - 30) < 2);
     resizedBox = leftResizedBox;
-    const firstTab = await desktop.locator('button[data-view="next"]').boundingBox(),
-      secondTab = await desktop.locator('button[data-view="outline"]').boundingBox();
-    await desktop.mouse.move(firstTab.x + firstTab.width / 2, firstTab.y + firstTab.height / 2);
-    await desktop.mouse.down();
-    await desktop.mouse.move(secondTab.x + secondTab.width, secondTab.y + secondTab.height / 2, {
-      steps: 8,
-    });
-    await desktop.mouse.up();
-    await waitFor(
-      async () => (await panelState()).order[0] === 'outline',
-      'View reorder did not persist',
+    await desktop.locator('[data-pane-focus]:visible').click();
+    await desktop.locator('[data-pane-arrange="next"]').selectOption('top');
+    assert.equal(
+      await desktop.evaluate(
+        () => window.__companionFloatingPanel.panelPreferences().dockLayout.first,
+      ),
+      'next',
     );
     record('浮窗拖拽、固定对角的 1:1 双向缩放和面板拖动排序');
 
@@ -809,7 +808,7 @@ try {
     );
     record('表情拖动不误收起或弹出');
 
-    await desktop.getByRole('button', { name: '收起', exact: true }).click();
+    await desktop.getByRole('button', { name: '收起工作台', exact: true }).click();
     await settle();
     assert.equal((await panelState()).open, false);
     await desktop.locator('.csw-fab').click();
@@ -819,7 +818,7 @@ try {
     assert.equal((await panelState()).open, false);
     await desktop.locator('.csw-fab').click();
     await settle();
-    await desktop.locator('.csw-head-face').focus();
+    await desktop.locator('[data-workbench-close]').focus();
     await desktop.keyboard.press('Enter');
     assert.equal(
       (await panelState()).open,
@@ -972,7 +971,7 @@ try {
     );
     await patch({ answerOutlineEnabled: false });
     await waitFor(
-      async () => (await desktop.locator('button[data-view="outline"]').count()) === 0,
+      async () => await desktop.locator('[data-refresh="outline"]').isDisabled(),
       'Independent outline disable did not apply',
     );
     await patch({ enabled: false });
@@ -1039,7 +1038,7 @@ try {
     modelDelay = 2500;
     const priorCalls = calls.length;
     await desktop.locator('.csw-head').hover();
-    await desktop.locator('[data-action="refresh"]').click();
+    await desktop.locator('[data-refresh="next"]').click();
     await waitFor(() => calls.length > priorCalls, 'Delayed model request did not start');
     await desktop.evaluate(() => {
       document.body.dataset.companionThreadId = 'fixture-thread-b';
@@ -1102,13 +1101,20 @@ try {
     await patch({ maxInputChars: 12000 });
     record('长中文回答遵循 32000 字符上限，正文截取范围外的更新也使旧建议失效');
 
+    const layoutBeforeReload = (await api('appearance')).body.ui.dockLayout;
     await desktop.reload();
     await waitFor(
       async () => (await panelState())?.active,
       'Reload did not restore floating panel',
     );
     assert.equal(await desktop.locator('[data-companion-stepwise-root]').count(), 1);
-    assert.equal((await panelState()).order[0], 'outline');
+    await waitFor(
+      async () =>
+        (await desktop.evaluate(
+          () => window.__companionFloatingPanel.panelPreferences().dockLayout.first,
+        )) === layoutBeforeReload.first,
+      'Backend workbench preference hydration did not finish after reload',
+    );
     // Preference hydration may already have restored an expanded panel.
     // Set the required state explicitly instead of toggling a possibly hidden button.
     await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(true));
@@ -1323,7 +1329,13 @@ try {
                 scan: p.state.scanStatus,
                 settingsStatus: p.state.settingsStatus,
                 open: p.state.open,
-                tab: p.state.activeTab,
+                tab: p.state.workbenchSettings
+                  ? 'settings'
+                  : document
+                      .querySelector(
+                        '.csw-workbench[data-composition=focus] [data-pane]:not([hidden])',
+                      )
+                      ?.getAttribute('data-pane') || p.state.activeTab,
                 diagnostics: p.diagnostics().slice(-8),
               }
             );

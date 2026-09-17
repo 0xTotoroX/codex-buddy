@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 带令牌和租约的启动链接、本机 panel API 与 Wry IPC。
- * [OUTPUT]: window.__companionPopout、原生空间交接确认、中途取消与临时尺寸隔离、阅读位置接续、投影同步、背景几何/材质及受限请求/手势桥接。
+ * [OUTPUT]: 窗口交接和原生通信；位置、置顶、外观写入共用串行队列与修订号，保留外部并发冲突保护。
  * [POS]: 系统窗口页面引导层，复用共享胶囊而不采集聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -171,11 +171,20 @@
       native({ kind: 'size', id, width, height });
     });
   }
+  function enqueueSave(action) {
+    const task = saving.then(action);
+    saving = task.catch((error) => notice(error.message));
+    return task;
+  }
+  async function savePreferences(patch) {
+    const result = await request('preferences', patch);
+    revision = Math.max(revision ?? 0, result.revision);
+    return result;
+  }
   async function save(ui) {
     const fingerprint = JSON.stringify(ui);
     if (!started || moving || docking || fingerprint === lastSaved) return;
-    const result = await request('preferences', { ui, expectedRevision: revision });
-    revision = result.revision;
+    await savePreferences({ ui, expectedRevision: revision });
     lastSaved = fingerprint;
   }
   async function dock() {
@@ -317,18 +326,22 @@
     moved(position) {
       if (moving || docking || stopped) return;
       clearTimeout(moveTimer);
-      moveTimer = setTimeout(() => request('preferences', { position }).catch(() => {}), 350);
+      moveTimer = setTimeout(() => {
+        void enqueueSave(() => savePreferences({ position })).catch(() => {});
+      }, 350);
     },
     save(ui) {
       if (moving || docking) return;
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => {
-        saving = saving.then(() => save(ui)).catch((error) => notice(error.message));
+        void enqueueSave(() => save(ui)).catch(() => {});
       }, 250);
     },
     async pin(value) {
-      await request('preferences', { alwaysOnTop: value });
-      native({ kind: 'pin', value });
+      await enqueueSave(async () => {
+        await savePreferences({ alwaysOnTop: value });
+        native({ kind: 'pin', value });
+      });
     },
   };
   window.__companionHostRequest = (raw) => {

@@ -387,6 +387,70 @@ async function chooseLayout(page, action) {
 }
 
 const cases = [
+  [
+    'unified expanded shell retains face controls across capsule popout arrangements and materials',
+    async (host) => {
+      await mode(host, true);
+      await host.evaluate(() => {
+        const original = window.__companionHostRequest;
+        window.workbenchFixture.detaches = [];
+        window.__companionHostRequest = (raw) => {
+          const input = JSON.parse(raw);
+          if (input.path !== '/panel/detach') return original(raw);
+          window.workbenchFixture.detaches.push(input.payload.ui);
+          queueMicrotask(() => window.__companionDesktop.complete(input.id, { ok: true }));
+        };
+      });
+      await host.locator('.csw-workbench-face').dblclick();
+      assert.equal(await host.evaluate(() => window.workbenchFixture.detaches.length), 1);
+      assert.equal(
+        await host.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockOpen),
+        true,
+      );
+      await host.locator('[data-workbench-exit]').click();
+      await host.locator('.csw-fab').waitFor({ state: 'visible' });
+      await host.waitForFunction(() => !window.__companionFloatingPanel.state.open);
+      await host.locator('.csw-fab').dblclick();
+      assert.equal(await host.evaluate(() => window.workbenchFixture.detaches.at(-1).open), false);
+      await host.evaluate(() => window.__companionFloatingPanel.setOpen(true));
+      await host.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      assert.equal(await host.locator('.csw-view-tabs').count(), 0);
+      const { page, projection, errors } = await createPopout(host);
+      projection.preferences.ui.layoutMode = 'capsule';
+      projection.preferences.ui.open = false;
+      projection.preferences.webRevision++;
+      await project(page, projection, false);
+      await page.evaluate(() => {
+        window.popoutFixture.docks = 0;
+        window.__companionPopout.dock = async () => {
+          window.popoutFixture.docks++;
+        };
+      });
+      for (const action of ['merge', 'split', 'focus']) {
+        if (action === 'focus') await page.locator('[data-pane-focus="outline"]').click();
+        else await page.locator('[data-pane-arrange="outline"]').selectOption(action);
+        for (const material of ['matte', 'frosted', 'native-glass']) {
+          await page.evaluate(
+            (material) => window.__companionFloatingPanel.setMaterial(material),
+            material,
+          );
+          const face = page.locator('.csw-workbench-face');
+          assert.equal(await face.count(), 1);
+          assert.equal(await face.isVisible(), true);
+          assert.equal(await page.locator('[data-action="detach"]').isVisible(), true);
+          await face.dblclick();
+          assert.equal(await page.locator('.csw-workbench').count(), 1);
+        }
+      }
+      assert.equal(await page.evaluate(() => window.popoutFixture.docks), 9);
+      await page.screenshot({ path: resolve(output, 'unified-shell-focus.png') });
+      await page.locator('[data-action="detach"]').click();
+      assert.equal(await page.evaluate(() => window.popoutFixture.docks), 10);
+      assert.deepEqual(errors, []);
+      await page.close();
+    },
+  ],
+
   ...chatBindingCases({ mode, settle, chooseLayout, createPopout, project, bundle, output }),
   [
     'arrangement menus tabs focus and hidden reading retain the same business nodes',
@@ -1338,7 +1402,7 @@ const cases = [
       await settle(page);
       assert.equal(await page.locator(slotSelector).count(), 0);
       assert.equal(await page.locator('.csw-workbench').count(), 0);
-      await box(page, panelSelector);
+      await box(page, '.csw-fab');
       await hostUnchanged(page, baseline);
     },
   ],
@@ -1355,8 +1419,15 @@ const cases = [
       await settle(page);
       assert.equal(await page.locator(slotSelector).count(), 0);
       assert.equal(await page.locator('.csw-workbench').count(), 0);
-      await box(page, panelSelector);
+      await box(page, '.csw-fab');
       await hostUnchanged(page, baseline);
+      await page.locator('.csw-fab').click();
+      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      assert.equal(await page.locator('.csw-workbench').count(), 1);
+      assert.equal(await page.locator(slotSelector).count(), 0);
+      await page.getByRole('button', { name: '收起工作台', exact: true }).click();
+      await page.locator('.csw-fab').waitFor({ state: 'visible' });
+      await box(page, '.csw-fab');
     },
   ],
   [
@@ -1380,7 +1451,7 @@ const cases = [
         'unsupported',
       );
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await box(page, panelSelector);
+      await box(page, '.csw-fab');
       const mounts = await page.evaluate(() => window.workbenchFixture.mounts);
       for (let i = 0; i < 10; i += 1) await settle(page);
       assert.equal(await page.evaluate(() => window.workbenchFixture.mounts), mounts);

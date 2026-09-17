@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 带共享聊天关联的窗口投影、关联命令与业务身份校验；锁定失联时保留只读内容。
+ * [OUTPUT]: 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -205,7 +205,7 @@ function readingState(viewToken) {
     scrollTop: readWorkbenchScroll(body),
     promptPreviewIndex: Number(shellState.promptPreviewIndex) || 0,
     promptScrollTop: readWorkbenchScroll(promptScroll),
-    ...(shellState.layoutMode === 'workbench'
+    ...(shellState.panel?.querySelector('.csw-workbench')
       ? {
           panes: Object.fromEntries(
             ['outline', 'next'].map((kind) => [
@@ -233,9 +233,7 @@ function validReadingState(value, viewToken) {
     Boolean(value && viewToken) &&
     value.viewToken === viewToken &&
     ['next', 'outline', 'settings'].includes(value.activeTab) &&
-    (shellState.layoutMode === 'workbench' && value.panes
-      ? true
-      : value.contentToken === readingContentToken(value.activeTab)) &&
+    (value.panes ? true : value.contentToken === readingContentToken(value.activeTab)) &&
     Number.isFinite(value.scrollTop) &&
     Number.isInteger(value.promptPreviewIndex) &&
     Number.isFinite(value.promptScrollTop)
@@ -245,7 +243,7 @@ function validReadingState(value, viewToken) {
 function applyReadingSelection(value, viewToken) {
   if (!validReadingState(value, viewToken)) return false;
   shellState.activeTab = normalizeActiveTab(value.activeTab);
-  shellState.restoringWorkbench = shellState.layoutMode === 'workbench';
+  shellState.restoringWorkbench = Boolean(value.panes);
   shellState.promptPreviewIndex = clamp(
     value.panes && value.panes.next?.contentToken !== readingContentToken('next')
       ? 0
@@ -259,7 +257,7 @@ function applyReadingSelection(value, viewToken) {
 function restoreReadingScroll(value, viewToken) {
   shellState.restoringWorkbench = false;
   if (!validReadingState(value, viewToken)) return;
-  if (shellState.layoutMode === 'workbench' && value.panes) {
+  if (value.panes) {
     for (const kind of ['outline', 'next']) {
       if (value.panes[kind]?.contentToken !== readingContentToken(kind)) continue;
       const pane = shellState.panel?.querySelector(`.csw-body[data-view-body="${kind}"]`);
