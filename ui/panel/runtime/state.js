@@ -1,12 +1,13 @@
 /*
  * [INPUT]: 工作台纯布局模型的默认偏好； 稳定常量、初始化偏好与页面桥接。
- * [OUTPUT]: 五组状态（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、文本工具和能力判断。
+ * [OUTPUT]: 五组状态与宿主本地聊天锁定元数据（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、文本工具和能力判断。
  * [POS]: 无上层依赖的状态基础层，初始化由 lifecycle 显式调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import { normalizeWorkbenchLayout } from '../workbench/model.js';
 import {
+  CHAT_BINDING_KEY,
   DETACHED_KEY,
   API_KEY,
   BRIDGE_TIMEOUT_MS,
@@ -107,6 +108,25 @@ function createRuntimeState(preferences) {
 /** @type {ReturnType<typeof createRuntimeState>} */
 const runtimeState = /** @type {any} */ ({});
 
+function readChatBinding() {
+  try {
+    const value = JSON.parse(storage.get(CHAT_BINDING_KEY) || 'null');
+    if (
+      value?.mode === 'locked' &&
+      typeof value.sessionId === 'string' &&
+      value.sessionId.length > 0 &&
+      value.sessionId.length <= 256 &&
+      !value.sessionId.startsWith('pane:')
+    )
+      return {
+        mode: 'locked',
+        sessionId: value.sessionId,
+        label: String(value.label || '').slice(0, 100),
+      };
+  } catch {}
+  return { mode: 'follow', sessionId: '', label: '' };
+}
+
 function createContextState(preferences) {
   return {
     codexAppActionsPromise: null,
@@ -115,6 +135,8 @@ function createContextState(preferences) {
     scanStatus: 'idle',
     scanBusy: false,
     lastScanStatus: '',
+    chatBinding: IS_POPOUT ? { mode: 'follow', sessionId: '', label: '' } : readChatBinding(),
+    bindingAvailable: false,
     pinnedThreadRoot: null,
     pinnedThreadAt: 0,
     pinnedPaneKey: '',

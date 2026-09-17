@@ -18,4 +18,6 @@ presentation 的 panelReadingState 由 lifecycle 导出，记录标签、预览�
 - [presentation.js](presentation.js)：包含宿主实际强调色的只读窗口投影（缺失时恢复默认色）、Web 三材质及 liquidVariant 偏好同步（忽略弹出收起偏好），通过工作台纯模型迁移旧比例并接收两端独立布局；按钮与表情双击共用 togglePanelWindow 弹出/收回与动作校验，未收到后台 popoutSupported=true 时禁用弹出；执行业务动作前重新核对宿主；不接收远端 theme 命令，也不以投影明暗覆盖弹出系统主题；内嵌弹出/收回发出 appearance 通知以同步 SVG 液态；弹出与收回使用方向相反的图标，提示对应动作；窗口切换与置顶按钮位于共同标题栏，不插入弹出专用来源行。
 - [lifecycle.js](lifecycle.js)：组合入口、DOM 观察、正文扫描、启停/销毁、接口和通知订阅，停用时清理表情连击记录；公开运行实例是否为开发版；停用/销毁时发送内嵌 SVG 液态清理通知。
 
+state 从独立宿主存储恢复聊天关联元数据；presentation 投影来源状态并接收关联命令，viewToken 使用逻辑上下文而非物理栏位。lifecycle 接收 bindingUnavailable 使在途请求失效并保留已完成结果，恢复时重验来源。
+
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。

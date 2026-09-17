@@ -1,11 +1,12 @@
 /*
  * [INPUT]: 宿主 DOM、上下文状态和基础可见性工具。
- * [OUTPUT]: 前景聊天关联与限定容器内的输入目标； 任务、回答、输入目标识别及上下文变更通知。
+ * [OUTPUT]: 工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标及上下文变更通知。
  * [POS]: 宿主读取边界，不修改 Stepwise 或大纲的内部状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import {
+  CHAT_BINDING_KEY,
   CHIP_HEIGHT,
   CHIP_WIDTH,
   CONVERSATION_TURN_SELECTOR,
@@ -14,6 +15,8 @@ import {
   ROOT_ATTR,
 } from '../runtime/constants.js';
 import {
+  storage,
+  hashText,
   contextState,
   directText,
   elementText,
@@ -54,6 +57,20 @@ function threadRoots() {
 function threadRootOf(node) {
   if (!(node instanceof Element)) return null;
   return node.closest?.('.thread-scroll-container') || null;
+}
+
+function interactionThreadRoot(target) {
+  const direct = threadRootOf(target);
+  if (direct) return direct;
+  // 输入框和聊天标题可能是消息区的兄弟节点，只接受唯一的同容器聊天。
+  let container = target.parentElement;
+  while (container && container !== document.body) {
+    const roots = container.querySelectorAll('.thread-scroll-container');
+    if (roots.length === 1) return roots[0];
+    if (roots.length > 1) return null;
+    container = container.parentElement;
+  }
+  return null;
 }
 
 function stablePaneKeyForRoot(root) {
@@ -203,17 +220,122 @@ function removeContextTracking() {
   contextState.selectionHandler = null;
 }
 
+// 只允许宿主明确标记的聊天身份用于长期锁定；位置、引用链接不能代替聊天身份。
+function lockableRoot(root) {
+  if (!(root instanceof Element) || !root.isConnected) return false;
+  const id = sessionIdForRoot(root);
+  if (!id || id.startsWith('pane:') || id.length > 256) return false;
+  let ancestor = root;
+  for (let depth = 0; ancestor && depth < 8; depth++, ancestor = ancestor.parentElement) {
+    for (const name of ['data-conversation-id', 'data-session-id', 'data-thread-id']) {
+      const explicit = ancestor.getAttribute(name);
+      if (explicit && explicit !== id) return false;
+    }
+  }
+  const markers = '[data-above-composer-conversation-id],[data-response-annotation-conversation]';
+  return Boolean(
+    root.matches(markers) ||
+    root.querySelector(markers) ||
+    root.closest('[data-conversation-id],[data-session-id],[data-thread-id]'),
+  );
+}
+
+function sourceLabel(root) {
+  const foreground = foregroundSurface();
+  const title =
+    foreground?.thread === root
+      ? foreground.dialog.querySelector('header')?.textContent?.trim().slice(0, 90)
+      : '';
+  return title ? `聊天 · ${title}` : `Codex · 任务 ${sessionIdForRoot(root).slice(-8)}`;
+}
+
+function selectedThreadRoot() {
+  const roots = threadRoots();
+  const selected = roots.find(
+    (root) =>
+      root === contextState.pinnedThreadRoot &&
+      sessionIdForRoot(root) === contextState.pinnedSessionId,
+  );
+  return selected || foregroundSurface()?.thread || roots[0] || null;
+}
+
+function chatBindingStatus() {
+  const binding = contextState.chatBinding;
+  const current = contextState.activeContext.paneRoot;
+  const selected = selectedThreadRoot();
+  return {
+    ...binding,
+    available: binding.mode !== 'locked' || contextState.bindingAvailable,
+    canLock: lockableRoot(current),
+    canRetarget: lockableRoot(selected) && sessionIdForRoot(selected) !== binding.sessionId,
+    selectedSessionId: lockableRoot(selected) ? sessionIdForRoot(selected) : '',
+  };
+}
+
+function changeChatBinding(action, expectedSessionId = '') {
+  if (!['follow', 'lock', 'current'].includes(action))
+    return { ok: false, message: '不支持的聊天关联操作。' };
+  const root = action === 'lock' ? resolveActiveThreadRoot() : selectedThreadRoot();
+  if (
+    action !== 'follow' &&
+    (!lockableRoot(root) || (expectedSessionId && sessionIdForRoot(root) !== expectedSessionId))
+  )
+    return { ok: false, message: '聊天来源已经变化或无法确认身份，请重新选择。' };
+  contextState.chatBinding =
+    action === 'follow'
+      ? { mode: 'follow', sessionId: '', label: '' }
+      : { mode: 'locked', sessionId: sessionIdForRoot(root), label: sourceLabel(root) };
+  storage.set(CHAT_BINDING_KEY, JSON.stringify(contextState.chatBinding));
+  if (root) setActiveThreadRoot(root, 'binding');
+  if (action !== 'follow') resolveActiveThreadRoot();
+  emitSignal('render', undefined);
+  emitSignal('scan', 0);
+  return { ok: true };
+}
+
+function lockedThreadRoot(roots) {
+  const matches = roots.filter(
+    (root) =>
+      lockableRoot(root) &&
+      sessionIdForRoot(root) === contextState.chatBinding.sessionId &&
+      getComputedStyle(root).visibility === 'visible' &&
+      !root.closest('[inert],[aria-hidden="true"]'),
+  );
+  const root = matches.length === 1 ? matches[0] : null;
+  const available = Boolean(root);
+  if (contextState.bindingAvailable !== available) {
+    contextState.bindingAvailable = available;
+    if (!available) emitSignal('bindingUnavailable', undefined);
+    // 不重置结果或上下文身份；请求 epoch 在失联时失效，阅读状态保留。
+  }
+  if (root) setActiveThreadRoot(root, 'locked');
+  return root;
+}
+
+function bindingSourceReady() {
+  if (IS_POPOUT)
+    return Boolean(
+      shellState.remoteSource && shellState.remoteSource.association?.available !== false,
+    );
+  return contextState.chatBinding.mode !== 'locked' || Boolean(resolveActiveThreadRoot());
+}
+
 function setActiveThreadRoot(root, reason = 'resolve') {
   if (!(root instanceof HTMLElement) || !root.isConnected) return false;
   const paneKey = stablePaneKeyForRoot(root);
   const sessionId = sessionIdForRoot(root);
   const previous = contextState.activeContext;
   const sessionChanged = previous.sessionId !== sessionId;
-  const identityChanged = previous.paneKey !== paneKey || sessionChanged;
+  const identityChanged =
+    sessionChanged ||
+    (previous.paneKey !== paneKey &&
+      contextState.chatBinding.mode !== 'locked' &&
+      reason !== 'binding');
   if (!identityChanged && previous.paneRoot === root) return false;
   if (!identityChanged) {
     contextState.activeContext = {
       ...previous,
+      paneKey,
       paneRoot: root,
     };
     if (contextState.pinnedPaneKey === paneKey && contextState.pinnedSessionId === sessionId) {
@@ -267,10 +389,15 @@ function contextSnapshot() {
 function contextMatches(snapshot) {
   if (!snapshot) return false;
   if (!isCurrentRuntime(snapshot.runtimeGeneration)) return false;
+  if (!bindingSourceReady() || (!IS_POPOUT && !resolveActiveThreadRoot())) return false;
   const current = contextState.activeContext;
+  if (contextState.chatBinding.mode === 'locked') {
+    const message = findLatestAssistantMessage();
+    if (hashText(normalizeText(message?.text || '')) !== contextState.lastAssistantHash)
+      return false;
+  }
   return (
     snapshot.generation === current.generation &&
-    snapshot.paneKey === current.paneKey &&
     snapshot.sessionId === current.sessionId &&
     snapshot.assistantMessageId === current.assistantMessageId
   );
@@ -283,12 +410,16 @@ function pinThreadFromTarget(target, reason) {
     target.closest('[data-codex-buddy-dock]')
   )
     return false;
-  const root = threadRootOf(target);
+  const root = interactionThreadRoot(target);
   if (!root) return false;
   contextState.pinnedPaneKey = stablePaneKeyForRoot(root);
   contextState.pinnedSessionId = sessionIdForRoot(root);
   contextState.pinnedThreadRoot = root;
   contextState.pinnedThreadAt = Date.now();
+  if (contextState.chatBinding.mode === 'locked') {
+    emitSignal('render', undefined);
+    return false;
+  }
   return setActiveThreadRoot(root, reason);
 }
 
@@ -298,17 +429,22 @@ function rootMatchesContext(root, paneKey, sessionId) {
   return !sessionId || sessionIdForRoot(root) === sessionId;
 }
 
-function rootForContext(paneKey, sessionId, roots = threadRoots()) {
+function rootForContext(paneKey, sessionId, roots = threadRoots(), allowPaneFallback = false) {
+  if (contextState.chatBinding.mode === 'locked') {
+    if (sessionId !== contextState.chatBinding.sessionId) return null;
+    return lockedThreadRoot(roots);
+  }
   if (!paneKey) return null;
   return (
     roots.find((root) => rootMatchesContext(root, paneKey, sessionId)) ||
-    roots.find((root) => stablePaneKeyForRoot(root) === paneKey) ||
+    (allowPaneFallback && roots.find((root) => stablePaneKeyForRoot(root) === paneKey)) ||
     null
   );
 }
 
 function resolveActiveThreadRoot() {
   const roots = threadRoots();
+  if (contextState.chatBinding.mode === 'locked') return lockedThreadRoot(roots);
   if (!roots.length) {
     contextState.activeContext.paneRoot = null;
     return null;
@@ -328,7 +464,7 @@ function resolveActiveThreadRoot() {
     return current;
   }
   const pinned =
-    rootForContext(contextState.pinnedPaneKey, contextState.pinnedSessionId, roots) ||
+    rootForContext(contextState.pinnedPaneKey, contextState.pinnedSessionId, roots, true) ||
     (contextState.pinnedThreadRoot?.isConnected && roots.includes(contextState.pinnedThreadRoot)
       ? contextState.pinnedThreadRoot
       : null);
@@ -341,6 +477,7 @@ function resolveActiveThreadRoot() {
     contextState.activeContext.paneKey,
     contextState.activeContext.sessionId,
     roots,
+    true,
   );
   if (rebound) {
     setActiveThreadRoot(rebound, 'active-rebound');
@@ -549,10 +686,23 @@ function globalComposerCandidateScore(node) {
   return score;
 }
 
+// 部分宿主将输入框放在消息滚动区旁边；只扩展到恰好包含此聊天的最近父容器。
+function composerScope(root) {
+  if (!(root instanceof Element)) return document;
+  const selector = '.ProseMirror,[data-codex-composer],textarea';
+  let scope = root;
+  while (scope && scope !== document.body) {
+    if (scope !== root && scope.querySelectorAll('.thread-scroll-container').length !== 1) break;
+    if (scope.querySelector(selector)) return scope;
+    scope = scope.parentElement;
+  }
+  return root;
+}
+
 function composerCandidates(targetRoot = null) {
   const surface = foregroundSurface();
   const scope =
-    surface?.thread === targetRoot ? surface.content || surface.dialog : targetRoot || document;
+    surface?.thread === targetRoot ? surface.content || surface.dialog : composerScope(targetRoot);
   return Array.from(
     scope.querySelectorAll(
       ['textarea', "[contenteditable='true']", "[role='textbox']", 'div.ProseMirror'].join(','),
@@ -562,8 +712,8 @@ function composerCandidates(targetRoot = null) {
     const rect = node.getBoundingClientRect();
     if (rect.width < 120 || rect.height < 20) return false;
     if (rect.bottom < window.innerHeight * 0.35) return false;
-    if (targetRoot && threadRootOf(node) !== targetRoot && surface?.thread !== targetRoot)
-      return false;
+    const owner = threadRootOf(node);
+    if (targetRoot && owner && owner !== targetRoot) return false;
     if (ignoredComposerContainer(node, targetRoot)) return false;
     return true;
   });
@@ -998,6 +1148,9 @@ function findPreviousUserText(message) {
 }
 
 export {
+  bindingSourceReady,
+  chatBindingStatus,
+  changeChatBinding,
   activePaneCue,
   assistantMessageId,
   buttonLabel,

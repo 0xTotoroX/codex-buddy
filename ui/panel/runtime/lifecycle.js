@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、运行启停、通知订阅及带阅读接续、开发标志和材质 setter 的胶囊及可选工作台接口。
+ * [OUTPUT]: 扫描、启停与通知订阅；来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -21,6 +21,7 @@ import {
 import {
   assistantMessageId,
   chatBusy,
+  bindingSourceReady,
   chatSurfaceReady,
   contextMatches,
   contextSnapshot,
@@ -122,6 +123,11 @@ function scan(generation = runtimeState.runtimeGeneration, timerId = 0) {
   const stepwiseActive = stepwiseEnabled();
   const outlineActive = outlineEnabled();
 
+  if (!bindingSourceReady()) {
+    setScanStatus('source-unavailable', {});
+    renderFloat();
+    return;
+  }
   if (!chatSurfaceReady()) {
     if (outlineActive && (outlineState.outlineItems.length || outlineState.outlineMessage))
       invalidateOutline();
@@ -178,7 +184,7 @@ function scan(generation = runtimeState.runtimeGeneration, timerId = 0) {
 
   if (
     outlineActive &&
-    outlineState.outlineSourceHash !== hash &&
+    (outlineState.outlineSourceHash !== hash || !outlineState.outlineMessage?.isConnected) &&
     !outlineState.outlineRefreshPromise
   ) {
     void refreshOutline({ message, assistantHash: hash });
@@ -493,6 +499,16 @@ function install() {
     onSignal('render', (options) => renderFloat(options)),
     onSignal('scan', (delay) => scheduleScan(delay)),
     onSignal('runtime', (enabled) => (enabled ? activateRuntime() : stopRuntime())),
+    onSignal('bindingUnavailable', () => {
+      stepwiseState.stepwiseEpoch += 1;
+      stepwiseState.bridgePendingHash = '';
+      stepwiseState.bridgePendingRequestId = 0;
+      if (stepwiseState.bridgeStatus === 'pending') stepwiseState.bridgeStatus = 'idle';
+      outlineState.outlineEpoch += 1;
+      outlineState.outlineRefreshPromise = null;
+      if (outlineState.outlineStatus === 'pending')
+        outlineState.outlineStatus = outlineState.outlineItems.length ? 'ready' : 'idle';
+    }),
     onSignal('context', () => {
       resetStepwiseFeature();
       resetOutlineFeature();

@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时核对 tests/AGENTS.md；入口与地图由主任务维护。
  */
 import assert from 'node:assert/strict';
+import { chatBindingCases } from './workbench-binding.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
@@ -386,6 +387,7 @@ async function chooseLayout(page, action) {
 }
 
 const cases = [
+  ...chatBindingCases({ mode, settle, chooseLayout, createPopout, project, bundle, output }),
   [
     'arrangement menus tabs focus and hidden reading retain the same business nodes',
     async (host) => {

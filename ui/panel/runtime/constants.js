@@ -19,6 +19,7 @@ const CONVERSATION_TURN_SELECTOR = 'div.contents[data-content-search-turn-key]';
 const POPOVER_ID = 'companion-stepwise-popover';
 const DEVELOPMENT = typeof CODEX_BUDDY_DEVELOPMENT !== 'undefined' && CODEX_BUDDY_DEVELOPMENT;
 const storageKey = (name) => (DEVELOPMENT ? 'codex-buddy-dev:' : '') + name;
+const CHAT_BINDING_KEY = storageKey('codex-buddy-chat-binding-v1');
 const DETACHED_KEY = storageKey('companion-panel-detached');
 const LEGACY_THEME_MODE_KEY = storageKey('companion-stepwise-theme-mode-v1');
 const POSITION_KEY = storageKey('companion-stepwise-float-position-v2');
@@ -174,6 +175,7 @@ const FRIENDLY_BRIDGE_ERRORS = [
 const INSTANCE_ID = `${SCRIPT_VERSION}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 
 export {
+  CHAT_BINDING_KEY,
   DEVELOPMENT,
   DETACHED_KEY,
   LEGACY_THEME_MODE_KEY,

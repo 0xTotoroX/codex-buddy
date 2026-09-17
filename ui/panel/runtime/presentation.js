@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 按钮/手势共用 togglePanelWindow、弹出强制展开且内嵌恢复出发形态、带独立分栏阅读位置和呈现确认的窗口交接、窗口/材质偏好同步、状态投影及受限业务命令。
+ * [OUTPUT]: 带共享聊天关联的窗口投影、关联命令与业务身份校验；锁定失联时保留只读内容。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -38,7 +38,14 @@ import {
   stepwiseState,
   storage,
 } from './state.js';
-import { chatBusy, contextMatches, contextSnapshot } from '../host/context.js';
+import {
+  chatBindingStatus,
+  changeChatBinding,
+  bindingSourceReady,
+  chatBusy,
+  contextMatches,
+  contextSnapshot,
+} from '../host/context.js';
 import { foregroundSurface } from '../host/surfaces.js';
 import {
   clampFontOffset,
@@ -377,7 +384,16 @@ function exportPanelState() {
       labelText,
     }),
   );
-  const viewToken = hashText(JSON.stringify([context, contextState.lastAssistantHash]));
+  const association = chatBindingStatus();
+  const viewToken = hashText(
+    JSON.stringify([
+      context.runtimeGeneration,
+      context.generation,
+      context.sessionId || context.paneKey,
+      context.assistantMessageId,
+      contextState.lastAssistantHash,
+    ]),
+  );
   const promptToken = hashText(
     JSON.stringify([runtimeState.settings?.generationRevision, stepwiseState.prompts]),
   );
@@ -403,31 +419,38 @@ function exportPanelState() {
     accentColor: getComputedStyle(shellState.root).getPropertyValue('--csw-accent').trim(),
     hostTypography: shellState.hostTypography,
     settings: runtimeState.settings,
-    sourceLabel: chatTitle
-      ? `聊天 · ${chatTitle}`
-      : context.sessionId
-        ? `Codex · 任务 ${context.sessionId.slice(-8)}`
-        : 'Codex · 未选择任务',
+    association,
+    sourceLabel:
+      association.mode === 'locked'
+        ? `已锁定：${association.label || association.sessionId}${association.available ? '' : ' · 来源暂不可用'}`
+        : chatTitle
+          ? `聊天 · ${chatTitle}`
+          : context.sessionId
+            ? `Codex · 任务 ${context.sessionId.slice(-8)}`
+            : 'Codex · 未选择任务',
   };
 }
 
 /** @param {import("../../contracts").PanelCommand} command */
 function panelCommand(command) {
   if (
-    !['fill', 'generate', 'outline-refresh', 'outline-jump', 'outline-anchor'].includes(
-      command?.kind,
-    )
+    ![
+      'association',
+      'fill',
+      'generate',
+      'outline-refresh',
+      'outline-jump',
+      'outline-anchor',
+    ].includes(command?.kind)
   )
     return { ok: false, message: '不支持的浮窗操作。' };
   emitSignal('verify', undefined);
   const current = exportPanelState();
-  if (
-    !current ||
-    command.instanceId !== INSTANCE_ID ||
-    command.viewToken !== current.viewToken ||
-    !contextMatches(command.context)
-  )
+  if (!current || command.instanceId !== INSTANCE_ID || command.viewToken !== current.viewToken)
     return { ok: false, message: '回答或任务已经变化，请刷新后重试。' };
+  if (command.kind === 'association') return changeChatBinding(command.action, command.sessionId);
+  if (!bindingSourceReady() || !contextMatches(command.context))
+    return { ok: false, message: '聊天来源暂不可用或已变化，请重新确认。' };
   if (['fill', 'generate'].includes(command.kind) && command.promptToken !== current.promptToken)
     return { ok: false, message: '建议或生成配置已经更新，请刷新后重试。' };
   if (chatBusy()) return { ok: false, message: '回答正在生成，请等待完成。' };
@@ -507,6 +530,13 @@ async function receivePanelState(result, initial) {
 }
 
 function panelDisconnected(message) {
+  if (shellState.remoteSource?.association?.mode === 'locked') {
+    shellState.remoteSource.association.available = false;
+    shellState.remoteSource.sourceLabel = `已锁定：${shellState.remoteSource.association.label} · 来源暂不可用`;
+    shellState.remoteFingerprint = '';
+    emitSignal('render', undefined);
+    return;
+  }
   if (!shellState.remoteSource && stepwiseState.bridgeError === message) return;
   shellState.remoteSource = null;
   shellState.remoteFingerprint = '';

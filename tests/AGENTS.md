@@ -14,6 +14,8 @@
 
 - [workbench-layout.test.mjs](workbench-layout.test.mjs)：纯布局决策、统一编排命令、无效落点、双向最低尺寸、滞回和旧偏好迁移。
 
+- [workbench-binding.mjs](workbench-binding.mjs)：由 workbench.mjs 执行的六组关联回归，覆盖同目标保留、换目标迟到结果、兄弟输入框隔离、身份替换/失联/重挂载、窗口命令及冷初始化；只使用合成响应。
+
 - [workbench.mjs](workbench.mjs)：工作台浏览器行为验收；自动/双轴布局、交换/重置、连续缩放及生成中切换不增加请求、独立持久化和嵌套滚动接续；真实占位、前景聊天迁移及输入目标、模态让位与阅读恢复、两栏独立渲染、键盘调整、空间不足、功能开关、宿主重绘和销毁恢复。连续流程以延迟的合成响应验证聊天切换、过期结果、生成次数及双端阅读交接，不调用模型；`WORKBENCH_CASE` 可按名称片段只运行相关用例，结果单独写入 `selected-results.json`。
 
 - [panel-settings.test.mjs](panel-settings.test.mjs)：隔离浏览器中的实际 React 设置控件回归，验证工作台偏好逐字段保存、数值范围及胶囊尺寸、主题和功能开关隔离。

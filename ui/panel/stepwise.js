@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 回答上下文、独立生成版本、模型桥接与宿主写入接口。
- * [OUTPUT]: 建议整理、生成、缓存、失效与明确的草稿意图。
+ * [OUTPUT]: 建议生成、预览与草稿保护；来源失联时禁止生成和填入。
  * [POS]: Stepwise 功能单元；不依赖大纲，通过通知请求外壳反馈。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -15,6 +15,7 @@ import {
   assistantMessageId,
   chatBusy,
   composerCandidates,
+  bindingSourceReady,
   contextMatches,
   contextSnapshot,
   findLatestAssistantMessage,
@@ -250,6 +251,7 @@ function requestBridgeStepwise(
 }
 
 function forceRefreshStepwise() {
+  if (!bindingSourceReady()) return false;
   if (IS_POPOUT) {
     void remotePanelAction('generate');
     return;
@@ -329,6 +331,7 @@ function clearPromptsForNewAssistant(hash) {
 }
 
 function fillComposer(prompt, submit = false, options = {}) {
+  if (!bindingSourceReady()) return false;
   if (IS_POPOUT) {
     void remotePanelAction('fill', {
       index: stepwiseState.prompts.findIndex((item) => item.prompt === prompt),

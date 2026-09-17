@@ -15,4 +15,6 @@ runtime/lifecycle.js 是组合入口：读取宿主上下文、协调独立的 S
 - [stepwise.js](stepwise.js)：建议整理、生成、缓存及草稿意图；通过 host/composer 写入。
 - [outline.js](outline.js)：本地大纲解析、刷新、展示与定位；不依赖 Stepwise。
 
+workbench/association 提供共享聊天关联入口，策略由 host/context 执行；runtime/state 恢复元数据，presentation 同步浮窗并校验命令，业务模块在来源不可用时拒绝操作。
+
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。

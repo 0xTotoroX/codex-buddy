@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前回答 DOM、上下文、窗口投影与大纲状态。
- * [OUTPUT]: 标题解析、去重、刷新、列表展示、定位及原文高亮。
+ * [OUTPUT]: 大纲解析、刷新和定位；来源失联或锁定回答变化时拒绝旧导航。
  * [POS]: 回答大纲完整功能；宿主解析，弹出窗口消费投影。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -31,6 +31,7 @@ import {
 } from './runtime/constants.js';
 import {
   chatBusy,
+  bindingSourceReady,
   contextMatches,
   contextSnapshot,
   findLatestAssistantMessage,
@@ -596,12 +597,15 @@ function outlineSetActiveTarget({ id = '', anchor = '' } = {}) {
 }
 
 function outlineJumpTo(id) {
+  if (!bindingSourceReady()) return false;
   if (IS_POPOUT) {
     void remotePanelAction('outline-jump', { id }).then((ok) => {
       if (ok) outlineSetActiveTarget({ id });
     });
     return true;
   }
+  if (contextState.chatBinding.mode === 'locked' && !contextMatches(contextSnapshot()))
+    return false;
   const element = outlineResolveElement(id);
   if (!(element instanceof Element)) return false;
   outlineSetActiveTarget({ id });
@@ -627,12 +631,15 @@ function outlineTurnStartElement(message) {
 }
 
 function outlineJumpToAnchor(anchor) {
+  if (!bindingSourceReady()) return false;
   if (IS_POPOUT) {
     void remotePanelAction('outline-anchor', { anchor }).then((ok) => {
       if (ok) outlineSetActiveTarget({ anchor });
     });
     return true;
   }
+  if (contextState.chatBinding.mode === 'locked' && !contextMatches(contextSnapshot()))
+    return false;
   const message = outlineCurrentMessageElement();
   if (!(message instanceof Element)) return false;
   if (anchor === 'start') {
@@ -690,6 +697,7 @@ function invalidateOutline(message = null, sourceHash = '') {
 }
 
 async function refreshOutline(options = {}) {
+  if (!bindingSourceReady()) return false;
   if (IS_POPOUT) return remotePanelAction('outline-refresh');
   if (!isCurrentRuntime() || !outlineEnabled()) return;
   if (outlineState.outlineRefreshPromise) return outlineState.outlineRefreshPromise;

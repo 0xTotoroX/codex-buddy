@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 上下/左右双面板、布局菜单、设置页、双向分隔线及停靠尺寸规则。
+ * [OUTPUT]: 工作台布局、分隔线与聊天关联菜单样式。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -325,4 +325,44 @@
 }
 .csw-workbench-tabs {
   padding-right: 100px;
+}
+
+.csw-association-menu {
+  flex: 1;
+  min-width: 0;
+}
+.csw-association-menu > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  color: var(--csw-muted);
+  cursor: pointer;
+  list-style: none;
+}
+.csw-association-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.csw-association-menu .csw-layout-options {
+  left: 12px;
+  right: auto;
+  max-width: calc(100% - 24px);
+}
+.csw-association-hint {
+  padding: 6px 10px;
+  color: var(--csw-muted);
+  font-size: 11px;
+}
+.csw-association-hint:empty {
+  display: none;
+}
+.csw-association-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.csw-association-menu > summary:focus-visible {
+  outline: 2px solid var(--csw-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
 }

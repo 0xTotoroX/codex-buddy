@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份的共享类型。
+ * [OUTPUT]: 独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份、工作台聊天关联投影及模式命令的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -58,6 +58,15 @@ export interface OutlineItem {
   numberPrefix: string;
   labelText: string;
 }
+export interface ChatAssociation {
+  mode: string;
+  sessionId: string;
+  label: string;
+  available: boolean;
+  canLock: boolean;
+  canRetarget: boolean;
+  selectedSessionId: string;
+}
 export interface PanelSnapshot {
   instanceId: string;
   context: ContextSnapshot;
@@ -79,6 +88,7 @@ export interface PanelSnapshot {
   hostTypography: HostTypography;
   settings: Settings;
   sourceLabel: string;
+  association?: ChatAssociation;
 }
 export interface PanelReadingState {
   viewToken: string;
@@ -94,12 +104,14 @@ export interface PanelPaneReadingState {
   scrollTop: number;
 }
 export interface PanelCommand {
-  kind: 'fill' | 'generate' | 'outline-refresh' | 'outline-jump' | 'outline-anchor';
+  kind: 'association' | 'fill' | 'generate' | 'outline-refresh' | 'outline-jump' | 'outline-anchor';
   instanceId: string;
   viewToken: string;
   context: ContextSnapshot;
   promptToken: string;
   outlineToken: string;
+  action?: string;
+  sessionId?: string;
   index?: number;
   id?: string;
   anchor?: string;

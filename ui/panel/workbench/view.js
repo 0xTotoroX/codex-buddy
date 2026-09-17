@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共享大纲与 Stepwise 视图、当前聊天身份、工作台布局偏好。
- * [OUTPUT]: 内置视图注册、双面板增量渲染、分栏/标签/专注组合、布局菜单、独立滚动与键盘分隔线。
+ * [OUTPUT]: 双面板增量渲染、布局与来源菜单；失联时保留阅读并禁用业务操作。
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -47,6 +47,7 @@ import {
   activeWorkbenchPanels,
 } from './model.js';
 
+import { installAssociation, updateAssociation } from './association.js';
 import { installArrangement } from './arrangement.js';
 
 const arrangements = new WeakMap();
@@ -152,6 +153,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
     </div>`;
+    installAssociation(panel.querySelector('.csw-workbench-head'));
     for (const pane of registry) {
       panel.querySelector(`[data-refresh="${pane.id}"]`).addEventListener('click', () => {
         if (pane.enabled()) void pane.refresh();
@@ -166,8 +168,8 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
     document.addEventListener(
       'pointerdown',
       (event) => {
-        const menu = panel.querySelector('.csw-layout-menu');
-        if (menu && !menu.contains(event.target)) menu.removeAttribute('open');
+        for (const menu of panel.querySelectorAll('.csw-layout-menu,.csw-association-menu'))
+          if (!menu.contains(event.target)) menu.removeAttribute('open');
       },
       { signal: events.signal },
     );
@@ -230,11 +232,9 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
     );
   }
   const root = panel.querySelector('.csw-workbench');
-  const sourceLabel = panel.querySelector('.csw-workbench-source');
   if (root.dataset.contextToken !== token) arrangements.get(root)?.cancel();
   root.dataset.contextToken = token;
-  sourceLabel.textContent = source?.sourceLabel || 'Codex · 等待聊天';
-  sourceLabel.title = sourceLabel.textContent;
+  updateAssociation(panel.querySelector('.csw-workbench-head'), source);
   const controls = panel.querySelector('.csw-workbench-controls');
   const controlsHtml = `${layoutMenu}${panelWindowControls()}<button class="csw-icon" data-workbench-settings aria-label="${shellState.workbenchSettings ? '返回工作台' : '设置'}" title="${shellState.workbenchSettings ? '返回工作台' : '设置'}">${iconSvg(shellState.workbenchSettings ? 'outline' : 'settings')}</button>${IS_POPOUT ? '' : '<button class="csw-icon" data-workbench-close aria-label="收起工作台" title="收起工作台">›</button><button class="csw-icon" data-workbench-exit aria-label="切回胶囊" title="切回胶囊">◉</button>'}`;
   if (paneContent.get(controls) !== controlsHtml) {
@@ -274,6 +274,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
     const body = pane.querySelector('.csw-body');
     pane.querySelector('[data-refresh]').disabled =
       !enabled ||
+      source?.association?.available === false ||
       (kind === 'outline'
         ? outlineState.outlineStatus === 'pending'
         : stepwiseState.bridgeStatus === 'pending');
@@ -324,6 +325,8 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       const nextPreview = body.querySelector('.csw-prompt-preview-scroll');
       writeWorkbenchScroll(nextPreview, previewTop);
     }
+    for (const button of pane.querySelectorAll('[data-outline-id],[data-outline-anchor]'))
+      button.disabled = source?.association?.available === false;
     if (moved && restored) {
       writeWorkbenchScroll(body, restored.top);
       const preview = body.querySelector('.csw-prompt-preview-scroll');
