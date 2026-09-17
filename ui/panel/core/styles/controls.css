@@ -728,8 +728,18 @@ button.csw-metric-action:disabled {
 
 .csw-popover[data-material='native-glass']
   .csw-control-row:has([data-action='liquid-variant']:not([hidden])) {
-  grid-template-columns: minmax(0, 1fr) 30px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
+}
+.csw-control-row:has([data-action='liquid-variant']:not([hidden])) > [data-action='material'] {
+  grid-area: 1 / 1;
+  padding-inline: 30px;
+}
+.csw-control-row > .csw-liquid-star {
+  grid-area: 1 / 1;
+  justify-self: end;
+  align-self: center;
+  margin-right: 2px;
 }
 .csw-control-button.csw-liquid-star {
   width: 26px;
