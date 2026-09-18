@@ -349,7 +349,7 @@ function renderFloat(options = {}) {
         <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" title="${faceHint}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
         <div class="csw-head-side csw-head-right">
           ${panelWindowControls()}
-          ${IS_POPOUT ? '' : '<button class="csw-icon" data-action="workbench" title="停靠工作台" aria-label="停靠工作台">◫</button>'}
+          ${IS_POPOUT ? '' : `<button class="csw-icon" data-action="workbench" title="停靠工作台" aria-label="停靠工作台">${iconSvg('dock')}</button>`}
           <button class="csw-icon" type="button" data-action="refresh" title="${escapeAttr(refreshTitle)}" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
           <button class="csw-icon" type="button" data-action="theme" title="${escapeAttr(themeLabel())}" aria-label="${escapeAttr(themeLabel())}">${themeIcon()}</button>
           <button class="csw-icon" type="button" data-view="settings" data-active="${shellState.activeTab === 'settings'}" aria-pressed="${shellState.activeTab === 'settings'}" title="设置" aria-label="设置">${iconSvg('settings')}</button>
@@ -458,7 +458,7 @@ function nextHtml() {
             <span class="csw-row-label">${escapeHtml(item.label || labelForPrompt(item.prompt))}</span>
             ${shellState.labelOnly ? '' : `<span class="csw-row-prompt">${escapeHtml(item.summary || summaryForPrompt(item.prompt))}</span>`}
           </span>
-          <span class="csw-row-arrow" aria-hidden="true">›</span>
+          <span class="csw-row-arrow" aria-hidden="true">${iconSvg('chevron-right')}</span>
         </button>
       `,
         )

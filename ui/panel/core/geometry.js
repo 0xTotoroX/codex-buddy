@@ -466,7 +466,7 @@ function settleMorph(progress, focusTarget = '') {
     window.requestAnimationFrame(() => {
       if (isCurrentRuntime(runtimeGeneration)) {
         shellState.panel
-          ?.querySelector("[data-workbench-close], [data-action='collapse']")
+          ?.querySelector(".csw-workbench-face, [data-action='collapse']")
           ?.focus({ preventScroll: true });
       }
     });

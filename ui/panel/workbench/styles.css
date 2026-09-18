@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 工作台布局、分隔线与聊天关联菜单样式。
+ * [OUTPUT]: 中轴表情、统一控件、分隔线和各级菜单样式。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -36,7 +36,9 @@
   border-radius: 0 !important;
   box-shadow: none !important;
 }
-[data-companion-stepwise-root][data-workbench='true'] .csw-fab,
+[data-companion-stepwise-root][data-workbench='true']
+  .csw-popover:not([data-morphing='true'])
+  .csw-fab,
 [data-companion-stepwise-root][data-dock-mounted='true'] .csw-resize-handle {
   display: none;
 }
@@ -58,12 +60,13 @@
 }
 .csw-workbench .csw-head {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  flex: 0 0 48px;
-  height: 48px;
-  padding: 8px 12px;
+  gap: 4px;
+  flex: 0 0 54px;
+  height: 54px;
+  padding: 4px 6px;
 }
 .csw-workbench-source {
   flex: 1;
@@ -78,6 +81,9 @@
   display: flex;
   flex-shrink: 0;
   align-items: center;
+  justify-self: end;
+  grid-column: 3;
+  grid-row: 1;
 }
 .csw-workbench .csw-icon {
   width: 28px;
@@ -189,8 +195,8 @@
   display: none;
 }
 .csw-layout-menu svg {
-  width: 17px;
-  height: 17px;
+  width: 18px;
+  height: 18px;
 }
 .csw-layout-options {
   position: absolute;
@@ -305,10 +311,6 @@
 .csw-workbench[data-arranging='true'] {
   user-select: none;
 }
-.csw-workbench [data-pane-focus] svg {
-  width: 15px;
-  height: 15px;
-}
 
 .csw-workbench-panes {
   position: relative;
@@ -367,10 +369,122 @@
 }
 
 .csw-workbench .csw-workbench-face {
-  flex: 0 0 48px;
-  width: 48px;
-  height: 28px;
+  grid-column: 2;
+  grid-row: 1;
+  width: 84px;
+  height: 46px;
 }
 .csw-workbench-face .csw-status-stage {
-  transform: scale(0.72);
+  transform: none;
+}
+
+.csw-association-menu {
+  grid-column: 1;
+  grid-row: 1;
+}
+.csw-association-menu > summary > svg {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+.csw-workbench .csw-icon svg,
+.csw-pane-menu > svg {
+  width: 18px;
+  height: 18px;
+}
+.csw-menu-label {
+  padding: 8px 10px 4px;
+  color: var(--csw-muted);
+  font-size: 11px;
+}
+.csw-layout-options {
+  max-height: min(70vh, var(--csw-menu-max-height, 540px));
+  overflow-y: auto;
+}
+.csw-layout-options button svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.csw-pane-menu {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  color: var(--csw-muted);
+}
+.csw-pane-menu > svg {
+  pointer-events: none;
+}
+.csw-pane-menu select {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  font-size: 0;
+}
+
+.csw-dock-entry {
+  place-items: center;
+}
+.csw-dock-entry svg,
+.csw-dock-menu svg {
+  width: 18px;
+  height: 18px;
+}
+.csw-dock-menu {
+  position: absolute;
+  top: 100px;
+  right: 4px;
+  z-index: 30;
+  font:
+    12px/1.4 -apple-system,
+    sans-serif;
+}
+.csw-dock-menu[hidden] {
+  display: none;
+}
+.csw-dock-menu summary {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 28px;
+  border-radius: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+.csw-dock-menu summary::-webkit-details-marker {
+  display: none;
+}
+.csw-dock-menu > div {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  width: 148px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+  border-radius: 10px;
+  background: light-dark(#fafafa, #292929);
+  box-shadow: 0 4px 14px #0002;
+}
+.csw-dock-menu button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.csw-dock-menu :is(button, summary):hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.csw-dock-menu :is(button, summary):focus-visible,
+.csw-dock-entry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
 }

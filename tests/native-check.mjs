@@ -199,7 +199,8 @@ function probePage() {
               ?.getAttribute('aria-label'),
           },
           glassStyleButton: Boolean(document.querySelector('[data-action=glass-style]')),
-          materialLabel: document.querySelector('[data-material-value]')?.textContent,
+          materialLabel: document.querySelector('[data-action=material] option:checked')
+            ?.textContent,
           nativeGlassStyle: window.__companionNativeGlassStyle,
           warp: window.__companionNativeWarp,
           theme: current?.theme,
@@ -258,8 +259,13 @@ function probePage() {
         if (cmd.kind === 'material') panel.setMaterial(cmd.value);
         if (cmd.kind === 'liquid-variant')
           document.querySelector('[data-action=liquid-variant]')?.click();
-        if (cmd.kind === 'cycle-material')
-          document.querySelector('[data-action=material]')?.click();
+        if (cmd.kind === 'cycle-material') {
+          const select = document.querySelector('[data-action=material]');
+          if (select) {
+            select.selectedIndex = (select.selectedIndex + 1) % select.options.length;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        }
         if (cmd.kind === 'dock') void window.__companionPopout.dock();
         if (cmd.kind === 'cancel-dock') window.__companionPopout.cancelDock();
         if (cmd.kind === 'close') window.ipc.postMessage(JSON.stringify({ kind: 'close' }));

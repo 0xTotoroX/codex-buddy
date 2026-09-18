@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共享大纲与 Stepwise 视图、当前聊天身份、工作台布局偏好。
- * [OUTPUT]: 唯一展开外壳、常驻共享表情与来源菜单、双面板编排和明确收起/收回入口。
+ * [OUTPUT]: 唯一展开外壳、居中共享表情、来源及布局位置菜单、双面板编排和明确收起/收回入口。
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -58,11 +58,18 @@ const arrangements = new WeakMap();
 const paneContent = new WeakMap();
 const layoutKey = IS_POPOUT ? 'popoutLayout' : 'dockLayout';
 const layoutPreference = () => shellState[layoutKey];
-const layoutMenu = `<details class="csw-layout-menu"><summary class="csw-icon" role="button" aria-label="布局" title="布局"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M12 4v16"/></svg></summary><div class="csw-layout-options" role="group" aria-label="工作台布局">
-  <button data-layout-mode="auto">自动</button><button data-layout-mode="vertical">上下</button><button data-layout-mode="horizontal">左右</button>
-  <span class="csw-layout-hint" hidden>空间不足，暂以上下排列</span>
-  <button data-layout-action="merge">合并为标签</button><button data-layout-action="split">拆回分栏</button><button data-layout-action="swap">交换位置</button><button data-layout-action="reset">恢复默认布局</button>
-</div></details>`;
+function layoutMenu() {
+  return `<details class="csw-layout-menu"><summary class="csw-icon" role="button" aria-label="布局与位置" title="布局与位置">${iconSvg('layout')}</summary><div class="csw-layout-options" role="group" aria-label="工作台布局">
+    <span class="csw-menu-label">面板排列</span>
+    <button data-layout-mode="auto">自动</button><button data-layout-mode="vertical">上下</button><button data-layout-mode="horizontal">左右</button>
+    <span class="csw-layout-hint" hidden>空间不足，暂以上下排列</span>
+    <button data-layout-action="merge">合并为标签</button><button data-layout-action="split">拆回分栏</button><button data-layout-action="swap">交换位置</button><button data-layout-action="reset">恢复默认布局</button>
+    ${IS_POPOUT ? '' : `<span class="csw-menu-label">工作台位置</span><button data-placement="dock" aria-pressed="${shellState.layoutMode === 'workbench'}">停靠侧栏</button><button data-placement="floating" aria-pressed="${shellState.layoutMode !== 'workbench'}">内嵌浮动</button><button data-workbench-close>收起工作台</button>`}
+    <span class="csw-menu-label">${IS_POPOUT ? '桌面窗口' : '外观'}</span>
+    ${IS_POPOUT ? `<button data-action="pin" aria-pressed="${shellState.pinnedOnTop}">${iconSvg('pin')}窗口置顶</button>` : ''}
+    <button data-action="theme" title="${themeLabel()}">${themeIcon()}${themeLabel()}</button>
+  </div></details>`;
+}
 
 function changeLayout(action) {
   const arrangement = arrangements.get(shellState.panel.querySelector('.csw-workbench'));
@@ -149,10 +156,10 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (!panel.querySelector('.csw-workbench')) {
     shellState.workbenchLayoutCleanup?.();
     panel.innerHTML = `<div class="csw-workbench">
-      <header class="csw-head csw-workbench-head"><button type="button" class="csw-head-face csw-workbench-face" aria-label="${IS_POPOUT ? '双击收回 Codex' : '双击弹出到桌面'}" title="${IS_POPOUT ? '双击收回 Codex' : '双击弹出到桌面'}">${statusStageHtml()}</button><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
+      <header class="csw-head csw-workbench-head"><button type="button" class="csw-head-face csw-workbench-face" aria-label="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}" title="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}">${statusStageHtml()}</button><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
       <div class="csw-workbench-panes">
         <div class="csw-workbench-tabs" role="tablist" aria-label="工作台面板" hidden>${registry.map((pane) => `<button type="button" role="tab" id="csw-tab-${pane.id}" data-pane-tab="${pane.id}" aria-controls="csw-pane-${pane.id}">${pane.title}</button>`).join('')}</div>
-        ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong>${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" aria-label="${pane.id === 'outline' ? '刷新大纲' : '刷新建议'}">${iconSvg('refresh')}</button><button class="csw-icon" data-pane-focus="${pane.id}" aria-label="专注查看" title="专注查看"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/></svg></button><select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">⋯</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
+        ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong>${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" title="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><button class="csw-icon" data-pane-focus="${pane.id}" aria-label="专注查看" title="专注查看">${iconSvg('focus')}</button><span class="csw-pane-menu">${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
       </div>
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
@@ -243,11 +250,15 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   const face = panel.querySelector('.csw-workbench-face');
   face.dataset.expression = resolveFabExpression();
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu}${panelWindowControls()}<button class="csw-icon" data-action="theme" aria-label="${themeLabel()}" title="${themeLabel()}">${themeIcon()}</button><button class="csw-icon" data-workbench-settings aria-label="${shellState.workbenchSettings ? '返回工作台' : '设置'}" title="${shellState.workbenchSettings ? '返回工作台' : '设置'}">${iconSvg(shellState.workbenchSettings ? 'outline' : 'settings')}</button>${IS_POPOUT ? '' : '<button class="csw-icon" data-workbench-close aria-label="收起工作台" title="收起工作台">›</button><button class="csw-icon" data-workbench-exit aria-label="切回胶囊" title="切回胶囊">◉</button>'}`;
+  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includePin: false })}<button class="csw-icon" data-workbench-settings aria-label="${shellState.workbenchSettings ? '返回工作台' : '设置'}" title="${shellState.workbenchSettings ? '返回工作台' : '设置'}">${iconSvg(shellState.workbenchSettings ? 'back' : 'settings')}</button>`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
     paneContent.set(controls, controlsHtml);
     bindPanelWindowControls();
+    controls.onclick = (event) => {
+      if (event.target.closest('button'))
+        controls.querySelector('details')?.removeAttribute('open');
+    };
     controls
       .querySelector('[data-action=theme]')
       .addEventListener('click', IS_POPOUT ? () => POPOUT.toggleTheme() : toggleCodexTheme);
@@ -264,8 +275,12 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       if (shellState.layoutMode === 'workbench') closeWorkbench();
       else setOpen(false, 'chip');
     });
-    controls.querySelector('[data-workbench-exit]')?.addEventListener('click', () => {
-      setWorkbench(false);
+    controls.querySelectorAll('[data-placement]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const docked = button.dataset.placement === 'dock';
+        if (docked === (shellState.layoutMode === 'workbench')) return;
+        setWorkbench(docked, { expanded: true });
+      });
     });
     if (IS_POPOUT || shellState.layoutMode !== 'workbench') installPanelDrag();
   }
@@ -366,6 +381,11 @@ function currentSplit() {
 }
 
 function updateSplit() {
+  const workbench = shellState.panel.querySelector('.csw-workbench');
+  workbench.style.setProperty(
+    '--csw-menu-max-height',
+    `${Math.max(120, workbench.clientHeight - 70)}px`,
+  );
   const panes = shellState.panel.querySelector('.csw-workbench-panes');
   const preference = layoutPreference();
   const root = shellState.panel.querySelector('.csw-workbench');

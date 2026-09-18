@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { iconSvg } from '../icons/index.js';
 import {
   DEVELOPMENT,
   LEGACY_THEME_MODE_KEY,
@@ -281,7 +282,7 @@ function readMaterial() {
 }
 
 function materialButtonLabel() {
-  return `外观：${materialLabel()}；切换为${materialLabel(nextMaterial())}`;
+  return `外观：${materialLabel()}；选择外观`;
 }
 
 function materialValueLabel() {
@@ -297,6 +298,8 @@ function applyMaterial(options = {}) {
   const variant = shellState.panel?.querySelector('[data-action=liquid-variant]');
   if (variant) {
     variant.hidden = mode !== 'native-glass';
+    const icon = appearance.liquidVariant === 'clear' ? 'star-filled' : 'star';
+    if (variant.querySelector('svg')?.dataset.icon !== icon) variant.innerHTML = iconSvg(icon);
     variant.title =
       appearance.liquidVariant === 'clear' ? '已开启通透液态，点击恢复标准' : '开启通透液态';
     variant.setAttribute('aria-pressed', String(appearance.liquidVariant === 'clear'));
@@ -328,11 +331,16 @@ function applyMaterial(options = {}) {
   const button = shellState.panel?.querySelector("[data-action='material']");
   if (button) {
     button.dataset.material = mode;
+    if (button instanceof HTMLSelectElement) button.value = mode;
     button.removeAttribute('aria-pressed');
     button.setAttribute('aria-label', materialButtonLabel());
     button.setAttribute('title', materialButtonLabel());
     const value = button.querySelector('[data-material-value]');
     const fallback = IS_POPOUT && mode !== effective && !effective.startsWith('native-');
+    if (button instanceof HTMLSelectElement) {
+      for (const option of button.options) option.textContent = materialLabel(option.value);
+      if (fallback) button.selectedOptions[0].textContent = `${materialLabel()}（当前哑光）`;
+    }
     if (value)
       value.textContent = fallback ? `${materialLabel()}（当前哑光）` : materialValueLabel();
     if (fallback)
@@ -417,43 +425,6 @@ function syncHostTypography(force = false) {
 function themeLabel() {
   const target = IS_POPOUT ? 'macOS' : 'Codex';
   return `${target} 明暗：${shellState.theme === 'dark' ? '深色；切换到浅色' : '浅色；切换到深色'}`;
-}
-
-function iconSvg(name) {
-  const common = `fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"`;
-  if (name === 'next') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M5 7.5h8.5M5 12h11M5 16.5h7"/><path ${common} d="m15.5 7.5 3 2.5-3 2.5"/></svg>`;
-  }
-  if (name === 'outline') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M8 6h11M8 12h8M8 18h6"/><circle fill="currentColor" cx="4.5" cy="6" r="1.2"/><circle fill="currentColor" cx="4.5" cy="12" r="1.2"/><circle fill="currentColor" cx="4.5" cy="18" r="1.2"/></svg>`;
-  }
-  if (name === 'settings') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M12 8.8a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4Z"/><path ${common} d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.06a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 1 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.06A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.88l-.04-.04A2 2 0 1 1 7.05 4.2l.04.04a1.7 1.7 0 0 0 1.88.34H9A1.7 1.7 0 0 0 10 3.06V3a2 2 0 0 1 4 0v.06a1.7 1.7 0 0 0 1.03 1.56h.03a1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 1 1 2.83 2.83l-.04.04a1.7 1.7 0 0 0-.34 1.88v.03A1.7 1.7 0 0 0 20.94 10H21a2 2 0 0 1 0 4h-.06A1.7 1.7 0 0 0 19.4 15Z"/></svg>`;
-  }
-  if (name === 'open-config') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M3.5 6h7M14.5 6h6M3.5 12h3M10.5 12h10M3.5 18h9M16.5 18h4"/><path ${common} d="M12.5 3.8v4.4M8.5 9.8v4.4M14.5 15.8v4.4"/></svg>`;
-  }
-  if (name === 'star')
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="m12 3 2.8 5.7 6.3.9-4.5 4.4 1.1 6.2-5.7-3-5.7 3 1.1-6.2L3.9 9.6l6.3-.9Z"/></svg>`;
-  if (name === 'moon') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M20.1 14.8A8.2 8.2 0 0 1 9.2 3.9a.9.9 0 0 0-1.1-1.1 9.8 9.8 0 1 0 13.1 13.1.9.9 0 0 0-1.1-1.1Z"/></svg>`;
-  }
-  if (name === 'sun') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><circle ${common} cx="12" cy="12" r="4.3"/><path ${common} d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.35 5.35 6.9 6.9M17.1 17.1l1.55 1.55M18.65 5.35 17.1 6.9M6.9 17.1l-1.55 1.55"/></svg>`;
-  }
-  if (name === 'refresh') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M20 11a8 8 0 0 0-14.1-5.2L4 8"/><path ${common} d="M4 4v4h4"/><path ${common} d="M4 13a8 8 0 0 0 14.1 5.2L20 16"/><path ${common} d="M20 20v-4h-4"/></svg>`;
-  }
-  if (name === 'connection') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="m8.2 15.8-1.4 1.4a3.4 3.4 0 0 1-4.8-4.8l3.2-3.2A3.4 3.4 0 0 1 10 9"/><path ${common} d="m15.8 8.2 1.4-1.4a3.4 3.4 0 0 1 4.8 4.8l-3.2 3.2A3.4 3.4 0 0 1 14 15"/><path ${common} d="m8.5 15.5 7-7"/></svg>`;
-  }
-  if (name === 'turn-start') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M5 5h14M12 19V8m-4 4 4-4 4 4"/></svg>`;
-  }
-  if (name === 'turn-end') {
-    return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M5 19h14M12 5v11m-4-4 4 4 4-4"/></svg>`;
-  }
-  return `<svg aria-hidden="true" viewBox="0 0 24 24"><path ${common} d="M6 6l12 12M18 6 6 18"/></svg>`;
 }
 
 function themeIcon() {

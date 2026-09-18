@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 只读设置、窗口偏好与 runtime/settings-sync 操作。
- * [OUTPUT]: 胶囊设置页模板与控件绑定，三材质入口及内嵌与弹出端的 Clear 星星切换。
+ * [OUTPUT]: 胶囊设置页模板与控件绑定，显式选项菜单、统一图标及内嵌与弹出端的 Clear 星星切换。
  * [POS]: 设置视图边界，不管理后台请求生命周期。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -19,10 +19,8 @@ import {
   fontSizeLabel,
   iconSvg,
   currentAppearance,
-  materialButtonLabel,
-  materialValueLabel,
   toggleLabelOnly,
-  toggleMaterial,
+  writeMaterial,
   toggleLiquidVariant,
 } from './panel-appearance.js';
 import {
@@ -129,36 +127,6 @@ function generationModeLabel(value = stepwiseGenerationMode()) {
   return normalizeGenerationMode(value) === 'manual' ? '手动刷新' : '自动生成';
 }
 
-function nextGenerationMode(value = stepwiseGenerationMode()) {
-  const index = GENERATION_MODES.indexOf(normalizeGenerationMode(value));
-  return GENERATION_MODES[(index + 1) % GENERATION_MODES.length];
-}
-
-function nextPromptClickMode(value = shellState.promptClickMode) {
-  const index = PROMPT_CLICK_MODES.indexOf(normalizePromptClickMode(value));
-  return PROMPT_CLICK_MODES[(index + 1) % PROMPT_CLICK_MODES.length];
-}
-
-function generationModeButtonLabel(value = stepwiseGenerationMode()) {
-  return `模式：${generationModeLabel(value)}；切换为${generationModeLabel(nextGenerationMode(value))}`;
-}
-
-function promptClickModeButtonLabel(value = shellState.promptClickMode) {
-  return `点击：${promptClickModeLabel(value)}；切换为${promptClickModeLabel(nextPromptClickMode(value))}`;
-}
-
-function toggleGenerationMode(event) {
-  event?.preventDefault();
-  event?.stopPropagation();
-  return setGenerationMode(nextGenerationMode());
-}
-
-function togglePromptClickMode(event) {
-  event?.preventDefault();
-  event?.stopPropagation();
-  return writePromptClickMode(nextPromptClickMode());
-}
-
 function appearanceSettingsHtml() {
   const appearance = currentAppearance();
   return `
@@ -166,22 +134,31 @@ function appearanceSettingsHtml() {
         <div class="csw-control-group">
           <span class="csw-control-label">外观</span>
           <span class="csw-control-row">
-            <button class="csw-control-button" type="button" data-action="material" data-material="${appearance.material}" title="${escapeAttr(materialButtonLabel())}" aria-label="${escapeAttr(materialButtonLabel())}"><span data-material-value>${materialValueLabel()}</span></button>
-            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${appearance.liquidVariant === 'clear'}" title="Regular 标准 / Clear 通透" ${appearance.material === 'native-glass' ? '' : 'hidden'}>${iconSvg('star')}</button>
+            <select class="csw-control-button" data-action="material" aria-label="外观" title="选择外观">${[
+              ['matte', '哑光'],
+              ['frosted', '磨砂'],
+              ['native-glass', '液态'],
+            ]
+              .map(
+                ([value, label]) =>
+                  `<option value="${value}" ${appearance.material === value ? 'selected' : ''}>${label}</option>`,
+              )
+              .join('')}</select>
+            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${appearance.liquidVariant === 'clear'}" title="Regular 标准 / Clear 通透" ${appearance.material === 'native-glass' ? '' : 'hidden'}>${iconSvg(appearance.liquidVariant === 'clear' ? 'star-filled' : 'star')}</button>
           </span>
         </div>
         <div class="csw-control-group">
           <span class="csw-control-label" title="同时调整下一步与大纲内容字号">字号</span>
           <span class="csw-stepper" aria-label="下一步与大纲内容字号">
-            <button class="csw-step-button" type="button" data-action="font-dec" title="减小字体" aria-label="减小字体" ${effectiveFontSize() <= MIN_FONT ? 'disabled' : ''}>−</button>
+            <button class="csw-step-button" type="button" data-action="font-dec" title="减小字体" aria-label="减小字体" ${effectiveFontSize() <= MIN_FONT ? 'disabled' : ''}>${iconSvg('minus')}</button>
             <span class="csw-step-value" aria-live="polite">${fontSizeLabel()}</span>
-            <button class="csw-step-button" type="button" data-action="font-inc" title="增大字体" aria-label="增大字体" ${effectiveFontSize() >= MAX_FONT ? 'disabled' : ''}>+</button>
+            <button class="csw-step-button" type="button" data-action="font-inc" title="增大字体" aria-label="增大字体" ${effectiveFontSize() >= MAX_FONT ? 'disabled' : ''}>${iconSvg('plus')}</button>
           </span>
         </div>
         <div class="csw-control-group">
           <span class="csw-control-label">显示</span>
           <span class="csw-control-row">
-            <button class="csw-control-button" type="button" data-action="label-only" aria-pressed="${shellState.labelOnly}" title="切换显示方式：${shellState.labelOnly ? '标题 + 摘要' : '仅标题'}"><span data-label-only-value>${shellState.labelOnly ? '仅标题' : '标题 + 摘要'}</span></button>
+            <select class="csw-control-button" data-action="label-only" aria-label="显示方式"><option value="false" ${!shellState.labelOnly ? 'selected' : ''}>标题 + 摘要</option><option value="true" ${shellState.labelOnly ? 'selected' : ''}>仅标题</option></select>
           </span>
         </div>
       </div>
@@ -212,15 +189,11 @@ function settingsHtml() {
             <div class="csw-runtime-grid" aria-label="配置摘要">
               <div class="csw-generation-mode" data-generation-mode-control>
                 <span class="csw-metric-label">模式</span>
-                <button class="csw-metric-action" type="button" data-action="generation-mode" title="${escapeAttr(generationModeButtonLabel())}" aria-label="${escapeAttr(generationModeButtonLabel())}">
-                  <span data-generation-mode-value>${generationModeLabel()}</span>
-                </button>
+                <select class="csw-metric-action" data-action="generation-mode" aria-label="生成模式">${GENERATION_MODES.map((mode) => `<option value="${mode}" ${stepwiseGenerationMode() === mode ? 'selected' : ''}>${generationModeLabel(mode)}</option>`).join('')}</select>
               </div>
               <div class="csw-click-mode" data-prompt-click-control>
                 <span class="csw-metric-label">点击</span>
-                <button class="csw-metric-action" type="button" data-action="prompt-click-mode" title="${escapeAttr(promptClickModeButtonLabel())}" aria-label="${escapeAttr(promptClickModeButtonLabel())}">
-                  <span data-prompt-click-mode-value>${promptClickModeLabel()}</span>
-                </button>
+                <select class="csw-metric-action" data-action="prompt-click-mode" aria-label="建议点击行为">${PROMPT_CLICK_MODES.map((mode) => `<option value="${mode}" ${shellState.promptClickMode === mode ? 'selected' : ''}>${promptClickModeLabel(mode)}</option>`).join('')}</select>
               </div>
             </div>
             <div class="csw-command-deck" aria-label="设置操作">
@@ -257,10 +230,14 @@ function attachSettingsEvents() {
     ?.addEventListener('click', toggleLiquidVariant);
   shellState.panel
     .querySelector("[data-action='material']")
-    ?.addEventListener('click', toggleMaterial);
+    ?.addEventListener('change', (event) => {
+      writeMaterial(event.target.value);
+    });
   shellState.panel
     .querySelector("[data-action='label-only']")
-    ?.addEventListener('click', toggleLabelOnly);
+    ?.addEventListener('change', (event) => {
+      if ((event.target.value === 'true') !== shellState.labelOnly) toggleLabelOnly(event);
+    });
   shellState.panel
     .querySelector("[data-action='font-dec']")
     ?.addEventListener('click', () => bumpFontSize(-1));
@@ -275,40 +252,38 @@ function attachSettingsEvents() {
     ?.addEventListener('click', () => void testSettings());
   shellState.panel
     .querySelector("[data-action='generation-mode']")
-    ?.addEventListener('click', (event) => {
-      void toggleGenerationMode(event);
+    ?.addEventListener('change', (event) => {
+      void setGenerationMode(event.target.value);
     });
   shellState.panel
     .querySelector("[data-action='prompt-click-mode']")
-    ?.addEventListener('click', togglePromptClickMode);
+    ?.addEventListener('change', (event) => writePromptClickMode(event.target.value));
 }
 
 function writePromptClickMode(value) {
   shellState.promptClickMode = normalizePromptClickMode(value);
   storage.set(PROMPT_CLICK_MODE_KEY, shellState.promptClickMode);
   const trigger = shellState.panel?.querySelector("[data-action='prompt-click-mode']");
-  const display = trigger?.querySelector('[data-prompt-click-mode-value]');
-  const label = promptClickModeButtonLabel();
+  const label = '建议点击行为';
   if (trigger) {
+    trigger.value = shellState.promptClickMode;
     trigger.title = label;
     trigger.setAttribute('aria-label', label);
   }
-  if (display) display.textContent = promptClickModeLabel();
   return shellState.promptClickMode;
 }
 
 function updateGenerationModeControl(value = stepwiseGenerationMode(), busy = false) {
   const mode = normalizeGenerationMode(value);
   const trigger = shellState.panel?.querySelector("[data-action='generation-mode']");
-  const display = trigger?.querySelector('[data-generation-mode-value]');
-  const label = generationModeButtonLabel(mode);
+  const label = '生成模式';
   if (trigger) {
+    trigger.value = mode;
     trigger.title = label;
     trigger.setAttribute('aria-label', label);
     trigger.setAttribute('aria-busy', String(busy));
     trigger.disabled = busy;
   }
-  if (display) display.textContent = generationModeLabel(mode);
 }
 
 function statusTone(expression) {

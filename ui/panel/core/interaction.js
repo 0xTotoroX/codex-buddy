@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、几何、外观与指针/键盘事件。
- * [OUTPUT]: 紧凑表情单击展开、展开表情仅双击切换窗口；拖动、缩放与键盘操作。
+ * [OUTPUT]: 内嵌表情单击收放、双击切换窗口；拖动、缩放与键盘操作。
  * [POS]: 外壳交互层；效果在 effects，原生手势经 popout/transport 转发。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -445,7 +445,12 @@ function installResize() {
 }
 
 // 鼠标单击等待 100ms；更慢的第二击仍可跨越形变中的表情/玻璃命中层。
+let dockFaceTimer = 0;
+
 function cancelFaceClick() {
+  window.clearTimeout(dockFaceTimer);
+  dockFaceTimer = 0;
+  document.removeEventListener('click', onDockFaceSecondClick, true);
   window.clearTimeout(shellState.faceClickTimer);
   shellState.faceClickTimer = 0;
   shellState.lastFaceClick = null;
@@ -466,7 +471,12 @@ function consumeFaceDoubleClick(event) {
     Math.hypot(event.clientX - previous.x, event.clientY - previous.y) <= 6;
   cancelFaceClick();
   if (!matched || !canSwitchWindow) return false;
-  if (!IS_POPOUT) settleMorph(previous.open ? 1 : 0);
+  if (!IS_POPOUT) {
+    if (previous.docked) {
+      shellState.dockOpen = previous.dockOpen;
+      emitSignal('render', undefined);
+    } else settleMorph(previous.open ? 1 : 0);
+  }
   emitSignal('windowToggle', undefined);
   return true;
 }
@@ -487,19 +497,34 @@ function onFaceClick(event, source) {
       x: event.clientX,
       y: event.clientY,
       open: shellState.open,
+      docked: shellState.layoutMode === 'workbench',
+      dockOpen: shellState.dockOpen,
     };
     window.addEventListener('blur', cancelFaceClick, { once: true });
   }
-  if (source === 'workbench') return;
+
   const expanded = source === 'fab' ? !shellState.open : false;
   const singleClick = () => {
     shellState.faceClickTimer = 0;
     if (!IS_POPOUT && isCurrentRuntime() && !shellState.detached && !shellState.detachPending) {
-      setOpen(expanded, expanded ? (event.detail === 0 ? 'panel' : '') : 'chip');
+      if (source === 'workbench' && shellState.layoutMode === 'workbench') {
+        shellState.dockOpen = false;
+        emitSignal('render', undefined);
+        // 收起会移除原命中区域，短时保留原坐标的第二击识别。
+        document.addEventListener('click', onDockFaceSecondClick, true);
+        dockFaceTimer = window.setTimeout(cancelFaceClick, 500);
+      } else setOpen(expanded, expanded ? (event.detail === 0 ? 'panel' : '') : 'chip');
     }
   };
   if (event.detail === 0 || runtimeState.settings?.popoutSupported !== true) singleClick();
   else if (!IS_POPOUT) shellState.faceClickTimer = window.setTimeout(singleClick, 100);
+}
+
+function onDockFaceSecondClick(event) {
+  if (consumeFaceDoubleClick(event)) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
 }
 
 function onFaceSecondPress(event) {

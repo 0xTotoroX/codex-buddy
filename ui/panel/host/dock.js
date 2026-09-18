@@ -4,6 +4,7 @@
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { iconSvg } from '../icons/index.js';
 import { foregroundSurface } from './surfaces.js';
 const SLOT = 'data-codex-buddy-dock';
 const OWN_UI = `[${SLOT}],[data-companion-stepwise-root]`;
@@ -38,7 +39,7 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
     slot = null,
     frame = 0,
     fingerprint = '';
-  let options = { width: 340, open: true, detached: false };
+  let options = { width: 340, open: true, detached: false, popoutSupported: false };
   let blocked = false;
   let observer = null;
   let attachedRoot = null;
@@ -91,6 +92,11 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
   });
   window.addEventListener('resize', schedule);
   document.addEventListener('focusin', schedule);
+  const closeMenu = (event) => {
+    const menu = slot?.querySelector('.csw-dock-menu');
+    if (menu && !menu.contains(event.target)) menu.removeAttribute('open');
+  };
+  document.addEventListener('pointerdown', closeMenu);
 
   function removeSlot() {
     if (slot) beforeMove();
@@ -127,29 +133,36 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       slot.setAttribute(SLOT, 'true');
       slot.setAttribute('aria-label', 'CodexBuddy 工作台入口');
       slot.style.cssText =
-        'order:1;flex:0 0 auto;min-width:0;position:relative;align-self:stretch;overflow:hidden;padding:0;border:0;margin:0;box-sizing:border-box;';
+        'order:1;flex:0 0 auto;min-width:0;position:relative;align-self:stretch;overflow:visible;padding:0;border:0;margin:0;box-sizing:border-box;';
       const entry = document.createElement('button');
       entry.type = 'button';
-      entry.textContent = '◫';
+      entry.innerHTML = iconSvg('dock');
+      entry.className = 'csw-dock-entry';
       entry.setAttribute('aria-label', '打开停靠工作台');
       entry.style.cssText =
         'position:absolute;top:56px;right:4px;width:36px;height:36px;border:0;border-radius:10px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;cursor:pointer;font-size:22px;';
       entry.onclick = () => {
         if (!options.detached) onOpen();
       };
-      const popout = /** @type {HTMLButtonElement} */ (entry.cloneNode(true));
-      popout.textContent = '↗';
-      popout.style.top = '96px';
-      popout.title = '弹出工作台';
-      popout.setAttribute('aria-label', '弹出工作台');
-      popout.onclick = onPopout;
-      const exit = /** @type {HTMLButtonElement} */ (entry.cloneNode(true));
-      exit.textContent = '◉';
-      exit.style.top = '136px';
-      exit.title = '切回胶囊';
-      exit.setAttribute('aria-label', '切回胶囊');
-      exit.onclick = onExit;
-      slot.append(entry, popout, exit);
+      const menu = document.createElement('details');
+      menu.className = 'csw-dock-menu';
+      menu.innerHTML = `<summary aria-label="工作台位置" title="工作台位置">${iconSvg('more')}</summary><div><button data-dock-popout>弹出到桌面</button><button data-dock-floating>内嵌浮动</button></div>`;
+      menu.querySelector('[data-dock-popout]').addEventListener('click', () => {
+        menu.open = false;
+        onPopout();
+      });
+      menu.querySelector('[data-dock-floating]').addEventListener('click', () => {
+        menu.open = false;
+        onExit();
+      });
+      menu.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          menu.open = false;
+          menu.querySelector('summary').focus();
+          event.stopPropagation();
+        }
+      });
+      slot.append(entry, menu);
       host.row.append(slot);
       observer = new ResizeObserver(schedule);
       observer.observe(host.row);
@@ -170,11 +183,14 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
     const width = expanded ? requestedWidth : 44;
     if (slot.style.width !== `${width}px`) slot.style.width = `${width}px`;
     const entry = slot.firstElementChild;
-    for (const button of slot.querySelectorAll(':scope > button'))
-      button.style.display = expanded ? 'none' : 'block';
+    const menu = slot.querySelector('.csw-dock-menu');
+    entry.style.display = expanded ? 'none' : 'grid';
+    menu.hidden = expanded || options.detached;
+    if (menu.hidden) menu.open = false;
     entry.disabled = options.detached;
-    slot.children[1].disabled = options.detached;
-    slot.children[2].disabled = options.detached;
+    const popout = /** @type {HTMLButtonElement} */ (menu.querySelector('[data-dock-popout]'));
+    popout.disabled = !options.popoutSupported;
+    popout.title = options.popoutSupported ? '弹出到桌面' : '当前系统不支持桌面浮窗';
     entry.title = options.detached
       ? '浮窗已弹出，请在浮窗中收回'
       : enough
@@ -241,6 +257,7 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       observer?.disconnect();
       window.removeEventListener('resize', schedule);
       document.removeEventListener('focusin', schedule);
+      document.removeEventListener('pointerdown', closeMenu);
       cancelAnimationFrame(frame);
       removeSlot();
     },

@@ -388,6 +388,142 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'expression remains visible in both morph directions and slow dock double click restores origin',
+    async (page) => {
+      await mode(page, false);
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.locator('.csw-fab').click();
+      await page.locator('.csw-popover[data-morphing=true]').waitFor();
+      assert.equal(
+        await page.locator('.csw-fab').isVisible(),
+        true,
+        'opening keeps expression visible',
+      );
+      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      await page.locator('.csw-workbench-face').click();
+      await page.locator('.csw-popover[data-morphing=true]').waitFor();
+      assert.equal(
+        await page.locator('.csw-fab').isVisible(),
+        true,
+        'closing keeps expression visible',
+      );
+      await page.waitForFunction(
+        () => document.querySelector('.csw-popover').dataset.morphing === 'false',
+      );
+      await mode(page, true);
+      await page.evaluate(() => {
+        const original = window.__companionHostRequest;
+        window.workbenchFixture.detaches = [];
+        window.__companionHostRequest = (raw) => {
+          const input = JSON.parse(raw);
+          if (input.path !== '/panel/detach') return original(raw);
+          window.workbenchFixture.detaches.push(input.payload.ui);
+          queueMicrotask(() => window.__companionDesktop.complete(input.id, { ok: true }));
+        };
+      });
+      await page.locator('.csw-workbench-face').dblclick({ delay: 180 });
+      assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), 1);
+      assert.equal(await page.evaluate(() => window.workbenchFixture.detaches[0].dockOpen), true);
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockOpen),
+        true,
+      );
+    },
+  ],
+
+  [
+    'centered shared face settings choices and placement keep their geometry and business state',
+    async (page) => {
+      await mode(page, true);
+      const requestCount = () =>
+        page.evaluate(
+          () =>
+            window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate').length,
+        );
+      const before = await requestCount();
+      const widthHandle = page.getByRole('separator', { name: '调整工作台宽度' });
+      for (const key of ['ArrowRight', 'ArrowLeft']) {
+        for (let i = 0; i < 16; i++) await widthHandle.press(key);
+        await settle(page);
+        const head = await box(page, '.csw-workbench-head');
+        const face = await box(page, '.csw-workbench-face');
+        const controls = await box(page, '.csw-workbench-controls');
+        near(face.x + face.width / 2, head.x + head.width / 2, 'face stays on shell center');
+        assert.ok(face.x + face.width <= controls.x, 'actions must not overlap expression');
+        for (const icon of await page
+          .locator(
+            '.csw-workbench-controls > .csw-icon svg, .csw-workbench-pane > header > button svg',
+          )
+          .all()) {
+          const rect = await icon.boundingBox();
+          near(rect.width, 18, 'shared icon width');
+          near(rect.height, 18, 'shared icon height');
+        }
+      }
+      await page.locator('[data-workbench-settings]').click();
+      for (const material of ['matte', 'frosted', 'native-glass']) {
+        await page.locator('[data-action=material]').selectOption(material);
+        assert.equal(
+          await page.locator('[data-companion-stepwise-root]').getAttribute('data-material'),
+          material,
+        );
+      }
+      const values = ['[data-action=material]', '.csw-step-value', '[data-action=label-only]'];
+      const centers = [];
+      for (const selector of values) {
+        const b = await box(page, selector);
+        centers.push(b.x + b.width / 2);
+      }
+      centers.forEach((center) =>
+        near(center, centers[0], 'settings values share a vertical axis'),
+      );
+      await page.screenshot({ path: resolve(output, 'unified-icons-settings.png') });
+      await page.locator('[data-workbench-settings]').click();
+      await page.locator('.csw-layout-menu summary').click();
+      await page.locator('[data-placement=floating]').click();
+      assert.equal(await page.locator(slotSelector).count(), 0);
+      await page.locator('.csw-workbench-face').click();
+      await page.waitForFunction(
+        () =>
+          !window.__companionFloatingPanel.state.open &&
+          !window.__companionFloatingPanel.state.morphAnimation,
+      );
+      await page.locator('.csw-fab').click();
+      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      const compact = await page.locator('.csw-fab').evaluate((node) => {
+        const parent = node.parentElement.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return {
+          x: parent.x + parseFloat(style.left),
+          y: parent.y + parseFloat(style.top),
+          width: parseFloat(style.width),
+          height: parseFloat(style.height),
+        };
+      });
+      const face = await box(page, '.csw-workbench-face');
+      near(
+        face.x + face.width / 2,
+        compact.x + compact.width / 2,
+        'morph endpoint horizontal continuity',
+      );
+      near(
+        face.y + face.height / 2,
+        compact.y + compact.height / 2,
+        'morph endpoint vertical continuity',
+      );
+      await page.locator('.csw-layout-menu summary').click();
+      await page.locator('[data-placement=dock]').click();
+      await page.locator('.csw-workbench-face').click();
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'closed',
+      );
+      await page.getByRole('button', { name: '打开停靠工作台', exact: true }).click();
+      assert.equal(await requestCount(), before, 'UI changes must not generate suggestions');
+      await page.screenshot({ path: resolve(output, 'unified-icons-dock.png') });
+    },
+  ],
+
+  [
     'unified expanded shell retains face controls across capsule popout arrangements and materials',
     async (host) => {
       await mode(host, true);
@@ -407,7 +543,9 @@ const cases = [
         await host.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockOpen),
         true,
       );
-      await host.locator('[data-workbench-exit]').click();
+      await host.locator('.csw-layout-menu summary').click();
+      await host.locator('[data-placement=floating]').click();
+      await host.locator('.csw-workbench-face').click();
       await host.locator('.csw-fab').waitFor({ state: 'visible' });
       await host.waitForFunction(() => !window.__companionFloatingPanel.state.open);
       await host.locator('.csw-fab').dblclick();
@@ -1036,6 +1174,7 @@ const cases = [
         'same B context through handoff',
       );
       assert.deepEqual(errors, []);
+      await page.locator('.csw-layout-menu summary').click();
       await page.locator('[data-workbench-close]').click();
       const closed = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       assert.equal(closed.dockOpen, false, 'explicit close updates intent');
@@ -1385,20 +1524,29 @@ const cases = [
     },
   ],
   [
-    'collapsed rail exposes open/popout/exit and exit restores capsule',
+    'collapsed rail keeps one primary action and secondary placement commands',
     async (page, baseline) => {
       await mode(page, true);
+      await page.locator('.csw-layout-menu summary').click();
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
       const rail = page.locator(slotSelector);
-      assert.equal(await rail.getByRole('button').count(), 3);
-      for (const name of ['打开停靠工作台', '弹出工作台', '切回胶囊']) {
-        assert.equal(await rail.getByRole('button', { name, exact: true }).isVisible(), true);
-        assert.equal(await rail.getByRole('button', { name, exact: true }).isEnabled(), true);
-      }
-      await rail.getByRole('button', { name: '切回胶囊', exact: true }).click();
+      assert.equal(await rail.locator(':scope > button:visible').count(), 1);
+      assert.equal(
+        await rail.getByRole('button', { name: '打开停靠工作台', exact: true }).isVisible(),
+        true,
+      );
+      await rail.locator('.csw-dock-menu > summary').click();
+      assert.equal(
+        await rail.getByRole('button', { name: '弹出到桌面', exact: true }).isVisible(),
+        true,
+      );
+      await page.locator('#fixture-host-content .app-bar').click();
+      assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+      await rail.locator('.csw-dock-menu > summary').click();
+      await rail.getByRole('button', { name: '内嵌浮动', exact: true }).click();
       await settle(page);
       assert.equal(await page.locator(slotSelector).count(), 0);
       assert.equal(await page.locator('.csw-workbench').count(), 0);
@@ -1425,6 +1573,7 @@ const cases = [
       await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.csw-workbench').count(), 1);
       assert.equal(await page.locator(slotSelector).count(), 0);
+      await page.locator('.csw-layout-menu summary').click();
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
       await page.locator('.csw-fab').waitFor({ state: 'visible' });
       await box(page, '.csw-fab');

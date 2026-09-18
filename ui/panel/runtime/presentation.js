@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { iconSvg } from '../icons/index.js';
 import { readWorkbenchScroll, writeWorkbenchScroll } from '../workbench/reading.js';
 import { normalizeWorkbenchLayout } from '../workbench/model.js';
 import {
@@ -547,7 +548,7 @@ function panelDisconnected(message) {
   emitSignal('render', undefined);
 }
 
-function panelWindowControls() {
+function panelWindowControls({ includePin = true } = {}) {
   const unsupported = !IS_POPOUT && runtimeState.settings?.popoutSupported !== true;
   const label = IS_POPOUT
     ? '收回 Codex'
@@ -556,10 +557,12 @@ function panelWindowControls() {
       : shellState.detachPending
         ? '正在弹出…'
         : '弹出到桌面';
-  const arrow = IS_POPOUT ? 'M21 3l-9 9M12 5v7h7' : 'M14 3h7v7M21 3l-9 9';
-  const popIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${arrow}M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></svg>`;
-  const pinTitle = IS_POPOUT ? (shellState.pinnedOnTop ? '取消置顶' : '窗口置顶') : '弹出后可置顶';
-  const pin = `<button class="csw-icon csw-desktop-pin" type="button" data-action="pin" aria-pressed="${shellState.pinnedOnTop}" title="${pinTitle}" aria-label="${pinTitle}" ${IS_POPOUT ? '' : 'disabled tabindex="-1" aria-hidden="true"'}><svg aria-hidden="true" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" d="m15 3 6 6-4 1-4 4-1 4-6-6 4-1 4-4 1-4ZM6 18l-3 3"/></svg></button>`;
+  const popIcon = iconSvg(IS_POPOUT ? 'return' : 'detach');
+  const pinTitle = shellState.pinnedOnTop ? '取消窗口置顶' : '窗口置顶';
+  const pin =
+    IS_POPOUT && includePin
+      ? `<button class="csw-icon csw-desktop-pin" type="button" data-action="pin" aria-pressed="${shellState.pinnedOnTop}" title="${pinTitle}" aria-label="${pinTitle}">${iconSvg('pin')}</button>`
+      : '';
   return `${pin}<button class="csw-icon" type="button" data-action="detach" title="${label}" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
 }
 

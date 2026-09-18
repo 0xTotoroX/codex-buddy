@@ -195,7 +195,7 @@
   color: var(--csw-text);
 }
 
-button.csw-metric-action {
+.csw-metric-action {
   appearance: none;
   background: transparent;
   border: 0;
@@ -214,17 +214,17 @@ button.csw-metric-action {
   text-align: left;
 }
 
-button.csw-metric-action:hover,
-button.csw-metric-action:focus-visible {
+.csw-metric-action:hover,
+.csw-metric-action:focus-visible {
   background: transparent;
   color: color-mix(in srgb, var(--csw-text) 88%, var(--csw-accent) 12%);
 }
 
-button.csw-metric-action:active {
+.csw-metric-action:active {
   color: color-mix(in srgb, var(--csw-text) 78%, var(--csw-accent) 22%);
 }
 
-button.csw-metric-action:disabled {
+.csw-metric-action:disabled {
   cursor: not-allowed;
   opacity: 0.34;
 }
@@ -757,9 +757,6 @@ button.csw-metric-action:disabled {
   color: var(--csw-text);
   background: color-mix(in srgb, currentColor 5%, transparent);
 }
-.csw-liquid-star[aria-pressed='true'] svg path {
-  fill: currentColor;
-}
 
 .csw-head-face[data-action='panel-face'] {
   cursor: grab;
@@ -767,4 +764,36 @@ button.csw-metric-action:disabled {
 
 .csw-control-button.csw-liquid-star[hidden] {
   display: none;
+}
+
+.csw-control-button:is(select) {
+  appearance: none;
+  text-align: center;
+  text-align-last: center;
+  cursor: pointer;
+}
+.csw-control-button option,
+.csw-metric-action option {
+  background: var(--csw-surface-opaque);
+  color: var(--csw-text);
+}
+.csw-metric-action:is(select) {
+  appearance: none;
+  cursor: pointer;
+}
+.csw-step-button svg {
+  width: 18px;
+  height: 18px;
+  margin: auto;
+}
+.csw-liquid-star svg,
+.csw-command-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.csw-outline-nav-button svg,
+.csw-row-arrow svg {
+  width: 18px;
+  height: 18px;
 }

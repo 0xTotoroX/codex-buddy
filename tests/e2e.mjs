@@ -599,13 +599,13 @@ try {
       await desktop.evaluate(() => window.__companionFloatingPanel.state.fontOffset),
       fontBefore,
     );
-    await desktop.locator('[data-action="label-only"]').click();
+    await desktop.locator('[data-action="label-only"]').selectOption('true');
     assert.equal(
       await desktop.evaluate(() => window.__companionFloatingPanel.state.labelOnly),
       true,
     );
     await desktop.getByRole('button', { name: '减小字体', exact: true }).click();
-    await desktop.locator('[data-action="label-only"]').click();
+    await desktop.locator('[data-action="label-only"]').selectOption('false');
     const materials = [];
     for (let i = 0; i < 3; i++) {
       materials.push((await panelState()).material);
@@ -614,7 +614,9 @@ try {
         'block',
         'Embedded materials keep a soft depth cue',
       );
-      await desktop.locator('[data-action="material"]').click();
+      await desktop
+        .locator('[data-action="material"]')
+        .selectOption(['matte', 'native-glass', 'frosted'][i]);
     }
     assert.deepEqual(new Set(materials), new Set(['frosted', 'matte', 'native-glass']));
     record('三种材质轮换、字号及标题摘要切换');
@@ -654,7 +656,10 @@ try {
       assert.equal(embeddedGlass.phase, 'error');
       assert.equal(await desktop.locator('feDisplacementMap').count(), 0);
     }
-    assert.equal(await desktop.locator('[data-material-value]').textContent(), '液态');
+    assert.equal(
+      await desktop.locator('[data-action=material] option:checked').textContent(),
+      '液态',
+    );
     assert.equal(
       await desktop.getByRole('button', { name: '通透液态（Clear）', exact: true }).count(),
       1,
@@ -669,7 +674,7 @@ try {
       '正式版内嵌液态启用自有 SVG，浏览器不支持或系统要求减少透明度时回退，切换材质后清理光学节点',
     );
 
-    await desktop.locator('[data-action="prompt-click-mode"]').click();
+    await desktop.locator('[data-action="prompt-click-mode"]').selectOption('direct');
     assert.equal((await panelState()).clickMode, 'direct');
     await switchView('next');
     await desktop.locator('.csw-row[data-index="0"]').click();
@@ -679,7 +684,7 @@ try {
     );
     await composer.fill('');
     await switchView('settings');
-    await desktop.locator('[data-action="prompt-click-mode"]').click();
+    await desktop.locator('[data-action="prompt-click-mode"]').selectOption('hybrid');
     assert.equal((await panelState()).clickMode, 'hybrid');
     await switchView('next');
     await desktop.locator('.csw-row[data-index="0"]').click();
@@ -693,7 +698,7 @@ try {
     );
     await composer.fill('');
     await switchView('settings');
-    await desktop.locator('[data-action="prompt-click-mode"]').click();
+    await desktop.locator('[data-action="prompt-click-mode"]').selectOption('fill');
     assert.equal((await panelState()).clickMode, 'fill');
     record('显式直接发送／单击填入双击发送模式，仅在测试页面计数');
 
@@ -808,6 +813,7 @@ try {
     );
     record('表情拖动不误收起或弹出');
 
+    await desktop.locator('.csw-layout-menu summary').click();
     await desktop.getByRole('button', { name: '收起工作台', exact: true }).click();
     await settle();
     assert.equal((await panelState()).open, false);
@@ -818,7 +824,7 @@ try {
     assert.equal((await panelState()).open, false);
     await desktop.locator('.csw-fab').click();
     await settle();
-    await desktop.locator('[data-workbench-close]').focus();
+    await desktop.locator('.csw-workbench-face').focus();
     await desktop.keyboard.press('Enter');
     assert.equal(
       (await panelState()).open,
@@ -955,7 +961,7 @@ try {
     record('Web 与内嵌胶囊的材质、点击和摘要设置双向同步，旧版本保存被拒绝');
 
     await switchView('settings');
-    await desktop.locator('[data-action="generation-mode"]').click();
+    await desktop.locator('[data-action="generation-mode"]').selectOption('auto');
     await waitFor(
       async () => (await settings()).generationMode === 'auto',
       'Desktop mode did not persist',

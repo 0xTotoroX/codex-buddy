@@ -84,13 +84,18 @@ test('dock appearances remember independent choices and leave shared window pref
             background: getComputedStyle(n).backgroundColor,
             fill: getComputedStyle(n.querySelector('path')).fill,
             pressed: n.getAttribute('aria-pressed'),
+            path: n.querySelector('path').getAttribute('d'),
           }));
         const selected = await star();
         assert.equal(selected.color, 'rgb(140, 140, 140)');
         assert.equal(selected.background, 'rgba(0, 0, 0, 0)');
         assert.equal(selected.fill, selected.color);
         await page.evaluate(() => window.probe.toggleLiquidVariant());
-        assert.equal((await star()).fill, 'none');
+        assert.notEqual(
+          (await star()).path,
+          selected.path,
+          'Regular and Clear must have distinct outlined and filled geometry',
+        );
         assert.equal((await star()).pressed, 'false');
         await move('chat');
         assert.deepEqual(await read(), { material: 'matte', liquidVariant: 'regular' });

@@ -4,13 +4,14 @@
  * [POS]: 来源菜单；不扫描聊天、不保存布局，也不控制窗口置顶。
  * [PROTOCOL]: 变更时检查 workbench/AGENTS.md。
  */
+import { iconSvg } from '../icons/index.js';
 import { IS_POPOUT } from '../runtime/constants.js';
 import { changeChatBinding } from '../host/context.js';
 import { remotePanelAction } from '../popout/transport.js';
 
 export function installAssociation(header) {
   const holder = header.querySelector('.csw-workbench-source');
-  holder.outerHTML = `<details class="csw-association-menu"><summary role="button" aria-label="聊天关联" aria-describedby="csw-association-source"><span id="csw-association-source" class="csw-workbench-source"></span><span aria-hidden="true">⌄</span></summary><div class="csw-layout-options" role="group" aria-label="聊天关联模式"><button type="button" data-association="follow">跟随当前聊天</button><button type="button" data-association="lock">锁定到此聊天</button><button type="button" data-association="current">改为锁定当前选中的聊天</button><span class="csw-association-hint" role="status"></span></div></details>`;
+  holder.outerHTML = `<details class="csw-association-menu"><summary role="button" aria-label="聊天关联" aria-describedby="csw-association-source"><span id="csw-association-source" class="csw-workbench-source"></span>${iconSvg('chevron-down')}</summary><div class="csw-layout-options" role="group" aria-label="聊天关联模式"><button type="button" data-association="follow">跟随当前聊天</button><button type="button" data-association="lock">锁定到此聊天</button><button type="button" data-association="current">改为锁定当前选中的聊天</button><span class="csw-association-hint" role="status"></span></div></details>`;
   const menu = header.querySelector('.csw-association-menu');
   menu.addEventListener('click', (event) => {
     const button = event.target.closest('button[data-association]');

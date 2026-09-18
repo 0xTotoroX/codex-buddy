@@ -4,6 +4,7 @@
  * [POS]: 只编排现有视图；不创建窗口、不读取正文、不发业务请求。
  * [PROTOCOL]: 变更时核对 workbench/AGENTS.md。
  */
+import { iconSvg } from '../icons/index.js';
 import { arrangeWorkbench } from './model.js';
 
 export function installArrangement(root, { read, write, update, enabled }) {
@@ -268,6 +269,11 @@ export function installArrangement(root, { read, write, update, enabled }) {
             );
       }
       for (const button of root.querySelectorAll('[data-pane-focus]')) {
+        const icon = focused ? 'restore' : 'focus';
+        if (button.dataset.icon !== icon) {
+          button.innerHTML = iconSvg(icon);
+          button.dataset.icon = icon;
+        }
         button.setAttribute('aria-label', focused ? '恢复编排' : '专注查看');
         button.setAttribute('title', focused ? '恢复编排' : '专注查看');
         button.setAttribute('aria-pressed', String(focused === button.dataset.paneFocus));

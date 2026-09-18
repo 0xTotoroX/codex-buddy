@@ -1,5 +1,5 @@
 /*
- * [INPUT]: 锁定 Cargo/npm 依赖、已安装包、本地 shadcn/ui与上游许可原文。
+ * [INPUT]: 锁定 Cargo/npm 依赖、已安装包、本地 shadcn/ui、OpenAI 图标与上游许可原文。
  * [OUTPUT]: collectLicenseFiles 收集包内许可路径；generateNotices 生成 THIRD_PARTY_NOTICES.md 与 dependencies.json。
  * [POS]: 递归收集包内许可与署名，保留相对路径；只合并完全相同的原文，保留组件归属和来源。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -84,6 +84,14 @@ export function generateNotices(directory = join(root, 'dist/licenses')) {
       directory: join(root, path),
     });
   }
+  components.push({
+    ecosystem: 'source',
+    name: 'openai/apps-sdk-ui icons',
+    version: '0f00143c7a639906f1621fe58e1b6be7b5bea46d',
+    license: 'MIT',
+    source: 'https://github.com/openai/apps-sdk-ui',
+    directory: join(root, 'ui/panel/icons'),
+  });
   components.push({
     ecosystem: 'source',
     name: 'shadcn/ui',

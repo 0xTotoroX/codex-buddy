@@ -293,6 +293,7 @@ export async function checkPopout({
     await waitFor(async () => (await state()).theme === 'light', 'Theme did not restore');
     await pop.locator('.csw-head').hover();
     const commandCount = commandResults.length;
+    await pop.locator('.csw-layout-menu summary').click();
     await pop.locator('[data-action=theme]').click();
     await waitFor(
       async () => (await state()).theme === 'dark',
@@ -307,6 +308,7 @@ export async function checkPopout({
       commandCount,
       'system toggle must not reach the Codex command channel',
     );
+    await pop.locator('.csw-layout-menu summary').click();
     await pop.locator('[data-action=theme]').click();
     await waitFor(async () => (await state()).theme === 'light', 'System toggle did not restore');
     record('弹出明暗走原生 IPC，系统变化更新浮窗且不发送 Codex 主题命令');
@@ -474,6 +476,7 @@ export async function checkPopout({
     await waitFor(async () => (await state()).count === 4, 'Generation from popout failed');
     record('大纲回到关联宿主定位，回答变化拒绝旧操作并从桌面窗口重新生成');
 
+    await pop.locator('.csw-layout-menu summary').click();
     await pop.locator('[data-action="pin"]').click();
     await waitFor(
       () => JSON.parse(readFileSync(join(dataDir, 'panel.json'))).alwaysOnTop,
@@ -580,7 +583,10 @@ export async function checkPopout({
         assert.ok(contained, 'Clear star must sit inside the shared material control border');
       }
       await pop.screenshot({ path: join(output, `popout-${material}.png`) });
-      if (material !== 'native-glass') await pop.locator('[data-action="material"]').click();
+      if (material !== 'native-glass')
+        await pop
+          .locator('[data-action="material"]')
+          .selectOption(material === 'matte' ? 'frosted' : 'native-glass');
     }
     await slowSurfaceTransition.evaluate((node) => node.remove());
     assert.notEqual(surfaces[0], surfaces[1], 'Matte must retain its opaque CSS surface');
@@ -603,7 +609,7 @@ export async function checkPopout({
         material === 'frosted' ? 'native-frosted' : 'matte',
       );
       assert.equal(
-        await pop.locator('[data-material-value]').textContent(),
+        await pop.locator('[data-action=material] option:checked').textContent(),
         material === 'frosted' ? '磨砂' : '液态（当前哑光）',
       );
     }

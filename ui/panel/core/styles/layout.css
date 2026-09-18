@@ -641,18 +641,6 @@
   width: var(--csw-icon-font);
 }
 
-.csw-icon[data-view='next'] svg {
-  transform: scale(1.08);
-}
-
-.csw-icon[data-action='refresh'] svg {
-  transform: scale(0.95);
-}
-
-.csw-icon[data-view='settings'] svg {
-  transform: scale(0.86);
-}
-
 .csw-body {
   display: flex;
   flex-direction: column;
