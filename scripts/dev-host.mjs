@@ -1,10 +1,11 @@
 /*
  * [INPUT]: 已安装配置、真实 Codex CDP 元数据与本机 API。
- * [OUTPUT]: 窗口选择、开发配置初始化、安装版连接暂停与恢复。
+ * [OUTPUT]: 窗口选择、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
  * [POS]: 真实宿主开发边界；不启动浏览器、不记录聊天、不修改官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
-import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 export function readJson(path, fallback = null) {
@@ -51,7 +52,11 @@ export async function requestRuntime(runtime, path, body) {
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
   });
-  if (!response.ok) throw new Error(`本机后台请求失败 (${response.status})`);
+  if (!response.ok) {
+    const result = await response.json().catch(() => null);
+    const message = typeof result?.message === 'string' ? `：${result.message}` : '';
+    throw new Error(`本机后台 ${path} 请求失败 (${response.status})${message}`);
+  }
   return response.json();
 }
 export async function inspectHost(target) {
@@ -158,7 +163,7 @@ export function initializeData(source, data, host) {
   config.targetId = host.target.id;
   writeFileSync(join(data, 'config.json'), JSON.stringify(config, null, 2), { mode: 0o600 });
 }
-export async function restoreInstallation(journal) {
+export async function restoreInstallation(journal, replacement) {
   const saved = readJson(journal);
   if (!saved) return;
   let state;
@@ -168,6 +173,35 @@ export async function restoreInstallation(journal) {
     throw new Error('安装版后台不可达，恢复记录已保留；请重新启动安装版。');
   }
   if (state.connection.status === 'disconnected') {
+    // Retire an unavailable old session only after a different real host was discovered.
+    // Keep the private recovery record; never reconnect the installation to the new chat.
+    if (
+      replacement &&
+      (replacement.endpoint !== saved.endpoint || replacement.target.id !== saved.targetId)
+    ) {
+      let available = false;
+      const endpoint = endpointUrl(saved.endpoint);
+      try {
+        const response = await fetch(endpoint + '/json/list', {
+          signal: AbortSignal.timeout(1500),
+        });
+        const targets = await response.json();
+        available =
+          !response.ok ||
+          !Array.isArray(targets) ||
+          targets.some(
+            (target) => realTarget(target) && (!saved.targetId || target.id === saved.targetId),
+          );
+      } catch (error) {
+        // An invalid response is not evidence that a window was closed.
+        if (error.name === 'SyntaxError') throw new Error('旧宿主返回异常，恢复记录已保留。');
+      }
+      if (!available) {
+        renameSync(journal, `${journal}.stale-${randomUUID()}`);
+        console.log('旧调试窗口已不可用，恢复记录已保留归档；继续连接当前窗口。');
+        return;
+      }
+    }
     await requestRuntime(saved.runtime, 'connect', {
       endpoint: saved.endpoint,
       targetId: saved.targetId,

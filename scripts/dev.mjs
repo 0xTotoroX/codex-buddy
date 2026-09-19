@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 项目源码、Rust/Node 与独立开发数据目录。
- * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust 编译后自动重启。
+ * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust 编译后自动重启；先发现宿主再恢复旧会话，启动错误传回 App。
  * [POS]: 开发编排；仅管理自身进程，连接真实 Codex，暂停并恢复安装版连接，不改写官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -165,7 +165,10 @@ async function rebuildNative() {
   const previous = binary + '.previous';
   if (existsSync(binary)) copyFileSync(binary, previous);
   copyFileSync(join(root, 'target/debug/codex-buddy'), binary + '.next');
-  if (!service) await pauseInstallation(host, journal);
+  if (!service) {
+    canRestore = true;
+    await pauseInstallation(host, journal);
+  }
   await stopChild(service);
   runtime = undefined;
   renameSync(binary + '.next', binary);
@@ -248,9 +251,8 @@ for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => cleanup().then(() => process.exit(0)));
 try {
   assertBackendStopped();
-  canRestore = true;
-  await restoreInstallation(journal);
   host = await findHost(source, args);
+  await restoreInstallation(journal, host);
   initializeData(source, data, host);
   gateway = await startGateway(token, () => runtime);
   await buildDevPanel(root, snapshot);
@@ -296,6 +298,11 @@ try {
     }),
   );
 } catch (error) {
+  writeFileSync(
+    join(directory, 'launcher-error.json'),
+    JSON.stringify({ message: error.message }),
+    { mode: 0o600 },
+  );
   console.error(error.message);
   await cleanup();
   process.exitCode = 1;

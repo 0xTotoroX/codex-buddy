@@ -128,6 +128,14 @@ test('a failed terminal startup is reported without waiting for the full readine
   writeFileSync(join(root, 'target/dev/launcher-error.json'), JSON.stringify({ failed: true }));
   await assert.rejects(revealDevelopment(root, { checkStartupError: true }), /启动失败/);
   assert.equal(requests.length, 0);
+  writeFileSync(
+    join(root, 'target/dev/launcher-error.json'),
+    JSON.stringify({ message: '没有找到可调试的真实 Codex' }),
+  );
+  await assert.rejects(
+    revealDevelopment(root, { checkStartupError: true }),
+    /没有找到可调试的真实 Codex/,
+  );
 });
 
 test('terminal entry preserves spaces and shell metacharacters without evaluating them', () => {

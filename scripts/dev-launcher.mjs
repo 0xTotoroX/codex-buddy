@@ -157,8 +157,12 @@ export async function revealDevelopment(
   let reconnected = false;
   let lastError;
   while (Date.now() < deadline) {
-    if (checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json')))
-      throw new Error('开发模式启动失败，请查看开发终端；未退出或重启 ChatGPT。');
+    const failure =
+      checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json'));
+    if (failure)
+      throw new Error(
+        failure.message || '开发模式启动失败，请查看开发终端；未退出或重启 ChatGPT。',
+      );
     const runtime = readJson(join(directory, 'target/dev/real/runtime.json'));
     if (runtime) {
       try {
@@ -213,11 +217,15 @@ async function main() {
     console.log(result.pid || 'host');
     return;
   }
+  rmSync(join(root, 'target/dev/launcher-error.json'), { force: true });
   const result = spawnSync(process.execPath, [join(root, 'scripts/dev.mjs'), '--no-open'], {
     cwd: root,
     stdio: 'inherit',
   });
-  if (result.error || result.status !== 0)
+  if (
+    (result.error || result.status !== 0) &&
+    !existsSync(join(root, 'target/dev/launcher-error.json'))
+  )
     writeFileSync(join(root, 'target/dev/launcher-error.json'), JSON.stringify({ failed: true }), {
       mode: 0o600,
     });

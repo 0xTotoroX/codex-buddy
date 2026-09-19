@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 临时配置、合成本机 CDP/API 与开发常量构建。
- * [OUTPUT]: 真实目标选择、配置/存储隔离和安装版恢复契约。
+ * [OUTPUT]: 真实目标选择、配置/存储隔离、安装版恢复及无宿主启动的错误/清理契约。
  * [POS]: 开发宿主边界回归；不连接用户应用或读取真实聊天。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -14,6 +14,7 @@ import {
   existsSync,
   statSync,
   rmSync,
+  readdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -30,6 +31,7 @@ import {
   findHost,
   initializeData,
   restoreInstallation,
+  requestRuntime,
 } from '../scripts/dev-host.mjs';
 
 const temporary = (t) => {
@@ -70,6 +72,116 @@ test('real development accepts only local CDP and actual app pages', () => {
   ])
     assert.equal(realTarget({ type: 'page', url }), false);
 });
+
+test('API failures retain the backend reason instead of only an HTTP status', async (t) => {
+  const api = await server(t, (_, res) =>
+    res.writeHead(400).end(JSON.stringify({ message: '所选 Codex 窗口已关闭' })),
+  );
+  await assert.rejects(
+    requestRuntime({ port: api.port, token: 'synthetic' }, 'connect', {}),
+    /connect 请求失败 \(400\)：所选 Codex 窗口已关闭/,
+  );
+});
+
+test('a verified replacement can retire a missing old target without connecting installation elsewhere', async (t) => {
+  const root = temporary(t),
+    journal = join(root, 'paused.json'),
+    requests = [];
+  const old = await server(t, (_, res) => res.end('[]'));
+  const api = await server(t, (req, res) => {
+    requests.push(req.url);
+    res.end(JSON.stringify({ connection: { status: 'disconnected' } }));
+  });
+  const saved = JSON.stringify({
+    runtime: { port: api.port, token: 'synthetic' },
+    endpoint: old.origin,
+    targetId: 'old-window',
+    detached: true,
+  });
+  writeFileSync(journal, saved, { mode: 0o600 });
+  await restoreInstallation(journal, { endpoint: old.origin, target: { id: 'new-window' } });
+  assert.deepEqual(requests, ['/api/state']);
+  assert.equal(existsSync(journal), false);
+  const archived = readdirSync(root).find((name) => name.startsWith('paused.json.stale-'));
+  assert.equal(readFileSync(join(root, archived), 'utf8'), saved);
+  assert.equal(statSync(join(root, archived)).mode & 0o777, 0o600);
+});
+
+test('a still available original target is restored even when a different host was found', async (t) => {
+  const root = temporary(t),
+    journal = join(root, 'paused.json'),
+    requests = [];
+  const old = await server(t, (_, res) =>
+    res.end(JSON.stringify([{ id: 'old', type: 'page', url: 'app://-/index.html' }])),
+  );
+  const api = await server(t, (req, res) => {
+    requests.push(req.url);
+    res.end(JSON.stringify({ connection: { status: 'disconnected' } }));
+  });
+  writeFileSync(
+    journal,
+    JSON.stringify({
+      runtime: { port: api.port, token: 'synthetic' },
+      endpoint: old.origin,
+      targetId: 'old',
+    }),
+  );
+  await restoreInstallation(journal, { endpoint: old.origin, target: { id: 'new' } });
+  assert.deepEqual(requests, ['/api/state', '/api/connect']);
+  assert.equal(existsSync(journal), false);
+});
+
+test('no-host startup reports one useful error and leaves the old restoration journal untouched', async (t) => {
+  const root = temporary(t),
+    scripts = join(root, 'scripts'),
+    data = join(root, 'target/dev/real');
+  mkdirSync(scripts);
+  mkdirSync(data, { recursive: true });
+  for (const file of [
+    'dev.mjs',
+    'dev-host.mjs',
+    'dev-panel.mjs',
+    'dev-runtime.mjs',
+    'build-panel.mjs',
+  ])
+    copyFileSync(resolve(import.meta.dirname, '../scripts', file), join(scripts, file));
+  symlinkSync(resolve(import.meta.dirname, '../node_modules'), join(root, 'node_modules'), 'dir');
+  const requests = [];
+  const api = await server(t, (req, res) => {
+    requests.push(req.url);
+    res.end('{}');
+  });
+  const host = await server(t, (_, res) => res.end('[]'));
+  const journal = join(root, 'target/dev/paused-installation.json');
+  const saved = JSON.stringify({
+    runtime: { port: api.port, token: 'synthetic' },
+    endpoint: host.origin,
+    targetId: 'old',
+  });
+  writeFileSync(journal, saved);
+  await assert.rejects(
+    promisify(execFile)(
+      process.execPath,
+      [join(scripts, 'dev.mjs'), '--no-open', '--cdp', host.origin],
+      {
+        env: { ...process.env, CODEX_BUDDY_HOME: join(root, 'installation') },
+        timeout: 10000,
+      },
+    ),
+    (error) => error.code === 1 && error.stderr.split('没有找到可调试的真实 Codex').length === 2,
+  );
+  assert.deepEqual(requests, []);
+  assert.equal(readFileSync(journal, 'utf8'), saved);
+  assert.match(
+    readJsonForTest(join(root, 'target/dev/launcher-error.json')).message,
+    /没有找到可调试/,
+  );
+  assert.equal(existsSync(join(root, 'target/dev/owner.json')), false);
+});
+
+function readJsonForTest(path) {
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
 test('host discovery uses configured real window and never falls back to a fixture', async (t) => {
   const source = temporary(t);
   let targets = [
