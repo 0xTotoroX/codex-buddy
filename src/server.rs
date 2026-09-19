@@ -1,5 +1,5 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
-// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态。
+// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
 // [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -124,6 +124,7 @@ fn router(service: Service) -> Router {
             get(development_status).post(development_report),
         )
         .route("/events", get(events))
+        .route("/development/reveal", post(development_reveal))
         .route("/connect", post(connect))
         .route("/disconnect", post(disconnect))
         .route("/settings", get(settings).post(save_settings))
@@ -373,6 +374,14 @@ async fn development_status(State(service): State<Service>) -> Response {
     Json(report).into_response()
 }
 
+async fn development_reveal(State(service): State<Service>) -> Result<Response, ApiError> {
+    if crate::assets::development().is_none() {
+        return Ok(StatusCode::NOT_FOUND.into_response());
+    }
+    let pid = service.app.reveal_panel().await?;
+    Ok(Json(json!({"ok":true,"pid":pid})).into_response())
+}
+
 async fn index() -> Response {
     static_asset("index.html")
 }
@@ -439,6 +448,40 @@ fn static_asset(path: &str) -> Response {
 mod tests {
     use super::*;
     use tower::ServiceExt;
+    #[tokio::test]
+    async fn reveal_requires_authentication_and_development_assets() {
+        let temp = tempfile::tempdir().unwrap();
+        let app = App::new(
+            Paths::new(Some(temp.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let router = router(Service {
+            app,
+            token: "test-token".into(),
+            port: 47831,
+        });
+        for (token, expected) in [
+            ("wrong-token", StatusCode::UNAUTHORIZED),
+            ("test-token", StatusCode::NOT_FOUND),
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/development/reveal")
+                        .header("host", "127.0.0.1:47831")
+                        .header("authorization", format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), expected);
+        }
+    }
     #[tokio::test]
     async fn removed_operations_are_not_executable_http_routes() {
         let temp = tempfile::tempdir().unwrap();

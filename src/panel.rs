@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令，以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -315,6 +315,38 @@ impl ReadingState {
 }
 
 impl App {
+    pub async fn reveal_panel(&self) -> Result<Option<u32>> {
+        let panel = self.panel.lock().await;
+        if panel.prefs.detached || panel.ready {
+            let pid = panel
+                .child
+                .as_ref()
+                .and_then(|child| child.id())
+                .context("开发浮窗正在准备，请稍后重试")?;
+            if !panel.presented || panel.docking {
+                bail!("开发浮窗正在切换，请稍后重试");
+            }
+            // The foreground launcher yields activation to this process using AppKit.
+            return Ok(Some(pid));
+        }
+        drop(panel);
+        let client = self.desktop_client().await.context("开发宿主尚未连接")?;
+        client.request("Page.bringToFront", json!({})).await?;
+        let visible = client.evaluate(r#"(() => {
+            const panel = window.__companionFloatingPanel;
+            if (!panel?.state.runtimeActive) return false;
+            if (panel.state.layoutMode === 'workbench') {
+                if (!panel.state.dockOpen || ['closed', 'space'].includes(panel.state.dockStatus)) panel.setWorkbench(true);
+            } else panel.setOpen(true);
+            panel.blinkHandoff();
+            return true;
+        })()"#.into()).await?;
+        if visible != true {
+            bail!("开发工作台尚未加载或功能已关闭");
+        }
+        Ok(None)
+    }
+
     pub async fn detach_panel(&self, ui: Option<Ui>) -> Result<()> {
         let activate = ui.is_some();
         let mut panel = self.panel.lock().await;

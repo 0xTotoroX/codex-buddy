@@ -10,7 +10,7 @@
 
 - [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、显式保存及页面重载恢复；合成本机 API，不退出真实宿主。
 
-- [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发启动器复用存活进程、失效锁保留及包含空格/引号的真实 shell 路径执行。
+- [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发入口重复唤起、原目标重连、失败边界、失效锁保留及 shell 转义；设置 CODEX_BUDDY_NATIVE_LAUNCHER_TEST=1 显式验收合成原生窗口的 Dock 策略与焦点交接，不在普通回归中抢焦点。
 
 - [bridge-requests.test.mjs](bridge-requests.test.mjs)：弹出请求失联后的超时释放、重试与迟到响应隔离，保留模型请求的长超时。
 

@@ -6,7 +6,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 
 成员清单：
 
-- [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，打开专用 Terminal 执行现有开发流程，复用存活开发实例，不更新日常安装；复用 launcher 的图标生成。
+- [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，首次通过 Terminal 执行开发流程，重复打开等待就绪并唤起现有工作台；失联重连原目标，失败显式提示。Applet 启动期间显示 Dock 图标，经 AppKit 协作交接焦点后退出；不更新日常安装，复用 launcher 的图标生成。
 - [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退；Ctrl+C 清理自身进程并恢复安装版连接。
 - [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 MIT 许可的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
 - [material-preview.swift](material-preview.swift)：14 种 NSVisualEffectView 材质的原生并排对照；独立背景窗口提供重复图案，统一切换外观、焦点状态与背景，支持真实桌面采样；标题栏固定不透明底色并跟随预览明暗。
