@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "dev:stop": "node scripts/dev-launcher.mjs --stop",
     "dev:materials": "node scripts/material-preview.mjs",
     "build:web": "tsc --noEmit && vite build --config ui/settings/vite.config.ts",
     "build": "npm run build:web && cargo build --release --locked",

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: install:dev 生成带 Dock 启动反馈的 App；--open 等待就绪、重连并唤起，--run 启动 dev.mjs。
+ * [OUTPUT]: install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -12,9 +12,11 @@ import {
   writeFileSync,
   renameSync,
   rmSync,
+  openSync,
+  closeSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { installIcon } from './launcher.mjs';
 import { readJson, requestRuntime } from './dev-host.mjs';
@@ -48,6 +50,63 @@ export function hasDevelopmentOwner(directory) {
     if (error.code === 'ESRCH') return false;
     throw error;
   }
+}
+
+export async function startBackgroundDevelopment(directory) {
+  if (hasDevelopmentOwner(directory)) return;
+  const data = join(directory, 'target/dev');
+  mkdirSync(data, { recursive: true, mode: 0o700 });
+  rmSync(join(data, 'launcher-error.json'), { force: true });
+  const log = openSync(join(data, 'launcher.log'), 'w', 0o600);
+  let child;
+  try {
+    child = spawn(
+      process.execPath,
+      [join(directory, 'scripts/dev.mjs'), '--no-open', '--restart-running'],
+      {
+        cwd: directory,
+        detached: true,
+        stdio: ['ignore', log, log],
+      },
+    );
+  } finally {
+    closeSync(log);
+  }
+  await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('spawn', resolve);
+  });
+  child.once('exit', (code, signal) => {
+    if ((code !== 0 || signal) && !existsSync(join(data, 'launcher-error.json')))
+      writeFileSync(
+        join(data, 'launcher-error.json'),
+        JSON.stringify({ message: '开发进程启动失败，请查看 target/dev/launcher.log。' }),
+        { mode: 0o600 },
+      );
+  });
+  child.unref();
+  return child.pid;
+}
+
+export async function stopBackgroundDevelopment(directory) {
+  if (!hasDevelopmentOwner(directory)) return;
+  const owner = readJson(join(directory, 'target/dev/owner.json'));
+  const expected = [
+    process.execPath,
+    join(directory, 'scripts/dev.mjs'),
+    '--no-open',
+    '--restart-running',
+  ].join(' ');
+  const actual = command('/bin/ps', ['-p', String(owner.pid), '-o', 'command=']);
+  if (actual !== expected) throw new Error('进程不是此入口启动的后台开发会话；未结束其他进程。');
+  process.kill(owner.pid, 'SIGTERM');
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    const current = readJson(join(directory, 'target/dev/owner.json'));
+    if (current?.pid !== owner.pid) return;
+    await delay(100);
+  }
+  throw new Error('开发会话仍在退出，请查看 target/dev/launcher.log；未强制结束进程。');
 }
 
 export function terminalScript(directory, node, path) {
@@ -159,7 +218,8 @@ export async function revealDevelopment(
   while (Date.now() < deadline) {
     const failure =
       checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json'));
-    if (failure) throw new Error(failure.message || '开发模式启动失败，请查看开发终端。');
+    if (failure)
+      throw new Error(failure.message || '开发模式启动失败，请查看 target/dev/launcher.log。');
     const runtime = readJson(join(directory, 'target/dev/real/runtime.json'));
     if (runtime) {
       try {
@@ -182,7 +242,7 @@ export async function revealDevelopment(
     await delay(interval);
   }
   throw new Error(
-    `开发工作台尚未就绪，请查看开发终端。${lastError ? ` ${lastError.message}` : ''}`,
+    `开发工作台尚未就绪，请查看 target/dev/launcher.log。${lastError ? ` ${lastError.message}` : ''}`,
   );
 }
 
@@ -190,23 +250,21 @@ async function main() {
   if (process.platform !== 'darwin') throw new Error('开发 App 入口仅适用于 macOS。');
   const mode = process.argv[2];
   if (!mode) return install();
-  if (!['--open', '--run'].includes(mode)) throw new Error('用法：npm run install:dev');
+  if (!['--open', '--run', '--stop'].includes(mode)) throw new Error('用法：npm run install:dev');
+  if (mode === '--stop') {
+    await stopBackgroundDevelopment(root);
+    console.log('后台开发会话已退出。');
+    return;
+  }
   if (mode === '--run' && hasDevelopmentOwner(root)) {
-    console.log('开发模式已在运行，请使用原终端；无需重复启动。');
+    console.log('开发模式已在运行，无需重复启动。');
     return;
   }
   if (!existsSync(join(root, 'node_modules/vite/package.json')))
     throw new Error('缺少开发依赖，请在源码目录运行 npm ci。');
   if (mode === '--open') {
     const running = hasDevelopmentOwner(root);
-    if (!running) {
-      rmSync(join(root, 'target/dev/launcher-error.json'), { force: true });
-      command('/usr/bin/open', [
-        '-a',
-        'Terminal',
-        join(root, 'target/dev/Start CodexBuddy Dev.command'),
-      ]);
-    }
+    if (!running) await startBackgroundDevelopment(root);
     const result = await revealDevelopment(root, {
       timeout: running ? 20000 : 120000,
       checkStartupError: !running,

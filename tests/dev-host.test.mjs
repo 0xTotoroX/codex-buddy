@@ -27,6 +27,7 @@ import { runInNewContext } from 'node:vm';
 import { build } from 'esbuild';
 import {
   endpointUrl,
+  hostSettingsDirectory,
   realTarget,
   findHost,
   findDevelopmentHost,
@@ -72,6 +73,27 @@ test('real development accepts only local CDP and actual app pages', () => {
     'app://-/index.html?initialRoute=/overlay',
   ])
     assert.equal(realTarget({ type: 'page', url }), false);
+});
+
+test('Dev startup reads its own force/ask setting and inherits installation only before first configuration', (t) => {
+  const source = temporary(t),
+    data = join(source, 'dev');
+  mkdirSync(data);
+  writeFileSync(join(source, 'config.json'), JSON.stringify({ hostRestartPolicy: 'ask' }));
+  assert.equal(hostSettingsDirectory(source, data), source);
+  writeFileSync(join(data, 'config.json'), JSON.stringify({ hostRestartPolicy: 'force' }));
+  assert.equal(
+    JSON.parse(readFileSync(join(hostSettingsDirectory(source, data), 'config.json')))
+      .hostRestartPolicy,
+    'force',
+  );
+  writeFileSync(join(source, 'config.json'), JSON.stringify({ hostRestartPolicy: 'force' }));
+  writeFileSync(join(data, 'config.json'), JSON.stringify({ hostRestartPolicy: 'ask' }));
+  assert.equal(
+    JSON.parse(readFileSync(join(hostSettingsDirectory(source, data), 'config.json')))
+      .hostRestartPolicy,
+    'ask',
+  );
 });
 
 test('API failures retain the backend reason instead of only an HTTP status', async (t) => {

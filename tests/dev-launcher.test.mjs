@@ -17,6 +17,8 @@ import { createServer } from 'node:http';
 import { once } from 'node:events';
 import {
   hasDevelopmentOwner,
+  startBackgroundDevelopment,
+  stopBackgroundDevelopment,
   terminalScript,
   revealDevelopment,
   launcherSource,
@@ -180,6 +182,98 @@ test(
     assert.deepEqual(JSON.parse(stdout), ['--no-open', '--restart-running']);
   },
 );
+
+test('background launch survives the launcher, logs privately, reuses its owner and stops cleanly', async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-background-')));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'target/dev'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts/dev.mjs'),
+    `
+    import fs from 'node:fs';
+    const lock = 'target/dev/owner.json';
+    fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+    console.log('background ready');
+    console.error('background stderr');
+    const timer = setInterval(() => {}, 100);
+    process.on('SIGTERM', () => {
+      clearInterval(timer);
+      fs.unlinkSync(lock);
+      fs.writeFileSync('target/dev/stopped', 'normal');
+    });
+  `,
+  );
+  let pid;
+  t.after(() => {
+    if (pid) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch {}
+    }
+    rmSync(root, { recursive: true, force: true });
+  });
+  const module = new URL('../scripts/dev-launcher.mjs', import.meta.url).href;
+  const { stdout } = await promisify(execFile)(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `import {startBackgroundDevelopment} from ${JSON.stringify(module)}; console.log(await startBackgroundDevelopment(${JSON.stringify(root)}));`,
+    ],
+    { timeout: 5000 },
+  );
+  pid = Number(stdout.trim());
+  for (let i = 0; i < 100 && !hasDevelopmentOwner(root); i++) await delay(20);
+  assert.equal(hasDevelopmentOwner(root), true);
+  process.kill(pid, 0);
+  for (
+    let i = 0;
+    i < 100 &&
+    !readFileSync(join(root, 'target/dev/launcher.log'), 'utf8').includes('background stderr');
+    i++
+  )
+    await delay(20);
+  const contents = readFileSync(join(root, 'target/dev/launcher.log'), 'utf8');
+  assert.match(contents, /background ready/);
+  assert.match(contents, /background stderr/);
+  assert.equal(
+    (await import('node:fs')).statSync(join(root, 'target/dev/launcher.log')).mode & 0o777,
+    0o600,
+  );
+  assert.equal(await startBackgroundDevelopment(root), undefined);
+  assert.equal(readFileSync(join(root, 'target/dev/launcher.log'), 'utf8'), contents);
+  await stopBackgroundDevelopment(root);
+  assert.equal(readFileSync(join(root, 'target/dev/stopped'), 'utf8'), 'normal');
+  assert.equal(hasDevelopmentOwner(root), false);
+  pid = undefined;
+});
+
+test('background startup failures retain logs and become visible to the App', async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-background-error-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'scripts'));
+  writeFileSync(
+    join(root, 'scripts/dev.mjs'),
+    'console.error("synthetic startup failure"); process.exit(1)',
+  );
+  await startBackgroundDevelopment(root);
+  await assert.rejects(
+    revealDevelopment(root, { checkStartupError: true, interval: 10, timeout: 2000 }),
+    /launcher.log/,
+  );
+  assert.match(
+    readFileSync(join(root, 'target/dev/launcher.log'), 'utf8'),
+    /synthetic startup failure/,
+  );
+});
+
+test('stop refuses an owner record pointing at an unrelated process', async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-stop-owner-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'target/dev'), { recursive: true });
+  writeFileSync(join(root, 'target/dev/owner.json'), JSON.stringify({ pid: process.pid }));
+  await assert.rejects(stopBackgroundDevelopment(root), /未结束其他进程/);
+});
 
 // Explicit opt-in: this check briefly takes foreground focus using only synthetic windows.
 test(

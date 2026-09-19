@@ -25,6 +25,7 @@ import { buildDevPanel, filesUnder, fingerprint } from './dev-panel.mjs';
 import { startGateway, command, stopChild, until } from './dev-runtime.mjs';
 import {
   findDevelopmentHost,
+  hostSettingsDirectory,
   initializeData,
   pauseInstallation,
   restoreInstallation,
@@ -266,7 +267,14 @@ try {
     if (closing) throw new Error('开发模式退出中');
     return command(
       join(root, 'target/debug/codex-buddy'),
-      ['--data-dir', source, 'launch', '--host-only', '--restart-running', '--no-open'],
+      [
+        '--data-dir',
+        hostSettingsDirectory(source, data),
+        'launch',
+        '--host-only',
+        '--restart-running',
+        '--no-open',
+      ],
       options,
       children,
       true,

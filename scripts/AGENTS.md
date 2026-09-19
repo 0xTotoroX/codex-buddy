@@ -6,11 +6,11 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 
 成员清单：
 
-- [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，首次通过 Terminal 执行带 --restart-running 的开发流程，按日常启动策略准备无连接宿主；重复打开等待就绪并唤起现有工作台；失联重连原目标，失败显式提示。Applet 启动期间显示 Dock 图标，经 AppKit 协作交接焦点后退出；不更新日常安装，复用 launcher 的图标生成。
+- [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，首次后台执行带 --restart-running 的开发流程，日志写入 launcher.log；按开发配置（首次回退日常配置）的策略准备无连接宿主；重复打开等待就绪并唤起现有工作台；失联重连原目标，失败显式提示；--stop 校验进程身份后正常退出后台会话。Applet 启动期间显示 Dock 图标，经 AppKit 协作交接焦点后退出；不更新日常安装，复用 launcher 的图标生成。
 - [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退；启动前先发现可调试宿主；显式 --restart-running 时先构建当前 CLI，再通过 host-only 模式准备宿主，仅在接管安装版后启用退出恢复，失败原因写入私有 launcher-error.json；Ctrl+C 清理自身进程并恢复安装版连接。
 - [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 MIT 许可的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
 - [material-preview.swift](material-preview.swift)：14 种 NSVisualEffectView 材质的原生并排对照；独立背景窗口提供重复图案，统一切换外观、焦点状态与背景，支持真实桌面采样；标题栏固定不透明底色并跟随预览明暗。
-- [dev-host.mjs](dev-host.mjs)：选择真实窗口，仅无宿主且显式授权自动准备时调用共享启动器，指定目标或歧义不触发重开；首次复制独立开发配置，暂停并恢复安装版连接；新目标已发现且旧目标不可用时将旧恢复记录保留为带唯一后缀的归档，不将安装版改连新聊天；API 错误保留后端原因；不创建浏览器或修改官方应用。
+- [dev-host.mjs](dev-host.mjs)：选择真实窗口与宿主启动配置（开发优先、首次继承日常），仅无宿主且显式授权自动准备时调用共享启动器，指定目标或歧义不触发重开；首次复制独立开发配置，暂停并恢复安装版连接；新目标已发现且旧目标不可用时将旧恢复记录保留为带唯一后缀的归档，不将安装版改连新聊天；API 错误保留后端原因；不创建浏览器或修改官方应用。
 - [dev-panel.mjs](dev-panel.mjs)：原子发布开发资源快照，CSS 更新保留实例，逻辑更新销毁并恢复胶囊，页面引导变化重载窗口页面；共享 measurePanel 仅采集两端几何、材质能力和实例计数。
 - [dev-runtime.mjs](dev-runtime.mjs)：受控子进程与稳定鉴权代理；可捕获宿主准备命令的端点及具体失败原因；后台重启后设置页会话保持有效；模型超时由后台控制，客户端断开时取消上游代理请求。
 - [verify.mjs](verify.mjs)：统一检查、工作台浏览器行为、构建、端到端与生命周期验收；按源码/工具链摘要验证产物新鲜度，排除 Markdown 与 Finder 的 .DS_Store；原生检查显式选择。

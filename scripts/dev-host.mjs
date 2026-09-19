@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已安装配置、真实 Codex CDP 元数据与本机 API。
- * [OUTPUT]: 窗口选择、显式启用时委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
+ * [OUTPUT]: 窗口选择、显式启用时使用开发配置（首次回退日常配置）委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
  * [POS]: 真实宿主开发边界；不启动浏览器、不记录聊天、不修改官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -15,6 +15,10 @@ export function readJson(path, fallback = null) {
     if (error.code === 'ENOENT') return fallback;
     throw error;
   }
+}
+// Dev settings belong to Dev. Only the first launch inherits the installation policy.
+export function hostSettingsDirectory(source, data) {
+  return existsSync(join(data, 'config.json')) ? data : source;
 }
 export function endpointUrl(value) {
   const url = new URL(/^\d+$/.test(value) ? `http://127.0.0.1:${value}` : value);
