@@ -2,10 +2,11 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
-npm 命令进入开发、构建、审计、安装和验证编排工具；具体测试实现与辅助文件位于 [tests/](../tests/AGENTS.md)。安装器生成的 macOS applet 调用已安装 CLI，运行时不依赖这些脚本或 Node。默认检查与打包只读取仓库及已安装依赖。
+npm 命令进入开发、构建、审计、安装和验证编排工具；具体测试实现与辅助文件位于 [tests/](../tests/AGENTS.md)。日常安装器生成的 macOS applet 调用已安装 CLI，运行时不依赖这些脚本或 Node；独立 Dev applet 依赖本地源码和开发工具。默认检查与打包只读取仓库及已安装依赖。
 
 成员清单：
 
+- [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，打开专用 Terminal 执行现有开发流程，复用存活开发实例，不更新日常安装；复用 launcher 的图标生成。
 - [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退；Ctrl+C 清理自身进程并恢复安装版连接。
 - [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 MIT 许可的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
 - [material-preview.swift](material-preview.swift)：14 种 NSVisualEffectView 材质的原生并排对照；独立背景窗口提供重复图案，统一切换外观、焦点状态与背景，支持真实桌面采样；标题栏固定不透明底色并跟随预览明暗。

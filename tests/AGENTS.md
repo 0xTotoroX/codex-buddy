@@ -8,6 +8,8 @@
 
 成员清单：
 
+- [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发启动器复用存活进程、失效锁保留及包含空格/引号的真实 shell 路径执行。
+
 - [bridge-requests.test.mjs](bridge-requests.test.mjs)：弹出请求失联后的超时释放、重试与迟到响应隔离，保留模型请求的长超时。
 
 - [dock-appearance.test.mjs](dock-appearance.test.mjs)：停靠场景默认外观、独立本地偏好与星星选中表现，覆盖共享窗口偏好不受污染。

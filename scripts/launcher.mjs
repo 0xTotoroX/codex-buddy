@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已安装 CLI、数据目录、目标 .app 路径与 ui/icon.png；macOS 自带 osacompile/sips/iconutil。
- * [OUTPUT]: installLauncher 生成可从 Finder / Dock 打开的 CodexBuddy.app。
+ * [OUTPUT]: installLauncher 生成日常 App；installIcon 为日常与开发启动器生成图标。
  * [POS]: 本地安装器使用的轻量启动入口；复用 CLI，不复制后台或修改宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -19,7 +19,7 @@ function run(program, args, input) {
   return result.stdout.trim();
 }
 
-function installIcon(app, staging) {
+export function installIcon(app, staging) {
   const source = join(import.meta.dirname, '../ui/icon.png');
   const iconset = join(staging, 'CodexBuddy.iconset');
   mkdirSync(iconset);

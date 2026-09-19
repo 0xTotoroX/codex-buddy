@@ -24,7 +24,8 @@
     "format:check": "prettier --check \"ui/**/*.{js,ts,tsx,css}\" \"scripts/*.mjs\" \"tests/*.mjs\"",
     "verify": "node scripts/verify.mjs",
     "test:glass": "node tests/embedded-glass.mjs",
-    "test:workbench": "node tests/workbench.mjs"
+    "test:workbench": "node tests/workbench.mjs",
+    "install:dev": "node scripts/dev-launcher.mjs"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.3.3",

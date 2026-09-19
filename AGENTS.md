@@ -12,6 +12,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 
 - 材质统一为哑光、磨砂、液态（内部标识保留 native-glass）。内嵌哑光/磨砂使用 CSS；哑光共用样式，磨砂用中性染色与均匀模糊近似弹出 HUDWindow。正式与开发构建的内嵌液态共用自有 SVG 边缘折射，无页面采集或额外渲染依赖；采用 B 版凸面透镜，Regular/Clear 共用几何与动效，通过独立星星切换共享 liquidVariant；A/B 对比入口已移除。弹出哑光关闭原生背景，磨砂使用 NSVisualEffectView HUDWindow + BehindWindow + Active，保持激活外观；液态使用 NSGlassEffectView，始终展开，由 liquidVariant 选择 Regular / Clear（默认 Regular），由 AppKit 跟随系统 Liquid Glass 偏好及焦点，不提供独立通透度条或 glassStyle。网页表面用阴影与反光定位；内嵌液态两变体共用阴影和内侧反光；原生液态自身光学边缘由 AppKit 绘制，不叠加网页定位层；弹出哑光与原生磨砂仅保留一层圆角浅阴影，范围限于窗口透明留白。保留圆角外溢裁切。macOS 26 以下仅弹出液态回退哑光，传统磨砂与内嵌 SVG 液态仍可用。保留已有材质偏好与历史迁移。
 - 胶囊继续使用原生 CSS，styles/ 按变量、布局、内容、控件、材质、动画分层；native.css 只处理原生覆盖。Web 设置页使用 Tailwind CSS v4 与本地 shadcn/ui 基础组件；工具类及 Preflight 仅进入设置页构建。ui/tokens.css 共享语义色和通用尺寸，两种界面不共享 reset。
+- `npm run install:dev` 生成独立 CodexBuddy Dev.app，绑定当前源码与 Node 路径，双击打开终端运行现有开发流程；重复启动复用存活开发进程，Ctrl+C 退出，不更新日常安装。移动源码或 Node 后重新生成入口。
 - `npm run dev` 只连接已开启调试端口的真实 Codex，默认内嵌；开发配置在 target/dev/real，首次复制日常模型配置并采用手动生成，不写回日常配置。占用同一窗口的安装版连接会暂停，退出后恢复；不重启或另开 ChatGPT。CSS 原位更新，胶囊逻辑清理后重新加载，Rust 编译成功后重启开发后台；release 忽略开发资源环境变量。示例宿主和模拟数据仅用于 tests 下的自动测试。
 - 应用最低目标为 macOS 14.0+ Apple Silicon；桌面弹出功能由后台单独检测 macOS 15.0+ Apple Silicon。不满足弹出条件时禁用界面入口、拒绝弹出请求及窗口子进程启动，并跳过旧弹出偏好的自动恢复，内嵌面板仍可使用。Windows 暂不适配，其他平台不宣称已支持。最低版本与实测版本分开记录。
 - 源码构建最低 Rust 1.88、Node.js 22.16；分别由 Cargo `rust-version` 和 npm `engines.node` 声明，CI 覆盖最低组合。release 的构建辅助库不 strip，避免 macOS 加载失败；最终程序仍 strip。
