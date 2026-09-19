@@ -32,7 +32,7 @@ tao = "0.37"
 wry = "0.57"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSScreen", "NSWindow", "NSView", "NSGlassEffectView", "NSVisualEffectView", "NSGraphics", "NSAppearance", "NSAccessibility", "NSWorkspace", "objc2-quartz-core"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSEvent", "NSScreen", "NSWindow", "NSView", "NSGlassEffectView", "NSVisualEffectView", "NSGraphics", "NSAppearance", "NSAccessibility", "NSWorkspace", "NSRunningApplication", "libc", "objc2-quartz-core"] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSProcessInfo"] }
 
 objc2 = "0.6"

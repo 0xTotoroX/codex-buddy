@@ -1,5 +1,5 @@
 // [INPUT]: App、有效模型配置与私有配置/密钥文件。
-// [OUTPUT]: 设置读取/保存、只读弹出能力、并发保存版本与独立生成版本。
+// [OUTPUT]: 设置读取/保存、独立启动策略、只读弹出能力、并发保存版本与独立生成版本。
 // [POS]: 设置事务边界；无关大纲开关不取消生成。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -26,6 +26,43 @@ pub struct Options {
 mod tests {
     use super::*;
     use crate::config::{Config, Paths};
+
+    #[tokio::test]
+    async fn restart_policy_is_persisted_without_changing_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let old: Config = serde_json::from_str(r#"{"model":"fixture"}"#).unwrap();
+        let app = App::new(paths.clone(), old, None, false);
+        let initial = app.settings().await;
+        assert_eq!(initial["hostRestartPolicy"], "ask");
+        let saved = app.save_settings(serde_json::from_value(json!({
+            "hostRestartPolicy":"force", "expectedRevision": initial["configurationRevision"]
+        })).unwrap()).await.unwrap();
+        assert_eq!(saved["hostRestartPolicy"], "force");
+        assert_eq!(saved["generationRevision"], initial["generationRevision"]);
+        assert_eq!(
+            paths.load().unwrap().host_restart_policy,
+            crate::config::HostRestartPolicy::Force
+        );
+        assert!(serde_json::from_value::<Update>(json!({"hostRestartPolicy":"kill-all"})).is_err());
+        assert!(
+            app.save_settings(
+                serde_json::from_value(json!({
+                    "hostRestartPolicy":"ask", "expectedRevision":initial["configurationRevision"]
+                }))
+                .unwrap()
+            )
+            .await
+            .is_err()
+        );
+        app.save_settings(serde_json::from_value(json!({"hostRestartPolicy":"ask"})).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(
+            paths.load().unwrap().host_restart_policy,
+            crate::config::HostRestartPolicy::Ask
+        );
+    }
 
     #[tokio::test]
     async fn outline_and_noop_saves_do_not_cancel_generation() {
@@ -165,6 +202,7 @@ impl Default for Options {
 #[derive(Deserialize, Default)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Update {
+    pub host_restart_policy: Option<crate::config::HostRestartPolicy>,
     pub expected_revision: Option<u64>,
     pub enabled: Option<bool>,
     pub answer_outline_enabled: Option<bool>,
@@ -190,6 +228,7 @@ impl App {
         let mut value = serde_json::to_value(&config.stepwise).expect("settings serialize");
         let fields = value.as_object_mut().expect("settings object");
         fields.extend(json!({
+            "hostRestartPolicy": config.host_restart_policy,
             "popoutSupported": self.panel.lock().await.popout_supported,
             "provider": model.provider, "model": model.name,
             "baseUrl": model.base_url, "available": info.available, "reason": info.reason,
@@ -215,6 +254,9 @@ impl App {
             bail!("设置已在其他窗口更新，请重新载入后再保存");
         }
         let mut next = config.clone();
+        if let Some(value) = patch.host_restart_policy {
+            next.host_restart_policy = value;
+        }
         if let Some(value) = patch.provider {
             if !["codex", "api"].contains(&value.as_str()) {
                 bail!("不支持的模型来源");

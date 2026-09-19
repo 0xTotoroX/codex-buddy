@@ -74,7 +74,8 @@ try {
   const appScript = run('/usr/bin/osadecompile', [
     join(appDir, 'CodexBuddy.app/Contents/Resources/Scripts/main.scpt'),
   ]);
-  assert.match(appScript, /launch --no-open/);
+  assert.match(appScript, /launch --no-open --restart-running/);
+  assert.match(appScript, /does not contain "已取消重开"/);
   assert.match(appScript, /popout/);
   assert.match(appScript, /macOS 15/);
   assert.match(appScript, /does not contain/);

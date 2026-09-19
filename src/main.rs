@@ -68,8 +68,14 @@ enum Commands {
         #[arg(long)]
         cdp: Option<String>,
     },
-    #[command(about = "通过调试参数启动官方 Codex，不结束已有进程")]
+    #[command(about = "通过调试参数启动官方 Codex，可按设置重开无连接的宿主")]
     Launch {
+        #[arg(
+            long,
+            conflicts_with = "isolated",
+            help = "按启动设置询问或强制重开无调试连接的宿主"
+        )]
+        restart_running: bool,
         #[arg(long)]
         app: Option<PathBuf>,
         #[arg(long, help = "用本工具独立的桌面 profile 打开窗口")]
@@ -129,10 +135,11 @@ async fn main() -> Result<()> {
         Commands::Stop => lifecycle::stop(&paths).await,
         Commands::Doctor { cdp } => lifecycle::doctor(&paths, cdp).await,
         Commands::Launch {
+            restart_running,
             app,
             isolated,
             no_open,
-        } => lifecycle::launch(&paths, app, isolated, no_open).await,
+        } => lifecycle::launch(&paths, app, isolated, no_open, restart_running).await,
         Commands::Update { from, sha256 } => lifecycle::update(&paths, &from, &sha256).await,
     }
 }

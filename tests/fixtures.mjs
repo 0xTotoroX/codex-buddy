@@ -6,6 +6,7 @@
  */
 /** @satisfies {import('../ui/contracts').Settings} */
 export const fixtureSettings = {
+  hostRestartPolicy: 'ask',
   popoutSupported: true,
   enabled: true,
   answerOutlineEnabled: true,

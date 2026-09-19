@@ -17,7 +17,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 - 应用最低目标为 macOS 14.0+ Apple Silicon；桌面弹出功能由后台单独检测 macOS 15.0+ Apple Silicon。不满足弹出条件时禁用界面入口、拒绝弹出请求及窗口子进程启动，并跳过旧弹出偏好的自动恢复，内嵌面板仍可使用。Windows 暂不适配，其他平台不宣称已支持。最低版本与实测版本分开记录。
 - 源码构建最低 Rust 1.88、Node.js 22.16；分别由 Cargo `rust-version` 和 npm `engines.node` 声明，CI 覆盖最低组合。release 的构建辅助库不 strip，避免 macOS 加载失败；最终程序仍 strip。
 - 自有源码采用 MIT；第三方依赖保留各自的版权与许可原文。维护者在私人资料中保留来源审计记录。
-- 应用独立构建与运行，通过本机协议连接宿主，不修改官方应用包。macOS 本地安装生成 CodexBuddy.app 作为双击入口，调用已安装 CLI 连接和弹出；已有普通宿主无可用连接时提示退出后再开，不自动结束任务或创建隔离实例。
+- 应用独立构建与运行，通过本机协议连接宿主，不修改官方应用包。macOS 本地安装生成 CodexBuddy.app 作为双击入口，调用已安装 CLI 连接和弹出；已有普通宿主无可用连接时，启动器通过 --restart-running 按 hostRestartPolicy 处理：默认 ask 询问后正常退出，force 显式保存后直接强制退出；两者都等待旧进程退出后再重开。取消、拒绝退出、超时或身份变化停止，不从正常退出升级为强退；不创建隔离实例。先从现有进程参数发现调试端口，不能因保存端口过期就重启。此策略独立于模型配置，不取消生成；开发入口仍只接入可调试宿主，不自动重启。
 - 产品名称为 CodexBuddy，源码目录、Cargo/npm 包、CLI 和分发前缀为 `codex-buddy`。默认数据目录为 `codex-buddy`，环境变量使用 `CODEX_BUDDY_*`；安装器迁移旧默认目录并保留配置，内部页面存储键暂保持兼容。启动器默认安装到 `/Applications/CodexBuddy.app`。
 - `src/` 为 Rust 应用源码，包含后台、CLI 与系统窗口；网页相关源码统一在 `ui/`：`panel/` 为内嵌与弹出共用的胶囊，`bridge/` 为受限 CDP binding，`settings/` 为 React 设置页。`scripts/` 保存开发、构建与分发工具，`tests/` 集中保存独立测试、测试辅助和合成数据；Rust 单元测试保留在源码旁。`ui/icon.png` 是用户选定的产品图标源图。开发计划、验收报告、设计过程图片、讨论及审计材料不在公开仓库维护。
 - 结构命名按职责区分：settings/ 是完整设置网页，settings-view 是胶囊内设置视图，settings-sync 是设置同步；panel-appearance 计算胶囊外观，host-appearance 适配宿主，install-styles 安装 CSS。requests 在前端桥与 Rust 分发端分别使用；标准 main/index/state 名称由目录界定。已有协议、存储键和环境变量不随文件重命名。

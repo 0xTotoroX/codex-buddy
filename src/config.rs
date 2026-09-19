@@ -1,5 +1,5 @@
 // [INPUT]: 环境变量、命令参数与独立私有数据目录。
-// [OUTPUT]: Config、Paths、默认参数及私有文件读写。
+// [OUTPUT]: Config、HostRestartPolicy（ask/force）、Paths、默认参数及私有文件读写。
 // [POS]: Rust 配置基础层，管理独立的应用数据目录。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -13,9 +13,18 @@ use std::{
 pub const DEFAULT_PORT: u16 = 47831;
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum HostRestartPolicy {
+    #[default]
+    Ask,
+    Force,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
+    pub host_restart_policy: HostRestartPolicy,
     pub cdp_endpoint: Option<String>,
     pub target_id: Option<String>,
     pub model: Option<String>,

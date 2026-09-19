@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 已安装 CLI、数据目录、目标 .app 路径与 ui/icon.png；macOS 自带 osacompile/sips/iconutil。
  * [OUTPUT]: installLauncher 生成日常 App；installIcon 为日常与开发启动器生成图标。
- * [POS]: 本地安装器使用的轻量启动入口；复用 CLI，不复制后台或修改宿主。
+ * [POS]: 本地安装器使用的轻量启动入口；按设置重开无连接宿主，取消时停止；复用 CLI，不复制后台或修改宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
@@ -59,15 +59,17 @@ export function installLauncher({ binary, dataDir, destination }) {
       ['-o', staged, '-'],
       `on run
   try
-    do shell script ${appleQuote(`${command} launch --no-open`)}
+    do shell script ${appleQuote(`${command} launch --no-open --restart-running`)}
     try
       do shell script ${appleQuote(`${command} popout`)}
     on error popoutMessage
       if popoutMessage does not contain ${appleQuote(popoutRequirement)} then error popoutMessage
     end try
   on error messageText
-    activate
-    display alert "CodexBuddy" message messageText buttons {"好"} default button "好"
+    if messageText does not contain "已取消重开" then
+      activate
+      display alert "CodexBuddy" message messageText buttons {"好"} default button "好"
+    end if
   end try
 end run
 `,

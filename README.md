@@ -47,7 +47,7 @@ npm run install:local
 
 安装完成后，在「应用程序」中双击 **CodexBuddy**。日常使用无需 Node.js 或 Rust。
 
-> 如果提示无法连接已打开的 ChatGPT / Codex，请等任务结束后用 ⌘Q 完整退出，再打开 CodexBuddy。已有可用调试连接时无需退出。
+> ChatGPT / Codex 已打开但没有调试连接时，CodexBuddy 默认先询问，再正常退出并重开。可在设置页「启动行为」改为「直接强制重开」，但可能中断任务或丢失未保存内容。已有可用调试连接时直接接入。
 
 ### 2. 配置模型
 

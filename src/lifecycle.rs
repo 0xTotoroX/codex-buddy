@@ -1,5 +1,5 @@
 // [INPUT]: Paths、私有 runtime 信息、系统进程与本地产物。
-// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；launch 复用连接或安全启动宿主。
+// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
 // [POS]: CLI 进程管理层，负责复用服务和本地更新回滚。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -230,6 +230,7 @@ pub async fn launch(
     executable: Option<PathBuf>,
     isolated: bool,
     no_open: bool,
+    restart_running: bool,
 ) -> Result<()> {
     if let Some(endpoint) = paths.load()?.cdp_endpoint
         && desktop_ready(&endpoint).await
@@ -241,10 +242,40 @@ pub async fn launch(
     let executable = executable
         .or_else(find_desktop)
         .context("未找到桌面 Codex，请使用 --app 指定可执行文件")?;
-    if !isolated && desktop_running(&executable)? {
-        bail!(
-            "ChatGPT / Codex 已经打开，但当前未找到可用连接。请在任务结束后用 ⌘Q 退出它，再次打开 CodexBuddy。以后直接从 CodexBuddy 启动即可；当前对话和窗口已保留。"
+    if !isolated && let Some(pid) = desktop_process(&executable)? {
+        // A host update may change the port; discover the existing process before
+        // treating a stale saved endpoint as permission to restart it.
+        if let Some(endpoint) = process_debug_endpoint(pid)? {
+            for _ in 0..20 {
+                if desktop_ready(&endpoint).await {
+                    let mut config = paths.load()?;
+                    config.cdp_endpoint = Some(endpoint.clone());
+                    config.target_id = None;
+                    paths.save(&config)?;
+                    start(paths, config::DEFAULT_PORT, Some(&endpoint), no_open, false).await?;
+                    println!("已复用正在运行的 Codex 调试连接");
+                    return Ok(());
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+            bail!("Codex 已开启调试端口，但页面尚未就绪。请稍后重试；未重启宿主。")
+        }
+        if !restart_running {
+            bail!(
+                "ChatGPT / Codex 已打开但没有调试连接。请从 CodexBuddy App 打开，或使用 launch --restart-running 按启动设置重开；当前应用已保留。"
+            )
+        }
+        let policy = paths.load()?.host_restart_policy;
+        if !restart_approved(policy, confirm_desktop_restart)? {
+            bail!("已取消重开，ChatGPT 保持运行。")
+        }
+        quit_desktop(
+            &executable,
+            pid,
+            policy == config::HostRestartPolicy::Force,
+            Duration::from_secs(30),
         )
+        .await?;
     }
     let listener = std::net::TcpListener::bind(("127.0.0.1", 0))?;
     let port = listener.local_addr()?.port();
@@ -279,20 +310,122 @@ pub async fn launch(
         }
     }
     bail!(
-        "未能连接新启动的 Codex。请检查应用是否已打开，并稍后再次打开 CodexBuddy。程序没有结束已有 Codex。"
+        "未能连接新启动的 Codex。请检查应用是否已打开，并稍后再次打开 CodexBuddy；不会继续退出或循环重启。"
     )
 }
 
-fn desktop_running(executable: &Path) -> Result<bool> {
+fn desktop_process(executable: &Path) -> Result<Option<i32>> {
     let executable = std::fs::canonicalize(executable).context("桌面程序路径无效")?;
-    let output = Command::new("/bin/ps").args(["-axo", "comm="]).output()?;
+    let output = Command::new("/bin/ps")
+        .args(["-axo", "pid=,comm="])
+        .output()?;
     if !output.status.success() {
         bail!("无法检查已打开的桌面程序；未启动新的实例")
     }
-    Ok(String::from_utf8_lossy(&output.stdout).lines().any(|line| {
-        let path = Path::new(line.trim());
-        path == executable || path.canonicalize().is_ok_and(|path| path == executable)
-    }))
+    let mut matches = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let Some((pid, path)) = line.trim().split_once(char::is_whitespace) else {
+            continue;
+        };
+        if Path::new(path.trim())
+            .canonicalize()
+            .is_ok_and(|path| path == executable)
+        {
+            matches.push(pid.parse::<i32>()?);
+        }
+    }
+    if matches.len() > 1 {
+        bail!("发现多个同路径宿主实例，无法确定需要重开的应用；未退出任何实例。")
+    }
+    Ok(matches.first().copied())
+}
+
+fn process_debug_endpoint(pid: i32) -> Result<Option<String>> {
+    let output = Command::new("/bin/ps")
+        .args(["-p", &pid.to_string(), "-o", "args="])
+        .output()?;
+    if !output.status.success() {
+        bail!("读取宿主进程失败，请重试；未退出应用。")
+    }
+    let args = String::from_utf8_lossy(&output.stdout);
+    if args
+        .split_whitespace()
+        .any(|arg| arg.starts_with("--user-data-dir"))
+    {
+        bail!("检测到独立 profile 的宿主，请使用其调试连接；不会自动重开独立实例。")
+    }
+    Ok(debug_endpoint_from_args(&args))
+}
+
+fn debug_endpoint_from_args(args: &str) -> Option<String> {
+    let mut args = args.split_whitespace();
+    while let Some(arg) = args.next() {
+        let value = if arg == "--remote-debugging-port" {
+            args.next()
+        } else {
+            arg.strip_prefix("--remote-debugging-port=")
+        };
+        if let Some(port) = value
+            .and_then(|value| value.parse::<u16>().ok())
+            .filter(|port| *port > 0)
+        {
+            return Some(format!("http://127.0.0.1:{port}"));
+        }
+    }
+    None
+}
+
+fn restart_approved(
+    policy: config::HostRestartPolicy,
+    confirm: impl FnOnce() -> Result<bool>,
+) -> Result<bool> {
+    match policy {
+        config::HostRestartPolicy::Ask => confirm(),
+        config::HostRestartPolicy::Force => Ok(true),
+    }
+}
+
+fn confirm_desktop_restart() -> Result<bool> {
+    let output = Command::new("/usr/bin/osascript").args(["-e", r#"
+        tell current application
+            activate
+            set choice to display dialog "ChatGPT / Codex 已打开，但没有调试连接。是否正常退出后重开，以启用 CodexBuddy？正在执行的任务可能中断。" with title "CodexBuddy" buttons {"取消", "退出并重开"} default button "取消"
+            return button returned of choice
+        end tell
+    "#]).output()?;
+    if !output.status.success() {
+        // A cancelled dialog or an unavailable GUI must never authorize restart.
+        if String::from_utf8_lossy(&output.stderr).contains("(-128)") {
+            return Ok(false);
+        }
+        bail!("无法显示重开确认；ChatGPT 保持运行。")
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim() == "退出并重开")
+}
+
+async fn quit_desktop(executable: &Path, pid: i32, force: bool, timeout: Duration) -> Result<()> {
+    use objc2_app_kit::NSRunningApplication;
+    // Recheck identity after the potentially long confirmation dialog.
+    if desktop_process(executable)? != Some(pid) {
+        bail!("宿主进程已变化，请重新打开 CodexBuddy；未退出其他进程。")
+    }
+    let app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
+        .context("无法识别宿主应用；未退出进程。")?;
+    if !(if force {
+        app.forceTerminate()
+    } else {
+        app.terminate()
+    }) {
+        bail!("宿主退出请求未被接受；未尝试强制退出或打开第二个实例。")
+    }
+    let deadline = tokio::time::Instant::now() + timeout;
+    while tokio::time::Instant::now() < deadline {
+        if desktop_process(executable)?.is_none() {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    bail!("宿主尚未退出，重开已停止。请处理应用中的提示后重试；不会自动升级为强制退出。")
 }
 
 async fn desktop_ready(endpoint: &str) -> bool {
@@ -396,4 +529,143 @@ fn replace_binary(path: &Path, bytes: &[u8]) -> Result<()> {
     staging.as_file().sync_all()?;
     staging.persist(path).map_err(|e| e.error)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod restart_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn quits_only_the_selected_fixture_app_and_never_escalates_a_refusal() {
+        struct Fixture(std::process::Child);
+        impl Drop for Fixture {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let contents = dir.path().join("Restart Fixture.app/Contents");
+        std::fs::create_dir_all(contents.join("MacOS")).unwrap();
+        std::fs::write(contents.join("Info.plist"), r#"<?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>local.codex-buddy.restart-fixture</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundlePackageType</key><string>APPL</string><key>LSUIElement</key><true/></dict></plist>"#).unwrap();
+        let source = dir.path().join("fixture.m");
+        std::fs::write(&source, r#"
+#import <Cocoa/Cocoa.h>
+@interface Delegate : NSObject <NSApplicationDelegate>
+@end
+@implementation Delegate
+- (void)applicationDidFinishLaunching:(NSNotification *)note {
+    [@"ready" writeToFile:[NSString stringWithUTF8String:getenv("READY_FILE")] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+}
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)app {
+    [@"requested" writeToFile:[NSString stringWithUTF8String:getenv("QUIT_FILE")] atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    return getenv("REFUSE_QUIT") ? NSTerminateCancel : NSTerminateNow;
+}
+@end
+int main(void) {
+    @autoreleasepool {
+        NSApplication *app = [NSApplication sharedApplication];
+        Delegate *delegate = [Delegate new];
+        [app setDelegate:delegate];
+        [app setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        [app run];
+    }
+    return 0;
+}
+"#).unwrap();
+        let executable = contents.join("MacOS/fixture");
+        let build = Command::new("/usr/bin/clang")
+            .args(["-framework", "Cocoa", "-w"])
+            .arg(&source)
+            .arg("-o")
+            .arg(&executable)
+            .output()
+            .unwrap();
+        assert!(
+            build.status.success(),
+            "{}",
+            String::from_utf8_lossy(&build.stderr)
+        );
+        for (name, force, refuse) in [
+            ("normal", false, false),
+            ("force", true, false),
+            ("refuse", false, true),
+        ] {
+            let ready = dir.path().join(format!("{name}-ready"));
+            let quit = dir.path().join(format!("{name}-quit"));
+            let mut cmd = Command::new(&executable);
+            cmd.env("READY_FILE", &ready)
+                .env("QUIT_FILE", &quit)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null());
+            if refuse {
+                cmd.env("REFUSE_QUIT", "1");
+            }
+            let mut child = Fixture(cmd.spawn().unwrap());
+            for _ in 0..100 {
+                if ready.exists() {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+            assert!(ready.exists(), "fixture did not launch");
+            let result = quit_desktop(
+                &executable,
+                child.0.id() as i32,
+                force,
+                Duration::from_secs(2),
+            )
+            .await;
+            if refuse {
+                assert!(result.is_err());
+                assert!(
+                    child.0.try_wait().unwrap().is_none(),
+                    "normal quit must not escalate"
+                );
+                assert!(quit.exists());
+            } else {
+                assert!(result.is_ok(), "{name}: {result:?}");
+                assert_eq!(
+                    quit.exists(),
+                    !force,
+                    "only normal quit invokes the delegate"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cancellation_and_failed_confirmation_never_authorize_restart() {
+        assert!(!restart_approved(config::HostRestartPolicy::Ask, || Ok(false)).unwrap());
+        assert!(restart_approved(config::HostRestartPolicy::Ask, || bail!("no GUI")).is_err());
+        assert!(restart_approved(config::HostRestartPolicy::Ask, || Ok(true)).unwrap());
+        assert!(
+            restart_approved(config::HostRestartPolicy::Force, || panic!(
+                "must not prompt"
+            ))
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn discovers_changed_debug_ports_from_process_arguments() {
+        assert_eq!(
+            debug_endpoint_from_args(
+                "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT --remote-debugging-port=51952"
+            ),
+            Some("http://127.0.0.1:51952".into())
+        );
+        assert_eq!(
+            debug_endpoint_from_args("a path with spaces --remote-debugging-port 9229"),
+            Some("http://127.0.0.1:9229".into())
+        );
+        for args in [
+            "--remote-debugging-port=0",
+            "--remote-debugging-port=70000",
+            "--remote-debugging-port=bad",
+            "--fake-remote-debugging-port=9229",
+        ] {
+            assert!(debug_endpoint_from_args(args).is_none());
+        }
+    }
 }

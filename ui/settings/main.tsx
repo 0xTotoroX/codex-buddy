@@ -38,6 +38,7 @@ function editable(value: Settings): EditableSettings {
     enabled,
     answerOutlineEnabled,
     generationMode,
+    hostRestartPolicy,
     provider,
     protocol,
     model,
@@ -52,6 +53,7 @@ function editable(value: Settings): EditableSettings {
     enabled,
     answerOutlineEnabled,
     generationMode,
+    hostRestartPolicy,
     provider,
     protocol,
     model,
@@ -538,6 +540,34 @@ function App() {
                     </Field>
                   </div>
                 </Card>
+                <Card aria-labelledby="startup-title">
+                  <h2 id="startup-title" className="mb-5 text-[15px] font-semibold">
+                    启动行为
+                  </h2>
+                  <Field
+                    id="host-restart-policy"
+                    label="ChatGPT 已打开，但没有调试连接时"
+                    hint={
+                      form.hostRestartPolicy === 'force'
+                        ? '直接强制退出并重开，可能中断任务或丢失未保存内容。已有调试连接时不会重启。'
+                        : '先询问；确认后请求正常退出，再重开并注入。取消或未能正常退出时保留应用。'
+                    }
+                  >
+                    <NativeSelect
+                      id="host-restart-policy"
+                      value={form.hostRestartPolicy}
+                      onChange={(e) =>
+                        change(
+                          'hostRestartPolicy',
+                          e.target.value as EditableSettings['hostRestartPolicy'],
+                        )
+                      }
+                    >
+                      <option value="ask">询问后正常重开</option>
+                      <option value="force">直接强制重开</option>
+                    </NativeSelect>
+                  </Field>
+                </Card>
                 {remoteChanged && (
                   <div
                     className="mb-4 rounded-[9px] border border-notice-border bg-notice px-[13px] py-[11px] text-[11px] leading-[1.8] text-notice-foreground [overflow-wrap:anywhere]"
@@ -674,8 +704,8 @@ function App() {
                     aria-label="复制启动命令"
                     onClick={() =>
                       void run('copy', async () => {
-                        await navigator.clipboard.writeText('codex-buddy launch');
-                        notify('已复制启动命令。请先完整退出没有调试端口的 ChatGPT。');
+                        await navigator.clipboard.writeText('codex-buddy launch --restart-running');
+                        notify('已复制启动命令；将按启动行为设置处理已打开的 ChatGPT。');
                       })
                     }
                   >
