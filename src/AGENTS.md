@@ -17,7 +17,7 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [cdp.rs](cdp.rs)：宿主连接基础层，被 state.rs 和 requests.rs 使用；目标发现与 Client 请求/事件/注入生命周期，内嵌共享胶囊，开发时检查胶囊归属并更新当前与导航后的脚本，将存活、显示同步和不含正文的状态摘要合并读取。
 - [config.rs](config.rs)：Rust 配置基础层，以 CODEX_BUDDY_HOME 或 codex-buddy 默认目录管理独立数据；Config、HostRestartPolicy（旧配置默认 ask）、Paths、默认参数及私有文件读写。
 - [requests.rs](requests.rs)：renderer 与独立后台的受限操作边界，生成前后校验上下文；桌面请求分发、建议 items 转换及结果回送。
-- [lifecycle.rs](lifecycle.rs)：CLI 进程管理层，负责复用服务和本地更新回滚；start/stop/status/doctor/launch/update 与 Runtime；launch 优先复用现有进程的调试连接，--restart-running 按 ask/force 策略确认正常退出或强制退出指定原生应用；等待退出后重开，取消/超时不升级或循环重启。
+- [lifecycle.rs](lifecycle.rs)：CLI 进程管理层，负责复用服务和本地更新回滚；start/stop/status/doctor/launch/update 与 Runtime；launch 优先复用现有进程的调试连接，--restart-running 按 ask/force 策略确认正常退出或强制退出指定原生应用；等待退出后重开，取消/超时不升级或循环重启；--host-only 只输出就绪端点，不启动后台或改写配置，供 Dev 共享启动策略。
 - [main.rs](main.rs)：独立可执行文件入口，区分后台和窗口子进程；codex-buddy 命令分发与进程入口。
 - [model.rs](model.rs)：模型适配层，统一 CLI 与 API 请求和结构化结果；Model、ModelInfo、Suggestion 与生成/测试/模型查询。
 - [panel.rs](panel.rs)：后台系统浮窗管理层，窗口呈现确认后才隐藏内嵌胶囊，宿主恢复失败时保留浮窗；Panel、Preferences、临时 ReadingState 及弹出/收回/受限命令协调；reveal_panel 保留现有呈现方式和实例，提供开发入口的唤起目标；统一检测 macOS 15+ arm64 弹出能力，限制手动/自动恢复及窗口子进程入口；旧玻璃偏好迁移为磨砂，弹出偏好始终展开且忽略宿主收起同步，外观 PATCH（含 liquidVariant）验证与版本控制，Web 修改和宿主回传分开同步。

@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 项目源码、Rust/Node 与独立开发数据目录。
- * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust 编译后自动重启；先发现宿主再恢复旧会话，启动错误传回 App。
- * [POS]: 开发编排；仅管理自身进程，连接真实 Codex，暂停并恢复安装版连接，不改写官方应用。
+ * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust 编译后自动重启；显式 --restart-running 复用共享宿主准备，再恢复旧会话，启动错误传回 App。
+ * [POS]: 开发编排；管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import {
@@ -23,12 +23,18 @@ import { createServer as createHttpServer } from 'node:http';
 import { createServer } from 'vite';
 import { buildDevPanel, filesUnder, fingerprint } from './dev-panel.mjs';
 import { startGateway, command, stopChild, until } from './dev-runtime.mjs';
-import { findHost, initializeData, pauseInstallation, restoreInstallation } from './dev-host.mjs';
+import {
+  findDevelopmentHost,
+  initializeData,
+  pauseInstallation,
+  restoreInstallation,
+} from './dev-host.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const { values: args } = parseArgs({
   options: {
     'no-open': { type: 'boolean' },
+    'restart-running': { type: 'boolean' },
     help: { type: 'boolean' },
     cdp: { type: 'string' },
     target: { type: 'string' },
@@ -36,7 +42,7 @@ const { values: args } = parseArgs({
 });
 if (args.help) {
   console.log(
-    'npm run dev [-- --no-open] [--cdp PORT] [--target ID]：连接真实 Codex；保存自动更新，Ctrl+C 恢复安装版。',
+    'npm run dev [-- --no-open] [--restart-running] [--cdp PORT] [--target ID]：连接真实 Codex；保存自动更新，Ctrl+C 恢复安装版。',
   );
   process.exit(0);
 }
@@ -251,7 +257,21 @@ for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => cleanup().then(() => process.exit(0)));
 try {
   assertBackendStopped();
-  host = await findHost(source, args);
+  host = await findDevelopmentHost(source, args, async () => {
+    // Build before any host restart; use current source, not an older installed CLI.
+    console.log('正在准备宿主启动器；将按「启动行为」设置处理没有调试连接的应用…');
+    if (!existsSync(join(root, 'target/web/index.html')))
+      await execute('npm', ['run', 'build:web']);
+    await execute('cargo', ['build', '--locked']);
+    if (closing) throw new Error('开发模式退出中');
+    return command(
+      join(root, 'target/debug/codex-buddy'),
+      ['--data-dir', source, 'launch', '--host-only', '--restart-running', '--no-open'],
+      options,
+      children,
+      true,
+    );
+  });
   await restoreInstallation(journal, host);
   initializeData(source, data, host);
   gateway = await startGateway(token, () => runtime);

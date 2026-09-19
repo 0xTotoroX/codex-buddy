@@ -162,3 +162,29 @@ test(
     }
   },
 );
+
+test('captured development commands return endpoints and preserve cancellation errors', async () => {
+  const { command } = await import('../scripts/dev-runtime.mjs');
+  const children = new Set();
+  assert.equal(
+    await command(
+      process.execPath,
+      ['-e', 'console.log("http://127.0.0.1:12345")'],
+      {},
+      children,
+      true,
+    ),
+    'http://127.0.0.1:12345\n',
+  );
+  await assert.rejects(
+    command(
+      process.execPath,
+      ['-e', 'console.error("已取消重开，ChatGPT 保持运行。"); process.exit(1)'],
+      {},
+      children,
+      true,
+    ),
+    /已取消重开/,
+  );
+  assert.equal(children.size, 0);
+});

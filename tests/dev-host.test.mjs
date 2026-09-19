@@ -29,6 +29,7 @@ import {
   endpointUrl,
   realTarget,
   findHost,
+  findDevelopmentHost,
   initializeData,
   restoreInstallation,
   requestRuntime,
@@ -196,6 +197,65 @@ test('host discovery uses configured real window and never falls back to a fixtu
   targets = [{ id: 'fixture', type: 'page', url: endpoint.origin + '/fixture' }];
   await assert.rejects(findHost(source, { cdp: endpoint.origin }), /没有找到可调试的真实 Codex/);
 });
+test('Dev prepares a missing host once, then discovers its real page without changing installation settings', async (t) => {
+  const source = temporary(t);
+  const saved = JSON.stringify({ hostRestartPolicy: 'force', cdpEndpoint: 'http://127.0.0.1:1' });
+  writeFileSync(join(source, 'config.json'), saved);
+  const originalFetch = globalThis.fetch;
+  const host = await server(t, (_, res) =>
+    res.end(JSON.stringify([{ id: 'reopened', type: 'page', url: 'app://-/index.html' }])),
+  );
+  t.mock.method(globalThis, 'fetch', (url, options) =>
+    String(url).startsWith(host.origin)
+      ? originalFetch(url, options)
+      : Promise.reject(new Error('fixture: no host')),
+  );
+  let preparations = 0;
+  const found = await findDevelopmentHost(source, { 'restart-running': true }, async () => {
+    preparations++;
+    return host.origin + '\n';
+  });
+  assert.equal(preparations, 1);
+  assert.equal(found.target.id, 'reopened');
+  assert.equal(readFileSync(join(source, 'config.json'), 'utf8'), saved);
+});
+
+test('Dev respects cancellation and explicit connection choices without retrying restart', async (t) => {
+  const source = temporary(t);
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('fixture: no host');
+  });
+  let preparations = 0;
+  const prepare = async () => {
+    preparations++;
+    throw new Error('已取消重开，ChatGPT 保持运行。');
+  };
+  await assert.rejects(
+    findDevelopmentHost(source, { 'restart-running': true }, prepare),
+    /已取消重开/,
+  );
+  assert.equal(preparations, 1);
+  for (const options of [
+    {},
+    { 'restart-running': true, cdp: '12345' },
+    { 'restart-running': true, target: 'selected' },
+  ])
+    await assert.rejects(findDevelopmentHost(source, options, prepare), /没有找到可调试/);
+  assert.equal(preparations, 1);
+});
+
+test('Dev reuses an available host and never invokes restart policy', async (t) => {
+  const source = temporary(t);
+  const host = await server(t, (_, res) =>
+    res.end(JSON.stringify([{ id: 'same', type: 'page', url: 'app://-/index.html' }])),
+  );
+  writeFileSync(join(source, 'config.json'), JSON.stringify({ cdpEndpoint: host.origin }));
+  const found = await findDevelopmentHost(source, { 'restart-running': true }, () =>
+    assert.fail('must reuse'),
+  );
+  assert.equal(found.target.id, 'same');
+});
+
 test('first real session copies settings privately and later sessions preserve development edits', (t) => {
   const root = temporary(t),
     source = join(root, 'installed'),

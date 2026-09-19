@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { test } from 'node:test';
-import { existsSync } from 'node:fs';
+import { existsSync, copyFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -157,6 +157,29 @@ test('terminal entry preserves spaces and shell metacharacters without evaluatin
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test(
+  'Dev App terminal entry opts into the shared host policy',
+  { skip: process.platform !== 'darwin' },
+  async (t) => {
+    const root = mkdtempSync(join(tmpdir(), 'buddy-app-policy-'));
+    t.after(() => rmSync(root, { recursive: true, force: true }));
+    for (const directory of ['scripts', 'target/dev', 'node_modules/vite'])
+      mkdirSync(join(root, directory), { recursive: true });
+    writeFileSync(join(root, 'node_modules/vite/package.json'), '{}');
+    for (const name of ['dev-launcher.mjs', 'dev-host.mjs', 'launcher.mjs'])
+      copyFileSync(new URL('../scripts/' + name, import.meta.url), join(root, 'scripts', name));
+    writeFileSync(
+      join(root, 'scripts/dev.mjs'),
+      'console.log(JSON.stringify(process.argv.slice(2)))',
+    );
+    const { stdout } = await promisify(execFile)(process.execPath, [
+      realpathSync(join(root, 'scripts/dev-launcher.mjs')),
+      '--run',
+    ]);
+    assert.deepEqual(JSON.parse(stdout), ['--no-open', '--restart-running']);
+  },
+);
 
 // Explicit opt-in: this check briefly takes foreground focus using only synthetic windows.
 test(

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机后台 runtime 信息与开发会话令牌。
- * [OUTPUT]: 稳定设置页代理及受控子进程工具。
+ * [OUTPUT]: 稳定设置页代理及受控子进程工具，可捕获端点输出及失败原因。
  * [POS]: 开发环境基础设施；不创建浏览器或模拟模型。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -33,8 +33,20 @@ export async function stopChild(child) {
     await until(() => child.exitCode !== null || child.signalCode !== null, '无法停止开发子进程');
   }
 }
-export function command(program, args, options, children) {
-  const child = spawn(program, args, { ...options, detached: true, stdio: 'inherit' });
+export function command(program, args, options, children, capture = false) {
+  const child = spawn(program, args, {
+    ...options,
+    detached: true,
+    stdio: capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+  });
+  let stdout = '',
+    stderr = '';
+  child.stdout?.on('data', (chunk) => {
+    stdout += chunk;
+  });
+  child.stderr?.on('data', (chunk) => {
+    stderr += chunk;
+  });
   child.developmentGroup = true;
   children.add(child);
   return new Promise((resolve, reject) => {
@@ -42,10 +54,10 @@ export function command(program, args, options, children) {
       children.delete(child);
       reject(error);
     });
-    child.on('exit', (code, signal) => {
+    child.on('close', (code, signal) => {
       children.delete(child);
-      if (code === 0) resolve();
-      else reject(new Error(`${program} 失败 (${code ?? signal})`));
+      if (code === 0) resolve(stdout);
+      else reject(new Error(stderr.trim() || `${program} 失败 (${code ?? signal})`));
     });
   });
 }

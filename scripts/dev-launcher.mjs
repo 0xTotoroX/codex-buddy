@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
  * [OUTPUT]: install:dev 生成带 Dock 启动反馈的 App；--open 等待就绪、重连并唤起，--run 启动 dev.mjs。
- * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版或重启宿主。
+ * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import {
@@ -159,10 +159,7 @@ export async function revealDevelopment(
   while (Date.now() < deadline) {
     const failure =
       checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json'));
-    if (failure)
-      throw new Error(
-        failure.message || '开发模式启动失败，请查看开发终端；未退出或重启 ChatGPT。',
-      );
+    if (failure) throw new Error(failure.message || '开发模式启动失败，请查看开发终端。');
     const runtime = readJson(join(directory, 'target/dev/real/runtime.json'));
     if (runtime) {
       try {
@@ -218,10 +215,14 @@ async function main() {
     return;
   }
   rmSync(join(root, 'target/dev/launcher-error.json'), { force: true });
-  const result = spawnSync(process.execPath, [join(root, 'scripts/dev.mjs'), '--no-open'], {
-    cwd: root,
-    stdio: 'inherit',
-  });
+  const result = spawnSync(
+    process.execPath,
+    [join(root, 'scripts/dev.mjs'), '--no-open', '--restart-running'],
+    {
+      cwd: root,
+      stdio: 'inherit',
+    },
+  );
   if (
     (result.error || result.status !== 0) &&
     !existsSync(join(root, 'target/dev/launcher-error.json'))

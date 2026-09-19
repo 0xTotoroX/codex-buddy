@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已安装配置、真实 Codex CDP 元数据与本机 API。
- * [OUTPUT]: 窗口选择、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
+ * [OUTPUT]: 窗口选择、显式启用时委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
  * [POS]: 真实宿主开发边界；不启动浏览器、不记录聊天、不修改官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -143,10 +143,30 @@ export async function findHost(source, options = {}) {
       );
     return { endpoint, target, installation, installedState: state };
   }
-  throw new Error(
-    '没有找到可调试的真实 Codex。请通过现有 CodexBuddy 启动入口打开 Codex，再运行 npm run dev；已有端口可用 --cdp 指定。不会打开示例页面或另建 ChatGPT 实例。',
+  throw Object.assign(
+    new Error(
+      '没有找到可调试的真实 Codex。请通过现有 CodexBuddy 启动入口打开 Codex，再运行 npm run dev；已有端口可用 --cdp 指定。不会打开示例页面或另建 ChatGPT 实例。',
+    ),
+    { code: 'NO_DEBUG_HOST' },
   );
 }
+export async function findDevelopmentHost(source, options, prepareHost) {
+  try {
+    return await findHost(source, options);
+  } catch (error) {
+    // Never turn an ambiguous/explicit target selection failure into a host restart.
+    if (
+      error.code !== 'NO_DEBUG_HOST' ||
+      !options['restart-running'] ||
+      options.cdp ||
+      options.target
+    )
+      throw error;
+    const endpoint = endpointUrl((await prepareHost()).trim());
+    return findHost(source, { ...options, cdp: endpoint });
+  }
+}
+
 export function initializeData(source, data, host) {
   const marker = join(data, 'real-host.json');
   if (!existsSync(marker)) {

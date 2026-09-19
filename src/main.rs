@@ -1,5 +1,5 @@
 // [INPUT]: CLI 参数以及 config/lifecycle/server/panel_window 模块。
-// [OUTPUT]: codex-buddy 命令分发与进程入口。
+// [OUTPUT]: codex-buddy 命令分发与进程入口；launch --host-only 供开发入口仅准备宿主。
 // [POS]: 独立可执行文件入口，区分后台和窗口子进程。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -76,6 +76,12 @@ enum Commands {
             help = "按启动设置询问或强制重开无调试连接的宿主"
         )]
         restart_running: bool,
+        #[arg(
+            long,
+            conflicts_with = "isolated",
+            help = "仅准备宿主并输出调试端点，不启动后台"
+        )]
+        host_only: bool,
         #[arg(long)]
         app: Option<PathBuf>,
         #[arg(long, help = "用本工具独立的桌面 profile 打开窗口")]
@@ -136,10 +142,11 @@ async fn main() -> Result<()> {
         Commands::Doctor { cdp } => lifecycle::doctor(&paths, cdp).await,
         Commands::Launch {
             restart_running,
+            host_only,
             app,
             isolated,
             no_open,
-        } => lifecycle::launch(&paths, app, isolated, no_open, restart_running).await,
+        } => lifecycle::launch(&paths, app, isolated, no_open, restart_running, host_only).await,
         Commands::Update { from, sha256 } => lifecycle::update(&paths, &from, &sha256).await,
     }
 }

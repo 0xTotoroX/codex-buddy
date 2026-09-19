@@ -1,5 +1,5 @@
 // [INPUT]: Paths、私有 runtime 信息、系统进程与本地产物。
-// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
+// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；host-only 仅准备宿主并输出端点，不启后台或写配置；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
 // [POS]: CLI 进程管理层，负责复用服务和本地更新回滚。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -231,13 +231,12 @@ pub async fn launch(
     isolated: bool,
     no_open: bool,
     restart_running: bool,
+    host_only: bool,
 ) -> Result<()> {
     if let Some(endpoint) = paths.load()?.cdp_endpoint
         && desktop_ready(&endpoint).await
     {
-        start(paths, config::DEFAULT_PORT, Some(&endpoint), no_open, false).await?;
-        println!("已复用可连接的桌面 Codex");
-        return Ok(());
+        return finish_launch(paths, &endpoint, no_open, host_only, false).await;
     }
     let executable = executable
         .or_else(find_desktop)
@@ -248,13 +247,7 @@ pub async fn launch(
         if let Some(endpoint) = process_debug_endpoint(pid)? {
             for _ in 0..20 {
                 if desktop_ready(&endpoint).await {
-                    let mut config = paths.load()?;
-                    config.cdp_endpoint = Some(endpoint.clone());
-                    config.target_id = None;
-                    paths.save(&config)?;
-                    start(paths, config::DEFAULT_PORT, Some(&endpoint), no_open, false).await?;
-                    println!("已复用正在运行的 Codex 调试连接");
-                    return Ok(());
+                    return finish_launch(paths, &endpoint, no_open, host_only, true).await;
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
@@ -300,18 +293,35 @@ pub async fn launch(
     for _ in 0..60 {
         tokio::time::sleep(Duration::from_millis(250)).await;
         if desktop_ready(&endpoint).await {
-            let mut config = paths.load()?;
-            config.cdp_endpoint = Some(endpoint.clone());
-            config.target_id = None;
-            paths.save(&config)?;
-            start(paths, config::DEFAULT_PORT, Some(&endpoint), no_open, false).await?;
-            println!("桌面 Codex 调试连接已就绪");
-            return Ok(());
+            return finish_launch(paths, &endpoint, no_open, host_only, true).await;
         }
     }
     bail!(
         "未能连接新启动的 Codex。请检查应用是否已打开，并稍后再次打开 CodexBuddy；不会继续退出或循环重启。"
     )
+}
+
+// Dev uses the same host policy without starting or modifying the installed backend.
+async fn finish_launch(
+    paths: &Paths,
+    endpoint: &str,
+    no_open: bool,
+    host_only: bool,
+    update_target: bool,
+) -> Result<()> {
+    if host_only {
+        println!("{endpoint}");
+        return Ok(());
+    }
+    if update_target {
+        let mut config = paths.load()?;
+        config.cdp_endpoint = Some(endpoint.to_owned());
+        config.target_id = None;
+        paths.save(&config)?;
+    }
+    start(paths, config::DEFAULT_PORT, Some(endpoint), no_open, false).await?;
+    println!("桌面 Codex 调试连接已就绪");
+    Ok(())
 }
 
 fn desktop_process(executable: &Path) -> Result<Option<i32>> {
@@ -632,6 +642,64 @@ int main(void) {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn host_only_reuses_ready_host_without_backend_or_config_changes() {
+        use futures_util::{SinkExt, StreamExt};
+        use serde_json::json;
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().to_owned())).unwrap();
+        let socket = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let websocket = format!("ws://{}", socket.local_addr().unwrap());
+        let probe = tokio::spawn(async move {
+            let (stream, _) = socket.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            let request = ws.next().await.unwrap().unwrap().into_text().unwrap();
+            let request: serde_json::Value = serde_json::from_str(&request).unwrap();
+            assert_eq!(request["method"], "Runtime.evaluate");
+            ws.send(tokio_tungstenite::tungstenite::Message::Text(
+                json!({
+                    "id": request["id"], "result": {"result": {"value": true}}
+                })
+                .to_string()
+                .into(),
+            ))
+            .await
+            .unwrap();
+        });
+        let http = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", http.local_addr().unwrap());
+        let router = axum::Router::new().route("/json/list", axum::routing::get(move || async move {
+            axum::Json(json!([{"id":"fixture", "title":"Synthetic", "type":"page", "url":"app://-/index.html", "webSocketDebuggerUrl":websocket}]))
+        }));
+        let http_task = tokio::spawn(async move {
+            axum::serve(http, router).await.unwrap();
+        });
+        let config = config::Config {
+            cdp_endpoint: Some(endpoint),
+            target_id: Some("original".into()),
+            ..Default::default()
+        };
+        paths.save(&config).unwrap();
+        let before = std::fs::read(paths.root.join("config.json")).unwrap();
+        let result = launch(
+            &paths,
+            Some(dir.path().join("must-not-be-started")),
+            false,
+            true,
+            true,
+            true,
+        )
+        .await;
+        http_task.abort();
+        assert!(result.is_ok(), "{result:?}");
+        probe.await.unwrap();
+        assert_eq!(
+            std::fs::read(paths.root.join("config.json")).unwrap(),
+            before
+        );
+        assert!(!paths.root.join("runtime.json").exists());
     }
 
     #[test]
