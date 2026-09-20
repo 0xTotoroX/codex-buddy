@@ -348,6 +348,26 @@ impl App {
     }
 
     pub async fn model_control_window(&self, lease: &str) -> Value {
+        let host = if let Some(client) = self.desktop_client().await {
+            let presence = client
+                .evaluate_with_timeout(
+                    "window.__codexBuddyModelControl?.presence?.() ?? null".into(),
+                    Duration::from_millis(600),
+                )
+                .await
+                .unwrap_or(Value::Null);
+            if self
+                .desktop_client()
+                .await
+                .is_some_and(|now| std::sync::Arc::ptr_eq(&client, &now))
+            {
+                presence
+            } else {
+                Value::Null
+            }
+        } else {
+            Value::Null
+        };
         let ui = self.appearance().await.ui;
         let appearance = json!({"material":ui.material,"liquidVariant":ui.liquid_variant,"fontOffset":ui.font_offset});
         let mut control = self.model_control.lock().await;
@@ -355,7 +375,7 @@ impl App {
             && control.lease == lease
             && control.preferences.enabled
             && control.alive();
-        json!({"valid":valid,"preferences":control.preferences,"reveal":control.reveal,"appearance":appearance})
+        json!({"valid":valid,"preferences":control.preferences,"reveal":control.reveal,"appearance":appearance,"host":host})
     }
 
     pub async fn supervise_model_control(&self) {

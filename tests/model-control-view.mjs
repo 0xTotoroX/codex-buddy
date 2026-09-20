@@ -134,7 +134,10 @@ async function setup({
         if (f.stateError) return route.fulfill({ status: 503, json: { message: '合成断连' } });
         return route.fulfill({ json: data });
       }
-      if (operation === 'refresh') return route.fulfill({ json: f.data });
+      if (operation === 'refresh') {
+        if (f.onRefresh) f.onRefresh();
+        return route.fulfill({ json: f.data });
+      }
       if (operation === 'preferences') {
         if (f.preferenceConflict || payload.revision !== f.data.revision) {
           f.preferenceConflict = false;
@@ -195,8 +198,9 @@ async function setup({
     `${origin}/model-control${auth ? '#token=synthetic-token&lease=synthetic-lease' : ''}`,
   );
   if (auth)
-    await page.waitForFunction(() =>
-      document.querySelector('#actual').textContent.includes('Alpha'),
+    await page.waitForFunction(
+      (status) => document.body.dataset.status === status,
+      initial.snapshot.status,
     );
   if (expand) await nativeEvent(page, { expanded: true, edge: 'right', keyboard: false });
   await page.mouse.move(470, 20);
@@ -230,6 +234,53 @@ async function shot(page, name) {
 async function menu(page, name) {
   await page.getByRole('button', { name, exact: true }).click();
 }
+
+test('first model cell click reads official state then preserves Fast without manual sync', async () => {
+  const initial = fixture();
+  initial.snapshot.status = 'waiting';
+  initial.snapshot.current = null;
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  f.onRefresh = () => {
+    f.data.snapshot.current = selection('alpha', 'low', 'fast');
+    f.data.snapshot.status = 'ready';
+    f.data.snapshot.revision = 'readback-2';
+  };
+  assert.equal(
+    f.requests.some((r) => r.operation === 'refresh'),
+    false,
+  );
+  await page.locator('.model-row[data-key="alpha"] .choices button[data-key="high"]').click();
+  await page.waitForFunction(() =>
+    document.getElementById('notice').textContent.includes('配置已应用'),
+  );
+  const applied = f.requests.filter((r) => r.operation === 'apply');
+  assert.equal(applied.length, 1);
+  assert.deepEqual(applied[0].payload.selection, selection('alpha', 'high', 'fast'));
+  assert.equal(applied[0].payload.expectedRevision, 'readback-2');
+  await cleanup(ctx);
+});
+test('target change during first-click refresh prevents any write and displays source failure', async () => {
+  const initial = fixture();
+  initial.snapshot.status = 'waiting';
+  initial.snapshot.current = null;
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  f.onRefresh = () => {
+    f.data.snapshot.target.id = 'task-b';
+    f.data.snapshot.current = selection();
+    f.data.snapshot.status = 'ready';
+  };
+  await page.locator('.model-row[data-key="alpha"] .choices button[data-key="high"]').click();
+  await page.waitForFunction(() =>
+    document.getElementById('notice').textContent.includes('目标已变化'),
+  );
+  assert.equal(
+    f.requests.some((r) => r.operation === 'apply'),
+    false,
+  );
+  await cleanup(ctx);
+});
 
 // Contract and rendering checks use actual DOM, not implementation-shaped unit assertions.
 test('authenticated passive polling preserves focus, search, hover, scroll and menus', async () => {

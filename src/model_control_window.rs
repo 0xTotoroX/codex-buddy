@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -102,7 +102,7 @@ impl ControlPanel {
         unsafe { panel.setReleasedWhenClosed(false) };
         panel.setLevel(NSStatusWindowLevel);
         panel.setCollectionBehavior(
-            NSWindowCollectionBehavior::CanJoinAllSpaces
+            NSWindowCollectionBehavior::Default
                 | NSWindowCollectionBehavior::Stationary
                 | NSWindowCollectionBehavior::FullScreenAuxiliary,
         );
@@ -279,6 +279,8 @@ struct Surface {
     prefs: Preferences,
     appearance: Appearance,
     screen: Option<Screen>,
+    host: Value,
+    host_attached: bool,
     expanded: bool,
     keyboard: bool,
     hidden: bool,
@@ -343,6 +345,27 @@ impl Surface {
     }
 
     fn reflow(&mut self, mtm: MainThreadMarker) -> Result<()> {
+        if self.host["visible"] != true {
+            self.release_keyboard();
+            self.panel.orderOut(None);
+            return Ok(());
+        }
+        // Only the connected host acquiring focus may move this panel to a Space.
+        // Background polling, hover and a global hotkey must never bring it elsewhere.
+        if self.host["focused"] == true {
+            self.host_attached = true;
+            if self.ready && self.valid && !self.hidden && !self.panel.isOnActiveSpace() {
+                let behavior = self.panel.collectionBehavior();
+                self.panel.setCollectionBehavior(
+                    behavior | NSWindowCollectionBehavior::MoveToActiveSpace,
+                );
+                self.panel.orderFrontRegardless();
+                self.panel.setCollectionBehavior(behavior);
+            }
+        }
+        if !self.host_attached {
+            return Ok(());
+        }
         let screens = screen_snapshots(mtm);
         let pointer = NSEvent::mouseLocation();
         let current = self.screen.as_ref().map_or("", |s| s.id.as_str());
@@ -406,7 +429,12 @@ impl Surface {
                 size: wry::dpi::LogicalSize::new(rect.width, rect.height).into(),
             })?;
         }
-        if self.valid && self.ready && !self.hidden && !self.panel.isVisible() {
+        if self.valid
+            && self.ready
+            && !self.hidden
+            && !self.panel.isVisible()
+            && (self.host["focused"] == true || self.panel.isOnActiveSpace())
+        {
             self.panel.orderFrontRegardless();
         }
         if changed || resized {
@@ -448,7 +476,12 @@ impl Surface {
     }
 
     fn mouse_passthrough(&mut self) {
-        if !self.ready || !self.valid || self.hidden {
+        if !self.ready
+            || !self.valid
+            || self.hidden
+            || !self.panel.isVisible()
+            || !self.panel.isOnActiveSpace()
+        {
             return;
         }
         let point = NSEvent::mouseLocation();
@@ -501,6 +534,12 @@ impl Surface {
     }
 
     fn expand(&mut self, keyboard: bool, mtm: MainThreadMarker) -> Result<()> {
+        if self.host["visible"] != true
+            || !self.host_attached
+            || (self.host["focused"] != true && !self.panel.isOnActiveSpace())
+        {
+            return Ok(());
+        }
         self.hidden = false;
         self.expanded = true;
         self.reflow(mtm)?;
@@ -595,6 +634,7 @@ impl Surface {
 
     fn snapshot(&mut self, value: Value, revision: u64, mtm: MainThreadMarker) -> Result<()> {
         self.valid = true;
+        self.host = value["host"].clone();
         self.appearance = Appearance::read(&value["appearance"]);
         let reveal = value["reveal"].as_u64().unwrap_or(0);
         let requested = self.reveal.is_some_and(|previous| previous != reveal);
@@ -676,6 +716,8 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         prefs: Preferences::default(),
         appearance: Appearance::read(&Value::Null),
         screen: None,
+        host: Value::Null,
+        host_attached: false,
         expanded: false,
         keyboard: false,
         hidden: false,

@@ -51,6 +51,36 @@ async function check(name, test, options) {
 }
 try {
   await check(
+    'composer identity survives references to another conversation and generic trigger labels',
+    async (page) => {
+      await page.evaluate(() => {
+        const pane = document.querySelector('section');
+        pane.removeAttribute('data-thread-id');
+        pane.querySelector('form').setAttribute('data-above-composer-conversation-id', 'chat-a');
+        pane.querySelector('.thread-scroll-container').innerHTML =
+          '<div data-response-annotation-conversation="referenced-chat">Reference</div>';
+        pane.querySelector('button').setAttribute('aria-label', 'Choose model');
+        pane.querySelector('button').removeAttribute('data-selected-reasoning-effort');
+      });
+      assert.equal((await snapshot(page)).target.id, 'chat-a');
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+      assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), targetBeta);
+    },
+  );
+  await check(
+    'conflicting composer and ancestor identities never fall back to a guessed target',
+    async (page) => {
+      await page.evaluate(() =>
+        document
+          .querySelector('form')
+          .setAttribute('data-above-composer-conversation-id', 'another-chat'),
+      );
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      assert.equal((await apply(page, targetBeta)).status, 'failed');
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+    },
+  );
+  await check(
     'passive snapshot has no clicks/focus changes; explicit refresh reads full config and restores focus',
     async (page) => {
       await page.locator('.ProseMirror').focus();

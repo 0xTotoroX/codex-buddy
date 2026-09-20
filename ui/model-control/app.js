@@ -54,7 +54,8 @@ const editable = (node) => node?.matches('input, textarea, select, [contentedita
 const canApply = () =>
   online &&
   !busy &&
-  snapshot()?.status === 'ready' &&
+  ['ready', 'waiting'].includes(snapshot()?.status) &&
+  models().length > 0 &&
   !snapshot()?.generating &&
   !!snapshot()?.target?.id;
 const canSave = () => canApply() && !validate(snapshot()?.current, models());
@@ -63,7 +64,7 @@ const reasonBlocked = () =>
     ? '连接不可用，请刷新后重试'
     : snapshot()?.generating
       ? '正在生成，暂不能修改配置'
-      : statusLabels[snapshot()?.status] || '等待来源就绪';
+      : snapshot()?.message || statusLabels[snapshot()?.status] || '等待来源就绪';
 
 for (const [id, name] of Object.entries({
   handle: 'open-config',
@@ -412,21 +413,32 @@ async function apply(selection, restore = false) {
     notify(reasonBlocked());
     return;
   }
-  const invalid = validate(selection, models());
-  if (invalid) {
-    notify(invalid);
-    return;
-  }
   const source = snapshot();
-  const frozen = Object.freeze({
-    target: Object.freeze({ ...source.target }),
-    expectedRevision: source.revision,
-    selection: Object.freeze({ ...selection }),
-  });
+  const target = { ...source.target };
+  // A cell resolves its speed after explicit first-click readback. Hover/polling
+  // still never opens the official menu, and presets retain their full selection.
+  const resolveSelection = typeof selection === 'function' ? selection : () => selection;
   undo = null;
   await mutate(async () => {
     notify('正在核对并应用配置…');
     try {
+      if (!source.current) {
+        accept(await request('refresh', {}));
+        if (
+          snapshot()?.target?.id !== target.id ||
+          snapshot()?.status !== 'ready' ||
+          !snapshot()?.current
+        )
+          throw new Error(snapshot()?.message || '目标已变化或配置无法读取');
+      }
+      const resolved = resolveSelection();
+      const invalid = validate(resolved, models());
+      if (invalid) throw new Error(invalid);
+      const frozen = Object.freeze({
+        target: Object.freeze(target),
+        expectedRevision: snapshot().revision,
+        selection: Object.freeze({ ...resolved }),
+      });
       const data = await request('apply', frozen);
       accept(data);
       const result = data.result;
@@ -510,9 +522,7 @@ function render() {
         ? '正在生成 · 等待回答完成'
         : source?.status === 'ready' && source?.current
           ? ''
-          : source?.current
-            ? statusLabels[source?.status] || '等待来源就绪'
-            : '尚未读取 · 同步',
+          : source?.message || statusLabels[source?.status] || '尚未读取 · 点击选择',
   );
   $('keep-open').setAttribute('aria-pressed', String(prefs().keepOpen));
   $('keep-open').disabled = busy || !online;
@@ -710,7 +720,7 @@ function updateModelRow(row, model) {
     (value) => {
       const choice = button(value, () => {
         const live = models().find((item) => item.id === row.dataset.key);
-        if (live) apply(manualSelection(live, choice.dataset.key));
+        if (live) apply(() => manualSelection(live, choice.dataset.key));
       });
       return choice;
     },

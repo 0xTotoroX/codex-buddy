@@ -61,6 +61,11 @@ const report = {
   environment,
   checks: [],
   skipped: [
+    {
+      name: 'real Spaces migration with connected host',
+      reason:
+        'Visibility and focus gates use fixture presence; actual Mission Control switching requires manual acceptance',
+    },
     ...(!environment.canPostEvents
       ? [
           {
@@ -94,6 +99,7 @@ const report = {
   screenshots: [],
   errors: [],
 };
+let hostPresence = { visible: true, focused: true };
 const envelope = () => ({ preferences: prefs, snapshot, revision });
 
 // Probe code is served only by this synthetic backend, never added to a product page/build.
@@ -180,7 +186,8 @@ const server = createServer(async (request, response) => {
   }
   if (path.startsWith('/api/')) {
     if (request.headers.authorization !== 'Bearer native-fixture-token') return json({}, 401);
-    if (path.endsWith('/window')) return json({ valid, preferences: prefs, reveal, appearance });
+    if (path.endsWith('/window'))
+      return json({ valid, preferences: prefs, reveal, appearance, host: hostPresence });
     if (path.endsWith('/preferences')) {
       Object.assign(prefs, JSON.parse(body).patch);
       revision++;
@@ -310,6 +317,15 @@ try {
   assert.equal(initial.kCGWindowBounds.Width, 32);
   assert.equal(initial.kCGWindowBounds.Height, 80);
   check('initial reveal baseline is compact', initial.kCGWindowBounds);
+  hostPresence = { visible: false, focused: false };
+  await until(() => !windowInfo(), 'host hidden removes native panel');
+  await ipc({ action: 'focus' });
+  await delay(200);
+  assert.equal(windowInfo(), undefined);
+  check('hidden host suppresses panel and explicit focus cannot resurrect it elsewhere');
+  hostPresence = { visible: true, focused: true };
+  await until(() => !!windowInfo(), 'host return restores panel');
+  check('host focus restores existing panel without a new process');
 
   if (environment.canPostEvents) {
     const bounds = windowInfo().kCGWindowBounds;

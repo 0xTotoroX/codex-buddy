@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 官方 DOM 菜单、稳定聊天标记和关联的 model/list 消息；不依赖工作台锁定。
- * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 cancel/dispose。
+ * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 presence/cancel/dispose。
  * [POS]: include_str / Page.addScriptToEvaluateOnNewDocument 可独立安装的宿主边界。
  * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、存储或发送模型请求。
  * snapshot(false) 不操作 DOM；refresh=true 显式探测菜单。target 无法确认时 id/title 为空。
@@ -200,15 +200,25 @@
   );
   function identity(root, scope, roots) {
     const values = new Set();
-    for (const name of MARKERS) {
-      if (root.hasAttribute(name)) values.add(root.getAttribute(name));
-      all(scope, `[${name}]`).forEach((node) => values.add(node.getAttribute(name)));
-    }
+    // Composer/ancestor identity is authoritative. A referenced answer may expose a
+    // response-annotation marker for another conversation inside message content.
+    const composerMarkers = all(scope, '[data-above-composer-conversation-id]');
+    if (root.hasAttribute('data-above-composer-conversation-id')) composerMarkers.push(root);
+    composerMarkers
+      .filter((node) => !owned(node))
+      .forEach((node) => values.add(node.getAttribute('data-above-composer-conversation-id')));
     for (let node = root; node && node !== document.body; node = node.parentElement) {
       if (roots.filter((entry) => node.contains(entry)).length > 1) break;
       IDS.forEach((name) => {
         if (node.getAttribute(name)) values.add(node.getAttribute(name));
       });
+    }
+    if (!values.size) {
+      const annotations = all(root, '[data-response-annotation-conversation]');
+      if (root.hasAttribute('data-response-annotation-conversation')) annotations.push(root);
+      annotations
+        .filter((node) => !owned(node))
+        .forEach((node) => values.add(node.getAttribute('data-response-annotation-conversation')));
     }
     // Only the sole main chat may inherit the route; never links in message content or pane/tab indices.
     if (!values.size && roots.length === 1 && !root.closest('[role="dialog"],aside')) {
@@ -241,7 +251,11 @@
           if (!visible(node) || owned(node)) return false;
           return (
             node.hasAttribute('data-selected-reasoning-effort') ||
-            models.some((model) => normalized(text(node)).includes(normalized(model.label))) ||
+            models.some((model) =>
+              normalized(`${text(node)} ${node.textContent || ''}`).includes(
+                normalized(model.label),
+              ),
+            ) ||
             /\b(?:gpt[-\s]*)?\d+\.\d+/i.test(text(node))
           );
         });
@@ -422,7 +436,7 @@
       message = '等待关联的官方 model/list 数据；可刷新官方模型菜单后重试，无需重启';
     } else if (!current) {
       status = 'waiting';
-      message = '需要显式刷新官方菜单以读取完整配置';
+      message = '点击模型组合即可同步并切换';
     }
     return clone({
       target: { id: target?.id || '', title: target?.title || '' },
@@ -794,6 +808,10 @@
     if (window.dispatchEvent === wrappedDispatch) window.dispatchEvent = originalDispatch;
     if (window[KEY] === api) delete window[KEY];
   }
-  const api = { snapshot, apply, cancel, dispose };
+  const presence = () => ({
+    visible: !disposed && document.visibilityState === 'visible',
+    focused: !disposed && document.hasFocus(),
+  });
+  const api = { snapshot, apply, cancel, dispose, presence };
   window[KEY] = api;
 })();
