@@ -12,6 +12,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 import { buildPanel } from '../scripts/build-panel.mjs';
 import { fixtureSettings } from './fixtures.mjs';
+import { showWorkbenchView } from './workbench-actions.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const output = resolve(root, 'target/reports/embedded-glass');
@@ -232,8 +233,7 @@ try {
     window.__companionFloatingPanel.setOpen(true);
   });
   await page.waitForFunction(() => !window.__companionFloatingPanel.state.transitioning);
-  await page.locator('.csw-head').hover();
-  await page.locator('button[data-view="settings"]').click();
+  await showWorkbenchView(page, 'settings');
   await page.waitForFunction(() => !window.__companionFloatingPanel.state.viewAnimation);
   await settle();
   assert.equal((await state()).phase, 'ready');

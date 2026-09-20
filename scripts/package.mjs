@@ -61,11 +61,11 @@ writeFileSync(
 在终端进入解压目录，执行：
 
 \`\`\`sh
-./codex-buddy launch --no-open
+./codex-buddy launch --no-open --restart-running
 ./codex-buddy popout
 \`\`\`
 
-若 ChatGPT 已经普通启动且没有开放调试端口，请保存工作并完整退出，再执行第一条命令；已有可用端口时可以直接连接。
+若 ChatGPT 已打开但没有调试连接，第一条命令按启动设置询问或直接重开；已有可用连接时直接复用。
 打开配置页：\`./codex-buddy start\`。查看诊断：\`./codex-buddy doctor\`。
 停止本工具：\`./codex-buddy stop\`。可用命令见 \`./codex-buddy --help\`。
 
