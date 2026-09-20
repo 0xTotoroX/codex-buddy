@@ -1,5 +1,5 @@
 // [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
-// [OUTPUT]: 安全区内的原生窗口矩形及可独立验证的多屏选择。
+// [OUTPUT]: 贴合物理边缘的内容高度布局、凹角命中与多屏选择。
 // [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
@@ -44,6 +44,41 @@ impl Edge {
     }
 }
 
+// Same quadratic contour as the CSS path, using page coordinates (top-left origin).
+pub fn surface_contains(width: f64, height: f64, edge: Edge, x: f64, y: f64) -> bool {
+    if x < 0. || y < 0. || x >= width || y >= height {
+        return false;
+    }
+    let (a, b, x, y) = match edge {
+        Edge::Right => (width, height, x, y),
+        Edge::Left => (width, height, width - x, y),
+        Edge::Top => (height, width, height - y, x),
+    };
+    let y = y.min(b - y);
+    if y < 8. {
+        return x >= a - 8. * (1. - (1. - y / 8.).sqrt()).powi(2);
+    }
+    let radius = 18_f64.min((b - 16.) / 2.).max(0.);
+    y >= 8. + radius || x >= radius * (1. - ((y - 8.) / radius).sqrt()).powi(2)
+}
+
+#[derive(Clone, Copy)]
+pub struct SurfaceRegion {
+    pub rect: Rect,
+    pub edge: Edge,
+}
+impl SurfaceRegion {
+    pub fn contains(self, x: f64, y: f64) -> bool {
+        surface_contains(
+            self.rect.width,
+            self.rect.height,
+            self.edge,
+            x - self.rect.x,
+            self.rect.y + self.rect.height - y,
+        )
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Screen {
     pub id: String,
@@ -65,7 +100,19 @@ pub fn fraction(value: f64) -> f64 {
 
 // position 从上到下（左右边缘）、从左到右（顶部）变化；始终使用 AppKit 全局点坐标。
 pub fn layout(screen: &Screen, edge: Edge, position: f64, expanded: bool) -> Rect {
+    layout_height(screen, edge, position, expanded, 274.)
+}
+
+pub fn layout_height(
+    screen: &Screen,
+    edge: Edge,
+    position: f64,
+    expanded: bool,
+    content_height: f64,
+) -> Rect {
     let area = screen.usable;
+    let expanded_height =
+        content_height.clamp(144., 2000.) + content_offset(screen, edge, expanded);
     if edge == Edge::Top && screen.notch_width > 0. && screen.notch_height > 0. {
         let bounds = if expanded {
             Rect {
@@ -82,7 +129,7 @@ pub fn layout(screen: &Screen, edge: Edge, position: f64, expanded: bool) -> Rec
         }
         .min(bounds.width);
         let height = if expanded {
-            640_f64
+            expanded_height
         } else {
             screen.notch_height.max(32.)
         }
@@ -96,7 +143,7 @@ pub fn layout(screen: &Screen, edge: Edge, position: f64, expanded: bool) -> Rec
         };
     }
     let (width, height): (f64, f64) = if expanded {
-        (480., 640.)
+        (480., expanded_height)
     } else if edge == Edge::Top {
         (80., 32.)
     } else {
@@ -106,14 +153,17 @@ pub fn layout(screen: &Screen, edge: Edge, position: f64, expanded: bool) -> Rec
     let height = height.min(area.height.max(1.)).floor();
     let position = fraction(position);
     let (x, y) = match edge {
-        Edge::Left => (area.x, area.y + (area.height - height) * (1. - position)),
+        Edge::Left => (
+            screen.frame.x,
+            area.y + (area.height - height) * (1. - position),
+        ),
         Edge::Right => (
-            area.x + area.width - width,
+            screen.frame.x + screen.frame.width - width,
             area.y + (area.height - height) * (1. - position),
         ),
         Edge::Top => (
             area.x + (area.width - width) * position,
-            area.y + area.height - height,
+            screen.frame.y + screen.frame.height - height,
         ),
     };
     Rect {
@@ -197,7 +247,7 @@ mod tests {
             let compact = layout(&s, edge, 0.5, false);
             assert_eq!((compact.width, compact.height), (32., 80.));
             let expanded = layout(&s, edge, 0.5, true);
-            assert_eq!((expanded.width, expanded.height), (480., 640.));
+            assert_eq!((expanded.width, expanded.height), (480., 274.));
             assert_eq!(
                 compact.y + compact.height / 2.,
                 expanded.y + expanded.height / 2.
@@ -296,6 +346,29 @@ mod tests {
             preferred
         );
         assert!(select_screen(&[], &preferred, "", (0., 0.)).is_none());
+    }
+
+    #[test]
+    fn contour_excludes_transparent_wings_and_round_corners() {
+        assert!(!surface_contains(32., 80., Edge::Right, 16., 2.));
+        assert!(surface_contains(32., 80., Edge::Right, 16., 40.));
+        assert!(!surface_contains(480., 274., Edge::Right, 2., 10.));
+        assert!(surface_contains(480., 274., Edge::Right, 479.9, 4.));
+        for edge in [Edge::Left, Edge::Right, Edge::Top] {
+            assert!(surface_contains(480., 274., edge, 240., 137.));
+            assert!(!surface_contains(480., 274., edge, -1., 137.));
+        }
+        let s = screen("main", 0., 0., 1440., 900.);
+        let compact = layout(&s, Edge::Right, 0.5, false);
+        let expanded = layout_height(&s, Edge::Right, 0.5, true, 222.);
+        assert_eq!(expanded.height, 222.);
+        let frozen = SurfaceRegion {
+            rect: expanded,
+            edge: Edge::Right,
+        };
+        let pointer = (expanded.x + 240., expanded.y + 111.);
+        assert!(frozen.contains(pointer.0, pointer.1));
+        assert!(!compact.contains(pointer.0, pointer.1));
     }
 
     #[test]

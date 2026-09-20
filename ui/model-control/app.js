@@ -1,6 +1,6 @@
 /*
- * [INPUT]: #token/#lease、/api/model-control/* 投影与 model-control-native 事件。
- * [OUTPUT]: 模型/推理/速度控制、版本保护偏好写入与原生 IPC 意图。
+ * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何与鼠标边界事件。
+ * [OUTPUT]: 紧凑模型矩阵、版本保护写入、开合/内容高度 IPC；材质独立纯黑。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -31,9 +31,12 @@ let othersOpen = false,
   menuOpener = null;
 let previewId = null,
   columns = [],
-  layout = 'matrix',
   widthDraft = null;
 let nativeState = {};
+let pointerButtons = 0;
+let nativePointer = false,
+  searchOpen = false,
+  sizeFrame;
 let lastNativeError = '';
 let online = false,
   message = '';
@@ -68,9 +71,10 @@ for (const [id, name] of Object.entries({
   'menu-button': 'more',
   collapse: 'minus',
   refresh: 'refresh',
+  fast: 'bolt',
 }))
   $(id).innerHTML = icons[name];
-$('save').innerHTML = `${icons.plus}<span>保存当前</span>`;
+$('save').innerHTML = icons.plus;
 
 function native(message) {
   if (window.ipc?.postMessage) window.ipc.postMessage(JSON.stringify(message));
@@ -109,6 +113,7 @@ function collapse() {
   keyboard = false;
   closeEditor();
   closeMenu(false);
+  setSearch(false);
   document.activeElement?.blur();
   native({ action: 'collapse' });
 }
@@ -122,30 +127,100 @@ function scheduleCollapse() {
       !keyboard &&
       !editable(document.activeElement) &&
       !dragging &&
-      !busy
+      !pointerButtons &&
+      !busy &&
+      !editor &&
+      !searchOpen &&
+      $('menu').hidden
     )
       collapse();
-  }, 400);
+  }, 450);
 }
 function applyAppearance(detail) {
-  const appearance = detail.appearance;
-  const root = document.documentElement;
-  if (appearance) {
-    if (['matte', 'frosted', 'native-glass'].includes(appearance.material))
-      root.dataset.material = appearance.material;
-    if (['regular', 'clear'].includes(appearance.liquidVariant))
-      root.dataset.liquidVariant = appearance.liquidVariant;
-    // Canonical panel default is 13px, bounded to 10–24; chrome stays 12px.
-    if (Number.isFinite(appearance.fontOffset))
-      root.style.setProperty(
-        '--model-font-offset',
-        `${Math.max(-3, Math.min(11, appearance.fontOffset))}px`,
-      );
+  const offset = detail.appearance?.fontOffset;
+  if (Number.isFinite(offset))
+    document.documentElement.style.setProperty(
+      '--model-font-offset',
+      `${Math.max(-3, Math.min(11, offset))}px`,
+    );
+}
+function pointerChanged(detail) {
+  pointerButtons = detail.buttons || 0;
+  inside = detail.inside === true;
+  if (typeof detail.hoverSuppressed === 'boolean') hoverArmed = !detail.hoverSuppressed;
+  if (inside) {
+    clearTimeout(leaveTimer);
+    if (!expanded && hoverArmed && !dragging && !detail.buttons && !detail.option) expand(false);
+  } else {
+    if (!detail.hoverSuppressed) hoverArmed = true;
+    scheduleCollapse();
   }
-  if (typeof detail.nativeBackdrop === 'boolean')
-    root.dataset.nativeBackdrop = String(detail.nativeBackdrop);
-  if (['matte', 'frosted', 'native-glass'].includes(detail.effectiveMaterial))
-    root.dataset.effectiveMaterial = detail.effectiveMaterial;
+}
+window.addEventListener('model-control-pointer', ({ detail }) => {
+  nativePointer = true;
+  pointerChanged(detail || {});
+});
+function setSearch(open) {
+  searchOpen = open;
+  $('search-bar').hidden = !open;
+  document.body.dataset.search = String(open);
+  for (const id of ['fast', 'save']) $(id).hidden = open;
+  renderPresets();
+  if (open) {
+    closeMenu(false);
+    focusWindow();
+    $('search').focus();
+  } else {
+    $('search').value = '';
+    $('search').blur();
+    render();
+    scheduleCollapse();
+  }
+}
+// Keep this quadratic contour aligned with model_control_geometry::surface_contains.
+function shapeSurface(node) {
+  const w = node.clientWidth,
+    h = node.clientHeight;
+  if (!w || !h) return;
+  const edge = document.body.dataset.edge;
+  const a = edge === 'top' ? h : w,
+    b = edge === 'top' ? w : h;
+  const p = (x, y) =>
+    edge === 'left' ? `${w - x} ${y}` : edge === 'top' ? `${y} ${h - x}` : `${x} ${y}`;
+  const r = Math.min(18, (b - 16) / 2);
+  const path = `M ${p(a, 0)} Q ${p(a, 8)} ${p(a - 8, 8)} L ${p(r, 8)} Q ${p(0, 8)} ${p(0, 8 + r)} L ${p(0, b - 8 - r)} Q ${p(0, b - 8)} ${p(r, b - 8)} L ${p(a - 8, b - 8)} Q ${p(a, b - 8)} ${p(a, b)} Z`;
+  const clip = `path('${path}')`;
+  node.style.setProperty('--shell-clip', clip);
+  node.style.clipPath = clip;
+  // Matching path commands reveal the silhouette without scaling text.
+  const q = (x, y) =>
+    p(a - (a - x) * Math.min(1, 32 / a), b / 2 + (y - b / 2) * Math.min(1, 80 / b));
+  const compact = `M ${q(a, 0)} Q ${q(a, 8)} ${q(a - 8, 8)} L ${q(r, 8)} Q ${q(0, 8)} ${q(0, 8 + r)} L ${q(0, b - 8 - r)} Q ${q(0, b - 8)} ${q(r, b - 8)} L ${q(a - 8, b - 8)} Q ${q(a, b - 8)} ${q(a, b)} Z`;
+  node.style.setProperty('--compact-clip', `path('${compact}')`);
+}
+// Natural content height is independent of the current native viewport.
+function queueSize() {
+  cancelAnimationFrame(sizeFrame);
+  sizeFrame = requestAnimationFrame(() => {
+    if (!expanded || stopped || nativeState.hidden) return;
+    const panel = $('panel');
+    shapeSurface(panel);
+    const natural = [...panel.children]
+      .filter(
+        (n) =>
+          (!n.hidden && ['HEADER', 'SECTION', 'FOOTER'].includes(n.tagName)) ||
+          (n.id === 'notice-area' && !n.hidden),
+      )
+      .reduce(
+        (height, n) =>
+          height +
+          (n.classList.contains('model-section')
+            ? $('model-scroll').scrollHeight
+            : n.getBoundingClientRect().height),
+        36,
+      );
+    native({ action: 'content-size', height: Math.ceil(Math.max(144, natural)) });
+  });
 }
 window.addEventListener('model-control-native', (event) => {
   const detail = event.detail || {};
@@ -159,6 +234,8 @@ window.addEventListener('model-control-native', (event) => {
   if (typeof detail.expanded === 'boolean') expanded = detail.expanded;
   if (typeof detail.keyboard === 'boolean') keyboard = detail.keyboard;
   if (['right', 'left', 'top'].includes(detail.edge)) document.body.dataset.edge = detail.edge;
+  if (Number.isFinite(detail.availableHeight))
+    document.documentElement.style.setProperty('--available-height', `${detail.availableHeight}px`);
   const top = document.body.dataset.edge === 'top';
   const notched = top && nativeState.notchWidth > 0 && nativeState.notchHeight > 0;
   document.body.dataset.notched = String(notched);
@@ -204,20 +281,18 @@ window.addEventListener('model-control-native', (event) => {
     (!wasExpanded ||
       (!wasKeyboard && !editor && !editable(document.activeElement) && $('menu').hidden))
   )
-    requestAnimationFrame(() => $('search').focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      $('panel').querySelector('button:not(:disabled)')?.focus({ preventScroll: true }),
+    );
+  shapeSurface($('handle'));
   updateLayout();
 });
 for (const root of [$('handle'), $('panel')]) {
-  root.addEventListener('pointerenter', () => {
-    inside = true;
-    clearTimeout(leaveTimer);
-    if (!expanded && hoverArmed && !dragging) enterTimer = setTimeout(() => expand(false), 250);
+  root.addEventListener('pointerenter', (event) => {
+    if (!nativePointer) pointerChanged({ inside: true, option: event.altKey });
   });
   root.addEventListener('pointerleave', () => {
-    inside = false;
-    hoverArmed = true;
-    clearTimeout(enterTimer);
-    scheduleCollapse();
+    if (!nativePointer) pointerChanged({ inside: false });
   });
 }
 document.addEventListener('focusout', () => setTimeout(scheduleCollapse, 0));
@@ -279,6 +354,7 @@ function renderNotice() {
   $('undo').hidden = !undo;
   $('undo').disabled = !canApply();
   $('undo').title = undo ? describe(undo.selection, models()) : '';
+  queueSize();
 }
 async function readState() {
   if (stopped || reading || busy) return;
@@ -402,26 +478,29 @@ function manualSelection(model, reasoning) {
 function updateLayout() {
   const font =
     parseFloat(
-      getComputedStyle(document.querySelector('.choices button') || $('panel')).fontSize,
+      getComputedStyle(document.querySelector('.model-label strong') || $('panel')).fontSize,
     ) || 13;
-  const available = $('model-scroll').clientWidth || 438;
   const width = Math.min(280, Math.max(100, widthDraft ?? prefs().modelColumnWidth));
-  const needed = Math.max(44, ...columns.map((value) => value.length * font * 0.56 + 14));
-  const next = available - width - 8 >= columns.length * needed ? 'matrix' : 'rows';
-  document.documentElement.style.setProperty('--name-width', `${width}px`);
-  document.documentElement.style.setProperty('--columns', String(Math.max(1, columns.length)));
+  const needed = Math.max(42, ...columns.map((value) => value.length * font * 0.56 + 12));
+  const style = document.documentElement.style;
+  style.setProperty('--name-width', `${width}px`);
+  style.setProperty('--columns', String(Math.max(1, columns.length)));
+  style.setProperty('--matrix-width', `${width + 8 + columns.length * needed}px`);
   $('resize').setAttribute('aria-valuenow', String(Math.round(width)));
-  if (layout !== next) {
-    layout = next;
-    renderModels();
-  }
-  document.body.dataset.layout = layout;
+  document.body.dataset.layout = 'matrix';
+  queueSize();
 }
 function render() {
   const source = snapshot();
   document.body.dataset.status = online ? source?.status || 'waiting' : 'unavailable';
   text($('target'), source?.target?.title || '尚未关联任务');
-  $('target').title = source?.target?.title || '';
+  $('target').title = [
+    source?.target?.title,
+    source?.target?.id,
+    describe(source?.current, models()),
+  ]
+    .filter(Boolean)
+    .join(' · ');
   text($('actual'), source?.current ? describe(source.current, models()) : '尚未读取');
   text(
     $('status'),
@@ -429,7 +508,11 @@ function render() {
       ? '连接不可用'
       : source?.generating
         ? '正在生成 · 等待回答完成'
-        : source?.message || statusLabels[source?.status] || '等待来源就绪',
+        : source?.status === 'ready' && source?.current
+          ? ''
+          : source?.current
+            ? statusLabels[source?.status] || '等待来源就绪'
+            : '尚未读取 · 同步',
   );
   $('keep-open').setAttribute('aria-pressed', String(prefs().keepOpen));
   $('keep-open').disabled = busy || !online;
@@ -439,17 +522,15 @@ function render() {
   renderModels();
   updateLayout();
   renderNotice();
-  for (const node of $('speeds').children) {
-    const fast = node.dataset.speed === 'fast';
-    const model = models().find((item) => item.id === source?.current?.model);
-    node.disabled =
-      !canApply() ||
-      !source?.current ||
-      !!validate({ ...source.current, speed: 'standard' }, models()) ||
-      (fast && !model?.fast);
-    node.setAttribute('aria-pressed', String(source?.current?.speed === node.dataset.speed));
-    node.title = fast && !model?.fast ? '当前模型不支持 Fast' : node.textContent;
-  }
+  const model = models().find((item) => item.id === source?.current?.model);
+  $('fast').disabled =
+    !canApply() || !source?.current || !!validate(source.current, models()) || !model?.fast;
+  $('fast').setAttribute('aria-pressed', String(source?.current?.speed === 'fast'));
+  $('fast').title = !model?.fast
+    ? '当前模型不支持 Fast'
+    : source?.current?.speed === 'fast'
+      ? 'Fast · 点击切换为 Standard'
+      : 'Standard · 点击启用 Fast';
   text($('speed-note'), '速度选择会直接应用到当前模型');
   if (editor) {
     const stale =
@@ -472,6 +553,7 @@ function visiblePresets() {
   );
 }
 function renderPresets() {
+  $('presets').hidden = searchOpen && !$('search').value.trim();
   reconcile(
     $('presets'),
     visiblePresets(),
@@ -533,11 +615,12 @@ function renderPresets() {
 }
 function renderPreview() {
   const preset = prefs().presets.find((item) => item.id === previewId);
+  $('preview').hidden = !preset;
   text(
     $('preview'),
     preset
       ? `${describe(preset.selection, models())}${validate(preset.selection, models()) ? ` · ${validate(preset.selection, models())}` : ''}`
-      : '悬停或聚焦预设以预览完整配置',
+      : '',
   );
 }
 function renderModels() {
@@ -552,7 +635,8 @@ function renderModels() {
   const current = visible.find(
     (model) => model.id === snapshot()?.current?.model && !prefs().pinned.includes(model.id),
   );
-  if (current) ordered.push(current);
+  if (!ordered.length) ordered.push(...visible);
+  else if (current) ordered.push(current);
   const other = visible.filter((model) => !ordered.includes(model));
   for (const [id, list] of [
     ['pinned', ordered],
@@ -596,6 +680,10 @@ function createModelRow() {
   const choices = document.createElement('div');
   choices.className = 'choices';
   row.append(name, choices);
+  name.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    openModelMenu(row.dataset.key, more);
+  });
   bindSort(row, 'pinned', name);
   return row;
 }
@@ -614,7 +702,7 @@ function updateModelRow(row, model) {
   more.title = `模型 ${model.label} 菜单`;
   more.disabled = busy;
   row.querySelector('.model-name').draggable = pinned && !busy;
-  const reasoning = layout === 'matrix' ? columns : model.reasoning;
+  const reasoning = columns;
   reconcile(
     row.querySelector('.choices'),
     reasoning,
@@ -629,7 +717,7 @@ function updateModelRow(row, model) {
     (choice, value) => {
       const supported = model.reasoning.includes(value);
       const downgrade = snapshot()?.current?.speed === 'fast' && !model.fast;
-      text(choice, supported ? (downgrade ? `${value} · Standard` : value) : '—');
+      text(choice, supported ? '●' : '—');
       choice.disabled = !supported || !canApply();
       const title = `${model.label} · ${value} · ${manualSelection(model, value).speed === 'fast' ? 'Fast' : 'Standard'}${downgrade ? '（不支持 Fast，将使用 Standard）' : ''}`;
       choice.title = supported ? title : `${model.label} 不支持 ${value}`;
@@ -650,6 +738,7 @@ function closeMenu(restore = true) {
   $('menu-button').setAttribute('aria-expanded', 'false');
   if (restore && menuOpener?.isConnected) menuOpener.focus({ preventScroll: true });
   menuOpener = null;
+  scheduleCollapse();
 }
 function openMenu(title, opener) {
   closeEditor();
@@ -688,7 +777,8 @@ function openSettings() {
     closeMenu();
     return;
   }
-  openMenu('停靠边缘', $('menu-button'));
+  openMenu('模型快切', $('menu-button'));
+  menuAction('搜索模型或预设 · ⌘F', () => setSearch(true), { write: false });
   for (const [edge, label] of [
     ['right', '右侧'],
     ['left', '左侧'],
@@ -957,6 +1047,7 @@ $('editor-cancel').addEventListener('click', closeEditor);
 $('others-toggle').addEventListener('click', () => {
   othersOpen = !othersOpen;
   renderModels();
+  updateLayout();
 });
 $('search').addEventListener('input', () => {
   renderPresets();
@@ -969,10 +1060,18 @@ $('refresh').addEventListener('click', () =>
     notify('已刷新模型与实际配置');
   }),
 );
-$('speeds').addEventListener('click', (event) => {
-  const speed = event.target.closest('[data-speed]');
-  if (speed && !speed.disabled && snapshot()?.current)
-    apply({ ...snapshot().current, speed: speed.dataset.speed });
+$('fast').addEventListener('click', () => {
+  if (!$('fast').disabled && snapshot()?.current)
+    apply({
+      ...snapshot().current,
+      speed: snapshot().current.speed === 'fast' ? 'standard' : 'fast',
+    });
+});
+$('target').addEventListener('click', () => {
+  openMenu('关联目标与实际配置', $('target'));
+  const details = document.createElement('p');
+  details.textContent = $('target').title;
+  $('menu').append(details);
 });
 $('undo').addEventListener('click', () => {
   const previous = undo;
@@ -993,7 +1092,17 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     if (editor) closeEditor();
     else if (!$('menu').hidden) closeMenu();
+    else if (searchOpen) setSearch(false);
     else collapse();
+    return;
+  }
+  if (
+    expanded &&
+    ((event.key.toLowerCase() === 'f' && (event.metaKey || event.ctrlKey)) ||
+      (event.key === '/' && !editable(event.target)))
+  ) {
+    event.preventDefault();
+    setSearch(true);
     return;
   }
   if (event.metaKey || event.ctrlKey || event.altKey) return;

@@ -10,15 +10,15 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 
 开发版 `window_warp` 动态解析 CGS 私有网格接口，不截屏；原生内容尺寸在动画中固定，合成后网格按临时坐标收束。入场在窗口显示前预置来源网格，再沿收回曲线反向展开，取消起步停顿与淡入遮挡；来源与目标按 NSScreen 全局逻辑坐标分别校验，可跨屏，不乘 backingScaleFactor；失效坐标仍回退。每 16ms 至多更新一次，完成、取消或接管后复位；失败停用，正式构建不加载。临时原生测试可在 debug 程序使用 `CODEX_BUDDY_DEV_GENIE=1`。
 
-模型控制条由独立 model_control 服务与 NSPanel 子进程管理，不调用工作台弹出/收回契约。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；与建议生成的 model.rs 完全分离。私有 model-control.json 仅保存边缘/屏幕位置、保持展开、模型置顶和配置预设，不保存聊天正文。API 鉴权复用现有服务；关闭或后端断开时租约失效。默认关闭，用户从设置或 CLI 开启后记住选择。控制条外观只读继承现有 panel 偏好，原生背景经 native_backdrop 与工作台共用。
+模型控制条由独立 model_control 服务与 NSPanel 子进程管理，不调用工作台弹出/收回契约。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；与建议生成的 model.rs 完全分离。私有 model-control.json 仅保存边缘/屏幕位置、保持展开、模型置顶和配置预设，不保存聊天正文。API 鉴权复用现有服务；关闭或后端断开时租约失效。默认关闭，用户从设置或 CLI 开启后记住选择。控制条仅继承字号，WebView绘制独立纯黑凹角外壳，原生层不创建材质背景；NSEvent位置采样报告进入/离开与按键状态，由网页统一决定开合。content-size IPC按内容调整高度，窗口/网页共用凹角命中规则与刘海内容预算。
 
 成员清单：
 
 - [native_backdrop.rs](native_backdrop.rs)：NSWindow/NSPanel 共用的原生磨砂、液态 Regular/Clear、圆角裁切与网页承载；不持有业务或窗口生命周期。
 
 - [model_control.rs](model_control.rs)：独立控制条服务、串行操作、版本化局部偏好及窗口租约，防止跨聊天迟到结果与并发覆盖。
-- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、边缘/刘海几何、屏幕恢复、快捷键和租约退出。
-- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、安全区和显示器选择的纯计算及测试。
+- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标边界与冻结区域、按内容调高、边缘/刘海几何、屏幕恢复、快捷键和租约退出。
+- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、凹角命中、安全区和显示器选择的纯计算及测试。
 
 
 - [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源。

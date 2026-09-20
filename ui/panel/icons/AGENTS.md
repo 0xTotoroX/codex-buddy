@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
-- `index.js`：按语义名导出静态 SVG，供外壳、工作台、宿主窄入口与窗口控件使用。
+- `index.js`：按语义名导出静态 SVG，供外壳、工作台、宿主窄入口与窗口控件使用；bolt 对应公开 Bolt.tsx，用于模型快切 Fast。
 - `LICENSE`：OpenAI 原始 MIT 许可；分发许可生成器收集本目录。
 
 来源：https://github.com/openai/apps-sdk-ui/tree/0f00143c7a639906f1621fe58e1b6be7b5bea46d/src/components/Icon/svg

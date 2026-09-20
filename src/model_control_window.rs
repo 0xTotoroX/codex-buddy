@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、显式键盘焦点、真实紧凑命中区及租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -8,11 +8,12 @@ mod geometry;
 
 use crate::{config::Paths, lifecycle::Runtime};
 use anyhow::{Context, Result};
-use geometry::{Edge, Rect, Screen};
+use geometry::{Edge, Rect, Screen, SurfaceRegion};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
 use objc2_app_kit::{
-    NSBackingStoreType, NSColor, NSEvent, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
-    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSBackingStoreType, NSColor, NSEvent, NSEventModifierFlags, NSPanel, NSScreen,
+    NSStatusWindowLevel, NSView, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
+    NSWindowStyleMask,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize, ns_string};
 use serde_json::{Value, json};
@@ -50,6 +51,7 @@ struct KeyboardGate {
 struct HitRegion {
     excluded: Cell<Rect>,
     allowed: Cell<Rect>,
+    edge: Cell<Edge>,
 }
 
 define_class!(
@@ -62,7 +64,7 @@ define_class!(
     impl ControlView {
         #[unsafe(method(hitTest:))]
         fn hit_test(&self, point: NSPoint) -> *mut NSView {
-            if !self.ivars().allowed.get().contains(point.x, point.y)
+            if !(SurfaceRegion {rect: self.ivars().allowed.get(), edge: self.ivars().edge.get()}).contains(point.x, point.y)
                 || self.ivars().excluded.get().contains(point.x, point.y) { return std::ptr::null_mut(); }
             unsafe { msg_send![super(self), hitTest: point] }
         }
@@ -269,7 +271,9 @@ impl Drop for Backend {
 struct Surface {
     // Drop WebView before its retained parent and panel.
     webview: WebView,
-    backdrop: crate::native_backdrop::Backdrop,
+    content_height: f64,
+    pointer_state: Option<Value>,
+    hover_suppressed: Vec<SurfaceRegion>,
     _parent: NativeParent,
     panel: Retained<ControlPanel>,
     prefs: Preferences,
@@ -323,9 +327,10 @@ impl Surface {
             "shortcutAvailable": self.shortcut_error.is_none(), "shortcutError": self.shortcut_error,
             "preferenceError": if self.preference_error { Some("无法保存模型控窗偏好，请稍后重试") } else { None },
             "appearance": {"material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant, "fontOffset": self.appearance.font_offset},
-            "effectiveMaterial": self.effective_material(),
+            "effectiveMaterial": "black",
+            "availableHeight": screen.map_or(640., |s| s.usable.height) + offset,
             "nativeGlassAvailable": crate::native_backdrop::glass_available(),
-            "nativeBackdrop": self.backdrop.style().is_some(), "backdropStyle": self.backdrop.style(),
+            "nativeBackdrop": false, "backdropStyle": Value::Null,
         });
         // 页面用 keyboard 变化安排输入焦点；重复轮询不能把预设编辑器的焦点抢回搜索框。
         if self.last_detail.as_ref() == Some(&detail) {
@@ -354,7 +359,13 @@ impl Surface {
             self.panel.orderOut(None);
             return Ok(());
         };
-        let rect = geometry::layout(screen, self.prefs.edge, self.prefs.position, self.expanded);
+        let rect = geometry::layout_height(
+            screen,
+            self.prefs.edge,
+            self.prefs.position,
+            self.expanded,
+            self.content_height,
+        );
         self._parent
             .0
             .ivars()
@@ -382,6 +393,7 @@ impl Surface {
             }
         };
         self._parent.0.ivars().allowed.set(allowed);
+        self._parent.0.ivars().edge.set(self.prefs.edge);
         let frame = NSRect::new(
             NSPoint::new(rect.x, rect.y),
             NSSize::new(rect.width, rect.height),
@@ -389,18 +401,14 @@ impl Surface {
         let resized = self.panel.frame() != frame;
         if resized {
             self.panel.setFrame_display(frame, false);
-            self.backdrop.resize_viewport(&self.panel, false);
+            self.webview.set_bounds(wry::Rect {
+                position: wry::dpi::LogicalPosition::new(0., 0.).into(),
+                size: wry::dpi::LogicalSize::new(rect.width, rect.height).into(),
+            })?;
         }
         if self.valid && self.ready && !self.hidden && !self.panel.isVisible() {
             self.panel.orderFrontRegardless();
         }
-        self.backdrop.update(&self.panel, &json!({
-            "material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant,
-            "x": allowed.x, "y": rect.height - allowed.y - allowed.height,
-            "width": allowed.width, "height": allowed.height,
-            "radius": if self.expanded { 18. } else { 12. },
-            "viewportWidth": rect.width, "viewportHeight": rect.height,
-        }));
         if changed || resized {
             self.dispatch();
         }
@@ -408,25 +416,77 @@ impl Surface {
         Ok(())
     }
 
-    fn effective_material(&self) -> &str {
-        if self.appearance.material == "native-glass" && !crate::native_backdrop::glass_available()
+    fn hover_regions(&self) -> Vec<SurfaceRegion> {
+        let frame = rect(self.panel.frame());
+        let allowed = self._parent.0.ivars().allowed.get();
+        let mut regions = vec![SurfaceRegion {
+            edge: self.prefs.edge,
+            rect: Rect {
+                x: frame.x + allowed.x,
+                y: frame.y + allowed.y,
+                ..allowed
+            },
+        }];
+        // Keep the original notch flank connected to the expanded content below it.
+        if let Some(screen) = &self.screen
+            && self.expanded
+            && self.prefs.edge == Edge::Top
+            && screen.notch_width > 0.
         {
-            "matte"
-        } else {
-            &self.appearance.material
+            regions.push(SurfaceRegion {
+                edge: Edge::Top,
+                rect: Rect {
+                    x: screen.notch_x - 32.,
+                    y: frame.y + frame.height
+                        - geometry::content_offset(screen, self.prefs.edge, true),
+                    width: 32.,
+                    height: geometry::content_offset(screen, self.prefs.edge, true),
+                },
+            });
         }
+        regions
     }
 
-    fn mouse_passthrough(&self) {
+    fn mouse_passthrough(&mut self) {
+        if !self.ready || !self.valid || self.hidden {
+            return;
+        }
         let point = NSEvent::mouseLocation();
+        let buttons = NSEvent::pressedMouseButtons();
         let frame = rect(self.panel.frame());
         let x = point.x - frame.x;
         let y = point.y - frame.y;
         let regions = self._parent.0.ivars();
-        let ignored = frame.contains(point.x, point.y)
-            && (!regions.allowed.get().contains(x, y) || regions.excluded.get().contains(x, y));
+        let excluded = regions.excluded.get().contains(x, y);
+        let ignored = buttons == 0
+            && frame.contains(point.x, point.y)
+            && (!SurfaceRegion {
+                rect: regions.allowed.get(),
+                edge: self.prefs.edge,
+            }
+            .contains(x, y)
+                || excluded);
         if self.panel.ignoresMouseEvents() != ignored {
             self.panel.setIgnoresMouseEvents(ignored);
+        }
+        if !self
+            .hover_suppressed
+            .iter()
+            .any(|r| r.contains(point.x, point.y))
+        {
+            self.hover_suppressed.clear();
+        }
+        let inside = !excluded
+            && self
+                .hover_regions()
+                .iter()
+                .any(|r| r.contains(point.x, point.y));
+        let detail = json!({"inside": inside, "buttons": buttons, "option": NSEvent::modifierFlags_class().contains(NSEventModifierFlags::Option), "hoverSuppressed": !self.hover_suppressed.is_empty()});
+        if self.pointer_state.as_ref() != Some(&detail) {
+            self.pointer_state = Some(detail.clone());
+            let _ = self.webview.evaluate_script(&format!(
+                "window.dispatchEvent(new CustomEvent('model-control-pointer',{{detail:{detail}}}));"
+            ));
         }
     }
 
@@ -473,6 +533,7 @@ impl Surface {
             "ready" => {
                 self.ready = true;
                 self.last_detail = None;
+                self.pointer_state = None;
                 self.reflow(mtm)?;
                 if self.pending_keyboard {
                     self.expand(true, mtm)?;
@@ -481,6 +542,7 @@ impl Surface {
             "expand" => self.expand(value["keyboard"] == true, mtm)?,
             "focus" => self.expand(true, mtm)?,
             "collapse" => {
+                self.hover_suppressed = self.hover_regions();
                 self.release_keyboard();
                 self.expanded = false;
                 if self.prefs.keep_open {
@@ -488,6 +550,15 @@ impl Surface {
                     self.persist(backend, json!({"keepOpen": false}));
                 }
                 self.reflow(mtm)?;
+            }
+            "content-size" => {
+                if let Some(height) = value["height"].as_f64().filter(|v| v.is_finite()) {
+                    let height = height.clamp(144., 2000.);
+                    if (height - self.content_height).abs() >= 1. {
+                        self.content_height = height;
+                        self.reflow(mtm)?;
+                    }
+                }
             }
             "hide" => {
                 self.release_keyboard();
@@ -595,10 +666,11 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         Err(error) => (None, Some(error)),
     };
     let backend = Backend::start(runtime, lease.into(), event_loop.create_proxy())?;
-    let backdrop = crate::native_backdrop::Backdrop::new(&panel);
     let mut surface = Surface {
         webview,
-        backdrop,
+        content_height: 274.,
+        pointer_state: None,
+        hover_suppressed: Vec::new(),
         _parent: parent,
         panel,
         prefs: Preferences::default(),
@@ -662,12 +734,12 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
             error = Some(failure);
             *control = ControlFlow::Exit;
         }
-        // hitTest alone does not release WindowServer ownership; sample the pointer only
-        // while a notched top surface is visible, without a permission-requiring event tap.
+        // NSEvent mouseLocation also detects entry before an inactive WebView gets any events.
+        // No event tap, input permission or focus change is involved.
         if !matches!(*control, ControlFlow::ExitWithCode(_))
             && !surface.hidden
-            && surface.prefs.edge == Edge::Top
-            && surface.screen.as_ref().is_some_and(|s| s.notch_width > 0.)
+            && surface.ready
+            && surface.valid
         {
             *control = ControlFlow::WaitUntil(
                 next_screen_check.min(Instant::now() + Duration::from_millis(16)),

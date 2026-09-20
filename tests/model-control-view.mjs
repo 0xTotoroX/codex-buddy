@@ -200,6 +200,10 @@ async function setup({
     );
   if (expand) await nativeEvent(page, { expanded: true, edge: 'right', keyboard: false });
   await page.mouse.move(470, 20);
+  if (expand)
+    await page
+      .locator('#panel')
+      .evaluate((n) => Promise.all(n.getAnimations().map((a) => a.finished)));
   return { page, f };
 }
 async function nativeEvent(page, detail) {
@@ -231,6 +235,7 @@ async function menu(page, name) {
 test('authenticated passive polling preserves focus, search, hover, scroll and menus', async () => {
   const ctx = await setup();
   const { page, f } = ctx;
+  await page.keyboard.press('Meta+f');
   await page.locator('#search').fill('a');
   await page
     .locator('#search')
@@ -251,10 +256,12 @@ test('authenticated passive polling preserves focus, search, hover, scroll and m
   assert.equal(writes(f).length, 0);
   assert.ok(f.requests.filter((item) => item.operation === 'state').length >= 2);
   assert.equal(new URL(page.url()).hash, '');
+  await page.keyboard.press('Meta+f');
   await page.locator('#search').fill('');
   await menu(page, '设置菜单');
   await page.waitForTimeout(1350);
   assert.equal(await page.locator('#menu').isVisible(), true);
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await page.locator('[data-key="p1"]').hover();
   await page.waitForTimeout(1350);
@@ -343,7 +350,7 @@ test('all nonready/generating sources disable writes; presets prevalidate full t
   f.data.snapshot.status = 'ready';
   f.data.snapshot.generating = true;
   await poll(page, () => document.querySelector('#status').textContent.includes('正在生成'));
-  assert.equal(await page.locator('[data-speed="fast"]').isDisabled(), true);
+  assert.equal(await page.locator('#fast').isDisabled(), true);
   await shot(page, 'waiting-generation');
   f.data.snapshot.generating = false;
   await poll(page, () => !document.querySelector('#save').disabled);
@@ -351,6 +358,7 @@ test('all nonready/generating sources disable writes; presets prevalidate full t
     await page.getByRole('button', { name: '应用预设 不可用 Fast', exact: true }).isDisabled(),
     true,
   );
+  await page.keyboard.press('Meta+f');
   await page.locator('#search').focus();
   await page.keyboard.press('Tab');
   await page.keyboard.press('3');
@@ -366,14 +374,14 @@ test('unsupported manual Fast explicitly previews Standard before selection; unp
   const ctx = await setup({ initial });
   const { page, f } = ctx;
   assert.equal(await modelButton(page, 'alpha', 'high').isVisible(), true);
-  assert.match(await page.locator('#pinned').innerText(), /当前 · 未固定/);
+  assert.equal(await modelButton(page, 'alpha', 'high').getAttribute('aria-pressed'), 'true');
   const target = modelButton(page, 'beta', 'medium');
   assert.match(await target.getAttribute('title'), /不支持 Fast.*Standard/);
   assert.match(await target.getAttribute('aria-label'), /Standard/);
   await target.click();
   await poll(page, () => document.querySelector('#actual').textContent.includes('Beta'));
   assert.equal(applies(f)[0].payload.selection.speed, 'standard');
-  assert.equal(await page.locator('[data-speed="fast"]').isDisabled(), true);
+  assert.equal(await page.locator('#fast').isDisabled(), true);
   await cleanup(ctx);
 });
 
@@ -428,9 +436,11 @@ test('keyboard preset shortcuts only during keyboard operation; Escape closes me
   await page.keyboard.press('2');
   await poll(page, () => document.querySelector('#actual').textContent.includes('Gamma'));
   assert.equal(applies(f).length, 1);
+  await page.keyboard.press('Meta+f');
   await page.locator('#search').fill('1');
   await page.keyboard.press('2');
   assert.equal(applies(f).length, 1);
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#panel').isHidden(), true);
   await page.waitForTimeout(400);
@@ -443,9 +453,7 @@ test('hover timing, no activation, keep-open/edit/drag/busy guards and native er
   const { page, f } = ctx;
   await page.mouse.move(300, 300);
   await page.mouse.move(12, 30);
-  await page.waitForTimeout(150);
-  assert.equal(await page.locator('#panel').isHidden(), true);
-  await page.waitForTimeout(220);
+  await page.waitForTimeout(80);
   assert.equal(await page.locator('#panel').isVisible(), true);
   const messages = await page.evaluate(() => window.nativeMessages);
   assert.ok(messages.some((item) => item.action === 'expand' && item.keyboard === false));
@@ -464,6 +472,7 @@ test('hover timing, no activation, keep-open/edit/drag/busy guards and native er
   await page.waitForTimeout(500);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await page.locator('#keep-open').click();
+  await page.keyboard.press('Meta+f');
   await page.locator('#search').focus();
   await page.mouse.move(490, 660);
   await page.waitForTimeout(500);
@@ -546,7 +555,7 @@ test('column resizing captures pointer, bounds 100–280, resets and adapts to f
     appearance: { material: 'matte', liquidVariant: 'regular', fontOffset: 8 },
   });
   await page.setViewportSize({ width: 360, height: 640 });
-  await poll(page, () => document.body.dataset.layout === 'rows');
+  await poll(page, () => document.body.dataset.layout === 'matrix');
   const geometry = await page.evaluate(() => ({
     footer: document.querySelector('footer').getBoundingClientRect().bottom,
     panel: document.querySelector('#panel').getBoundingClientRect().bottom,
@@ -556,7 +565,7 @@ test('column resizing captures pointer, bounds 100–280, resets and adapts to f
   assert.ok(geometry.footer <= geometry.panel, JSON.stringify(geometry));
   assert.ok(geometry.width <= geometry.screen, JSON.stringify(geometry));
   assert.equal(f.data.preferences.modelColumnWidth, 136);
-  await shot(page, 'large-font-rows');
+  await shot(page, 'large-font-matrix');
   await cleanup(ctx);
 });
 
@@ -586,10 +595,12 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   );
   assert.equal((await page.locator('#handle').boundingBox()).height, 32);
   await shot(page, 'compact-top');
+  await page.keyboard.down('Alt');
   await page.mouse.move(10, 10);
   await page.mouse.down();
   await page.mouse.move(40, 10);
   await page.mouse.up();
+  await page.keyboard.up('Alt');
   const position = await page.evaluate(() =>
     window.nativeMessages.find((item) => item.action === 'position'),
   );
@@ -597,7 +608,7 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   assert.equal(await page.locator('#panel').isHidden(), true, 'Drag does not expand');
   await page.setViewportSize({ width: 480, height: 640 });
   await nativeEvent(page, { expanded: true, keyboard: true });
-  await page.waitForFunction(() => document.activeElement.id === 'search');
+  await page.waitForFunction(() => document.activeElement.id === 'fast');
   await menu(page, '设置菜单');
   await page.getByRole('menuitemradio', { name: '左侧', exact: true }).click();
   await page.waitForFunction(() => document.body.dataset.edge === 'left');
@@ -612,7 +623,8 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   assert.equal(await page.evaluate(() => window.nativeMessages.at(-1).action), 'hide');
   await cleanup(ctx);
   const fallback = await setup({ native: false, expand: false });
-  await fallback.page.locator('#handle').click();
+  await fallback.page.locator('#handle').focus();
+  await fallback.page.keyboard.press('Enter');
   assert.equal(await fallback.page.locator('#panel').isVisible(), true);
   await cleanup(fallback);
 });
@@ -657,10 +669,10 @@ test('physical notch reserves expanded header, never steals editor focus, and su
     compactHeight: 32,
     keyboard: true,
   });
-  await page.waitForFunction(() => document.activeElement.id === 'search');
+  await page.waitForFunction(() => document.activeElement.id === 'fast');
   const panel = await page.locator('#panel').boundingBox();
   assert.equal(panel.y, 32);
-  assert.equal(panel.height, 608);
+  assert.ok(panel.height < 320 && panel.height >= 144);
   await shot(page, 'top-notch-expanded');
   assert.equal(
     await page.evaluate(() => document.elementFromPoint(240, 16)?.closest('button') !== null),
@@ -699,6 +711,9 @@ test('busy and pointer capture block leave collapse; pointer cancellation discar
   f.delayApply = null;
   await page.waitForFunction(() => document.querySelector('#panel').hidden);
   await nativeEvent(page, { expanded: true });
+  await page
+    .locator('#panel')
+    .evaluate((n) => Promise.all(n.getAnimations().map((a) => a.finished)));
   const rect = await page.locator('#resize').boundingBox();
   await page.mouse.move(rect.x + 10, rect.y + 10);
   await page.mouse.down();
@@ -719,6 +734,7 @@ test('busy and pointer capture block leave collapse; pointer cancellation discar
 test('search matches preset names and full configurations as well as model labels', async () => {
   const ctx = await setup();
   const { page, f } = ctx;
+  await page.keyboard.press('Meta+f');
   const search = page.getByRole('searchbox', { name: '搜索模型或预设' });
   await search.fill('快速');
   assert.equal(await page.locator('.preset-chip').count(), 1);
@@ -738,99 +754,86 @@ test('search matches preset names and full configurations as well as model label
   await cleanup(ctx);
 });
 
-test('workbench appearance follows shared tokens, native transparency and content typography in all three materials', async () => {
+test('opaque black matrix remains independent of workbench material and system theme; typography still follows', async () => {
   const ctx = await setup();
   const { page, f } = ctx;
-  await page.locator('#search').fill('a');
-  await page.evaluate(() => {
-    window.appearanceInput = document.querySelector('#search');
-    window.appearanceCell = document.querySelector('.choices button');
-  });
-  for (const theme of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-    // A flat synthetic substrate verifies transparency; it does not imitate AppKit optics.
-    await page.evaluate((theme) => {
-      document.documentElement.style.background = theme === 'dark' ? '#343434' : '#e8e8e8';
-    }, theme);
+  for (const colorScheme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
     for (const material of ['matte', 'frosted', 'native-glass']) {
-      const nativeBackdrop = material !== 'matte';
       await nativeEvent(page, {
-        appearance: { material, liquidVariant: 'regular', fontOffset: 0 },
-        effectiveMaterial: material,
-        nativeBackdrop,
+        appearance: { material, liquidVariant: 'clear', fontOffset: 4 },
+        nativeBackdrop: true,
       });
-      const computed = await page.evaluate(() => {
-        const root = document.documentElement,
-          panel = document.querySelector('#panel');
-        const surface = getComputedStyle(panel),
-          tokens = getComputedStyle(root);
-        return {
-          material: root.dataset.material,
-          nativeBackdrop: root.dataset.nativeBackdrop,
-          background: surface.backgroundColor,
-          image: surface.backgroundImage,
-          blur: surface.backdropFilter,
-          border: surface.borderTopColor,
-          text: surface.color,
-          elevated: tokens.getPropertyValue('--buddy-elevated').trim(),
-          chrome: getComputedStyle(document.querySelector('header')).fontSize,
-          content: getComputedStyle(document.querySelector('.choices button')).fontSize,
-        };
-      });
-      assert.equal(computed.material, material);
-      assert.equal(computed.nativeBackdrop, String(nativeBackdrop));
       assert.equal(
-        computed.background,
-        nativeBackdrop
-          ? 'rgba(0, 0, 0, 0)'
-          : theme === 'dark'
-            ? 'rgb(43, 43, 43)'
-            : 'rgb(250, 250, 250)',
+        await page.locator('#panel').evaluate((n) => getComputedStyle(n).backgroundColor),
+        'rgb(0, 0, 0)',
       );
-      assert.equal(computed.text, theme === 'dark' ? 'rgb(243, 243, 243)' : 'rgb(32, 32, 32)');
-      assert.equal(computed.image, 'none');
-      assert.equal(computed.blur, 'none');
-      assert.equal(computed.chrome, '12px');
-      assert.equal(computed.content, '13px');
-      await shot(page, `appearance-${material}-${theme}`);
-      if (material === 'native-glass') {
-        await nativeEvent(page, {
-          appearance: { material, liquidVariant: 'clear', fontOffset: 0 },
-          nativeBackdrop: true,
-          effectiveMaterial: material,
-        });
-        assert.equal(await page.locator('html').getAttribute('data-liquid-variant'), 'clear');
-        await shot(page, `appearance-native-glass-clear-${theme}`);
-      }
+      assert.equal(
+        await page
+          .locator('.model-label strong')
+          .first()
+          .evaluate((n) => getComputedStyle(n).fontSize),
+        '17px',
+      );
+      assert.equal(
+        await page.locator('#panel').evaluate((n) => getComputedStyle(n).backdropFilter),
+        'none',
+      );
     }
   }
-  assert.equal(await page.locator('#search').inputValue(), 'a');
-  assert.equal(
-    await page.evaluate(
-      () =>
-        document.activeElement === window.appearanceInput &&
-        document.querySelector('.choices button') === window.appearanceCell,
-    ),
-    true,
-  );
-  await nativeEvent(page, {
-    appearance: { material: 'native-glass', liquidVariant: 'clear', fontOffset: 4 },
-    effectiveMaterial: 'matte',
-    nativeBackdrop: false,
-  });
-  const sizes = await page.evaluate(() => ({
-    chrome: getComputedStyle(document.querySelector('header')).fontSize,
-    content: getComputedStyle(document.querySelector('.choices button')).fontSize,
-    background: getComputedStyle(document.querySelector('#panel')).backgroundColor,
-  }));
-  assert.equal(sizes.chrome, '12px');
-  assert.equal(sizes.content, '17px');
-  assert.equal(sizes.background, 'rgb(43, 43, 43)');
-  assert.equal(
-    writes(f).length,
-    0,
-    'Appearance notifications never write model state or preferences',
-  );
+  assert.equal(writes(f).length, 0);
+  await shot(page, 'v2-black-matrix');
+  await cleanup(ctx);
+});
+
+test('native pointer entry is immediate, overrides DOM leave and respects suppression until real exit', async () => {
+  const ctx = await setup({ expand: false });
+  const { page, f } = ctx;
+  const pointer = (detail) =>
+    page.evaluate(
+      (detail) => window.dispatchEvent(new CustomEvent('model-control-pointer', { detail })),
+      detail,
+    );
+  await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await page.locator('#panel').dispatchEvent('pointerleave');
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
+  await page.waitForTimeout(250);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
+  await page.waitForTimeout(250);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await page.keyboard.press('Escape');
+  await pointer({ inside: true, buttons: 0, hoverSuppressed: true });
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
+  await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await pointer({ inside: false, buttons: 1, hoverSuppressed: false });
+  await page.waitForTimeout(520);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
+  await page.waitForTimeout(520);
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  assert.equal(writes(f).length, 0);
+  await cleanup(ctx);
+});
+
+test('no pins shows all models directly; compact content sizes and wide matrices never turn into cards', async () => {
+  const initial = fixture();
+  initial.preferences.pinned = [];
+  const ctx = await setup({ initial });
+  const { page } = ctx;
+  assert.equal(await page.locator('#pinned .model-row').count(), 4);
+  assert.equal(await page.locator('#others-toggle').isHidden(), true);
+  assert.ok((await page.locator('#panel').boundingBox()).height < 320);
+  await page.setViewportSize({ width: 320, height: 640 });
+  await nativeEvent(page, { appearance: { fontOffset: 11 } });
+  assert.equal(await page.locator('body').getAttribute('data-layout'), 'matrix');
+  assert.ok(await page.locator('#model-scroll').evaluate((n) => n.scrollWidth > n.clientWidth));
+  assert.equal(await page.locator('#matrix-head').isVisible(), true);
   await cleanup(ctx);
 });
 

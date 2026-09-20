@@ -14,7 +14,7 @@
 - [model-control-view.mjs](model-control-view.mjs)：控制条预设、矩阵、排序、列宽、读回状态及键盘交互的浏览器回归。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
 - [model-control-e2e.mjs](model-control-e2e.mjs)：真实 Rust HTTP/CDP 到合成官方菜单的链路、鉴权、完整回读及旧目标拒绝验收。
-- [model-control-native.mjs](model-control-native.mjs)：独立 NSPanel 的实际窗口尺寸、焦点、共享材质、租约退出与定位验收；不支持的系统输入事件明确记录跳过。
+- [model-control-native.mjs](model-control-native.mjs)：独立 NSPanel 的实际窗口尺寸、焦点、独立纯黑背景、内容高度、租约退出与定位验收；不支持的系统输入事件明确记录跳过。
 - [model-control-probe.swift](model-control-probe.swift)：仅操作指定合成原生面板的窗口、焦点和鼠标验收探针。
 
 - [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、显式保存及页面重载恢复；合成本机 API，不退出真实宿主。

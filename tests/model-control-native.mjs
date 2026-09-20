@@ -61,10 +61,15 @@ const report = {
   environment,
   checks: [],
   skipped: [
-    {
-      name: 'real mouse hover',
-      reason: 'Hover is exercised through DOM pointerenter; no native pointer move is performed',
-    },
+    ...(!environment.canPostEvents
+      ? [
+          {
+            name: 'real mouse hover',
+            reason:
+              'CGPreflightPostEventAccess=false; native pointer messages are tested synthetically',
+          },
+        ]
+      : []),
     {
       name: 'global shortcut dispatch and toggle',
       reason: 'Carbon registration is observed; real keyboard dispatch is not exercised',
@@ -95,12 +100,18 @@ const envelope = () => ({ preferences: prefs, snapshot, revision });
 function probePage() {
   let native = null,
     nativeEvents = 0,
+    keyboardActivations = 0,
     busy = false,
-    pointerDown = null;
+    pointerDown = null,
+    pointer = null;
   const errors = [];
   window.addEventListener('error', (event) => errors.push(event.message));
   window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
+  window.addEventListener('model-control-pointer', (event) => {
+    pointer = event.detail;
+  });
   window.addEventListener('model-control-native', (event) => {
+    if (event.detail.keyboard && !native?.keyboard) keyboardActivations++;
     native = event.detail;
     nativeEvents++;
   });
@@ -120,13 +131,16 @@ function probePage() {
         body: JSON.stringify({
           native,
           nativeEvents,
+          keyboardActivations,
           errors,
           pointerDown,
+          pointer,
+          background: getComputedStyle(document.getElementById('panel')).backgroundColor,
           hasFocus: document.hasFocus(),
           active: document.activeElement?.id,
           path: location.pathname,
           viewport: [innerWidth, innerHeight],
-          searchRect: document.getElementById('search')?.getBoundingClientRect().toJSON(),
+          searchRect: document.getElementById('menu-button')?.getBoundingClientRect().toJSON(),
         }),
       });
       for (const command of await response.json()) {
@@ -297,18 +311,28 @@ try {
   assert.equal(initial.kCGWindowBounds.Height, 80);
   check('initial reveal baseline is compact', initial.kCGWindowBounds);
 
-  await command(
-    "document.getElementById('handle').dispatchEvent(new PointerEvent('pointerenter'))",
-  );
-  await until(() => telemetry.native.expanded, '250ms hover expansion');
+  if (environment.canPostEvents) {
+    const bounds = windowInfo().kCGWindowBounds;
+    execFileSync(inputProbe, ['move', String(bounds.X + 16), String(bounds.Y + 40)]);
+  } else {
+    await command(
+      "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:true,buttons:0,hoverSuppressed:false}}))",
+    );
+  }
+  await until(() => telemetry.native.expanded, 'immediate pointer expansion');
   assert.equal(telemetry.native.keyboard, false);
   assert.equal(
     JSON.parse(execFileSync(inputProbe, ['state'], { encoding: 'utf8' })).frontmost,
     environment.frontmost,
   );
-  check('DOM hover expands without taking native keyboard or foreground app');
+  check(
+    environment.canPostEvents
+      ? 'real native hover expands without stealing focus'
+      : 'synthetic native pointer message expands without stealing focus',
+  );
   capture('expanded');
 
+  assert.equal(telemetry.native.keyboard, false);
   if (environment.canPostEvents) {
     const bounds = windowInfo().kCGWindowBounds,
       search = telemetry.searchRect;
@@ -318,9 +342,7 @@ try {
       String(bounds.Y + search.y + search.height / 2),
     ]);
   } else {
-    await command(
-      "document.getElementById('search').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))",
-    );
+    await command("document.getElementById('menu-button').click()");
   }
   await until(
     () => telemetry.native.keyboard && telemetry.hasFocus,
@@ -328,18 +350,20 @@ try {
   );
   check(
     environment.canPostEvents
-      ? 'real first click acquires key focus'
-      : 'synthetic pointerdown acquires key focus (event posting unavailable)',
+      ? 'real first menu click acquires key focus'
+      : 'synthetic menu click acquires key focus (real first click not verified)',
     { native: telemetry.native, pointerDown: telemetry.pointerDown, hasFocus: telemetry.hasFocus },
   );
-  const events = telemetry.nativeEvents;
+  const events = telemetry.keyboardActivations;
   await delay(2200);
   assert.equal(
-    telemetry.nativeEvents,
+    telemetry.keyboardActivations,
     events,
     'unchanged backend polling must not refocus the page',
   );
-  check('unchanged polls emit no repeated focus event', { nativeEvents: events });
+  check('unchanged polls do not repeatedly acquire keyboard focus', {
+    keyboardActivations: events,
+  });
 
   await ipc({ action: 'collapse' });
   await until(() => !telemetry.native.expanded && !telemetry.native.keyboard, 'collapse');
@@ -386,7 +410,7 @@ try {
   // Keep the screenshot subject open; collapse behavior is exercised above.
   await command("document.getElementById('keep-open').click()");
   await until(() => telemetry.native.keepOpen && prefs.keepOpen, 'pin material screenshots');
-  for (const [material, variant, style] of [
+  for (const [material, variant] of [
     ['matte', 'regular', null],
     ['frosted', 'regular', 'frosted-hud-active'],
     ['native-glass', 'regular', 'regular'],
@@ -400,22 +424,24 @@ try {
         telemetry.native.appearance.liquidVariant === variant,
       `native material ${material}/${variant}`,
     );
-    const fallback = material === 'native-glass' && !telemetry.native.nativeGlassAvailable;
-    assert.equal(telemetry.native.effectiveMaterial, fallback ? 'matte' : material);
-    assert.equal(telemetry.native.nativeBackdrop, !fallback && material !== 'matte');
-    assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
+    const fallback = false;
+    assert.equal(telemetry.native.effectiveMaterial, 'black');
+    assert.equal(telemetry.native.nativeBackdrop, false);
+    assert.equal(telemetry.native.backdropStyle, null);
     assert.equal(windowInfo().kCGWindowBounds.Width, 480);
     assert.deepEqual(
       telemetry.viewport,
-      [480, 640],
-      'switching AppKit carrier preserves full WebView viewport',
+      [480, windowInfo().kCGWindowBounds.Height],
+      'content-sized native frame and WebView stay aligned',
     );
     if (fallback)
       report.skipped.push({
         name: `native glass ${variant}`,
         reason: 'NSGlassEffectView unavailable; matte fallback was verified',
       });
-    check(`shared native material ${material}/${variant}`, telemetry.native);
+    assert.equal(telemetry.background, 'rgb(0, 0, 0)');
+    assert.ok(telemetry.viewport[1] < 320);
+    check(`independent black shell with workbench ${material}/${variant}`, telemetry.native);
     capture(`theme-${material}-${variant}`);
   }
   await command("location.href='https://example.invalid/blocked-navigation'");
