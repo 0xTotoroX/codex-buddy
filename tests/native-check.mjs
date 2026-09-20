@@ -2,6 +2,7 @@
  * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
  * [OUTPUT]: target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
  * [POS]: 原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
+ * 设置验收使用公共头部入口与实际设置区可见性，不依赖旧 activeTab。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { prepareTestBinary } from '../scripts/verify.mjs';
@@ -240,7 +241,8 @@ function probePage() {
           const body = document.querySelector(`[data-view-body="${cmd.pane}"]`);
           if (body) body.scrollTop = cmd.top;
         }
-        if (cmd.kind === 'tab') document.querySelector('button[data-view="settings"]')?.click();
+        if (cmd.kind === 'tab' && document.querySelector('.csw-workbench-settings')?.hidden)
+          document.querySelector('[data-workbench-settings]')?.click();
         if (cmd.kind === 'open') panel.setOpen(cmd.value);
         if (cmd.kind === 'viewport')
           window.__companionPopout.native({
@@ -670,7 +672,7 @@ try {
       await waitFor(() => telemetry.material === material, 'motion material not applied');
       if (genieOnly && warpChecks.length === 3 && telemetry.nativeGlassAvailable) {
         commands.push({ kind: 'tab' });
-        await waitFor(() => telemetry.activeTab === 'settings', 'settings not ready');
+        await waitFor(() => telemetry.workbench?.settings?.visible, 'settings not ready');
         commands.push({ kind: 'liquid-variant' });
         await waitFor(() => telemetry.nativeGlassStyle === 'clear', 'Clear mode missing');
       }
@@ -769,7 +771,7 @@ try {
     commands.push({ kind: 'material', value: 'matte' });
     commands.push({ kind: 'tab', value: 'settings' });
     await waitFor(
-      () => telemetry?.material === 'matte' && telemetry?.activeTab === 'settings',
+      () => telemetry?.material === 'matte' && telemetry?.workbench?.settings?.visible,
       'material controls',
     );
     if (telemetry.glassStyleButton) throw Error('Obsolete glass style control remains');
@@ -873,8 +875,8 @@ try {
         resized: telemetry.rect,
       });
     }
-    if (telemetry.headHeight !== 48 || telemetry.eyeBox !== 'border-box')
-      throw Error('WebKit capsule baseline differs from embedded layout');
+    if (telemetry.headHeight !== 54 || telemetry.eyeBox !== 'border-box')
+      throw Error('WebKit workbench header differs from the shared 54px layout');
     if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
     if (appearanceOnly) {
       writeFileSync(

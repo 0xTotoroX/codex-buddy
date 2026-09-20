@@ -1,5 +1,5 @@
 // [INPUT]: scripts/build-panel.mjs、ui/panel ES modules 与 ui/bridge/requests.js。
-// [OUTPUT]: 校验 macOS arm64 目标，生成 OUT_DIR/panel.js 供 cdp.rs 内嵌。
+// [OUTPUT]: 校验 macOS arm64 目标，生成 OUT_DIR/panel.js；模型控制资源变化触发 Cargo 重新内嵌。
 // [POS]: Cargo 构建入口，调用项目已安装的 Node/esbuild 解析显式依赖。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -13,6 +13,7 @@ fn main() {
     );
     for path in [
         "ui/panel",
+        "ui/model-control",
         "ui/tokens.css",
         "ui/bridge/requests.js",
         "scripts/build-panel.mjs",

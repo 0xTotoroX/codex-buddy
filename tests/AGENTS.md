@@ -6,7 +6,16 @@
 
 窗口交接回归：popout-checks 区分 ready / presented，检查隐藏面板的有效回程坐标、胶囊出发的慢双击和收回状态还原、阅读接续、过期内容拒绝、快速反向切换和减少动态效果；native-check 通过 native-probe 采样指定测试进程主窗口的实际位置/尺寸/透明度，验证呈现确认、首个可见帧的来源尺寸和连续展开中间帧、三材质返回取消与退出，追加 --cross-screen 使用实际连接的第二块屏幕，--reverse-screens 交换起终屏幕，检查首帧和终点的屏幕坐标；采样本身无需截图。测试数值不能代替真实宿主的视觉体验验收。
 
+模型控制条使用独立合成宿主与本机 API 验收；不读取真实聊天、不调用模型，也不修改官方应用配置。宿主适配和网页行为纳入 verify，原生窗口单独检查焦点与鼠标。
+
 成员清单：
+
+- [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、菜单切换与完整回读、迟到/生成/部分失败及清理的合成宿主回归。
+- [model-control-view.mjs](model-control-view.mjs)：控制条预设、矩阵、排序、列宽、读回状态及键盘交互的浏览器回归。
+- [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
+- [model-control-e2e.mjs](model-control-e2e.mjs)：真实 Rust HTTP/CDP 到合成官方菜单的链路、鉴权、完整回读及旧目标拒绝验收。
+- [model-control-native.mjs](model-control-native.mjs)：独立 NSPanel 的实际窗口尺寸、焦点、共享材质、租约退出与定位验收；不支持的系统输入事件明确记录跳过。
+- [model-control-probe.swift](model-control-probe.swift)：仅操作指定合成原生面板的窗口、焦点和鼠标验收探针。
 
 - [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、显式保存及页面重载恢复；合成本机 API，不退出真实宿主。
 
@@ -29,7 +38,7 @@
 - [e2e.mjs](e2e.mjs)：端到端测试入口；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
 - [popout-checks.mjs](popout-checks.mjs)：端到端测试的弹出窗口子流程；检查三材质单入口与双向保存、投影、宿主强调色动态同步及回退、收回、受限操作、隐藏像素、表面偏色、哑光/磨砂的单层圆角浅阴影，以及宿主 reset 有无变化时的公共几何、内边距和字体。
 - [lifecycle-test.mjs](lifecycle-test.mjs)：进程生命周期测试入口，不使用真实聊天数据；验证启动器在不支持浮窗时保留内嵌、其他错误仍提示，以及旧默认目录迁移、安装、服务复用、升级、回滚和模型请求取消；报告写入 target/reports/lifecycle.json。 正式程序冷启动覆盖旧胶囊配置、工作台开合意图与独立宽度/比例。
-- [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×46 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 主题及宿主强调色、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；完整检查需屏幕录制权限，`--appearance-only` 可免截图检查主题、材质能力、点击三材质按钮后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。
+- [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×46 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 主题及宿主强调色、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；完整检查需屏幕录制权限，`--appearance-only` 可免截图检查主题、材质能力、通过公共头部进入设置并切换三材质后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。
 - [native-backdrop.test.mjs](native-backdrop.test.mjs)：暂停动画帧时仍发送原生材质与收放状态通知，背景不覆盖系统明暗；系统切换单独走 IPC 并防止重复请求，且不重复发送未变状态；并发尺寸请求保留最后展开尺寸；旧样式迁入新材质后不覆盖后续选择。
 
 - [dev-host.test.mjs](dev-host.test.mjs)：真实目标筛选、安装版连接恢复与配置/存储隔离；覆盖开发配置优先与首次继承日常策略、Dev 无连接准备/取消/复用及显式目标保护、无宿主启动不触发旧恢复、错误透传和失效旧目标保留归档；只使用合成本机服务。

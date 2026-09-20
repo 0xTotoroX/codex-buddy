@@ -100,6 +100,14 @@ export function generateNotices(directory = join(root, 'dist/licenses')) {
     source: 'https://ui.shadcn.com/r/styles/new-york-v4',
     directory: join(root, 'ui/settings/components/ui'),
   });
+  components.push({
+    ecosystem: 'source',
+    name: 'model-deck host adapter',
+    version: '0.3.9',
+    license: 'MIT',
+    source: 'https://github.com/0xTotoroX/model-deck',
+    directory: join(root, 'ui/model-control'),
+  });
   components.sort(
     (a, b) =>
       a.ecosystem.localeCompare(b.ecosystem) ||

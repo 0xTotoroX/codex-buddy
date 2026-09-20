@@ -11,7 +11,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 独立的 Rust + TypeScript 桌面浮窗与网页配置工具。维护资料统一放在维护者的 Obsidian 项目目录；本机通过 `git config --local buddy.docsPath` 定位，构建、测试和分发不读取该目录。
 
 - 材质统一为哑光、磨砂、液态（内部标识保留 native-glass）。内嵌哑光/磨砂使用 CSS；哑光共用样式，磨砂用中性染色与均匀模糊近似弹出 HUDWindow。正式与开发构建的内嵌液态共用自有 SVG 边缘折射，无页面采集或额外渲染依赖；采用 B 版凸面透镜，Regular/Clear 共用几何与动效，通过独立星星切换共享 liquidVariant；A/B 对比入口已移除。弹出哑光关闭原生背景，磨砂使用 NSVisualEffectView HUDWindow + BehindWindow + Active，保持激活外观；液态使用 NSGlassEffectView，始终展开，由 liquidVariant 选择 Regular / Clear（默认 Regular），由 AppKit 跟随系统 Liquid Glass 偏好及焦点，不提供独立通透度条或 glassStyle。网页表面用阴影与反光定位；内嵌液态两变体共用阴影和内侧反光；原生液态自身光学边缘由 AppKit 绘制，不叠加网页定位层；弹出哑光与原生磨砂仅保留一层圆角浅阴影，范围限于窗口透明留白。保留圆角外溢裁切。macOS 26 以下仅弹出液态回退哑光，传统磨砂与内嵌 SVG 液态仍可用。保留已有材质偏好与历史迁移。
-- 胶囊继续使用原生 CSS，styles/ 按变量、布局、内容、控件、材质、动画分层；native.css 只处理原生覆盖。Web 设置页使用 Tailwind CSS v4 与本地 shadcn/ui 基础组件；工具类及 Preflight 仅进入设置页构建。ui/tokens.css 共享语义色和通用尺寸，两种界面不共享 reset。
+- 胶囊继续使用原生 CSS，styles/ 按变量、布局、内容、控件、材质、动画分层；native.css 只处理原生覆盖。Web 设置页使用 Tailwind CSS v4 与本地 shadcn/ui 基础组件；工具类及 Preflight 仅进入设置页构建。ui/tokens.css 共享语义色和通用尺寸，各界面不共享 reset。模型控制条只读继承三种材质、Regular/Clear 与字号，使用相同图标和中性控件，不另设主题系统。
 - `npm run install:dev` 生成独立 CodexBuddy Dev.app，绑定当前源码与 Node 路径，双击后台运行开发流程，输出写入 target/dev/launcher.log；冷启动无连接时读取开发配置 hostRestartPolicy，开发配置尚不存在时回退日常配置，经当前源码 CLI 的 launch --host-only --restart-running 准备宿主，不启动安装版后台或写回其配置；重复启动唤起现有工作台，断连只尝试重连原目标；启动期间显示 Dock 图标，AppKit 协作交接焦点后退出入口。后台会话通过 npm run dev:stop 正常退出，前台 npm run dev 仍使用 Ctrl+C，不更新日常安装。移动源码或 Node 后重新生成入口。
 - `npm run dev` 只连接已开启调试端口的真实 Codex，默认内嵌；开发配置在 target/dev/real，首次复制日常模型配置并采用手动生成，不写回日常配置。占用同一窗口的安装版连接会暂停，退出后恢复；不重启或另开 ChatGPT。CSS 原位更新，胶囊逻辑清理后重新加载，Rust 编译成功后重启开发后台；release 忽略开发资源环境变量。示例宿主和模拟数据仅用于 tests 下的自动测试。
 - 应用最低目标为 macOS 14.0+ Apple Silicon；桌面弹出功能由后台单独检测 macOS 15.0+ Apple Silicon。不满足弹出条件时禁用界面入口、拒绝弹出请求及窗口子进程启动，并跳过旧弹出偏好的自动恢复，内嵌面板仍可使用。Windows 暂不适配，其他平台不宣称已支持。最低版本与实测版本分开记录。
@@ -43,6 +43,8 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 - 升版时同步 Cargo/npm 包版本与锁文件中的本项目版本；公开发布时，`vX.Y.Z` 标签、发布说明和产物版本必须对应。已发布版本不替换内容，修正通过新版本发布。
 - DMG 安装包和 Homebrew 一键安装延后实现；当前继续源码安装，不把现有轻量启动器描述为可独立分发的完整安装包。
 
+模型控制条独立于大纲/下一步工作台：设置页或 `codex-buddy model-control` 开启，默认右侧贴边，支持左侧与顶部物理刘海/普通顶部回退；首次启用后保存启动偏好。只控制已连接且能唯一识别的输入目标，工作台阅读锁定不改变它。模型能力来自关联的官方 model/list，与菜单可见选项匹配；未知时等待，不硬编码模型或自动重启宿主。菜单操作串行执行并回读，生成中拒绝切换、不排队；部分失败显示实际状态，不宣称原子回滚。预设与边缘位置独立保存在 model-control.json，后台退出时控制窗随租约结束。复用原有图标，模型控制不进入建议生成 model.rs。
+
 ## 架构地图（L1）
 
 开发材质对照：`npm run dev:materials` 打开独立 AppKit 窗口，同步比较 14 种传统原生材质的背景、明暗及焦点效果；仅用于选材，不替代真实 Codex 调试，不扩展产品三材质菜单。Swift 工具不连接宿主、不修改系统外观或产品偏好，构建产物位于 `target/material-preview/`。
@@ -52,6 +54,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + Tailwind CSS v4/shadcn/ui 设置页。
 
 - [src/AGENTS.md](src/AGENTS.md)：命令、后台、CDP、模型和系统窗口；macOS 手势内联于 `src/panel_window.rs`。
+- [ui/model-control/AGENTS.md](ui/model-control/AGENTS.md)：模型能力和官方菜单适配、独立控制条网页；不改变工作台布局或阅读来源。
 - [ui/bridge/AGENTS.md](ui/bridge/AGENTS.md)：受限 CDP binding 与请求生命周期。
 - [ui/panel/AGENTS.md](ui/panel/AGENTS.md)：共享胶囊；core 外壳、host 宿主适配、runtime 协调、stepwise.js 建议、outline.js 大纲、popout 窗口页面；静态依赖无环。
 - `components.json`：shadcn/ui 的设置页路径与组件别名配置。

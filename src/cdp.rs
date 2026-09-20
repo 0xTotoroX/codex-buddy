@@ -1,5 +1,5 @@
 // [INPUT]: 本机 CDP 端点、WebSocket、assets 胶囊脚本与受限 binding。
-// [OUTPUT]: 目标发现、Client 请求/事件/注入及开发实例归属检查。
+// [OUTPUT]: 目标发现、Client 请求/事件/注入及开发实例归属检查；独立模型适配器的文档生命周期与有界执行。
 // [POS]: 宿主连接基础层，被 state.rs 和 requests.rs 使用。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -81,6 +81,7 @@ pub struct Client {
     closed: Arc<AtomicBool>,
     events: Mutex<Option<mpsc::Receiver<Value>>>,
     script_id: Mutex<Option<String>>,
+    model_control_script_id: Mutex<Option<String>>,
     dev_revision: Mutex<String>,
     desktop_installed: AtomicBool,
 }
@@ -113,6 +114,7 @@ impl Client {
             closed: closed.clone(),
             events: Mutex::new(Some(events_rx)),
             script_id: Mutex::new(None),
+            model_control_script_id: Mutex::new(None),
             dev_revision: Mutex::new(String::new()),
             desktop_installed: AtomicBool::new(false),
         });
@@ -154,6 +156,16 @@ impl Client {
     }
 
     pub async fn request(&self, method: &str, params: Value) -> Result<Value> {
+        self.request_with_timeout(method, params, Duration::from_secs(5))
+            .await
+    }
+
+    async fn request_with_timeout(
+        &self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+    ) -> Result<Value> {
         if self.is_closed() {
             bail!("Codex 连接已关闭");
         }
@@ -171,7 +183,7 @@ impl Client {
             self.pending.lock().await.remove(&id);
             bail!("Codex 连接已关闭");
         }
-        let result = tokio::time::timeout(Duration::from_secs(5), receiver).await;
+        let result = tokio::time::timeout(timeout, receiver).await;
         self.pending.lock().await.remove(&id);
         result
             .context("Codex 页面响应超时")?
@@ -180,10 +192,20 @@ impl Client {
     }
 
     pub async fn evaluate(&self, expression: String) -> Result<Value> {
+        self.evaluate_with_timeout(expression, Duration::from_secs(5))
+            .await
+    }
+
+    pub async fn evaluate_with_timeout(
+        &self,
+        expression: String,
+        timeout: Duration,
+    ) -> Result<Value> {
         let result = self
-            .request(
+            .request_with_timeout(
                 "Runtime.evaluate",
                 json!({"expression":expression,"returnByValue":true,"awaitPromise":true}),
+                timeout,
             )
             .await?;
         if result.get("exceptionDetails").is_some() {
@@ -243,6 +265,16 @@ impl Client {
         }
         self.request("Runtime.enable", json!({})).await?;
         self.request("Page.enable", json!({})).await?;
+        let model_script = include_str!("../ui/model-control/host.js");
+        let installed_model = self
+            .request(
+                "Page.addScriptToEvaluateOnNewDocument",
+                json!({"source":model_script}),
+            )
+            .await?;
+        *self.model_control_script_id.lock().await =
+            installed_model["identifier"].as_str().map(str::to_owned);
+        self.evaluate(model_script.into()).await?;
         self.request(
             "Runtime.addBinding",
             json!({"name":"__companionHostRequest"}),
@@ -269,6 +301,17 @@ impl Client {
 
     pub async fn close(&self) {
         if !self.is_closed() {
+            if let Some(identifier) = self.model_control_script_id.lock().await.take() {
+                let _ = self
+                    .evaluate("window.__codexBuddyModelControl?.dispose(); true".into())
+                    .await;
+                let _ = self
+                    .request(
+                        "Page.removeScriptToEvaluateOnNewDocument",
+                        json!({"identifier":identifier}),
+                    )
+                    .await;
+            }
             if let Some(identifier) = self.script_id.lock().await.take() {
                 let _ = self
                     .request(

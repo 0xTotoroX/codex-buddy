@@ -205,6 +205,26 @@ function App() {
             让浮窗按你的习惯工作。
           </h1>
         </div>
+        <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3">
+          <div>
+            <div className="text-sm font-medium">模型快切</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              从屏幕边缘切换当前聊天的模型、推理强度和速度。
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            disabled={!live || Boolean(busy)}
+            onClick={() =>
+              run('model-control', async () => {
+                await request('model-control/open', {});
+                notify('模型控制条已打开');
+              })
+            }
+          >
+            打开控制条
+          </Button>
+        </div>
         {error && (
           <div
             className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"

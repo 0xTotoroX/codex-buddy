@@ -1,6 +1,6 @@
 // [INPUT]: CDP Client、Config、Model 与胶囊状态摘要。
 // [OUTPUT]: App、View、连接与无正文胶囊状态；退出信号取消模型请求，开发模式锁定启动窗口。
-// [POS]: 后台业务状态层，为 server、requests 与 panel 提供一致状态。
+// [POS]: 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -66,6 +66,7 @@ pub struct App {
     pub closing: watch::Sender<bool>,
     pub paths: Paths,
     pub(crate) panel: Mutex<crate::panel::Panel>,
+    pub(crate) model_control: Mutex<crate::model_control::Control>,
     pub(crate) model: RwLock<Model>,
     pub(crate) config: Mutex<Config>,
     pub(crate) settings_revision: std::sync::atomic::AtomicU64,
@@ -115,6 +116,7 @@ impl App {
             shutdown: Notify::new(),
             closing: watch::channel(false).0,
             panel: Mutex::new(crate::panel::Panel::load(&paths, allow_fixture)),
+            model_control: Mutex::new(crate::model_control::Control::load(&paths)),
             paths,
             desired: RwLock::new(desired),
             model: RwLock::new(model),
@@ -151,6 +153,7 @@ impl App {
             loop {
                 interval.tick().await;
                 self.supervise_panel().await;
+                self.supervise_model_control().await;
                 let prefs = self.appearance().await;
                 self.views.send_if_modified(|view| {
                     if view.panel_preferences == prefs {

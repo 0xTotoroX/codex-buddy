@@ -1,0 +1,873 @@
+/*
+ * [INPUT]: Playwright Chromium、仅合成的 model-control API 与原生事件。
+ * [OUTPUT]: 独立视图行为验收、JSON 结果与 target/reports/model-control 截图。
+ * [POS]: 不启动宿主、不调用 CDP 或模型；静态路由与父服务约定相同。
+ * [PROTOCOL]: 由父任务接入统一验证及地图；独立运行 node tests/model-control-view.mjs。
+ */
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { chromium } from 'playwright';
+
+const root = resolve(import.meta.dirname, '..');
+const output = resolve(root, 'target/reports/model-control');
+mkdirSync(output, { recursive: true });
+const origin = 'http://127.0.0.1:47991';
+const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const browser = await chromium.launch({
+  executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),
+  headless: true,
+});
+const results = [];
+const cases = [];
+const test = (name, run) => cases.push({ name, run });
+const copy = (value) => structuredClone(value);
+const selection = (model = 'alpha', reasoning = 'high', speed = 'standard') => ({
+  model,
+  reasoning,
+  speed,
+});
+function fixture() {
+  return {
+    snapshot: {
+      target: { id: 'task-a', title: '合成任务 · 模型控制界面验收' },
+      revision: 'source-1',
+      status: 'ready',
+      message: '',
+      current: selection(),
+      models: [
+        { id: 'alpha', label: 'Alpha', reasoning: ['low', 'medium', 'high'], fast: true },
+        { id: 'beta', label: 'Beta', reasoning: ['medium', 'high'], fast: false },
+        { id: 'gamma', label: 'Gamma', reasoning: ['low', 'high'], fast: true },
+        { id: 'delta', label: 'Delta', reasoning: ['high'], fast: true },
+      ],
+      generating: false,
+    },
+    preferences: {
+      edge: 'right',
+      position: 0.5,
+      screen: '',
+      keepOpen: false,
+      modelColumnWidth: 144,
+      pinned: ['alpha', 'beta'],
+      presets: [
+        { id: 'p1', name: '日常', selection: selection() },
+        { id: 'p2', name: '快速', selection: selection('gamma', 'low', 'fast') },
+        { id: 'bad', name: '不可用 Fast', selection: selection('beta', 'high', 'fast') },
+      ],
+    },
+    revision: 1,
+  };
+}
+async function setup({
+  initial = fixture(),
+  native = true,
+  viewport = { width: 480, height: 640 },
+  expand = true,
+  auth = true,
+} = {}) {
+  const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
+  page.setDefaultTimeout(6000);
+  const f = {
+    data: copy(initial),
+    requests: [],
+    unexpected: [],
+    errors: [],
+    preferenceConflict: false,
+    applyResult: 'success',
+    delayApply: null,
+    delayState: null,
+    stateError: false,
+  };
+  page.on('pageerror', (error) => f.errors.push(error.message));
+  await page.addInitScript(
+    ({ native }) => {
+      window.nativeMessages = [];
+      if (native)
+        window.ipc = {
+          postMessage(raw) {
+            const message = JSON.parse(raw);
+            window.nativeMessages.push(message);
+            if (
+              message.action === 'expand' ||
+              message.action === 'collapse' ||
+              message.action === 'edge'
+            )
+              window.dispatchEvent(
+                new CustomEvent('model-control-native', {
+                  detail: {
+                    ...(message.action === 'edge' ? {} : { expanded: message.action === 'expand' }),
+                    edge: message.edge || document.body.dataset.edge,
+                    ...(message.action === 'expand' ? { keyboard: message.keyboard } : {}),
+                  },
+                }),
+              );
+          },
+        };
+    },
+    { native },
+  );
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    if (url.origin !== origin) {
+      f.unexpected.push(request.url());
+      return route.abort();
+    }
+    if (path.startsWith('/api/model-control/')) {
+      const operation = path.split('/').at(-1),
+        payload = request.postDataJSON();
+      f.requests.push({ operation, method: request.method(), payload, headers: request.headers() });
+      if (
+        request.headers().authorization !== 'Bearer synthetic-token' ||
+        request.headers()['x-model-control-lease'] !== 'synthetic-lease'
+      )
+        return route.fulfill({ status: 401, json: { message: '未授权' } });
+      if (operation === 'state') {
+        const data = copy(f.data);
+        const barrier = f.delayState;
+        if (barrier) {
+          f.delayState = null;
+          await barrier;
+        }
+        if (f.stateError) return route.fulfill({ status: 503, json: { message: '合成断连' } });
+        return route.fulfill({ json: data });
+      }
+      if (operation === 'refresh') return route.fulfill({ json: f.data });
+      if (operation === 'preferences') {
+        if (f.preferenceConflict || payload.revision !== f.data.revision) {
+          f.preferenceConflict = false;
+          return route.fulfill({ status: 409, json: { message: 'stale preference revision' } });
+        }
+        Object.assign(f.data.preferences, payload.patch);
+        f.data.revision++;
+        return route.fulfill({ json: f.data });
+      }
+      if (operation === 'apply') {
+        if (f.delayApply) await f.delayApply;
+        if (f.failApply) return route.fulfill({ status: 409, json: { message: '目标已变化' } });
+        const previous = copy(f.data.snapshot.current);
+        if (f.applyResult === 'success') f.data.snapshot.current = copy(payload.selection);
+        if (f.applyResult === 'partial')
+          f.data.snapshot.current = { ...payload.selection, speed: 'standard' };
+        f.data.snapshot.revision = `${f.data.snapshot.revision}-applied`;
+        return route.fulfill({
+          json: {
+            ...f.data,
+            result: {
+              status: f.applyResult,
+              message: '合成回读',
+              previous,
+              snapshot: copy(f.data.snapshot),
+            },
+          },
+        });
+      }
+      if (operation === 'close') return route.fulfill({ json: { ok: true } });
+      f.unexpected.push(path);
+      return route.abort();
+    }
+    const file =
+      path === '/model-control'
+        ? 'ui/model-control/index.html'
+        : path === '/model-control/tokens.css'
+          ? 'ui/tokens.css'
+          : path === '/model-control/icons.js'
+            ? 'ui/panel/icons/index.js'
+            : ['app.js', 'view.js', 'styles.css'].some((name) => path === `/model-control/${name}`)
+              ? `ui${path}`
+              : null;
+    if (!file) {
+      f.unexpected.push(path);
+      return route.abort();
+    }
+    await route.fulfill({
+      contentType: path.endsWith('.css')
+        ? 'text/css'
+        : path.endsWith('.js')
+          ? 'text/javascript'
+          : 'text/html',
+      body: readFileSync(resolve(root, file), 'utf8'),
+    });
+  });
+  await page.goto(
+    `${origin}/model-control${auth ? '#token=synthetic-token&lease=synthetic-lease' : ''}`,
+  );
+  if (auth)
+    await page.waitForFunction(() =>
+      document.querySelector('#actual').textContent.includes('Alpha'),
+    );
+  if (expand) await nativeEvent(page, { expanded: true, edge: 'right', keyboard: false });
+  await page.mouse.move(470, 20);
+  return { page, f };
+}
+async function nativeEvent(page, detail) {
+  await page.evaluate(
+    (detail) => window.dispatchEvent(new CustomEvent('model-control-native', { detail })),
+    detail,
+  );
+}
+const applies = (f) => f.requests.filter((item) => item.operation === 'apply');
+const writes = (f) => f.requests.filter((item) => item.method === 'POST');
+const modelButton = (page, model, reasoning) =>
+  page.locator(`.choices button[data-model="${model}"][data-reasoning="${reasoning}"]`);
+async function poll(page, condition) {
+  await page.waitForFunction(condition, null, { timeout: 6000 });
+}
+async function cleanup({ page, f }) {
+  assert.deepEqual(f.unexpected, [], 'No host/network requests outside the synthetic API');
+  assert.deepEqual(f.errors, [], 'No browser errors');
+  await page.close();
+}
+async function shot(page, name) {
+  await page.screenshot({ path: resolve(output, `${name}.png`) });
+}
+async function menu(page, name) {
+  await page.getByRole('button', { name, exact: true }).click();
+}
+
+// Contract and rendering checks use actual DOM, not implementation-shaped unit assertions.
+test('authenticated passive polling preserves focus, search, hover, scroll and menus', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  await page.locator('#search').fill('a');
+  await page
+    .locator('#search')
+    .evaluate((node) => node.setSelectionRange?.(1, 1))
+    .catch(() => {});
+  await page.evaluate(() => {
+    window.savedInput = document.querySelector('#search');
+    window.savedCell = document.querySelector('.choices button');
+  });
+  await page.waitForTimeout(1450);
+  assert.equal(await page.locator('#search').inputValue(), 'a');
+  assert.equal(await page.evaluate(() => document.activeElement === window.savedInput), true);
+  assert.equal(
+    await page.evaluate(() => document.querySelector('.choices button') === window.savedCell),
+    true,
+  );
+  assert.equal(await page.locator('#menu').isHidden(), true);
+  assert.equal(writes(f).length, 0);
+  assert.ok(f.requests.filter((item) => item.operation === 'state').length >= 2);
+  assert.equal(new URL(page.url()).hash, '');
+  await page.locator('#search').fill('');
+  await menu(page, '设置菜单');
+  await page.waitForTimeout(1350);
+  assert.equal(await page.locator('#menu').isVisible(), true);
+  await page.keyboard.press('Escape');
+  await page.locator('[data-key="p1"]').hover();
+  await page.waitForTimeout(1350);
+  assert.match(await page.locator('#preview').innerText(), /Alpha.*high.*Standard/);
+  assert.equal(
+    await page.locator('[data-key="p1"]').evaluate((node) => node.matches(':hover')),
+    true,
+  );
+  await shot(page, 'expanded-matrix');
+  await menu(page, '刷新可用模型');
+  await poll(page, () => document.querySelector('#notice').textContent.includes('已刷新'));
+  assert.deepEqual(f.requests.find((item) => item.operation === 'refresh').payload, {});
+  await cleanup(ctx);
+});
+
+test('frozen apply, double-click guard, actual-only result and explicit same-target restore', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  let release;
+  f.delayApply = new Promise((resolve) => {
+    release = resolve;
+  });
+  await modelButton(page, 'alpha', 'low').click();
+  await page.waitForTimeout(100);
+  assert.match(await page.locator('#actual').innerText(), /high/);
+  assert.equal(await modelButton(page, 'alpha', 'high').isDisabled(), true);
+  assert.equal(await page.locator('#save').isDisabled(), true);
+  assert.equal(applies(f).length, 1);
+  assert.deepEqual(applies(f)[0].payload, {
+    target: { id: 'task-a', title: '合成任务 · 模型控制界面验收' },
+    expectedRevision: 'source-1',
+    selection: selection('alpha', 'low'),
+  });
+  release();
+  f.delayApply = null;
+  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  assert.equal(await page.locator('#undo').isVisible(), true);
+  assert.equal(applies(f).length, 1, 'No automatic rollback');
+  await page.locator('#undo').click();
+  await poll(page, () => document.querySelector('#actual').textContent.includes('high'));
+  assert.equal(applies(f).length, 2);
+  assert.equal(applies(f)[1].payload.expectedRevision, 'source-1-applied');
+  await modelButton(page, 'alpha', 'low').click();
+  await poll(page, () => document.querySelector('#undo').hidden === false);
+  f.data.snapshot.target = { id: 'task-b', title: '另一合成任务' };
+  f.data.snapshot.revision = 'other-target';
+  await poll(page, () => document.querySelector('#target').textContent === '另一合成任务');
+  assert.equal(await page.locator('#undo').isHidden(), true);
+  await cleanup(ctx);
+});
+
+test('partial and failed applies show service actual state without optimistic or automatic writes', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  f.applyResult = 'partial';
+  await menu(page, '应用预设 快速');
+  await poll(page, () => document.querySelector('#notice').textContent.includes('部分'));
+  assert.match(await page.locator('#actual').innerText(), /Gamma.*low.*Standard/);
+  assert.equal(applies(f).length, 1);
+  await shot(page, 'partial-result');
+  f.applyResult = 'failed';
+  await modelButton(page, 'alpha', 'high').click();
+  await poll(page, () => document.querySelector('#notice').textContent.includes('未成功'));
+  assert.match(await page.locator('#actual').innerText(), /Gamma.*low.*Standard/);
+  assert.equal(applies(f).length, 2);
+  f.failApply = true;
+  await modelButton(page, 'alpha', 'high').click();
+  await poll(page, () => document.querySelector('#notice').textContent.includes('未确认'));
+  assert.equal(applies(f).length, 3);
+  await cleanup(ctx);
+});
+
+test('all nonready/generating sources disable writes; presets prevalidate full tuple', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  for (const status of ['unavailable', 'waiting', 'busy', 'conflict']) {
+    f.data.snapshot.status = status;
+    await page.waitForFunction((status) => document.body.dataset.status === status, status);
+    assert.equal(await modelButton(page, 'alpha', 'low').isDisabled(), true, status);
+    assert.equal(
+      await page.getByRole('button', { name: '应用预设 日常', exact: true }).isDisabled(),
+      true,
+    );
+    assert.equal(await page.locator('#save').isDisabled(), true);
+  }
+  f.data.snapshot.status = 'ready';
+  f.data.snapshot.generating = true;
+  await poll(page, () => document.querySelector('#status').textContent.includes('正在生成'));
+  assert.equal(await page.locator('[data-speed="fast"]').isDisabled(), true);
+  await shot(page, 'waiting-generation');
+  f.data.snapshot.generating = false;
+  await poll(page, () => !document.querySelector('#save').disabled);
+  assert.equal(
+    await page.getByRole('button', { name: '应用预设 不可用 Fast', exact: true }).isDisabled(),
+    true,
+  );
+  await page.locator('#search').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('3');
+  assert.equal(applies(f).length, 0);
+  assert.equal(writes(f).length, 0);
+  await cleanup(ctx);
+});
+
+test('unsupported manual Fast explicitly previews Standard before selection; unpinned actual remains visible', async () => {
+  const initial = fixture();
+  initial.snapshot.current = selection('alpha', 'high', 'fast');
+  initial.preferences.pinned = ['beta'];
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  assert.equal(await modelButton(page, 'alpha', 'high').isVisible(), true);
+  assert.match(await page.locator('#pinned').innerText(), /当前 · 未固定/);
+  const target = modelButton(page, 'beta', 'medium');
+  assert.match(await target.getAttribute('title'), /不支持 Fast.*Standard/);
+  assert.match(await target.getAttribute('aria-label'), /Standard/);
+  await target.click();
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Beta'));
+  assert.equal(applies(f)[0].payload.selection.speed, 'standard');
+  assert.equal(await page.locator('[data-speed="fast"]').isDisabled(), true);
+  await cleanup(ctx);
+});
+
+test('preferences conflict refreshes once without overwrite; save only frozen confirmed state', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  await page.locator('#save').click();
+  await page.locator('#preset-name').fill('确认配置');
+  f.data.snapshot.current = selection('alpha', 'low');
+  f.data.snapshot.revision = 'source-new';
+  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  assert.equal(await page.locator('#editor-submit').isDisabled(), true);
+  assert.equal(await page.locator('#preset-name').inputValue(), '确认配置');
+  assert.equal(
+    await page.locator('#preset-name').evaluate((node) => node === document.activeElement),
+    true,
+  );
+  await page.locator('#editor-cancel').click();
+  await page.locator('#save').click();
+  await page.locator('#preset-name').fill('确认配置');
+  await page.locator('#editor-submit').click();
+  await poll(page, () => document.querySelector('#editor').hidden);
+  assert.deepEqual(f.data.preferences.presets.at(-1).selection, selection('alpha', 'low'));
+  const before = copy(f.data.preferences.presets);
+  await menu(page, '预设 日常 菜单');
+  await page.getByRole('menuitem', { name: '重命名', exact: true }).click();
+  await page.locator('#preset-name').fill('不应覆盖');
+  f.data.preferences.presets[0].name = '其他窗口已改名';
+  f.data.revision++;
+  await page.locator('#editor-submit').click();
+  await poll(page, () => document.querySelector('#notice').textContent.includes('未覆盖'));
+  assert.equal(f.data.preferences.presets[0].name, '其他窗口已改名');
+  assert.equal(f.data.preferences.presets.length, before.length);
+  assert.equal(f.requests.filter((item) => item.operation === 'preferences').length, 2);
+  const patches = f.requests
+    .filter((item) => item.operation === 'preferences')
+    .map((item) => Object.keys(item.payload.patch));
+  assert.deepEqual(patches, [['presets'], ['presets']]);
+  await cleanup(ctx);
+});
+
+test('keyboard preset shortcuts only during keyboard operation; Escape closes menu then panel and rearms on leave', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  await page.keyboard.press('2');
+  assert.equal(applies(f).length, 0);
+  await menu(page, '设置菜单');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#menu').isHidden(), true);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('2');
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Gamma'));
+  assert.equal(applies(f).length, 1);
+  await page.locator('#search').fill('1');
+  await page.keyboard.press('2');
+  assert.equal(applies(f).length, 1);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await page.waitForTimeout(400);
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await cleanup(ctx);
+});
+
+test('hover timing, no activation, keep-open/edit/drag/busy guards and native errors', async () => {
+  const ctx = await setup({ expand: false, viewport: { width: 480, height: 640 } });
+  const { page, f } = ctx;
+  await page.mouse.move(300, 300);
+  await page.mouse.move(12, 30);
+  await page.waitForTimeout(150);
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await page.waitForTimeout(220);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  const messages = await page.evaluate(() => window.nativeMessages);
+  assert.ok(messages.some((item) => item.action === 'expand' && item.keyboard === false));
+  assert.equal(
+    messages.some((item) => item.action === 'focus'),
+    false,
+  );
+  await page.mouse.move(490, 660);
+  await page.waitForTimeout(220);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await page.waitForTimeout(300);
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await nativeEvent(page, { expanded: true });
+  await page.locator('#keep-open').click();
+  await page.mouse.move(490, 660);
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await page.locator('#keep-open').click();
+  await page.locator('#search').focus();
+  await page.mouse.move(490, 660);
+  await page.waitForTimeout(500);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  await nativeEvent(page, { error: '快捷键注册失败：合成冲突' });
+  assert.match(await page.locator('#notice').innerText(), /快捷键注册失败/);
+  await cleanup(ctx);
+});
+
+test('unlimited presets/model rows support keyboard reorder, drag reorder, rename and delete', async () => {
+  const initial = fixture();
+  initial.preferences.presets.push(
+    ...Array.from({ length: 18 }, (_, index) => ({
+      id: `extra-${index}`,
+      name: `预设 ${index}`,
+      selection: selection(),
+    })),
+  );
+  initial.snapshot.models.push(
+    ...Array.from({ length: 20 }, (_, index) => ({
+      id: `extra-model-${index}`,
+      label: `Extra model ${index}`,
+      reasoning: ['low', 'high'],
+      fast: true,
+    })),
+  );
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  assert.equal(await page.locator('.preset-chip').count(), 21);
+  await page.locator('.preset-chip[data-key="p1"]').click({ button: 'right' });
+  assert.equal(await page.locator('#menu').isVisible(), true);
+  await page.getByRole('menuitem', { name: '向后移动', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await poll(page, () => document.querySelector('.preset-chip').dataset.key === 'p2');
+  assert.equal(f.data.preferences.presets[0].id, 'p2');
+  await page
+    .locator('.preset-chip[data-key="p1"]')
+    .dragTo(page.locator('.preset-chip[data-key="p2"]'));
+  await poll(page, () => document.querySelector('.preset-chip').dataset.key === 'p1');
+  await menu(page, '模型 Alpha 菜单');
+  await page.getByRole('menuitem', { name: '向后移动', exact: true }).click();
+  await poll(page, () => document.querySelector('#pinned > div').dataset.key === 'beta');
+  await page
+    .locator('#pinned [data-key="alpha"] .model-name')
+    .dragTo(page.locator('#pinned [data-key="beta"] .model-name'));
+  await poll(page, () => document.querySelector('#pinned > div').dataset.key === 'alpha');
+  await menu(page, '预设 日常 菜单');
+  await page.getByRole('menuitem', { name: '重命名', exact: true }).click();
+  await page.locator('#preset-name').fill('改名成功');
+  await page.locator('#preset-name').press('Enter');
+  await poll(page, () => document.querySelector('.preset-chip button').textContent === '改名成功');
+  await menu(page, '预设 改名成功 菜单');
+  await page.getByRole('menuitem', { name: '删除预设', exact: true }).click();
+  await page.waitForFunction(() => document.querySelectorAll('.preset-chip').length === 20);
+  await page.locator('#others-toggle').click();
+  await page.locator('#model-scroll').evaluate((node) => {
+    node.scrollTop = node.scrollHeight;
+  });
+  const scroll = await page.locator('#model-scroll').evaluate((node) => node.scrollTop);
+  await page.waitForTimeout(1350);
+  assert.equal(await page.locator('#model-scroll').evaluate((node) => node.scrollTop), scroll);
+  await cleanup(ctx);
+});
+
+test('column resizing captures pointer, bounds 100–280, resets and adapts to font/width without footer overflow', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  const box = await page.locator('#resize').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(900, box.y + 10);
+  await page.mouse.up();
+  await poll(page, () => document.querySelector('#resize').getAttribute('aria-valuenow') === '280');
+  await page.locator('#resize').dblclick();
+  await poll(page, () => document.querySelector('#resize').getAttribute('aria-valuenow') === '144');
+  await page.locator('#resize').focus();
+  await page.keyboard.press('ArrowLeft');
+  await poll(page, () => document.querySelector('#resize').getAttribute('aria-valuenow') === '136');
+  await nativeEvent(page, {
+    appearance: { material: 'matte', liquidVariant: 'regular', fontOffset: 8 },
+  });
+  await page.setViewportSize({ width: 360, height: 640 });
+  await poll(page, () => document.body.dataset.layout === 'rows');
+  const geometry = await page.evaluate(() => ({
+    footer: document.querySelector('footer').getBoundingClientRect().bottom,
+    panel: document.querySelector('#panel').getBoundingClientRect().bottom,
+    width: document.querySelector('#panel').scrollWidth,
+    screen: innerWidth,
+  }));
+  assert.ok(geometry.footer <= geometry.panel, JSON.stringify(geometry));
+  assert.ok(geometry.width <= geometry.screen, JSON.stringify(geometry));
+  assert.equal(f.data.preferences.modelColumnWidth, 136);
+  await shot(page, 'large-font-rows');
+  await cleanup(ctx);
+});
+
+test('initial compact pane, fallback events, native geometry/position and exit are isolated', async () => {
+  const ctx = await setup({ expand: false, viewport: { width: 32, height: 80 } });
+  const { page, f } = ctx;
+  const box = await page.locator('#handle').boundingBox();
+  assert.equal(box.width, 32);
+  assert.equal(box.height, 80);
+  assert.equal(await page.locator('#panel').isHidden(), true);
+  await shot(page, 'compact-right');
+  await nativeEvent(page, {
+    edge: 'top',
+    notchWidth: 180,
+    notchHeight: 32,
+    compactWidth: 244,
+    compactHeight: 32,
+    notchX: 32,
+  });
+  await page.setViewportSize({ width: 244, height: 32 });
+  const handleRect = await page.locator('#handle').boundingBox();
+  assert.ok(handleRect.x + handleRect.width <= 32, 'Icon stays in the safe left flank');
+  assert.equal(
+    await page.evaluate(() => document.elementFromPoint(100, 16)?.closest('button') !== null),
+    false,
+    'No clickable UI under physical notch',
+  );
+  assert.equal((await page.locator('#handle').boundingBox()).height, 32);
+  await shot(page, 'compact-top');
+  await page.mouse.move(10, 10);
+  await page.mouse.down();
+  await page.mouse.move(40, 10);
+  await page.mouse.up();
+  const position = await page.evaluate(() =>
+    window.nativeMessages.find((item) => item.action === 'position'),
+  );
+  assert.ok(Number.isFinite(position.delta) && position.delta > 0);
+  assert.equal(await page.locator('#panel').isHidden(), true, 'Drag does not expand');
+  await page.setViewportSize({ width: 480, height: 640 });
+  await nativeEvent(page, { expanded: true, keyboard: true });
+  await page.waitForFunction(() => document.activeElement.id === 'search');
+  await menu(page, '设置菜单');
+  await page.getByRole('menuitemradio', { name: '左侧', exact: true }).click();
+  await page.waitForFunction(() => document.body.dataset.edge === 'left');
+  await nativeEvent(page, { edge: 'left', compactWidth: 32, compactHeight: 80 });
+  assert.equal(f.data.preferences.edge, 'left');
+  await menu(page, '设置菜单');
+  await page.getByRole('menuitem', { name: '退出模型控制', exact: true }).click();
+  await page.waitForFunction(
+    () => document.querySelector('#panel').hidden && document.querySelector('#handle').hidden,
+  );
+  assert.deepEqual(f.requests.find((item) => item.operation === 'close').payload, {});
+  assert.equal(await page.evaluate(() => window.nativeMessages.at(-1).action), 'hide');
+  await cleanup(ctx);
+  const fallback = await setup({ native: false, expand: false });
+  await fallback.page.locator('#handle').click();
+  assert.equal(await fallback.page.locator('#panel').isVisible(), true);
+  await cleanup(fallback);
+});
+
+test('missing credentials fail closed; delayed state cannot overwrite an apply result', async () => {
+  const missing = await setup({ auth: false });
+  await poll(missing.page, () =>
+    document.querySelector('#notice').textContent.includes('缺少窗口凭据'),
+  );
+  assert.equal(missing.f.requests.length, 0);
+  assert.equal(await missing.page.locator('#save').isDisabled(), true);
+  await cleanup(missing);
+  const ctx = await setup();
+  const { page, f } = ctx;
+  let release;
+  f.delayState = new Promise((resolve) => {
+    release = resolve;
+  });
+  const count = f.requests.length;
+  await page.waitForTimeout(1350);
+  assert.ok(f.requests.length > count);
+  await modelButton(page, 'alpha', 'low').click();
+  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  release();
+  await page.waitForTimeout(150);
+  assert.match(await page.locator('#actual').innerText(), /low/);
+  assert.equal(applies(f).length, 1);
+  await cleanup(ctx);
+});
+
+test('physical notch reserves expanded header, never steals editor focus, and supports dark mode', async () => {
+  const ctx = await setup();
+  const { page } = ctx;
+  await page.setViewportSize({ width: 480, height: 640 });
+  await nativeEvent(page, {
+    expanded: true,
+    edge: 'top',
+    notchWidth: 180,
+    notchHeight: 32,
+    notchX: 150,
+    compactWidth: 244,
+    compactHeight: 32,
+    keyboard: true,
+  });
+  await page.waitForFunction(() => document.activeElement.id === 'search');
+  const panel = await page.locator('#panel').boundingBox();
+  assert.equal(panel.y, 32);
+  assert.equal(panel.height, 608);
+  await shot(page, 'top-notch-expanded');
+  assert.equal(
+    await page.evaluate(() => document.elementFromPoint(240, 16)?.closest('button') !== null),
+    false,
+  );
+  await page.locator('#save').click();
+  await page.locator('#preset-name').fill('编辑时不抢焦点');
+  await nativeEvent(page, { expanded: true, keyboard: true, position: 0.6 });
+  await page.waitForTimeout(100);
+  assert.equal(
+    await page.locator('#preset-name').evaluate((node) => node === document.activeElement),
+    true,
+  );
+  await page.keyboard.press('Escape');
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  assert.equal(
+    await page.locator('#panel').evaluate((node) => getComputedStyle(node).animationName),
+    'none',
+  );
+  await shot(page, 'top-notch-expanded-dark');
+  await cleanup(ctx);
+});
+
+test('busy and pointer capture block leave collapse; pointer cancellation discards width changes', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  let release;
+  f.delayApply = new Promise((resolve) => {
+    release = resolve;
+  });
+  await modelButton(page, 'alpha', 'low').click();
+  await page.mouse.move(490, 660);
+  await page.waitForTimeout(550);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  release();
+  f.delayApply = null;
+  await page.waitForFunction(() => document.querySelector('#panel').hidden);
+  await nativeEvent(page, { expanded: true });
+  const rect = await page.locator('#resize').boundingBox();
+  await page.mouse.move(rect.x + 10, rect.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(-100, 660);
+  await page.waitForTimeout(550);
+  assert.equal(await page.locator('#panel').isVisible(), true);
+  assert.equal(await page.locator('#resize').getAttribute('aria-valuenow'), '100');
+  await page.locator('#resize').dispatchEvent('pointercancel', { pointerId: 1 });
+  await page.mouse.up();
+  assert.equal(f.data.preferences.modelColumnWidth, 144);
+  assert.equal(
+    f.requests.some((request) => request.operation === 'preferences'),
+    false,
+  );
+  await cleanup(ctx);
+});
+
+test('search matches preset names and full configurations as well as model labels', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  const search = page.getByRole('searchbox', { name: '搜索模型或预设' });
+  await search.fill('快速');
+  assert.equal(await page.locator('.preset-chip').count(), 1);
+  assert.equal(await page.locator('.preset-chip').getAttribute('data-key'), 'p2');
+  assert.equal(await page.locator('.model-row').count(), 0);
+  await search.fill('gamma');
+  assert.equal(await page.locator('.preset-chip').count(), 1);
+  assert.equal(await page.locator('.model-row').count(), 1);
+  await search.fill('standard');
+  assert.equal(await page.locator('.preset-chip').count(), 1);
+  assert.equal(await page.locator('.preset-chip').getAttribute('data-key'), 'p1');
+  await search.fill('not-present');
+  assert.equal(await page.locator('.preset-chip').count(), 0);
+  await search.fill('');
+  assert.equal(await page.locator('.preset-chip').count(), 3);
+  assert.equal(writes(f).length, 0);
+  await cleanup(ctx);
+});
+
+test('workbench appearance follows shared tokens, native transparency and content typography in all three materials', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  await page.locator('#search').fill('a');
+  await page.evaluate(() => {
+    window.appearanceInput = document.querySelector('#search');
+    window.appearanceCell = document.querySelector('.choices button');
+  });
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    // A flat synthetic substrate verifies transparency; it does not imitate AppKit optics.
+    await page.evaluate((theme) => {
+      document.documentElement.style.background = theme === 'dark' ? '#343434' : '#e8e8e8';
+    }, theme);
+    for (const material of ['matte', 'frosted', 'native-glass']) {
+      const nativeBackdrop = material !== 'matte';
+      await nativeEvent(page, {
+        appearance: { material, liquidVariant: 'regular', fontOffset: 0 },
+        effectiveMaterial: material,
+        nativeBackdrop,
+      });
+      const computed = await page.evaluate(() => {
+        const root = document.documentElement,
+          panel = document.querySelector('#panel');
+        const surface = getComputedStyle(panel),
+          tokens = getComputedStyle(root);
+        return {
+          material: root.dataset.material,
+          nativeBackdrop: root.dataset.nativeBackdrop,
+          background: surface.backgroundColor,
+          image: surface.backgroundImage,
+          blur: surface.backdropFilter,
+          border: surface.borderTopColor,
+          text: surface.color,
+          elevated: tokens.getPropertyValue('--buddy-elevated').trim(),
+          chrome: getComputedStyle(document.querySelector('header')).fontSize,
+          content: getComputedStyle(document.querySelector('.choices button')).fontSize,
+        };
+      });
+      assert.equal(computed.material, material);
+      assert.equal(computed.nativeBackdrop, String(nativeBackdrop));
+      assert.equal(
+        computed.background,
+        nativeBackdrop
+          ? 'rgba(0, 0, 0, 0)'
+          : theme === 'dark'
+            ? 'rgb(43, 43, 43)'
+            : 'rgb(250, 250, 250)',
+      );
+      assert.equal(computed.text, theme === 'dark' ? 'rgb(243, 243, 243)' : 'rgb(32, 32, 32)');
+      assert.equal(computed.image, 'none');
+      assert.equal(computed.blur, 'none');
+      assert.equal(computed.chrome, '12px');
+      assert.equal(computed.content, '13px');
+      await shot(page, `appearance-${material}-${theme}`);
+      if (material === 'native-glass') {
+        await nativeEvent(page, {
+          appearance: { material, liquidVariant: 'clear', fontOffset: 0 },
+          nativeBackdrop: true,
+          effectiveMaterial: material,
+        });
+        assert.equal(await page.locator('html').getAttribute('data-liquid-variant'), 'clear');
+        await shot(page, `appearance-native-glass-clear-${theme}`);
+      }
+    }
+  }
+  assert.equal(await page.locator('#search').inputValue(), 'a');
+  assert.equal(
+    await page.evaluate(
+      () =>
+        document.activeElement === window.appearanceInput &&
+        document.querySelector('.choices button') === window.appearanceCell,
+    ),
+    true,
+  );
+  await nativeEvent(page, {
+    appearance: { material: 'native-glass', liquidVariant: 'clear', fontOffset: 4 },
+    effectiveMaterial: 'matte',
+    nativeBackdrop: false,
+  });
+  const sizes = await page.evaluate(() => ({
+    chrome: getComputedStyle(document.querySelector('header')).fontSize,
+    content: getComputedStyle(document.querySelector('.choices button')).fontSize,
+    background: getComputedStyle(document.querySelector('#panel')).backgroundColor,
+  }));
+  assert.equal(sizes.chrome, '12px');
+  assert.equal(sizes.content, '17px');
+  assert.equal(sizes.background, 'rgb(43, 43, 43)');
+  assert.equal(
+    writes(f).length,
+    0,
+    'Appearance notifications never write model state or preferences',
+  );
+  await cleanup(ctx);
+});
+
+try {
+  for (const { name, run } of cases) {
+    if (process.env.MODEL_CONTROL_CASE && !name.includes(process.env.MODEL_CONTROL_CASE)) continue;
+    const started = Date.now();
+    try {
+      await run();
+      results.push({ name, status: 'passed', durationMs: Date.now() - started });
+      console.log(`PASS ${name}`);
+    } catch (error) {
+      results.push({
+        name,
+        status: 'failed',
+        message: error.stack,
+        durationMs: Date.now() - started,
+      });
+      console.error(`FAIL ${name}\n${error.stack}`);
+    }
+  }
+} finally {
+  await browser.close();
+  writeFileSync(
+    resolve(
+      output,
+      process.env.MODEL_CONTROL_CASE ? 'selected-view-results.json' : 'view-results.json',
+    ),
+    JSON.stringify(
+      {
+        results,
+        passed: results.filter((item) => item.status === 'passed').length,
+        total: results.length,
+      },
+      null,
+      2,
+    ),
+  );
+}
+if (results.some((item) => item.status === 'failed')) process.exitCode = 1;

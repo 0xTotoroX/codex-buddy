@@ -1,6 +1,6 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
 // [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
-// [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文。
+// [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文；独立模型控制 API、页面与窗口租约共用鉴权。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 use axum::{
     Json, Router,
     body::Body,
-    extract::{DefaultBodyLimit, Path, Request, State},
+    extract::{DefaultBodyLimit, Path, Query, Request, State},
     http::{HeaderMap, StatusCode, header},
     middleware::{self, Next},
     response::{
@@ -142,6 +142,16 @@ fn router(service: Service) -> Router {
         .route("/panel/preferences", post(panel_preferences))
         .route("/panel/command", post(panel_command))
         .route("/panel/request", post(panel_request))
+        .route("/model-control/state", get(model_control_state))
+        .route("/model-control/refresh", post(model_control_refresh))
+        .route("/model-control/apply", post(model_control_apply))
+        .route(
+            "/model-control/preferences",
+            post(model_control_preferences),
+        )
+        .route("/model-control/open", post(model_control_open))
+        .route("/model-control/close", post(model_control_close))
+        .route("/model-control/window", get(model_control_window))
         .route("/shutdown", post(shutdown))
         .route_layer(middleware::from_fn_with_state(service.clone(), authorize));
     Router::new()
@@ -382,6 +392,49 @@ async fn development_reveal(State(service): State<Service>) -> Result<Response, 
     Ok(Json(json!({"ok":true,"pid":pid})).into_response())
 }
 
+async fn model_control_state(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.model_control_state(false).await?))
+}
+async fn model_control_refresh(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.model_control_state(true).await?))
+}
+async fn model_control_apply(
+    State(service): State<Service>,
+    Json(command): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.model_control_apply(command).await?))
+}
+async fn model_control_preferences(
+    State(service): State<Service>,
+    Json(patch): Json<Value>,
+) -> Response {
+    match service.app.model_control_preferences(patch).await {
+        Ok(value) => Json(value).into_response(),
+        Err(error) if error.to_string() == "model_control_conflict" => (
+            StatusCode::CONFLICT,
+            Json(json!({"ok":false,"message":"模型控制设置已更新，请刷新后重试"})),
+        )
+            .into_response(),
+        Err(error) => ApiError::from(error).into_response(),
+    }
+}
+async fn model_control_open(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.open_model_control().await?))
+}
+async fn model_control_close(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.close_model_control().await?))
+}
+async fn model_control_window(
+    State(service): State<Service>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Json<Value> {
+    Json(
+        service
+            .app
+            .model_control_window(query.get("lease").map(String::as_str).unwrap_or(""))
+            .await,
+    )
+}
 async fn index() -> Response {
     static_asset("index.html")
 }
@@ -401,6 +454,42 @@ async fn asset(Path(path): Path<String>) -> Response {
         if let Some((kind, body)) = resource {
             return ([(header::CONTENT_TYPE, kind)], body).into_response();
         }
+    }
+    match path.as_str() {
+        "model-control" => {
+            return panel_asset(
+                "text/html; charset=utf-8",
+                include_str!("../ui/model-control/index.html"),
+            );
+        }
+        "model-control/app.js" => {
+            return panel_asset(
+                "text/javascript; charset=utf-8",
+                include_str!("../ui/model-control/app.js"),
+            );
+        }
+        "model-control/icons.js" => {
+            return panel_asset(
+                "text/javascript; charset=utf-8",
+                include_str!("../ui/panel/icons/index.js"),
+            );
+        }
+        "model-control/tokens.css" => {
+            return panel_asset("text/css; charset=utf-8", include_str!("../ui/tokens.css"));
+        }
+        "model-control/view.js" => {
+            return panel_asset(
+                "text/javascript; charset=utf-8",
+                include_str!("../ui/model-control/view.js"),
+            );
+        }
+        "model-control/styles.css" => {
+            return panel_asset(
+                "text/css; charset=utf-8",
+                include_str!("../ui/model-control/styles.css"),
+            );
+        }
+        _ => {}
     }
     if path == "panel" {
         return panel_asset(
@@ -475,6 +564,66 @@ mod tests {
                         .header("host", "127.0.0.1:47831")
                         .header("authorization", format!("Bearer {token}"))
                         .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), expected);
+        }
+    }
+    #[tokio::test]
+    async fn model_control_routes_enforce_auth_and_preference_revision() {
+        let temp = tempfile::tempdir().unwrap();
+        let app = App::new(
+            Paths::new(Some(temp.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let router = router(Service {
+            app,
+            token: "test-token".into(),
+            port: 47831,
+        });
+        for route in [
+            "state",
+            "refresh",
+            "apply",
+            "preferences",
+            "open",
+            "close",
+            "window",
+        ] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(if ["state", "window"].contains(&route) {
+                            "GET"
+                        } else {
+                            "POST"
+                        })
+                        .uri(format!("/api/model-control/{route}"))
+                        .header("host", "127.0.0.1:47831")
+                        .header("content-type", "application/json")
+                        .body(Body::from("{}"))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{route}");
+        }
+        for expected in [StatusCode::OK, StatusCode::CONFLICT] {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method("POST")
+                        .uri("/api/model-control/preferences")
+                        .header("host", "127.0.0.1:47831")
+                        .header("authorization", "Bearer test-token")
+                        .header("content-type", "application/json")
+                        .body(Body::from(r#"{"revision":1,"patch":{"edge":"left"}}"#))
                         .unwrap(),
                 )
                 .await

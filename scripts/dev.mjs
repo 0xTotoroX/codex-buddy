@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 项目源码、Rust/Node 与独立开发数据目录。
- * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust 编译后自动重启；显式 --restart-running 复用共享宿主准备，再恢复旧会话，启动错误传回 App。
+ * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，再恢复旧会话，启动错误传回 App。
  * [POS]: 开发编排；管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -98,6 +98,9 @@ const token = randomUUID();
 let nativeFingerprint;
 const nativeInputs = () => [
   ...filesUnder(root, 'src'),
+  ...filesUnder(root, 'ui/model-control'),
+  'ui/tokens.css',
+  'ui/panel/icons/index.js',
   ...filesUnder(root, '.cargo'),
   'build.rs',
   'Cargo.toml',
@@ -221,6 +224,8 @@ function changed(path) {
     pendingPanel = true;
   if (
     path.startsWith('src/') ||
+    path.startsWith('ui/model-control/') ||
+    ['ui/tokens.css', 'ui/panel/icons/index.js'].includes(path) ||
     path.startsWith('.cargo/') ||
     ['build.rs', 'Cargo.toml', 'Cargo.lock'].includes(path)
   )

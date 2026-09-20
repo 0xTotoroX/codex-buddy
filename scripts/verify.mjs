@@ -88,11 +88,14 @@ async function verify() {
   rmSync(join(root, 'target/reports/verify.json'), { force: true });
   run('npm', ['run', 'check']);
   run(process.execPath, ['tests/workbench.mjs']);
+  run(process.execPath, ['tests/model-control-host.mjs']);
+  run(process.execPath, ['tests/model-control-view.mjs']);
   run('cargo', ['fmt', '--check']);
   const artifact = prepareTestBinary();
   run('cargo', ['test', '--locked']);
   run('cargo', ['clippy', '--locked', '--', '-D', 'warnings']);
   const env = { ...process.env, CODEX_BUDDY_TEST_BINARY: artifact.binary };
+  run(process.execPath, ['tests/model-control-e2e.mjs'], env);
   run(process.execPath, ['tests/e2e.mjs'], env);
   run(process.execPath, ['tests/lifecycle-test.mjs'], env);
   if (process.argv.includes('--native')) run(process.execPath, ['tests/native-check.mjs'], env);
