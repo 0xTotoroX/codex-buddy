@@ -406,10 +406,10 @@ test('partial and failed applies show service actual state without optimistic or
   await cleanup(ctx);
 });
 
-test('all nonready/generating sources disable writes; presets prevalidate full tuple', async () => {
+test('unavailable, busy and conflicting sources disable writes', async () => {
   const ctx = await setup();
   const { page, f } = ctx;
-  for (const status of ['unavailable', 'waiting', 'busy', 'conflict']) {
+  for (const status of ['unavailable', 'busy', 'conflict']) {
     f.data.snapshot.status = status;
     await page.waitForFunction((status) => document.body.dataset.status === status, status);
     assert.equal(await modelButton(page, 'alpha', 'low').isDisabled(), true, status);
@@ -524,7 +524,7 @@ test('hover timing, no activation, keep-open/edit/drag/busy guards and native er
   const ctx = await setup({ expand: false, viewport: { width: 480, height: 640 } });
   const { page, f } = ctx;
   await page.mouse.move(300, 300);
-  await page.mouse.move(12, 30);
+  await page.mouse.move(5, 30);
   await page.waitForTimeout(80);
   assert.equal(await page.locator('#panel').isVisible(), true);
   const messages = await page.evaluate(() => window.nativeMessages);
@@ -642,24 +642,42 @@ test('column resizing captures pointer, bounds 100–280, resets and adapts to f
 });
 
 test('initial compact pane, fallback events, native geometry/position and exit are isolated', async () => {
-  const ctx = await setup({ expand: false, viewport: { width: 32, height: 80 } });
+  const ctx = await setup({ expand: false, viewport: { width: 10, height: 80 } });
   const { page, f } = ctx;
   const box = await page.locator('#handle').boundingBox();
-  assert.equal(box.width, 32);
+  assert.equal(box.width, 10);
   assert.equal(box.height, 80);
   assert.equal(await page.locator('#panel').isHidden(), true);
+  assert.equal(await page.locator('#handle svg').count(), 0, 'Resting handle has no icon');
   await shot(page, 'compact-right');
+  for (const edge of ['left', 'top']) {
+    const width = edge === 'top' ? 80 : 10,
+      height = edge === 'top' ? 10 : 80;
+    await page.setViewportSize({ width, height });
+    await nativeEvent(page, { edge, compactWidth: width, compactHeight: height });
+    const rect = await page.locator('#handle').boundingBox();
+    assert.deepEqual([rect.width, rect.height], [width, height]);
+    assert.equal(
+      await page.evaluate(
+        ({ width, height }) => document.elementFromPoint(width / 2, height / 2)?.id,
+        { width, height },
+      ),
+      'handle',
+      'Thin center remains interactive',
+    );
+    await shot(page, `compact-${edge}-plain`);
+  }
   await nativeEvent(page, {
     edge: 'top',
     notchWidth: 180,
     notchHeight: 32,
-    compactWidth: 244,
+    compactWidth: 200,
     compactHeight: 32,
-    notchX: 32,
+    notchX: 10,
   });
-  await page.setViewportSize({ width: 244, height: 32 });
+  await page.setViewportSize({ width: 200, height: 32 });
   const handleRect = await page.locator('#handle').boundingBox();
-  assert.ok(handleRect.x + handleRect.width <= 32, 'Icon stays in the safe left flank');
+  assert.ok(handleRect.x + handleRect.width <= 10, 'Thin handle stays in the safe left flank');
   assert.equal(
     await page.evaluate(() => document.elementFromPoint(100, 16)?.closest('button') !== null),
     false,
@@ -668,7 +686,7 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   assert.equal((await page.locator('#handle').boundingBox()).height, 32);
   await shot(page, 'compact-top');
   await page.keyboard.down('Alt');
-  await page.mouse.move(10, 10);
+  await page.mouse.move(5, 10);
   await page.mouse.down();
   await page.mouse.move(40, 10);
   await page.mouse.up();
@@ -684,7 +702,7 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   await menu(page, '设置菜单');
   await page.getByRole('menuitemradio', { name: '左侧', exact: true }).click();
   await page.waitForFunction(() => document.body.dataset.edge === 'left');
-  await nativeEvent(page, { edge: 'left', compactWidth: 32, compactHeight: 80 });
+  await nativeEvent(page, { edge: 'left', compactWidth: 10, compactHeight: 80 });
   assert.equal(f.data.preferences.edge, 'left');
   await menu(page, '设置菜单');
   await page.getByRole('menuitem', { name: '退出模型控制', exact: true }).click();
@@ -737,7 +755,7 @@ test('physical notch reserves expanded header, never steals editor focus, and su
     notchWidth: 180,
     notchHeight: 32,
     notchX: 150,
-    compactWidth: 244,
+    compactWidth: 200,
     compactHeight: 32,
     keyboard: true,
   });

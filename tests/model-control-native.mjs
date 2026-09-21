@@ -308,13 +308,13 @@ try {
   );
   start();
   await until(
-    () => telemetry?.native?.width === 32 && telemetry.native.height === 80,
+    () => telemetry?.native?.width === 10 && telemetry.native.height === 80,
     'initial compact',
   );
   assert.equal(telemetry.native.expanded, false);
   assert.equal(telemetry.native.keyboard, false);
   const initial = windowInfo();
-  assert.equal(initial.kCGWindowBounds.Width, 32);
+  assert.equal(initial.kCGWindowBounds.Width, 10);
   assert.equal(initial.kCGWindowBounds.Height, 80);
   check('initial reveal baseline is compact', initial.kCGWindowBounds);
   hostPresence = { visible: false, focused: false };
@@ -329,7 +329,7 @@ try {
 
   if (environment.canPostEvents) {
     const bounds = windowInfo().kCGWindowBounds;
-    execFileSync(inputProbe, ['move', String(bounds.X + 16), String(bounds.Y + 40)]);
+    execFileSync(inputProbe, ['move', String(bounds.X + bounds.Width / 2), String(bounds.Y + 40)]);
   } else {
     await command(
       "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:true,buttons:0,hoverSuppressed:false}}))",
@@ -383,7 +383,7 @@ try {
 
   await ipc({ action: 'collapse' });
   await until(() => !telemetry.native.expanded && !telemetry.native.keyboard, 'collapse');
-  assert.equal(windowInfo().kCGWindowBounds.Width, 32);
+  assert.equal(windowInfo().kCGWindowBounds.Width, 10);
   check('collapse shrinks actual WindowServer bounds');
   await command("document.getElementById('panel').dispatchEvent(new PointerEvent('pointerleave'))");
   prefs.keepOpen = true;

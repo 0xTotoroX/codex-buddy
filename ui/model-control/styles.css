@@ -79,23 +79,25 @@ svg {
 #notch-mask::after {
   content: '';
   position: absolute;
-  width: 32px;
+  width: 10px;
   height: 100%;
   background: #000;
 }
 #notch-mask::before {
   right: 100%;
-  border-radius: 0 0 0 12px;
+  border-radius: 0 0 0 5px;
 }
 #notch-mask::after {
   left: 100%;
-  border-radius: 0 0 12px 0;
+  border-radius: 0 0 5px 0;
 }
 #handle {
   position: relative;
   pointer-events: auto;
   margin-left: var(--handle-left, 0px);
-  width: var(--compact-width, 32px);
+  width: var(--compact-width, 10px);
+  min-width: 0;
+  min-height: 0;
   height: var(--compact-height, 80px);
   padding: 0;
   display: grid;

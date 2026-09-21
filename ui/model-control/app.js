@@ -67,7 +67,6 @@ const reasonBlocked = () =>
       : snapshot()?.message || statusLabels[snapshot()?.status] || '等待来源就绪';
 
 for (const [id, name] of Object.entries({
-  handle: 'open-config',
   'keep-open': 'pin',
   'menu-button': 'more',
   collapse: 'minus',
@@ -188,16 +187,19 @@ function shapeSurface(node) {
     b = edge === 'top' ? w : h;
   const p = (x, y) =>
     edge === 'left' ? `${w - x} ${y}` : edge === 'top' ? `${y} ${h - x}` : `${x} ${y}`;
-  const r = Math.min(18, (b - 16) / 2);
-  const path = `M ${p(a, 0)} Q ${p(a, 8)} ${p(a - 8, 8)} L ${p(r, 8)} Q ${p(0, 8)} ${p(0, 8 + r)} L ${p(0, b - 8 - r)} Q ${p(0, b - 8)} ${p(r, b - 8)} L ${p(a - 8, b - 8)} Q ${p(a, b - 8)} ${p(a, b)} Z`;
-  const clip = `path('${path}')`;
+  const contour = (depth, length, point) => {
+    const lip = Math.min(8, depth / 2, length / 4);
+    const r = Math.min(18, depth - lip, (length - 2 * lip) / 2);
+    return `M ${point(depth, 0)} Q ${point(depth, lip)} ${point(depth - lip, lip)} L ${point(r, lip)} Q ${point(0, lip)} ${point(0, lip + r)} L ${point(0, length - lip - r)} Q ${point(0, length - lip)} ${point(r, length - lip)} L ${point(depth - lip, length - lip)} Q ${point(depth, length - lip)} ${point(depth, length)} Z`;
+  };
+  const clip = `path('${contour(a, b, p)}')`;
   node.style.setProperty('--shell-clip', clip);
   node.style.clipPath = clip;
-  // Matching path commands reveal the silhouette without scaling text.
-  const q = (x, y) =>
-    p(a - (a - x) * Math.min(1, 32 / a), b / 2 + (y - b / 2) * Math.min(1, 80 / b));
-  const compact = `M ${q(a, 0)} Q ${q(a, 8)} ${q(a - 8, 8)} L ${q(r, 8)} Q ${q(0, 8)} ${q(0, 8 + r)} L ${q(0, b - 8 - r)} Q ${q(0, b - 8)} ${q(r, b - 8)} L ${q(a - 8, b - 8)} Q ${q(a, b - 8)} ${q(a, b)} Z`;
-  node.style.setProperty('--compact-clip', `path('${compact}')`);
+  // Same thin silhouette at the edge; only the outline moves, never the text.
+  const depth = Math.min(a, 10),
+    length = Math.min(b, 80);
+  const q = (x, y) => p(a - depth + x, (b - length) / 2 + y);
+  node.style.setProperty('--compact-clip', `path('${contour(depth, length, q)}')`);
 }
 // Natural content height is independent of the current native viewport.
 function queueSize() {
@@ -243,11 +245,11 @@ window.addEventListener('model-control-native', (event) => {
   const finite = (value, fallback) => (Number.isFinite(value) && value > 0 ? value : fallback);
   const compactWidth = finite(
     nativeState.compactWidth,
-    top ? (notched ? nativeState.notchWidth + 64 : 80) : 32,
+    top ? (notched ? nativeState.notchWidth + 20 : 80) : 10,
   );
   const compactHeight = finite(
     nativeState.compactHeight,
-    top ? Math.max(32, nativeState.notchHeight || 0) : 80,
+    top ? (notched ? nativeState.notchHeight : 10) : 80,
   );
   const notchX = Number.isFinite(nativeState.notchX)
     ? nativeState.notchX
@@ -255,10 +257,10 @@ window.addEventListener('model-control-native', (event) => {
   const style = document.documentElement.style;
   style.setProperty(
     '--compact-width',
-    `${notched ? Math.min(32, Math.max(0, notchX)) : compactWidth}px`,
+    `${notched ? Math.min(10, Math.max(0, notchX)) : compactWidth}px`,
   );
   style.setProperty('--compact-height', `${compactHeight}px`);
-  style.setProperty('--handle-left', `${notched ? Math.max(0, notchX - 32) : 0}px`);
+  style.setProperty('--handle-left', `${notched ? Math.max(0, notchX - 10) : 0}px`);
   style.setProperty(
     '--content-top',
     `${notched ? finite(nativeState.contentOffsetY, nativeState.notchHeight) : 0}px`,

@@ -3,6 +3,10 @@
 // [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
+pub const COMPACT_DEPTH: f64 = 10.;
+pub const COMPACT_LENGTH: f64 = 80.;
+pub const NOTCH_FLANK: f64 = 10.;
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
     pub x: f64,
@@ -55,11 +59,12 @@ pub fn surface_contains(width: f64, height: f64, edge: Edge, x: f64, y: f64) -> 
         Edge::Top => (height, width, height - y, x),
     };
     let y = y.min(b - y);
-    if y < 8. {
-        return x >= a - 8. * (1. - (1. - y / 8.).sqrt()).powi(2);
+    let lip = 8_f64.min(a / 2.).min(b / 4.);
+    if y < lip {
+        return x >= a - lip * (1. - (1. - y / lip).sqrt()).powi(2);
     }
-    let radius = 18_f64.min((b - 16.) / 2.).max(0.);
-    y >= 8. + radius || x >= radius * (1. - ((y - 8.) / radius).sqrt()).powi(2)
+    let radius = 18_f64.min(a - lip).min((b - 2. * lip) / 2.).max(0.);
+    y >= lip + radius || x >= radius * (1. - ((y - lip) / radius).sqrt()).powi(2)
 }
 
 #[derive(Clone, Copy)]
@@ -125,13 +130,13 @@ pub fn layout_height(
         let width = if expanded {
             480.
         } else {
-            screen.notch_width + 64.
+            screen.notch_width + 2. * NOTCH_FLANK
         }
         .min(bounds.width);
         let height = if expanded {
             expanded_height
         } else {
-            screen.notch_height.max(32.)
+            screen.notch_height
         }
         .min(bounds.height);
         let center = screen.notch_x + screen.notch_width / 2.;
@@ -145,9 +150,9 @@ pub fn layout_height(
     let (width, height): (f64, f64) = if expanded {
         (480., expanded_height)
     } else if edge == Edge::Top {
-        (80., 32.)
+        (COMPACT_LENGTH, COMPACT_DEPTH)
     } else {
-        (32., 80.)
+        (COMPACT_DEPTH, COMPACT_LENGTH)
     };
     let width = width.min(area.width.max(1.)).floor();
     let height = height.min(area.height.max(1.)).floor();
@@ -245,7 +250,10 @@ mod tests {
         let s = screen("main", 0., 0., 1440., 900.);
         for edge in [Edge::Left, Edge::Right] {
             let compact = layout(&s, edge, 0.5, false);
-            assert_eq!((compact.width, compact.height), (32., 80.));
+            assert_eq!(
+                (compact.width, compact.height),
+                (COMPACT_DEPTH, COMPACT_LENGTH)
+            );
             let expanded = layout(&s, edge, 0.5, true);
             assert_eq!((expanded.width, expanded.height), (480., 274.));
             assert_eq!(
@@ -275,9 +283,9 @@ mod tests {
                         assert_eq!(
                             r,
                             Rect {
-                                x: 634.,
+                                x: 656.,
                                 y: 950.,
-                                width: 244.,
+                                width: 200.,
                                 height: 32.
                             }
                         );
@@ -291,11 +299,11 @@ mod tests {
             }
         }
         let r = layout(&s, Edge::Top, 0.5, false);
-        assert_eq!((r.width, r.height), (244., 32.));
+        assert_eq!((r.width, r.height), (200., 32.));
         let exclusion = excluded_notch(&s, r, Edge::Top, false);
-        assert!(exclusion.contains(122., 16.));
-        assert!(!exclusion.contains(16., 16.));
-        assert!(!exclusion.contains(228., 16.));
+        assert!(exclusion.contains(100., 16.));
+        assert!(!exclusion.contains(5., 16.));
+        assert!(!exclusion.contains(195., 16.));
         let expanded = layout(&s, Edge::Top, 0., true);
         assert_eq!(expanded.x + expanded.width / 2., r.x + r.width / 2.);
         assert_eq!(excluded_notch(&s, expanded, Edge::Top, true).width, 180.);
@@ -350,8 +358,14 @@ mod tests {
 
     #[test]
     fn contour_excludes_transparent_wings_and_round_corners() {
-        assert!(!surface_contains(32., 80., Edge::Right, 16., 2.));
-        assert!(surface_contains(32., 80., Edge::Right, 16., 40.));
+        assert!(!surface_contains(10., 80., Edge::Right, 5., 2.));
+        assert!(surface_contains(10., 80., Edge::Right, 5., 40.));
+        assert!(surface_contains(10., 80., Edge::Left, 5., 40.));
+        assert!(surface_contains(80., 10., Edge::Top, 40., 5.));
+        assert!(!surface_contains(80., 10., Edge::Top, 2., 5.));
+        let plain_top = layout(&screen("top", 0., 0., 1440., 900.), Edge::Top, 0.5, false);
+        assert_eq!((plain_top.width, plain_top.height), (80., 10.));
+        assert_eq!(plain_top.y + plain_top.height, 900.);
         assert!(!surface_contains(480., 274., Edge::Right, 2., 10.));
         assert!(surface_contains(480., 274., Edge::Right, 479.9, 4.));
         for edge in [Edge::Left, Edge::Right, Edge::Top] {

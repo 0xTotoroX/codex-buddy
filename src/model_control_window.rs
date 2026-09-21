@@ -94,7 +94,7 @@ impl ControlPanel {
         // NSPanel designated initializer; the mask is fixed for the panel's entire life.
         let panel: Retained<Self> = unsafe {
             msg_send![super(this),
-                initWithContentRect: NSRect::new(NSPoint::ZERO, NSSize::new(32., 80.)),
+                initWithContentRect: NSRect::new(NSPoint::ZERO, NSSize::new(geometry::COMPACT_DEPTH, geometry::COMPACT_LENGTH)),
                 styleMask: NSWindowStyleMask::Borderless | NSWindowStyleMask::NonactivatingPanel,
                 backing: NSBackingStoreType::Buffered, defer: false
             ]
@@ -402,9 +402,9 @@ impl Surface {
         let offset = geometry::content_offset(screen, self.prefs.edge, self.expanded);
         let allowed = if self.prefs.edge == Edge::Top && screen.notch_width > 0. && !self.expanded {
             Rect {
-                x: (screen.notch_x - rect.x - 32.).max(0.),
+                x: (screen.notch_x - rect.x - geometry::NOTCH_FLANK).max(0.),
                 y: 0.,
-                width: 32.,
+                width: geometry::NOTCH_FLANK,
                 height: rect.height,
             }
         } else {
@@ -464,10 +464,10 @@ impl Surface {
             regions.push(SurfaceRegion {
                 edge: Edge::Top,
                 rect: Rect {
-                    x: screen.notch_x - 32.,
+                    x: screen.notch_x - geometry::NOTCH_FLANK,
                     y: frame.y + frame.height
                         - geometry::content_offset(screen, self.prefs.edge, true),
-                    width: 32.,
+                    width: geometry::NOTCH_FLANK,
                     height: geometry::content_offset(screen, self.prefs.edge, true),
                 },
             });
@@ -667,7 +667,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
     let panel = ControlPanel::new(mtm);
     let view: Retained<ControlView> = unsafe {
         msg_send![super(ControlView::alloc(mtm).set_ivars(HitRegion::default())),
-            initWithFrame: NSRect::new(NSPoint::ZERO, NSSize::new(32., 80.))]
+            initWithFrame: NSRect::new(NSPoint::ZERO, NSSize::new(geometry::COMPACT_DEPTH, geometry::COMPACT_LENGTH))]
     };
     panel.setContentView(Some(&view));
     let parent = NativeParent(view);
@@ -698,7 +698,8 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         })
         .with_bounds(wry::Rect {
             position: wry::dpi::LogicalPosition::new(0., 0.).into(),
-            size: wry::dpi::LogicalSize::new(32., 80.).into(),
+            size: wry::dpi::LogicalSize::new(geometry::COMPACT_DEPTH, geometry::COMPACT_LENGTH)
+                .into(),
         })
         .build_as_child(&parent)?;
     let (hotkey, shortcut_error) = match Hotkey::register(event_loop.create_proxy()) {
