@@ -65,9 +65,11 @@ async function setup({
   viewport = { width: 480, height: 640 },
   expand = true,
   auth = true,
+  controlledClock = false,
 } = {}) {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
   page.setDefaultTimeout(6000);
+  if (controlledClock) await page.clock.install({ time: new Date(2030, 0, 1) });
   const f = {
     data: copy(initial),
     requests: [],
@@ -215,6 +217,7 @@ async function setup({
     await page
       .locator('#panel')
       .evaluate((n) => Promise.all(n.getAnimations().map((a) => a.finished)));
+  if (controlledClock) await page.clock.pauseAt(new Date(2030, 0, 1, 1));
   return { page, f };
 }
 async function nativeEvent(page, detail) {
@@ -547,11 +550,15 @@ test('keyboard preset shortcuts only during keyboard operation; Escape closes me
 });
 
 test('hover timing, no activation, keep-open/edit/drag/busy guards and native errors', async () => {
-  const ctx = await setup({ expand: false, viewport: { width: 480, height: 640 } });
+  const ctx = await setup({
+    expand: false,
+    controlledClock: true,
+    viewport: { width: 480, height: 640 },
+  });
   const { page, f } = ctx;
   await page.mouse.move(300, 300);
   await page.mouse.move(5, 30);
-  await page.waitForTimeout(80);
+  await page.clock.runFor(80);
   assert.equal(await page.locator('#panel').isVisible(), true);
   const messages = await page.evaluate(() => window.nativeMessages);
   assert.ok(messages.some((item) => item.action === 'expand' && item.keyboard === false));
@@ -560,20 +567,20 @@ test('hover timing, no activation, keep-open/edit/drag/busy guards and native er
     false,
   );
   await page.mouse.move(490, 660);
-  await page.waitForTimeout(220);
+  await page.clock.runFor(220);
   assert.equal(await page.locator('#panel').isVisible(), true);
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   assert.equal(await page.locator('#panel').isHidden(), true);
   await nativeEvent(page, { expanded: true });
   await page.locator('#keep-open').click();
   await page.mouse.move(490, 660);
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await page.locator('#keep-open').click();
   await page.keyboard.press('Meta+f');
   await page.locator('#search').focus();
   await page.mouse.move(490, 660);
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await nativeEvent(page, { error: '快捷键注册失败：合成冲突' });
   assert.match(await page.locator('#notice').innerText(), /快捷键注册失败/);
@@ -955,7 +962,7 @@ test('opaque black matrix remains independent of workbench material and system t
 });
 
 test('native pointer entry is immediate, overrides DOM leave and respects suppression until real exit', async () => {
-  const ctx = await setup({ expand: false });
+  const ctx = await setup({ expand: false, controlledClock: true });
   const { page, f } = ctx;
   const pointer = (detail) =>
     page.evaluate(
@@ -965,13 +972,13 @@ test('native pointer entry is immediate, overrides DOM leave and respects suppre
   await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
   assert.equal(await page.locator('#panel').isVisible(), true);
   await page.locator('#panel').dispatchEvent('pointerleave');
-  await page.waitForTimeout(500);
+  await page.clock.runFor(500);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
-  await page.waitForTimeout(250);
+  await page.clock.runFor(250);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
-  await page.waitForTimeout(250);
+  await page.clock.runFor(250);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await page.keyboard.press('Escape');
   await pointer({ inside: true, buttons: 0, hoverSuppressed: true });
@@ -980,10 +987,10 @@ test('native pointer entry is immediate, overrides DOM leave and respects suppre
   await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
   assert.equal(await page.locator('#panel').isVisible(), true);
   await pointer({ inside: false, buttons: 1, hoverSuppressed: false });
-  await page.waitForTimeout(520);
+  await page.clock.runFor(520);
   assert.equal(await page.locator('#panel').isVisible(), true);
   await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
-  await page.waitForTimeout(520);
+  await page.clock.runFor(520);
   assert.equal(await page.locator('#panel').isHidden(), true);
   assert.equal(writes(f).length, 0);
   await cleanup(ctx);
