@@ -102,13 +102,13 @@ svg {
   padding: 0;
   display: grid;
   place-items: center;
-  background: #000;
+  background: var(--bg);
   color: var(--muted);
   touch-action: none;
   border-radius: 12px 0 0 12px;
 }
 #handle:hover {
-  background: #000;
+  background: var(--bg);
 }
 body[data-edge='left'] #handle {
   border-radius: 0 12px 12px 0;
@@ -476,7 +476,9 @@ body[data-material='native-glass'] {
 body:not([data-material='black']) #panel {
   background: var(--bg);
 }
-body[data-native-backdrop='true']:not([data-material='black']) #panel {
+body[data-native-backdrop='true']:not([data-material='black']) :is(#panel, #handle, #handle:hover),
+body[data-native-backdrop='true']:not([data-material='black']) #notch-mask::before,
+body[data-native-backdrop='true']:not([data-material='black']) #notch-mask::after {
   background: transparent;
 }
 body:not([data-material='black']) #panel {
@@ -498,9 +500,16 @@ body[data-native-backdrop='true']:not([data-material='black']) .matrix-toolbar {
 }
 
 /* Web text cannot adopt AppKit's adaptive vibrancy; keep a neutral readability veil. */
-body[data-material='native-glass'][data-native-backdrop='true'] #panel {
+body[data-material='native-glass'][data-native-backdrop='true'] :is(#panel, #handle, #handle:hover),
+body[data-material='native-glass'][data-native-backdrop='true'] #notch-mask::before,
+body[data-material='native-glass'][data-native-backdrop='true'] #notch-mask::after {
   background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
 body[data-material='native-glass'][data-native-dark='false'] {
   --muted: #444;
+}
+
+body:not([data-material='black']):not([data-native-backdrop='true']) #notch-mask::before,
+body:not([data-material='black']):not([data-native-backdrop='true']) #notch-mask::after {
+  background: var(--bg);
 }

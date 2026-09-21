@@ -9,7 +9,15 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium } from 'playwright';
@@ -49,7 +57,7 @@ const fixture = createServer((request, response) => {
   if (path === '/fixture' && request.method === 'GET') {
     response.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
     response.end(
-      `<!doctype html><title>Model control synthetic host</title><body><script>(${installModelControlFixture.toString()})(${JSON.stringify({ records, options: { modern: new URL(request.url, 'http://127.0.0.1').searchParams.has('modern') } })});</script></body>`,
+      `<!doctype html><title>Model control synthetic host</title><body><script>(${installModelControlFixture.toString()})(${JSON.stringify({ records, options: { modern: new URL(request.url, 'http://127.0.0.1').searchParams.has('modern'), openPlaceholder: true, speedFlyout: true } })});</script></body>`,
     );
   } else if (path === '/favicon.ico') {
     response.writeHead(204);
@@ -234,6 +242,18 @@ try {
   record(
     'authenticated apply changes reasoning and speed via official menus and returns actual state',
   );
+  const diagnosticPath = join(directory, 'model-control-diagnostic.json');
+  const diagnosticText = readFileSync(diagnosticPath, 'utf8');
+  const diagnostic = JSON.parse(diagnosticText);
+  assert.equal(diagnostic.kind, 'apply');
+  assert.equal(diagnostic.status, 'success');
+  assert.equal(diagnostic.diagnostic.failure, null);
+  assert.ok(diagnostic.diagnostic.steps.includes('读取当前配置'));
+  assert.equal(statSync(diagnosticPath).mode & 0o777, 0o600);
+  assert.ok(!diagnosticText.includes('chat-a') && !diagnosticText.includes('Draft'));
+  await api('state');
+  assert.equal(readFileSync(diagnosticPath, 'utf8'), diagnosticText);
+  record('private bounded operation diagnostic excludes chat data and survives passive polling');
 
   let clicks = await page.evaluate(() => host.triggerEvents);
   const staleRevision = await api('apply', command(refreshed.snapshot, beta));

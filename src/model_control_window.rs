@@ -451,16 +451,31 @@ impl Surface {
         }
         let backdrop = json!({
             "material": self.effective_material(), "liquidVariant": self.prefs.liquid_variant,
-            "x":0., "y":offset, "width":rect.width, "height":(rect.height-offset).max(1.),
-            "radius":0., "hidden": !self.expanded || self.hidden, "edge":self.prefs.edge.as_str(),
+            "x":0., "y":0., "width":rect.width, "height":rect.height,
+            "radius":0., "hidden": self.hidden, "edge":self.prefs.edge.as_str(),
             "viewportWidth":rect.width, "viewportHeight":rect.height,
         });
         if self.last_backdrop.as_ref() != Some(&backdrop) {
             self.backdrop.resize_viewport(&self.panel, false);
             self.backdrop.update(&self.panel, &backdrop);
-            if self.expanded && self.backdrop.style().is_some() {
-                self.backdrop
-                    .clip_edge(rect.width, rect.height - offset, self.prefs.edge.as_str());
+            if self.backdrop.style().is_some() {
+                let notch = (self.prefs.edge == Edge::Top && screen.notch_width > 0.).then_some((
+                    screen.notch_x - rect.x,
+                    screen.notch_width,
+                    screen.notch_height,
+                ));
+                let content_top = if notch.is_some() && !self.expanded {
+                    rect.height
+                } else {
+                    offset
+                };
+                self.backdrop.clip_edge(
+                    rect.width,
+                    rect.height,
+                    self.prefs.edge.as_str(),
+                    content_top,
+                    notch,
+                );
             }
             self.last_backdrop = Some(backdrop);
         }

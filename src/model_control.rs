@@ -1,5 +1,5 @@
 // [INPUT]: 已连接的 CDP Client、宿主模型适配器、独立偏好及原生窗口租约。
-// [OUTPUT]: 模型控制条状态、串行切换、偏好保存与单实例窗口生命周期。
+// [OUTPUT]: 模型控制条状态、串行切换、偏好保存、私有末次操作诊断与单实例窗口生命周期。
 // [POS]: 宿主模型控制服务；不读写建议生成配置或工作台的来源/布局。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -205,6 +205,18 @@ fn unavailable(message: &str) -> Value {
 }
 
 impl App {
+    // Last explicit user operation only: no chat text, identifiers, DOM dump or credentials.
+    fn record_model_control_diagnostic(&self, kind: &str, value: &Value) {
+        let record = json!({"kind":kind,"time":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs()),
+            "status":value["status"],"message":value["message"],"diagnostic":value["diagnostic"]});
+        if let Err(error) = write_private(
+            &self.paths.root.join("model-control-diagnostic.json"),
+            &serde_json::to_vec_pretty(&record).unwrap_or_default(),
+        ) {
+            tracing::warn!(%error, "无法保存模型切换诊断");
+        }
+    }
+
     pub async fn model_control_state(&self, refresh: bool) -> Result<Value> {
         let operation = self.model_control.lock().await.operation.clone();
         let Ok(_guard) = operation.try_lock() else {
@@ -237,6 +249,9 @@ impl App {
             }
             None => unavailable("尚未连接 Codex；请先在设置中连接宿主"),
         };
+        if refresh {
+            self.record_model_control_diagnostic("refresh", &snapshot);
+        }
         let mut control = self.model_control.lock().await;
         control.snapshot = snapshot.clone();
         Ok(control.envelope(snapshot))
@@ -274,6 +289,7 @@ impl App {
                 json!({"status":"failed","message":"连接中断或操作超时，实际配置尚未确认，请刷新核对","snapshot":unavailable("实际配置尚未确认")})
             }
         };
+        self.record_model_control_diagnostic("apply", &result);
         let same = self
             .desktop_client()
             .await

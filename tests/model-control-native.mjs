@@ -142,6 +142,7 @@ function probePage() {
           pointerDown,
           pointer,
           background: getComputedStyle(document.getElementById('panel')).backgroundColor,
+          handleBackground: getComputedStyle(document.getElementById('handle')).backgroundColor,
           hasFocus: document.hasFocus(),
           active: document.activeElement?.id,
           path: location.pathname,
@@ -466,6 +467,18 @@ try {
     assert.ok(telemetry.viewport[1] < 320);
     check(`independent theme ${theme}/${variant}`, telemetry.native);
     capture(`theme-${theme}-${variant}`);
+    const expandedBackground = telemetry.background;
+    await ipc({ action: 'collapse' });
+    await until(() => !telemetry.native.expanded, 'compact material');
+    assert.equal(telemetry.native.nativeBackdrop, backed);
+    assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
+    assert.equal(telemetry.handleBackground, expandedBackground);
+    const compactBounds = windowInfo().kCGWindowBounds;
+    assert.equal(Math.min(compactBounds.Width, compactBounds.Height), 10);
+    capture(`compact-${theme}-${variant}`);
+    check(`compact retains ${theme}/${variant} material`);
+    await ipc({ action: 'expand' });
+    await until(() => telemetry.native.expanded, 'restore expanded material');
   }
   await command("location.href='https://example.invalid/blocked-navigation'");
   await delay(500);

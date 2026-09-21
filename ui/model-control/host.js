@@ -4,7 +4,8 @@
  * [POS]: include_str / Page.addScriptToEvaluateOnNewDocument 可独立安装的宿主边界。
  * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、存储或发送模型请求。
  * snapshot(false) 不操作 DOM；refresh=true 显式探测菜单。target 无法确认时 id/title 为空。
- * apply 返回 {status,message,snapshot,previous}；status 为 success/partial/failed，细节在 message 与 snapshot.status。
+ * apply 返回 {status,message,snapshot,previous,diagnostic}；status 为 success/partial/failed。
+ * 显式 snapshot/apply 附有界阶段诊断，不含目标、聊天正文或 DOM；被动读取不产生诊断。
  * restore 是调用方恢复意图标记；selection 仍须完整且通过全部校验，无隐式回滚。
  * revision 是实例内不透明的乐观并发令牌，包含目标/DOM/能力/可观察配置变化。
  *
@@ -475,6 +476,36 @@
       signal.addEventListener('abort', abort, { once: true });
     });
   }
+  function phase(op, name) {
+    op.phase = name;
+    if (op.steps.at(-1) !== name && op.steps.length < 32) op.steps.push(name);
+  }
+  function failure(op, cause) {
+    op.failure ||= {
+      phase: op.phase,
+      message: cause.message,
+      openMenus: menus().length,
+      ownedMenus: [...op.menus].filter(menuOpen).length,
+      triggerExpanded: op.target.trigger.getAttribute('aria-expanded'),
+      triggerControls: !!op.target.trigger.getAttribute('aria-controls'),
+      pickerViews: op.main
+        ? all(op.main, '[data-model-picker-view]')
+            .filter(visible)
+            .map((n) => n.getAttribute('data-model-picker-view'))
+        : [],
+    };
+    return `${cause.message}（${op.failure.phase}）`;
+  }
+  const diagnostic = (op) =>
+    op
+      ? {
+          version: 2,
+          steps: op.steps,
+          failure: op.failure || null,
+          mutated: op.mutated,
+          cleanupError: op.cleanupError || null,
+        }
+      : null;
   async function waitFor(op, read, timeout = 1600) {
     const deadline = performance.now() + timeout;
     do {
@@ -550,11 +581,18 @@
     if (marked) return marked.closest('[role="menuitem"],button') || marked;
     return one(
       all(menu, '[role="menuitem"][aria-haspopup="menu"]').filter(
-        (item) => visible(item) && PREFIX[section].test(text(item)),
+        (item) =>
+          visible(item) &&
+          PREFIX[section].test(
+            section === 'speed' ? item.getAttribute('aria-label') || text(item) : text(item),
+          ),
       ),
     );
   };
-  const rowValue = (row, section) => text(row).replace(PREFIX[section], '').trim();
+  const rowValue = (row, section) =>
+    (section === 'speed' ? row?.getAttribute('aria-label') || text(row) : text(row))
+      .replace(PREFIX[section], '')
+      .trim();
   const items = (menu) =>
     all(menu, '[role="menuitem"],[role="option"],[role="menuitemradio"]').filter(
       (node) => visible(node) && !disabled(node) && node.getAttribute('aria-haspopup') !== 'menu',
@@ -578,6 +616,7 @@
         ? 'standard'
         : null;
   function modelFromTrigger(trigger) {
+    if (!trigger) return null;
     const candidates = [trigger, ...all(trigger, 'span')].filter(visible);
     const matches = new Set();
     for (const node of candidates) {
@@ -606,10 +645,12 @@
     one(all(main, '[role="menuitemcheckbox"][data-fast-mode-enabled]').filter(visible));
   function readMain(op, main) {
     guard(op, main);
+    phase(op, '读取当前配置');
     const modelRow = sectionRow(main, 'model');
     const model = modelRow
       ? matchModel(rowValue(modelRow, 'model'))
-      : modelFromTrigger(op.target.trigger);
+      : modelFromTrigger(op.target.trigger) ||
+        modelFromTrigger(one(all(main, '[data-model-picker-view-toggle]').filter(visible)));
     const reasoning = canonical(
       op.target.trigger.getAttribute('data-selected-reasoning-effort') ??
         rowValue(sectionRow(main, 'reasoning'), 'reasoning'),
@@ -640,6 +681,7 @@
   }
   async function openMain(op) {
     guard(op);
+    phase(op, '打开主菜单');
     const active = menus();
     const existing = one(active.filter((menu) => linkedMenu(op.target.trigger, menu)));
     if (active.length) {
@@ -686,6 +728,7 @@
   }
   async function closeMenu(op) {
     guard(op);
+    phase(op, '关闭自有菜单');
     if (op.main) menuFamily(op.main).forEach((menu) => op.menus.add(menu));
     // Escape usually closes the deepest menu first. Some hosts listen only on
     // the parent; fall back to that same owned parent, never body or another menu.
@@ -707,6 +750,7 @@
     op.main = null;
   }
   async function submenu(op, main, section) {
+    phase(op, `打开 ${section} 选项`);
     const row = sectionRow(main, section);
     if (!row) throw new Error(`官方 ${section} 菜单不可用`);
     const before = new Set(menus());
@@ -741,12 +785,18 @@
     return menu;
   }
   async function simpleMain(op) {
-    let main = await openMain(op);
+    const main = await openMain(op);
     if (one(all(main, '[data-model-picker-view="advanced"]').filter(visible))) {
-      await closeMenu(op);
-      main = await openMain(op);
-      if (one(all(main, '[data-model-picker-view="advanced"]').filter(visible)))
-        throw new Error('官方模型视图未恢复，请切回简洁视图后重试');
+      // The host remembers this view across close/reopen. Selecting its already
+      // checked row is the official no-change return path to the simple view.
+      const selected = one(
+        all(main, '[role="menuitemradio"][aria-checked="true"]').filter(visible),
+      );
+      if (!selected || disabled(selected) || selected.getAttribute('aria-describedby'))
+        throw new Error('官方模型视图无法安全返回，请先切回简洁视图');
+      phase(op, '返回简洁模型视图');
+      activate(op, selected);
+      await waitFor(op, () => one(all(main, '[data-model-picker-view="simple"]').filter(visible)));
     }
     return main;
   }
@@ -789,6 +839,7 @@
       const key =
         order.indexOf(wanted) > order.indexOf(actual.reasoning) ? 'ArrowRight' : 'ArrowLeft';
       const before = actual.reasoning;
+      phase(op, '调整推理滑块');
       pressKey(op, slider, key, true);
       actual = await waitFor(op, () => {
         const current = readMain(op, main);
@@ -804,6 +855,7 @@
       if (toggle) {
         if (disabled(toggle) || toggle.getAttribute('data-interactive') === 'false')
           throw new Error('官方模型选择已禁用');
+        phase(op, '打开高级模型视图');
         activate(op, toggle);
         await waitFor(op, () =>
           one(all(main, '[data-model-picker-view="advanced"]').filter(visible)),
@@ -854,6 +906,7 @@
       );
       if (!item || (section === 'model' && item.getAttribute('aria-describedby')))
         throw new Error(`官方 ${section} 选项不存在、重复、锁定或被禁用`);
+      phase(op, `选择 ${section} 选项`);
       activate(op, item, true);
     }
     // Menu can close before the host commits its asynchronous update.
@@ -876,6 +929,8 @@
       target,
       capabilityVersion,
       refresh,
+      phase: '准备',
+      steps: [],
       mutated: false,
       aborted: '',
       main: null,
@@ -928,14 +983,17 @@
       // A hot injection can provoke a normal host capability fetch by opening its menu.
       const main = await simpleMain(op);
       guard(op, main);
-      if (models.length) remember(op, readMain(op, main));
+      const current = models.length ? readMain(op, main) : null;
+      await closeMenu(op);
+      if (current) remember(op, current);
     } catch (cause) {
-      error = cause.message;
+      error = failure(op, cause);
       cache = null;
     }
     const cleanupError = await finish(op);
     error ||= cleanupError;
     const result = passive();
+    result.diagnostic = diagnostic(op);
     if (error) {
       result.message = error;
       if (models.length && ['ready', 'waiting'].includes(result.status))
@@ -945,12 +1003,14 @@
   }
   async function apply(request = {}) {
     let before = passive(),
-      previous = null;
+      previous = null,
+      op = null;
     const result = (status, message) => ({
       status: status === 'applied' ? 'success' : status === 'partial' ? 'partial' : 'failed',
       message,
       snapshot: passive(),
       previous,
+      diagnostic: diagnostic(op),
     });
     if (operation || ['busy', 'unavailable', 'conflict'].includes(before.status))
       return result(before.status, before.message);
@@ -966,7 +1026,7 @@
       (selection.speed === 'fast' && !model.fast)
     )
       return result('invalid', '完整配置不受官方能力支持，未做任何修改');
-    const op = begin();
+    op = begin();
     let status = 'applied',
       message = '';
     try {
@@ -987,7 +1047,7 @@
         throw new Error('官方完整配置与请求不一致');
     } catch (cause) {
       status = op.mutated ? 'partial' : op.aborted ? 'conflict' : 'unavailable';
-      message = cause.message;
+      message = failure(op, cause);
       cache = null;
       if (!op.aborted && op.mutated) {
         try {

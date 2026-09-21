@@ -1,7 +1,7 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
 // [OUTPUT]: 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
 // [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
-// [PROTOCOL]: 共享材质保持窗口无关；控制条可选边缘裁切，工作台仍用圆角矩形。
+// [PROTOCOL]: 共享材质保持窗口无关；控制条可选内容边缘和刘海两翼裁切，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};
 use objc2_app_kit::{
@@ -92,7 +92,14 @@ impl Backdrop {
     }
 
     // Optional edge contour for the model control. Workbench keeps its rounded rectangle.
-    pub fn clip_edge(&self, width: f64, height: f64, edge: &str) {
+    pub fn clip_edge(
+        &self,
+        width: f64,
+        height: f64,
+        edge: &str,
+        content_top: f64,
+        notch: Option<(f64, f64, f64)>,
+    ) {
         let Some(layer) = self.boundary.layer() else {
             return;
         };
@@ -100,41 +107,52 @@ impl Backdrop {
             return;
         };
         let mask: Retained<CALayer> = unsafe { objc2::msg_send![class, new] };
+        let body_height = (height - content_top).max(0.);
         let (a, b) = if edge == "top" {
-            (height, width)
+            (body_height, width)
         } else {
-            (width, height)
+            (width, body_height)
         };
         let lip = 8_f64.min(a / 2.).min(b / 4.);
         let r = 18_f64.min(a - lip).min((b - 2. * lip) / 2.);
         let p = |x: f64, y: f64| match edge {
-            "left" => (width - x, height - y),
+            "left" => (width - x, body_height - y),
             "top" => (y, x),
-            _ => (x, height - y),
+            _ => (x, body_height - y),
         };
         unsafe {
             let path = CGPathCreateMutable();
             if path.is_null() {
                 return;
             }
-            let start = p(a, 0.);
-            CGPathMoveToPoint(path, std::ptr::null(), start.0, start.1);
-            for (control, end) in [
-                (Some(p(a, lip)), p(a - lip, lip)),
-                (None, p(r, lip)),
-                (Some(p(0., lip)), p(0., lip + r)),
-                (None, p(0., b - lip - r)),
-                (Some(p(0., b - lip)), p(r, b - lip)),
-                (None, p(a - lip, b - lip)),
-                (Some(p(a, b - lip)), p(a, b)),
-            ] {
-                if let Some(c) = control {
-                    CGPathAddQuadCurveToPoint(path, std::ptr::null(), c.0, c.1, end.0, end.1);
-                } else {
-                    CGPathAddLineToPoint(path, std::ptr::null(), end.0, end.1);
+            if body_height > 0. {
+                let start = p(a, 0.);
+                CGPathMoveToPoint(path, std::ptr::null(), start.0, start.1);
+                for (control, end) in [
+                    (Some(p(a, lip)), p(a - lip, lip)),
+                    (None, p(r, lip)),
+                    (Some(p(0., lip)), p(0., lip + r)),
+                    (None, p(0., b - lip - r)),
+                    (Some(p(0., b - lip)), p(r, b - lip)),
+                    (None, p(a - lip, b - lip)),
+                    (Some(p(a, b - lip)), p(a, b)),
+                ] {
+                    if let Some(c) = control {
+                        CGPathAddQuadCurveToPoint(path, std::ptr::null(), c.0, c.1, end.0, end.1);
+                    } else {
+                        CGPathAddLineToPoint(path, std::ptr::null(), end.0, end.1);
+                    }
+                }
+                CGPathCloseSubpath(path);
+            }
+            if let Some((x, w, h)) = notch {
+                // Only the two visible flanks share the material; the hardware hole stays empty.
+                for left in [x - 10., x + w] {
+                    let rect =
+                        NSRect::new(NSPoint::new(left.max(0.), height - h), NSSize::new(10., h));
+                    CGPathAddRect(path, std::ptr::null(), rect);
                 }
             }
-            CGPathCloseSubpath(path);
             let _: () = objc2::msg_send![&*mask, setPath: path];
             layer.setMask(Some(&mask));
             CGPathRelease(path);
@@ -282,6 +300,7 @@ unsafe extern "C" {
         x: f64,
         y: f64,
     );
+    fn CGPathAddRect(path: *mut c_void, transform: *const c_void, rect: NSRect);
     fn CGPathCloseSubpath(path: *mut c_void);
     fn CGPathRelease(path: *mut c_void);
 }

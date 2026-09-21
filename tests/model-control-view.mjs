@@ -751,6 +751,33 @@ test('theme and placement menus save independent preferences without applying a 
   await cleanup(ctx);
 });
 
+test('compact handle and notch flanks retain each selected material', async () => {
+  const ctx = await setup();
+  const { page } = ctx;
+  for (const material of ['black', 'matte', 'frosted', 'native-glass']) {
+    const detail = {
+      effectiveMaterial: material,
+      nativeBackdrop: ['frosted', 'native-glass'].includes(material),
+    };
+    await nativeEvent(page, { ...detail, expanded: true });
+    const expanded = await page
+      .locator('#panel')
+      .evaluate((n) => getComputedStyle(n).backgroundColor);
+    await nativeEvent(page, { ...detail, expanded: false });
+    assert.equal(
+      await page.locator('#handle').evaluate((n) => getComputedStyle(n).backgroundColor),
+      expanded,
+    );
+    assert.equal(
+      await page
+        .locator('#notch-mask')
+        .evaluate((n) => getComputedStyle(n, '::before').backgroundColor),
+      expanded,
+    );
+  }
+  await cleanup(ctx);
+});
+
 test('missing credentials fail closed; delayed state cannot overwrite an apply result', async () => {
   const missing = await setup({ auth: false });
   await poll(missing.page, () =>

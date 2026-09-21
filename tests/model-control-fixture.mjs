@@ -79,6 +79,7 @@ export function installModelControlFixture({ records, options = {} }) {
       main.dataset.state = 'open';
       main.tabIndex = -1;
       const config = state.configs[id];
+      if (options.openPlaceholder) trigger.textContent = 'Select model';
       if (options.unknownMenu) {
         main.textContent = 'An unsupported future picker';
       } else if (options.modern) {
@@ -94,16 +95,27 @@ export function installModelControlFixture({ records, options = {} }) {
           inactive.innerHTML =
             '<div role="menuitemradio" data-model-selected="true">Hidden model</div>';
           main.append(inactive);
+          if (options.openPlaceholder) trigger.textContent = 'Select model';
           if (view === 'advanced') {
             for (const model of records) {
               const choice = document.createElement('div');
               choice.setAttribute('role', 'menuitemradio');
-              choice.setAttribute('aria-checked', String(config.model === model.model));
+              choice.setAttribute(
+                'aria-checked',
+                String(
+                  (!options.defaultRecommendation || state.explicitModel) &&
+                    config.model === model.model,
+                ),
+              );
               if (config.model === model.model) choice.dataset.modelSelected = 'true';
               if (options.lockedModel === model.model)
                 choice.setAttribute('aria-describedby', 'locked-help');
               choice.innerHTML = `<span>${model.displayName}</span>`;
               choice.addEventListener('click', () => {
+                if (choice.getAttribute('aria-checked') === 'true') {
+                  draw();
+                  return;
+                }
                 state.explicitModel = true;
                 config.model = model.model;
                 config.reasoning = model.supportedReasoningEfforts.map((effort) =>
@@ -120,7 +132,8 @@ export function installModelControlFixture({ records, options = {} }) {
             const toggle = document.createElement('div');
             toggle.setAttribute('role', 'menuitem');
             toggle.dataset.modelPickerViewToggle = 'true';
-            toggle.textContent = '选择模型';
+            toggle.setAttribute('aria-label', 'Select model');
+            toggle.innerHTML = `<span>${records.find((m) => m.model === config.model).displayName}</span><span>${config.reasoning}</span>`;
             toggle.addEventListener('click', () => draw('advanced'));
             root.append(toggle);
             const slider = document.createElement('div');
@@ -156,7 +169,41 @@ export function installModelControlFixture({ records, options = {} }) {
                 render();
                 draw();
               });
-              root.append(fast);
+              if (options.speedFlyout) {
+                fast.setAttribute('role', 'menuitem');
+                fast.setAttribute('aria-haspopup', 'menu');
+                fast.setAttribute(
+                  'aria-label',
+                  `Speed ${config.speed === 'fast' ? 'Fast' : 'Standard'}`,
+                );
+                const flyout = fast.cloneNode(false);
+                flyout.textContent = '⚡';
+                flyout.addEventListener('click', () => {
+                  const sub = document.createElement('div');
+                  sub.id = 'speed-menu';
+                  sub.setAttribute('role', 'menu');
+                  sub.dataset.state = 'open';
+                  flyout.setAttribute('aria-controls', sub.id);
+                  for (const speed of ['standard', 'fast']) {
+                    const item = document.createElement('div');
+                    item.setAttribute('role', 'menuitem');
+                    item.textContent = speed === 'fast' ? 'Fast' : 'Standard';
+                    item.addEventListener('click', () => {
+                      config.speed = speed;
+                      state.changes.push({ id, ...config });
+                      sub.remove();
+                      render();
+                      draw();
+                    });
+                    sub.append(item);
+                  }
+                  sub.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') sub.remove();
+                  });
+                  document.body.append(sub);
+                });
+                root.append(flyout);
+              } else root.append(fast);
             }
           }
         };
@@ -234,6 +281,7 @@ export function installModelControlFixture({ records, options = {} }) {
         if (event.key === 'Escape') {
           state.clicks.push({ id, action: 'close' });
           clearMenus();
+          render();
         }
       });
       document.body.append(main);

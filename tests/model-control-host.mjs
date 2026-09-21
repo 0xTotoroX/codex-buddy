@@ -63,7 +63,19 @@ try {
       assert.deepEqual(result.snapshot.current, targetBeta);
       assert.equal(await page.locator('[role="menu"]').count(), 0);
     },
-    { modern: true, defaultRecommendation: true },
+    { modern: true, defaultRecommendation: true, openPlaceholder: true, speedFlyout: true },
+  );
+  await check(
+    'already-open advanced picker returns through checked item without changing selection',
+    async (page) => {
+      await page.locator('form button').click();
+      await page.locator('[data-model-picker-view-toggle]').click();
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success', result.message);
+    },
+    { modern: true, openPlaceholder: true },
   );
   await check(
     'inline model submenu without Model prefix and flat reasoning options',
@@ -106,6 +118,9 @@ try {
         const result = await snapshot(page, true);
         assert.equal(result.status, 'unavailable');
         assert.match(result.message, /完整配置/);
+        assert.equal(result.diagnostic.failure.phase, '读取当前配置');
+        assert.equal(result.diagnostic.failure.ownedMenus, 1);
+        assert.equal('target' in result.diagnostic, false);
         assert.equal(await page.locator('[role="menu"]').count(), 0);
         assert.equal(await page.evaluate(() => host.changes.length), 0);
       }
@@ -236,7 +251,9 @@ try {
       assert.deepEqual(state.current, { model: 'alpha', reasoning: 'low', speed: 'standard' });
       assert.equal(await page.evaluate(() => document.activeElement.matches('.ProseMirror')), true);
       const clicks = await page.evaluate(() => host.clicks.length);
-      assert.deepEqual(await snapshot(page), state);
+      const { diagnostic, ...passiveState } = state;
+      assert.equal(diagnostic.failure, null);
+      assert.deepEqual(await snapshot(page), passiveState);
       assert.equal(await page.evaluate(() => host.clicks.length), clicks);
     },
   );
