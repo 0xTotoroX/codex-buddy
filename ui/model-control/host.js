@@ -57,6 +57,7 @@
     最大: 'max',
     最高: 'max',
     超高: 'ultra',
+    持续: 'persistent',
   };
   const life = new AbortController();
   const requests = new Map();
@@ -543,12 +544,16 @@
     }
     return family;
   }
-  const sectionRow = (menu, section) =>
-    one(
-      all(menu, '[role="menuitem"][aria-haspopup="menu"]').filter((item) =>
-        PREFIX[section].test(text(item)),
+  const sectionRow = (menu, section) => {
+    const marked =
+      section === 'model' ? one(all(menu, '[data-model-picker-model-row]').filter(visible)) : null;
+    if (marked) return marked.closest('[role="menuitem"],button') || marked;
+    return one(
+      all(menu, '[role="menuitem"][aria-haspopup="menu"]').filter(
+        (item) => visible(item) && PREFIX[section].test(text(item)),
       ),
     );
+  };
   const rowValue = (row, section) => text(row).replace(PREFIX[section], '').trim();
   const items = (menu) =>
     all(menu, '[role="menuitem"],[role="option"],[role="menuitemradio"]').filter(
@@ -572,16 +577,58 @@
       : /^(?:standard|标准)(?:\s|$)/i.test(value)
         ? 'standard'
         : null;
+  function modelFromTrigger(trigger) {
+    const candidates = [trigger, ...all(trigger, 'span')].filter(visible);
+    const matches = new Set();
+    for (const node of candidates) {
+      // Hidden measuring copies must not become model evidence.
+      const content = [...node.childNodes]
+        .filter((child) => child.nodeType === Node.TEXT_NODE)
+        .map((child) => child.textContent)
+        .join(' ')
+        .trim();
+      const direct = matchModel(content);
+      if (direct) matches.add(direct);
+      for (const model of models)
+        for (const name of [model.id, model.label]) {
+          const value = normalized(content),
+            prefix = normalized(name);
+          if (
+            value.startsWith(prefix + ' ') &&
+            model.reasoning.includes(canonical(value.slice(prefix.length).trim()))
+          )
+            matches.add(model);
+        }
+    }
+    return matches.size === 1 ? [...matches][0] : null;
+  }
+  const fastCheckbox = (main) =>
+    one(all(main, '[role="menuitemcheckbox"][data-fast-mode-enabled]').filter(visible));
   function readMain(op, main) {
     guard(op, main);
-    const model = matchModel(rowValue(sectionRow(main, 'model'), 'model'));
-    const reasoning = canonical(rowValue(sectionRow(main, 'reasoning'), 'reasoning'));
-    const speedRow = sectionRow(main, 'speed');
+    const modelRow = sectionRow(main, 'model');
+    const model = modelRow
+      ? matchModel(rowValue(modelRow, 'model'))
+      : modelFromTrigger(op.target.trigger);
+    const reasoning = canonical(
+      op.target.trigger.getAttribute('data-selected-reasoning-effort') ??
+        rowValue(sectionRow(main, 'reasoning'), 'reasoning'),
+    );
+    const selected = one(all(main, '[data-model-selected="true"]').filter(visible));
+    if (selected && model && matchModel(label(selected))?.id !== model.id)
+      throw new Error('官方模型显示与选中状态不一致');
+    const speedRow = sectionRow(main, 'speed'),
+      checkbox = fastCheckbox(main);
+    const checked = checkbox?.getAttribute('aria-checked');
     const speed = speedRow
       ? speedValue(rowValue(speedRow, 'speed'))
-      : model && !model.fast
-        ? 'standard'
-        : null;
+      : checked === 'true'
+        ? 'fast'
+        : checked === 'false'
+          ? 'standard'
+          : model && !model.fast
+            ? 'standard'
+            : null;
     if (!model || !model.reasoning.includes(reasoning) || !speed)
       throw new Error('官方完整配置无法精确回读');
     return { model: model.id, reasoning, speed };
@@ -594,9 +641,7 @@
   async function openMain(op) {
     guard(op);
     const active = menus();
-    const existing = one(
-      active.filter((menu) => linkedMenu(op.target.trigger, menu) && sectionRow(menu, 'model')),
-    );
+    const existing = one(active.filter((menu) => linkedMenu(op.target.trigger, menu)));
     if (active.length) {
       if (!existing || active.some((menu) => !menuFamily(existing).includes(menu)))
         throw new Error('另一个官方菜单仍然打开，请先关闭该菜单再选择模型');
@@ -611,9 +656,7 @@
     const main = await waitFor(op, () => {
       const id = op.target.trigger.getAttribute('aria-controls');
       const found = menus().filter(
-        (menu) =>
-          sectionRow(menu, 'model') &&
-          (!id || references(op.target.trigger, 'aria-controls', menu.id)),
+        (menu) => !id || references(op.target.trigger, 'aria-controls', menu.id),
       );
       const menu = one(found);
       if (menu) {
@@ -667,15 +710,29 @@
     const row = sectionRow(main, section);
     if (!row) throw new Error(`官方 ${section} 菜单不可用`);
     const before = new Set(menus());
+    const previousItems = new Set(items(main));
     activate(op, row);
     const menu = await waitFor(op, () => {
       const id = row.getAttribute('aria-controls');
-      return one(
+      const popup = one(
         menus().filter(
           (entry) =>
             entry !== main && items(entry).length && (id ? entry.id === id : !before.has(entry)),
         ),
       );
+      if (popup) return popup;
+      // Inline submenus insert options into the same owned root.
+      return items(main).some(
+        (item) =>
+          !previousItems.has(item) &&
+          (section === 'model'
+            ? matchModel(label(item))
+            : section === 'reasoning'
+              ? models.some((model) => model.reasoning.includes(canonical(label(item))))
+              : speedValue(label(item))),
+      )
+        ? main
+        : null;
     });
     op.menus.add(menu);
     guard(op, main);
@@ -683,8 +740,82 @@
     guard(op, menu);
     return menu;
   }
+  async function simpleMain(op) {
+    let main = await openMain(op);
+    if (one(all(main, '[data-model-picker-view="advanced"]').filter(visible))) {
+      await closeMenu(op);
+      main = await openMain(op);
+      if (one(all(main, '[data-model-picker-view="advanced"]').filter(visible)))
+        throw new Error('官方模型视图未恢复，请切回简洁视图后重试');
+    }
+    return main;
+  }
+  function pressKey(op, node, key, mutation = false) {
+    guard(op, node);
+    if (mutation) {
+      op.mutated = true;
+      cache = null;
+    }
+    dispatching = true;
+    try {
+      node.dispatchEvent(
+        new KeyboardEvent('keydown', { key, code: key, bubbles: true, cancelable: true }),
+      );
+    } finally {
+      dispatching = false;
+    }
+    guard(op);
+  }
+  async function chooseReasoningSlider(op, main, wanted) {
+    const order = [
+      'none',
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+      'ultra',
+      'persistent',
+    ];
+    const initial = readMain(op, main);
+    const model = models.find((m) => m.id === initial.model);
+    if (wanted === 'persistent') throw new Error('官方简洁滑块不提供持续强度，请在官方菜单选择');
+    let actual = initial;
+    for (let i = 0; i < model.reasoning.length + 1 && actual.reasoning !== wanted; i++) {
+      const slider = one(all(main, '[data-reasoning-slider]').filter(visible));
+      if (!slider || !order.includes(actual.reasoning) || !order.includes(wanted))
+        throw new Error('官方推理滑块不可用');
+      const key =
+        order.indexOf(wanted) > order.indexOf(actual.reasoning) ? 'ArrowRight' : 'ArrowLeft';
+      const before = actual.reasoning;
+      pressKey(op, slider, key, true);
+      actual = await waitFor(op, () => {
+        const current = readMain(op, main);
+        return current.reasoning !== before || current.model !== initial.model ? current : null;
+      });
+      if (actual.model !== initial.model) throw new Error('官方滑块同时改变了模型，请核对当前配置');
+    }
+    if (actual.reasoning !== wanted) throw new Error('官方推理档位不可达');
+  }
+  async function selectionMenu(op, main, section) {
+    if (section === 'model') {
+      const toggle = one(all(main, '[data-model-picker-view-toggle]').filter(visible));
+      if (toggle) {
+        if (disabled(toggle) || toggle.getAttribute('data-interactive') === 'false')
+          throw new Error('官方模型选择已禁用');
+        activate(op, toggle);
+        await waitFor(op, () =>
+          one(all(main, '[data-model-picker-view="advanced"]').filter(visible)),
+        );
+        return main;
+      }
+    }
+    if (sectionRow(main, section)) return submenu(op, main, section);
+    return main; // Current host can render reasoning choices directly in the main popup.
+  }
   async function readOfficial(op) {
-    const main = await openMain(op);
+    const main = await simpleMain(op);
     guard(op, main);
     const current = readMain(op, main);
     await closeMenu(op);
@@ -692,22 +823,39 @@
     return remember(op, current);
   }
   async function choose(op, section, wanted) {
-    const main = await openMain(op);
+    let main = await simpleMain(op);
     guard(op, main);
-    const menu = await submenu(op, main, section);
-    guard(op, main);
-    guard(op, menu);
-    const item = one(
-      items(menu).filter((entry) =>
-        section === 'model'
-          ? matchModel(label(entry))?.id === wanted
-          : section === 'reasoning'
-            ? canonical(label(entry)) === wanted
-            : speedValue(label(entry)) === wanted,
-      ),
-    );
-    if (!item) throw new Error(`官方 ${section} 选项不存在、重复或被禁用`);
-    activate(op, item, true);
+    const checkbox = section === 'speed' && fastCheckbox(main);
+    if (section === 'reasoning' && one(all(main, '[data-reasoning-slider]').filter(visible))) {
+      // Default recommendation mode can couple slider steps to model changes.
+      // Explicitly select this same model first, then use its supported effort range.
+      if (one(all(main, '[data-model-picker-view-toggle]').filter(visible))) {
+        const current = readMain(op, main);
+        await choose(op, 'model', current.model);
+        main = await simpleMain(op);
+      }
+      await chooseReasoningSlider(op, main, wanted);
+    } else if (checkbox) {
+      const current = checkbox.getAttribute('aria-checked');
+      if (!['true', 'false'].includes(current)) throw new Error('官方速度状态未知');
+      if ((current === 'true') !== (wanted === 'fast')) activate(op, checkbox, true);
+    } else {
+      const menu = await selectionMenu(op, main, section);
+      guard(op, main);
+      guard(op, menu);
+      const item = one(
+        items(menu).filter((entry) =>
+          section === 'model'
+            ? matchModel(label(entry))?.id === wanted
+            : section === 'reasoning'
+              ? canonical(label(entry)) === wanted
+              : speedValue(label(entry)) === wanted,
+        ),
+      );
+      if (!item || (section === 'model' && item.getAttribute('aria-describedby')))
+        throw new Error(`官方 ${section} 选项不存在、重复、锁定或被禁用`);
+      activate(op, item, true);
+    }
     // Menu can close before the host commits its asynchronous update.
     await closeMenu(op);
     guard(op);
@@ -778,7 +926,7 @@
     let error = '';
     try {
       // A hot injection can provoke a normal host capability fetch by opening its menu.
-      const main = await openMain(op);
+      const main = await simpleMain(op);
       guard(op, main);
       if (models.length) remember(op, readMain(op, main));
     } catch (cause) {

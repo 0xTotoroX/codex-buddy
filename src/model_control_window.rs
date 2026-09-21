@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随与租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随、独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -11,11 +11,11 @@ use anyhow::{Context, Result};
 use geometry::{Edge, Rect, Screen, SurfaceRegion};
 use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_send, rc::Retained};
 use objc2_app_kit::{
-    NSBackingStoreType, NSColor, NSEvent, NSEventModifierFlags, NSPanel, NSScreen,
-    NSStatusWindowLevel, NSView, NSWindowAnimationBehavior, NSWindowCollectionBehavior,
-    NSWindowStyleMask,
+    NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSBackingStoreType,
+    NSColor, NSEvent, NSEventModifierFlags, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
+    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
-use objc2_foundation::{NSPoint, NSRect, NSSize, ns_string};
+use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, ns_string};
 use serde_json::{Value, json};
 use std::{
     cell::Cell,
@@ -167,6 +167,8 @@ struct Preferences {
     position: f64,
     screen: String,
     keep_open: bool,
+    theme: String,
+    liquid_variant: String,
 }
 impl Default for Preferences {
     fn default() -> Self {
@@ -175,6 +177,8 @@ impl Default for Preferences {
             position: 0.5,
             screen: String::new(),
             keep_open: false,
+            theme: "black".into(),
+            liquid_variant: "regular".into(),
         }
     }
 }
@@ -188,6 +192,8 @@ impl Preferences {
             position: geometry::fraction(value["position"].as_f64().unwrap_or(0.5)),
             screen: value["screen"].as_str().unwrap_or_default().to_owned(),
             keep_open: value["keepOpen"].as_bool().unwrap_or(false),
+            theme: value["theme"].as_str().unwrap_or("black").into(),
+            liquid_variant: value["liquidVariant"].as_str().unwrap_or("regular").into(),
         }
     }
 }
@@ -271,6 +277,7 @@ impl Drop for Backend {
 struct Surface {
     // Drop WebView before its retained parent and panel.
     webview: WebView,
+    backdrop: crate::native_backdrop::Backdrop,
     content_height: f64,
     pointer_state: Option<Value>,
     hover_suppressed: Vec<SurfaceRegion>,
@@ -292,9 +299,18 @@ struct Surface {
     preference_error: bool,
     shortcut_error: Option<String>,
     last_detail: Option<Value>,
+    last_backdrop: Option<Value>,
 }
 
 impl Surface {
+    fn effective_material(&self) -> &str {
+        if self.prefs.theme == "native-glass" && !crate::native_backdrop::glass_available() {
+            "matte"
+        } else {
+            &self.prefs.theme
+        }
+    }
+
     fn dispatch(&mut self) {
         if !self.ready {
             return;
@@ -329,10 +345,14 @@ impl Surface {
             "shortcutAvailable": self.shortcut_error.is_none(), "shortcutError": self.shortcut_error,
             "preferenceError": if self.preference_error { Some("无法保存模型控窗偏好，请稍后重试") } else { None },
             "appearance": {"material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant, "fontOffset": self.appearance.font_offset},
-            "effectiveMaterial": "black",
+            "nativeDark": self.panel.effectiveAppearance().bestMatchFromAppearancesWithNames(
+                &NSArray::from_slice(&[unsafe {NSAppearanceNameDarkAqua}, unsafe {NSAppearanceNameAqua}])
+            ).is_some_and(|name| name.isEqualToString(unsafe {NSAppearanceNameDarkAqua})),
+            "theme": self.prefs.theme, "liquidVariant": self.prefs.liquid_variant,
+            "effectiveMaterial": self.effective_material(),
             "availableHeight": screen.map_or(640., |s| s.usable.height) + offset,
             "nativeGlassAvailable": crate::native_backdrop::glass_available(),
-            "nativeBackdrop": false, "backdropStyle": Value::Null,
+            "nativeBackdrop": self.backdrop.style().is_some(), "backdropStyle": self.backdrop.style(),
         });
         // 页面用 keyboard 变化安排输入焦点；重复轮询不能把预设编辑器的焦点抢回搜索框。
         if self.last_detail.as_ref() == Some(&detail) {
@@ -428,6 +448,21 @@ impl Surface {
                 position: wry::dpi::LogicalPosition::new(0., 0.).into(),
                 size: wry::dpi::LogicalSize::new(rect.width, rect.height).into(),
             })?;
+        }
+        let backdrop = json!({
+            "material": self.effective_material(), "liquidVariant": self.prefs.liquid_variant,
+            "x":0., "y":offset, "width":rect.width, "height":(rect.height-offset).max(1.),
+            "radius":0., "hidden": !self.expanded || self.hidden, "edge":self.prefs.edge.as_str(),
+            "viewportWidth":rect.width, "viewportHeight":rect.height,
+        });
+        if self.last_backdrop.as_ref() != Some(&backdrop) {
+            self.backdrop.resize_viewport(&self.panel, false);
+            self.backdrop.update(&self.panel, &backdrop);
+            if self.expanded && self.backdrop.style().is_some() {
+                self.backdrop
+                    .clip_edge(rect.width, rect.height - offset, self.prefs.edge.as_str());
+            }
+            self.last_backdrop = Some(backdrop);
         }
         if self.valid
             && self.ready
@@ -707,8 +742,10 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         Err(error) => (None, Some(error)),
     };
     let backend = Backend::start(runtime, lease.into(), event_loop.create_proxy())?;
+    let backdrop = crate::native_backdrop::Backdrop::new(&panel);
     let mut surface = Surface {
         webview,
+        backdrop,
         content_height: 274.,
         pointer_state: None,
         hover_suppressed: Vec::new(),
@@ -730,6 +767,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         preference_error: false,
         shortcut_error,
         last_detail: None,
+        last_backdrop: None,
     };
     let mut error = None;
     let mut next_screen_check = Instant::now();
@@ -850,6 +888,9 @@ struct UuidBytes {
 #[link(name = "CoreGraphics", kind = "framework")]
 unsafe extern "C" {
     fn CGDisplayCreateUUIDFromDisplayID(display: u32) -> *const c_void;
+    fn CGGetActiveDisplayList(max: u32, displays: *mut u32, count: *mut u32) -> i32;
+    fn CGDisplayBounds(display: u32) -> NSRect;
+    fn CGDisplayIsBuiltin(display: u32) -> u32;
 }
 #[link(name = "CoreFoundation", kind = "framework")]
 unsafe extern "C" {
@@ -864,6 +905,10 @@ fn display_identity(screen: &NSScreen) -> String {
     };
     // NSNumber returned for Apple's documented NSScreenNumber key.
     let display: u32 = unsafe { msg_send![&*number, unsignedIntValue] };
+    display_uuid(display)
+}
+
+fn display_uuid(display: u32) -> String {
     let uuid = unsafe { CGDisplayCreateUUIDFromDisplayID(display) };
     if uuid.is_null() {
         return String::new();
@@ -871,6 +916,23 @@ fn display_identity(screen: &NSScreen) -> String {
     let bytes = unsafe { CFUUIDGetUUIDBytes(uuid) }.bytes;
     unsafe { CFRelease(uuid) };
     uuid::Uuid::from_bytes(bytes).to_string()
+}
+
+// CoreGraphics display enumeration is thread-safe; settings never calls NSScreen off-main.
+pub fn display_options() -> Result<Value> {
+    let mut ids = [0_u32; 32];
+    let mut count = 0;
+    let status = unsafe { CGGetActiveDisplayList(ids.len() as u32, ids.as_mut_ptr(), &mut count) };
+    anyhow::ensure!(status == 0, "无法读取显示器列表");
+    let displays: Vec<Value> = ids.iter().take(count.min(ids.len() as u32) as usize).enumerate()
+        .filter_map(|(index, &id)| {
+            let uuid = display_uuid(id);
+            if uuid.is_empty() { return None; }
+            let bounds = unsafe { CGDisplayBounds(id) };
+            let builtin = unsafe { CGDisplayIsBuiltin(id) } != 0;
+            Some(json!({"id":uuid,"label":format!("{} · {} × {}", if builtin { "内建显示器".into() } else { format!("显示器 {}",index+1) }, bounds.size.width as u32, bounds.size.height as u32)}))
+        }).collect();
+    Ok(json!({"screens":displays,"nativeGlassAvailable":crate::native_backdrop::glass_available()}))
 }
 
 // Carbon event hotkeys use no global keyboard event tap and request no AX permission.

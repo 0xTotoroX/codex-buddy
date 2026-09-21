@@ -51,6 +51,68 @@ async function check(name, test, options) {
 }
 try {
   await check(
+    'modern same-popup model view, canonical reasoning slider and Fast checkbox round trip',
+    async (page) => {
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      const desired = { model: 'alpha', reasoning: 'high', speed: 'fast' };
+      let result = await apply(page, desired);
+      assert.equal(result.status, 'success', result.message);
+      assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), desired);
+      result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success', result.message);
+      assert.deepEqual(result.snapshot.current, targetBeta);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+    },
+    { modern: true, defaultRecommendation: true },
+  );
+  await check(
+    'inline model submenu without Model prefix and flat reasoning options',
+    async (page) => {
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success', result.message);
+      assert.deepEqual(result.snapshot.current, targetBeta);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+    },
+    { inlineModel: true, flatReasoning: true },
+  );
+  await check(
+    'locked advanced choices are not selected and their menu is cleaned',
+    async (page) => {
+      const result = await apply(page, targetBeta);
+      assert.notEqual(result.status, 'success');
+      assert.match(result.message, /锁定/);
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+    },
+    { modern: true, lockedModel: 'beta' },
+  );
+  await check(
+    'an already-open modern picker is adopted and closed',
+    async (page) => {
+      await page.locator('form button').click();
+      const count = await page.evaluate(() => host.triggerEvents);
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      assert.equal(await page.evaluate(() => host.triggerEvents), count);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+    },
+    { modern: true },
+  );
+  await check(
+    'unrecognized owned popup is cleaned after parsing fails and repeat remains usable',
+    async (page) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const result = await snapshot(page, true);
+        assert.equal(result.status, 'unavailable');
+        assert.match(result.message, /完整配置/);
+        assert.equal(await page.locator('[role="menu"]').count(), 0);
+        assert.equal(await page.evaluate(() => host.changes.length), 0);
+      }
+    },
+    { unknownMenu: true },
+  );
+  await check(
     'permanent listboxes and closing overlays do not occupy the official model menu',
     async (page) => {
       await page.evaluate(() => {

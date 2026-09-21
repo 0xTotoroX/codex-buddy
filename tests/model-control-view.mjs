@@ -124,6 +124,13 @@ async function setup({
         request.headers()['x-model-control-lease'] !== 'synthetic-lease'
       )
         return route.fulfill({ status: 401, json: { message: '未授权' } });
+      if (operation === 'displays')
+        return route.fulfill({
+          json: {
+            screens: [{ id: 'fixture-screen', label: 'Fixture display' }],
+            nativeGlassAvailable: true,
+          },
+        });
       if (operation === 'state') {
         const data = copy(f.data);
         const barrier = f.delayState;
@@ -717,6 +724,31 @@ test('initial compact pane, fallback events, native geometry/position and exit a
   await fallback.page.keyboard.press('Enter');
   assert.equal(await fallback.page.locator('#panel').isVisible(), true);
   await cleanup(fallback);
+});
+
+test('theme and placement menus save independent preferences without applying a model', async () => {
+  const ctx = await setup();
+  const { page, f } = ctx;
+  await menu(page, '设置菜单');
+  await page.getByRole('menuitem', { name: '主题…', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '磨砂', exact: true }).click();
+  assert.equal(f.data.preferences.theme, 'frosted');
+  await menu(page, '设置菜单');
+  await page.getByRole('menuitem', { name: '屏幕与位置…', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: 'Fixture display', exact: true }).click();
+  assert.equal(f.data.preferences.screen, 'fixture-screen');
+  await menu(page, '设置菜单');
+  await page.getByRole('menuitem', { name: '屏幕与位置…', exact: true }).click();
+  await page.getByRole('menuitemradio', { name: '靠前 · 20%', exact: true }).click();
+  assert.equal(f.data.preferences.position, 0.2);
+  assert.equal(applies(f).length, 0);
+  await nativeEvent(page, { effectiveMaterial: 'frosted', nativeBackdrop: true });
+  assert.equal(await page.locator('body').getAttribute('data-material'), 'frosted');
+  assert.equal(
+    await page.locator('#panel').evaluate((n) => getComputedStyle(n).backgroundColor),
+    'rgba(0, 0, 0, 0)',
+  );
+  await cleanup(ctx);
 });
 
 test('missing credentials fail closed; delayed state cannot overwrite an apply result', async () => {

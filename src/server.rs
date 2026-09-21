@@ -152,6 +152,7 @@ fn router(service: Service) -> Router {
         .route("/model-control/open", post(model_control_open))
         .route("/model-control/close", post(model_control_close))
         .route("/model-control/window", get(model_control_window))
+        .route("/model-control/displays", get(model_control_displays))
         .route("/shutdown", post(shutdown))
         .route_layer(middleware::from_fn_with_state(service.clone(), authorize));
     Router::new()
@@ -423,6 +424,9 @@ async fn model_control_open(State(service): State<Service>) -> Result<Json<Value
 }
 async fn model_control_close(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_model_control().await?))
+}
+async fn model_control_displays() -> Result<Json<Value>, ApiError> {
+    Ok(Json(crate::model_control_window::display_options()?))
 }
 async fn model_control_window(
     State(service): State<Service>,

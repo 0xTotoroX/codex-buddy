@@ -426,39 +426,46 @@ try {
   // Keep the screenshot subject open; collapse behavior is exercised above.
   await command("document.getElementById('keep-open').click()");
   await until(() => telemetry.native.keepOpen && prefs.keepOpen, 'pin material screenshots');
-  for (const [material, variant] of [
+  // Workbench changes do not replace the control's own default.
+  Object.assign(appearance, { material: 'native-glass', liquidVariant: 'clear' });
+  await until(
+    () => telemetry.native.appearance?.material === 'native-glass',
+    'workbench appearance',
+  );
+  assert.equal(telemetry.native.effectiveMaterial, 'black');
+  for (const [theme, variant, style] of [
+    ['black', 'regular', null],
     ['matte', 'regular', null],
     ['frosted', 'regular', 'frosted-hud-active'],
     ['native-glass', 'regular', 'regular'],
     ['native-glass', 'clear', 'clear'],
-    ['matte', 'regular', null],
+    ['black', 'regular', null],
   ]) {
-    Object.assign(appearance, { material, liquidVariant: variant });
+    Object.assign(prefs, { theme, liquidVariant: variant });
     await until(
-      () =>
-        telemetry.native.appearance?.material === material &&
-        telemetry.native.appearance.liquidVariant === variant,
-      `native material ${material}/${variant}`,
+      () => telemetry.native.theme === theme && telemetry.native.liquidVariant === variant,
+      `theme ${theme}/${variant}`,
     );
-    const fallback = false;
-    assert.equal(telemetry.native.effectiveMaterial, 'black');
-    assert.equal(telemetry.native.nativeBackdrop, false);
-    assert.equal(telemetry.native.backdropStyle, null);
+    const fallback = theme === 'native-glass' && !telemetry.native.nativeGlassAvailable;
+    const effective = fallback ? 'matte' : theme;
+    assert.equal(telemetry.native.effectiveMaterial, effective);
+    const backed = ['frosted', 'native-glass'].includes(effective);
+    assert.equal(telemetry.native.nativeBackdrop, backed);
+    assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
     assert.equal(windowInfo().kCGWindowBounds.Width, 480);
-    assert.deepEqual(
-      telemetry.viewport,
-      [480, windowInfo().kCGWindowBounds.Height],
-      'content-sized native frame and WebView stay aligned',
-    );
+    assert.deepEqual(telemetry.viewport, [480, windowInfo().kCGWindowBounds.Height]);
     if (fallback)
       report.skipped.push({
         name: `native glass ${variant}`,
-        reason: 'NSGlassEffectView unavailable; matte fallback was verified',
+        reason: 'NSGlassEffectView unavailable; matte fallback verified',
       });
-    assert.equal(telemetry.background, 'rgb(0, 0, 0)');
+    if (theme === 'black') assert.equal(telemetry.background, 'rgb(0, 0, 0)');
+    else if (effective === 'frosted') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
+    else if (effective === 'native-glass')
+      assert.notEqual(telemetry.background, 'rgba(0, 0, 0, 0)');
     assert.ok(telemetry.viewport[1] < 320);
-    check(`independent black shell with workbench ${material}/${variant}`, telemetry.native);
-    capture(`theme-${material}-${variant}`);
+    check(`independent theme ${theme}/${variant}`, telemetry.native);
+    capture(`theme-${theme}-${variant}`);
   }
   await command("location.href='https://example.invalid/blocked-navigation'");
   await delay(500);

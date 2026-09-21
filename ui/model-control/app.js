@@ -1,6 +1,6 @@
 /*
  * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何与鼠标边界事件。
- * [OUTPUT]: 紧凑模型矩阵、版本保护写入、开合/内容高度 IPC；材质独立纯黑。
+ * [OUTPUT]: 紧凑模型矩阵、版本保护写入、开合/内容高度 IPC；独立四主题、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -137,6 +137,11 @@ function scheduleCollapse() {
   }, 450);
 }
 function applyAppearance(detail) {
+  document.body.dataset.material = detail.effectiveMaterial || 'black';
+  if (typeof detail.nativeDark === 'boolean')
+    document.body.dataset.nativeDark = String(detail.nativeDark);
+  document.body.dataset.nativeBackdrop = String(detail.nativeBackdrop === true);
+  document.body.dataset.liquidVariant = detail.liquidVariant || 'regular';
   const offset = detail.appearance?.fontOffset;
   if (Number.isFinite(offset))
     document.documentElement.style.setProperty(
@@ -812,6 +817,28 @@ function openSettings() {
       },
       { pressed: prefs().edge === edge },
     );
+  menuAction('屏幕与位置…', () => openPlacement(), { write: false });
+  menuAction(
+    '主题…',
+    () => {
+      openMenu('主题', $('menu-button'));
+      for (const [theme, label] of [
+        ['black', '纯黑'],
+        ['matte', '哑光'],
+        ['frosted', '磨砂'],
+        ['native-glass', '液态'],
+      ])
+        menuAction(
+          label,
+          async () => {
+            if (await savePreferences({ theme })) closeMenu();
+          },
+          { pressed: (prefs().theme || 'black') === theme },
+        );
+      finishMenu();
+    },
+    { write: false },
+  );
   menuAction('收起面板', collapse, { write: false, icon: 'minus' });
   menuAction(
     '退出模型控制',
@@ -830,6 +857,38 @@ function openSettings() {
     { write: false, icon: 'close' },
   );
   finishMenu();
+}
+async function openPlacement() {
+  openMenu('屏幕与位置', $('menu-button'));
+  const menu = $('menu');
+  try {
+    const { screens } = await request('displays');
+    if (menu.hidden || menu.getAttribute('aria-label') !== '屏幕与位置') return;
+    for (const screen of [{ id: '', label: '自动选择屏幕' }, ...screens])
+      menuAction(
+        screen.label,
+        async () => {
+          if (await savePreferences({ screen: screen.id })) closeMenu();
+        },
+        { pressed: prefs().screen === screen.id },
+      );
+    for (const [position, label] of [
+      [0.2, '靠前 · 20%'],
+      [0.5, '居中 · 50%'],
+      [0.8, '靠后 · 80%'],
+    ])
+      menuAction(
+        label,
+        async () => {
+          if (await savePreferences({ position })) closeMenu();
+        },
+        { pressed: prefs().position === position },
+      );
+    finishMenu();
+  } catch (error) {
+    notify(error.message);
+    closeMenu();
+  }
 }
 function openModelMenu(id, opener) {
   const model = models().find((item) => item.id === id);

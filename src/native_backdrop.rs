@@ -1,7 +1,7 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
 // [OUTPUT]: 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
 // [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
-// [PROTOCOL]: 从原 panel_window::macos::Backdrop 原样提取，仅窗口参数改为 NSWindow。
+// [PROTOCOL]: 共享材质保持窗口无关；控制条可选边缘裁切，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};
 use objc2_app_kit::{
@@ -10,8 +10,9 @@ use objc2_app_kit::{
     NSWindow,
 };
 use objc2_foundation::{NSPoint, NSRect, NSSize};
-use objc2_quartz_core::CATransaction;
+use objc2_quartz_core::{CALayer, CATransaction};
 use serde_json::Value;
+use std::ffi::c_void;
 
 pub fn glass_available() -> bool {
     AnyClass::get(c"NSGlassEffectView").is_some()
@@ -88,6 +89,56 @@ impl Backdrop {
                     "clear"
                 }
             })
+    }
+
+    // Optional edge contour for the model control. Workbench keeps its rounded rectangle.
+    pub fn clip_edge(&self, width: f64, height: f64, edge: &str) {
+        let Some(layer) = self.boundary.layer() else {
+            return;
+        };
+        let Some(class) = AnyClass::get(c"CAShapeLayer") else {
+            return;
+        };
+        let mask: Retained<CALayer> = unsafe { objc2::msg_send![class, new] };
+        let (a, b) = if edge == "top" {
+            (height, width)
+        } else {
+            (width, height)
+        };
+        let lip = 8_f64.min(a / 2.).min(b / 4.);
+        let r = 18_f64.min(a - lip).min((b - 2. * lip) / 2.);
+        let p = |x: f64, y: f64| match edge {
+            "left" => (width - x, height - y),
+            "top" => (y, x),
+            _ => (x, height - y),
+        };
+        unsafe {
+            let path = CGPathCreateMutable();
+            if path.is_null() {
+                return;
+            }
+            let start = p(a, 0.);
+            CGPathMoveToPoint(path, std::ptr::null(), start.0, start.1);
+            for (control, end) in [
+                (Some(p(a, lip)), p(a - lip, lip)),
+                (None, p(r, lip)),
+                (Some(p(0., lip)), p(0., lip + r)),
+                (None, p(0., b - lip - r)),
+                (Some(p(0., b - lip)), p(r, b - lip)),
+                (None, p(a - lip, b - lip)),
+                (Some(p(a, b - lip)), p(a, b)),
+            ] {
+                if let Some(c) = control {
+                    CGPathAddQuadCurveToPoint(path, std::ptr::null(), c.0, c.1, end.0, end.1);
+                } else {
+                    CGPathAddLineToPoint(path, std::ptr::null(), end.0, end.1);
+                }
+            }
+            CGPathCloseSubpath(path);
+            let _: () = objc2::msg_send![&*mask, setPath: path];
+            layer.setMask(Some(&mask));
+            CGPathRelease(path);
+        }
     }
 
     pub fn resize_viewport(&self, window: &NSWindow, interactive: bool) {
@@ -216,4 +267,21 @@ impl Backdrop {
         }
         CATransaction::commit();
     }
+}
+
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGPathCreateMutable() -> *mut c_void;
+    fn CGPathMoveToPoint(path: *mut c_void, transform: *const c_void, x: f64, y: f64);
+    fn CGPathAddLineToPoint(path: *mut c_void, transform: *const c_void, x: f64, y: f64);
+    fn CGPathAddQuadCurveToPoint(
+        path: *mut c_void,
+        transform: *const c_void,
+        cx: f64,
+        cy: f64,
+        x: f64,
+        y: f64,
+    );
+    fn CGPathCloseSubpath(path: *mut c_void);
+    fn CGPathRelease(path: *mut c_void);
 }

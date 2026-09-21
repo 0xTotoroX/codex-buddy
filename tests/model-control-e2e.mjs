@@ -49,7 +49,7 @@ const fixture = createServer((request, response) => {
   if (path === '/fixture' && request.method === 'GET') {
     response.writeHead(200, { 'Content-Type': 'text/html', 'Cache-Control': 'no-store' });
     response.end(
-      `<!doctype html><title>Model control synthetic host</title><body><script>(${installModelControlFixture.toString()})(${JSON.stringify({ records, options: {} })});</script></body>`,
+      `<!doctype html><title>Model control synthetic host</title><body><script>(${installModelControlFixture.toString()})(${JSON.stringify({ records, options: { modern: new URL(request.url, 'http://127.0.0.1').searchParams.has('modern') } })});</script></body>`,
     );
   } else if (path === '/favicon.ico') {
     response.writeHead(204);
@@ -293,12 +293,74 @@ try {
   assert.equal(await page.evaluate(() => host.triggerEvents), clicks);
   record('navigation reinstalls embedded adapter and rejects the prior document revision');
 
+  await page.goto(`${fixtureOrigin}/fixture?modern=1`);
+  await page.waitForFunction(() => typeof window.__codexBuddyModelControl?.snapshot === 'function');
+  await page.evaluate(() => capability('modern-view'));
+  const modern = await api('refresh', {});
+  assert.equal(modern.snapshot.status, 'ready');
+  const modernFast = await api('apply', command(modern.snapshot, fast));
+  assert.equal(modernFast.result.status, 'success', modernFast.result.message);
+  const modernBeta = await api('apply', command(modernFast.snapshot, beta));
+  assert.equal(modernBeta.result.status, 'success', modernBeta.result.message);
+  assert.deepEqual(modernBeta.snapshot.current, beta);
+  assert.equal(await page.locator('[role="menu"]').count(), 0);
+  record('embedded adapter switches modern same-root model view, slider and Fast through Rust/CDP');
+
   assert.equal(await decoy.evaluate(() => typeof window.__codexBuddyModelControl), 'undefined');
   assert.equal(await decoy.evaluate(() => host.triggerEvents), 0);
   assert.deepEqual(await page.evaluate(() => host.unexpected), []);
   assert.deepEqual(unexpectedRequests, []);
   assert.deepEqual(pageErrors, []);
   record('decoy target untouched; no model requests or page errors');
+  const settingsPage = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+  settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
+  await settingsPage.goto(`${base}/#token=${runtime.token}`);
+  const section = settingsPage.getByRole('region', { name: '模型快切设置' });
+  await settingsPage.getByLabel('模型快切主题', { exact: true }).waitFor();
+  await settingsPage.waitForFunction(
+    () => !document.querySelector('[aria-label="模型快切主题"]').disabled,
+  );
+  assert.equal(
+    await settingsPage.getByLabel('模型快切主题', { exact: true }).inputValue(),
+    'black',
+  );
+  const change = async (name, value, key) => {
+    await settingsPage.waitForFunction(
+      (name) => !document.querySelector(`[aria-label="${name}"]`).disabled,
+      name,
+    );
+    await settingsPage.getByLabel(name, { exact: true }).selectOption(value);
+    await waitFor(async () => (await api('state')).preferences[key] === value, `saved ${key}`);
+  };
+  const beforeAppearance = (await request('state')).body.panelPreferences;
+  await change('模型快切主题', 'matte', 'theme');
+  await change('模型快切主题', 'frosted', 'theme');
+  await change('模型快切边缘', 'left', 'edge');
+  const screens = await api('displays');
+  assert.equal((await request('model-control/displays', undefined, false)).status, 401);
+  if (screens.screens.length) await change('模型快切屏幕', screens.screens[0].id, 'screen');
+  const position = settingsPage.getByLabel('模型快切位置', { exact: true });
+  await position.focus();
+  await position.press('Home');
+  await waitFor(
+    async () => (await api('state')).preferences.position === 0,
+    'keyboard position saves',
+  );
+  await change('模型快切主题', 'native-glass', 'theme');
+  await change('模型快切液态变体', 'clear', 'liquidVariant');
+  await settingsPage.reload();
+  await settingsPage.waitForFunction(
+    () => document.querySelector('[aria-label="模型快切主题"]')?.value === 'native-glass',
+  );
+  assert.equal(
+    await settingsPage.getByLabel('模型快切液态变体', { exact: true }).inputValue(),
+    'clear',
+  );
+  assert.deepEqual((await request('state')).body.panelPreferences, beforeAppearance);
+  await section.screenshot({ path: join(output, 'settings-placement-themes.png') });
+  await settingsPage.close();
+  record('settings page persists screen, edge, keyboard position and four independent themes');
+  assert.deepEqual(pageErrors, []);
   report.passed = true;
 } catch (error) {
   report.errors.push(String(error.stack || error));

@@ -40,6 +40,8 @@ pub struct Preferences {
     pub position: f64,
     pub screen: String,
     pub keep_open: bool,
+    pub theme: String,
+    pub liquid_variant: String,
     pub model_column_width: f64,
     pub pinned: Vec<String>,
     pub presets: Vec<Preset>,
@@ -53,6 +55,8 @@ impl Default for Preferences {
             position: 0.5,
             screen: String::new(),
             keep_open: false,
+            theme: "black".into(),
+            liquid_variant: "regular".into(),
             model_column_width: 140.,
             pinned: vec![],
             presets: vec![],
@@ -81,6 +85,11 @@ impl Preferences {
             || self.screen.len() > 256
         {
             bail!("控制条位置或列宽无效");
+        }
+        if !["black", "matte", "frosted", "native-glass"].contains(&self.theme.as_str())
+            || !["regular", "clear"].contains(&self.liquid_variant.as_str())
+        {
+            bail!("模型控制主题无效");
         }
         let mut ids = std::collections::HashSet::new();
         for preset in &self.presets {
@@ -437,7 +446,7 @@ mod tests {
                 .as_bool()
                 .unwrap()
         );
-        let result = app.model_control_preferences(json!({"revision":1,"patch":{"edge":"top","presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
+        let result = app.model_control_preferences(json!({"revision":1,"patch":{"edge":"top","theme":"native-glass","liquidVariant":"clear","screen":"fixture-screen","presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
         assert_eq!(result["revision"], 2);
         assert!(
             app.model_control_preferences(json!({"revision":1,"patch":{"presets":[]}}))
@@ -451,6 +460,9 @@ mod tests {
         assert_eq!(loaded.preferences.presets.len(), 1);
         assert_eq!(loaded.preferences.edge, "top");
         assert_eq!(loaded.preferences.position, 0.7);
+        assert_eq!(loaded.preferences.theme, "native-glass");
+        assert_eq!(loaded.preferences.liquid_variant, "clear");
+        assert_eq!(loaded.preferences.screen, "fixture-screen");
         assert_eq!(before, app.appearance().await);
         let appearance = app.model_control_window("invalid").await["appearance"].clone();
         assert_eq!(appearance["material"], before.ui.material);
@@ -468,6 +480,14 @@ mod tests {
         let prefs: Preferences = serde_json::from_value(json!({})).unwrap();
         assert!(!prefs.enabled);
         assert_eq!(prefs.edge, "right");
+        assert_eq!(prefs.theme, "black");
+        for theme in ["black", "matte", "frosted", "native-glass"] {
+            let next = prefs
+                .patched(&json!({"theme":theme,"liquidVariant":"clear"}))
+                .unwrap();
+            assert_eq!(next.theme, theme);
+        }
+        assert!(prefs.patched(&json!({"theme":"neon"})).is_err());
         prefs.validate().unwrap();
     }
 }

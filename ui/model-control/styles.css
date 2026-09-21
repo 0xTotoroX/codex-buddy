@@ -1,5 +1,5 @@
 /* [INPUT]: 原生几何、动态模型列数与共享字号。
- * [OUTPUT]: 不透明黑色贴边外壳、紧凑矩阵、按需工具及单层轮廓过渡。
+ * [OUTPUT]: 默认黑色及三种可选材质、紧凑矩阵、按需工具及单层轮廓过渡。
  * [POS]: 模型快切独立表面，不继承工作台材质。
  * [PROTOCOL]: 凹角轮廓与原生命中/高度协议同步维护。 */
 @import url('/model-control/tokens.css');
@@ -231,7 +231,7 @@ input {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #000;
+  background: var(--bg);
   min-width: var(--matrix-width);
 }
 .matrix-head,
@@ -462,4 +462,45 @@ body[data-search='true'] header {
 body[data-search='true'] #presets {
   order: 10;
   flex-basis: 100%;
+}
+
+/* Shared workbench materials; black remains an independent default. */
+body[data-material='matte'],
+body[data-material='frosted'],
+body[data-material='native-glass'] {
+  --bg: #292929;
+  --surface: #333;
+  --text: #eee;
+  --muted: #a0a0a0;
+}
+body:not([data-material='black']) #panel {
+  background: var(--bg);
+}
+body[data-native-backdrop='true']:not([data-material='black']) #panel {
+  background: transparent;
+}
+body:not([data-material='black']) #panel {
+  animation: none;
+}
+body[data-native-dark='false']:not([data-material='black']) {
+  color-scheme: light;
+  --bg: #f5f5f5;
+  --surface: #fff;
+  --text: #222;
+  --muted: #777;
+  --line: #0000001f;
+  --hover: #0000000a;
+  --selected: #00000012;
+  --accent: #176ade;
+}
+body[data-native-backdrop='true']:not([data-material='black']) .matrix-toolbar {
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+
+/* Web text cannot adopt AppKit's adaptive vibrancy; keep a neutral readability veil. */
+body[data-material='native-glass'][data-native-backdrop='true'] #panel {
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+body[data-material='native-glass'][data-native-dark='false'] {
+  --muted: #444;
 }
