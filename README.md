@@ -1,7 +1,7 @@
 <div align="center">
   <img src="ui/icon.png" alt="CodexBuddy logo" width="140" />
   <h1>CodexBuddy</h1>
-  <p><strong>你的 Codex 桌面搭档：看回答大纲，接着问下一步。</strong></p>
+  <p><strong>Your desktop companion for Codex: navigate answers and find your next question.</strong></p>
   <p>Answer outlines and next-step suggestions, inside Codex or in a desktop panel.</p>
   <p>
     <img alt="Rust 2024 edition" src="https://img.shields.io/badge/Rust-2024-000000?logo=rust&amp;logoColor=white" />
@@ -11,105 +11,117 @@
   </p>
 </div>
 
-CodexBuddy 为 Codex / ChatGPT 增加一个随手可用的辅助面板：快速定位长回答，生成下一步问题，留在对话内或弹到桌面使用。
+**English** · [简体中文](README.zh-CN.md)
 
-## 能做什么
+CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, generate follow-up questions, and keep your tools inside the conversation or in a desktop window.
 
-| 功能 | 用途 |
+## Features
+
+| Feature | What it does |
 | --- | --- |
-| 回答大纲 | 点击标题定位并高亮原文 |
-| 下一步建议 | 根据当前回答生成后续问题，复制或填入输入框 |
-| 停靠工作台 | 大纲与下一步同时显示，聊天让出空间；支持自动、上下或左右排列，可拖拽编排、合并标签或专注查看，分别记住停靠与浮窗布局 |
-| 桌面浮窗 | macOS 15+ 可在内嵌与弹出之间切换，支持拖动、调整大小和置顶 |
-| 模型快切（当前源码） | 独立屏幕贴边控制条，切换官方聊天模型、推理强度与速度，保存完整预设；不改变下一步建议的模型配置 |
-| 阅读与外观 | 调整材质、字号和摘要显示，记住你的偏好 |
-| 自选模型 | 使用现有 Codex 登录，或连接自己的模型 API |
+| Answer outline | Jump to a heading and highlight its location in the answer |
+| Next-step suggestions | Generate follow-up questions from the current answer, then copy them or insert them into the composer |
+| Docked workbench | Show the outline and suggestions together without covering the chat; use automatic, vertical, or horizontal layouts, drag panels, group tabs, or focus one panel; remember docked and desktop layouts separately |
+| Desktop window | On macOS 15+, pop out and return to the embedded panel, move and resize the window, or keep it on top |
+| Model quick switch | Use a separate screen-edge control to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
+| Reading and appearance | Choose materials, font size, and summary visibility, with saved preferences |
+| Your choice of model | Use an existing Codex login or connect your own model API |
 
-大纲在本机解析，无需模型；下一步建议需要配置模型。两个功能可以分别关闭。
+Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-内嵌时单击表情展开或收起工作台；双击表情弹出到桌面，在桌面再次双击收回，恢复出发时的紧凑或展开状态。分栏、标签和专注查看始终保留顶部表情与收回按钮。
+Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
 
-工作台中，拖动面板标题或标签到另一面板边缘可分栏，拖到中央可合并标签；标题旁的「⋯」也提供移动、合并与拆分操作。「专注查看」按钮临时放大一个面板，再点一次或按 Esc 恢复。拖动时按 Esc 可取消。
+Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. The heading's **⋯** menu also provides move, group, and split commands. Focus a panel temporarily, then click the focus button again or press Esc to restore the layout. Press Esc during a drag to cancel it.
 
-点击工作台顶部的聊天名称，可选择跟随当前聊天或锁定到该聊天；大纲与下一步始终使用同一来源。来源暂不可用时保留已有结果供查看，恢复后继续使用。
+Click the chat name at the top of the workbench to follow the current chat or lock to that chat. Both panels share the same source. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
-## 安装与使用
+## Installation and use
 
-### 1. 安装
+### 1. Install
 
-准备好 ChatGPT / Codex 桌面应用，以及 Node.js 22.16+、Rust 1.88+、Xcode Command Line Tools。
+You need the ChatGPT / Codex desktop app, Node.js 22.16+, Rust 1.88+, and Xcode Command Line Tools.
 
-从 [Releases](https://github.com/0xTotoroX/codex-buddy/releases) 下载并解压源码包，在项目目录执行：
+Download and extract the source archive from [Releases](https://github.com/0xTotoroX/codex-buddy/releases), then run these commands in the project directory:
 
 ```sh
 npm ci
 npm run install:local
 ```
 
-安装完成后，在「应用程序」中双击 **CodexBuddy**。日常使用无需 Node.js 或 Rust。
+After installation, open **CodexBuddy** from Applications. Node.js and Rust are not required for everyday use.
 
-> ChatGPT / Codex 已打开但没有调试连接时，CodexBuddy 默认先询问，再正常退出并重开。可在设置页「启动行为」改为「直接强制重开」，但可能中断任务或丢失未保存内容。已有可用调试连接时直接接入。
+> If ChatGPT / Codex is already running without a debugging connection, CodexBuddy asks before quitting and reopening it by default. You can select the force-restart option in the launch settings, but this may interrupt tasks or lose unsaved work. An existing debugging connection is reused directly.
 
-### 2. 配置模型
+### 2. Configure the suggestions model
 
-从胶囊打开设置，选择「现有 Codex 登录」或填写自己的模型 API，保存后点击「测试连接」。使用现有登录需要本机有可用的 Codex CLI 和登录状态。
+Open settings from the capsule. Choose your existing Codex login or enter your model API settings, save, and test the connection. Using an existing login requires a working local Codex CLI installation and login session.
 
-### 3. 开始使用
+### 3. Use the workbench
 
-- **看大纲**：切换到「大纲」，点击标题跳转到原文。
-- **继续提问**：在「下一步」点击刷新生成建议，也可开启自动生成。默认点击只填入，不自动发送；已有草稿时会询问是否追加。
-- **同时查看**：在顶部「布局与位置」中选择「停靠侧栏」，也可切回「内嵌浮动」。拖动左边界调宽、内部分隔线调整比例；菜单中可选自动、上下、左右，也可交换位置或恢复默认；单独打开聊天时跟随到聊天内，关闭后回到主界面；空间不足时收起，点击右侧入口重新打开。整个工作台仍可弹出或收回。
-- **调整面板**：顶部按钮弹出或收回，拖动顶部移动，拖动下角调整大小；在设置中修改外观。弹出后保持展开，菜单内可选择窗口置顶和切换明暗。
+- **Navigate an answer:** open the outline and click a heading to jump to the source text.
+- **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
+- **View both panels:** choose the docked sidebar from the layout and position menu, or return to the embedded floating view. Drag the left edge to resize the sidebar and the internal divider to change proportions. Choose automatic, vertical, or horizontal layout, swap panels, or restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, it collapses to a right-edge entry that you can reopen. You can still pop out or return the entire workbench.
+- **Adjust the window:** use the top controls to pop out or return, drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; its menu provides always-on-top and light/dark controls.
 
-模型快切在设置页点击「打开控制条」，或运行 `codex-buddy model-control`。使用纯黑贴边外壳，共用字号与图标；工作台的哑光、磨砂、液态设置保持不变。控制条跟随已连接 Codex 所在桌面，宿主隐藏或断连时隐藏；默认停靠右侧，可切换左侧或顶部；鼠标触达即展开、离开约半秒收起，按住 `⌥` 拖动入口调位置。模型与推理强度共用一张矩阵，搜索从菜单或 `⌘F` 打开；搜索与编辑时才获取键盘焦点。`⌘⇧M` 可展开/收起，菜单可保持展开或关闭。模型与档位以宿主实际能力为准，首次点击会先同步实际配置，无需另点刷新，切换后回读确认；正在生成、目标不明或能力尚未加载时不会执行。热接入后若尚未观察到官方模型列表，会保留等待状态，无需为此重启正在工作的宿主。
+### Model quick switch
 
-## 更新与卸载
+Open the control from settings or run `codex-buddy model-control`. Its default shell is opaque black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The compact entry and expanded panel use the same theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
 
-更新时获取新版源码，重新执行 `npm ci` 和 `npm run install:local`，原配置会保留。
+The control follows the connected Codex desktop space and hides when the host is hidden or disconnected. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
 
-卸载时先执行：
+Models and reasoning efforts share a matrix. Open search from the menu or with `⌘F`. Hovering does not steal keyboard focus; search, editing, and keyboard interaction can request it. `⌘⇧M` toggles the panel, and the menu lets you keep it open or close the control.
+
+Available models and efforts come from the host. The first selection reads and applies the configuration in one operation, without a separate refresh, then verifies the actual result. You can adjust subsequent configuration while an answer is being generated, provided the official controls allow it. Switching stops if the controls are disabled, the target is ambiguous, or capabilities have not loaded. If the official model list has not yet been observed after connecting, the control waits; there is no need to restart a working host just to load the list.
+
+## Updating and uninstalling
+
+To update, get the latest source and run `npm ci` and `npm run install:local` again. Existing configuration is preserved.
+
+To uninstall, first stop the background service:
 
 ```sh
 ~/.local/bin/codex-buddy stop
 ```
 
-再删除 `/Applications/CodexBuddy.app` 和 `~/.local/bin/codex-buddy`。如需同时清除配置，再删除 `~/Library/Application Support/codex-buddy/`。
+Then delete `/Applications/CodexBuddy.app` and `~/.local/bin/codex-buddy`. To also remove configuration, delete `~/Library/Application Support/codex-buddy/`.
 
-## 二次开发
+## Development
 
-技术栈：**Rust + JavaScript / TypeScript + React**。
+Built with **Rust, JavaScript / TypeScript, and React**.
 
 ```text
-src/          后台、CLI 和原生窗口
-ui/panel/     胶囊界面、下一步建议和大纲
-ui/settings/  设置网页
-ui/model-control/  独立模型控制条及官方菜单适配器
-ui/bridge/    宿主通信
-tests/        自动测试
-scripts/      开发、构建与安装工具
+src/               Backend, CLI, and native windows
+ui/panel/          Capsule, next-step suggestions, and outlines
+ui/settings/       Settings web app
+ui/model-control/  Independent model control and official-menu adapter
+ui/bridge/         Host communication
+tests/            Automated tests
+scripts/           Development, build, and installation tools
 ```
 
-安装依赖后，先通过 CodexBuddy 打开宿主，再运行：
+After installing dependencies, open the host through CodexBuddy, then run:
 
 ```sh
 npm run dev
 ```
 
-也可执行一次 `npm run install:dev`，安装独立的 **CodexBuddy Dev.app**。双击后在后台启动，保存源码自动更新，不弹出终端；重复打开会唤起已有工作台。没有调试连接时按开发设置页「启动行为」处理，首次使用继承日常设置。后台开发可用 `npm run dev:stop` 退出，日志在 `target/dev/launcher.log`。它依赖本机源码和开发工具；修改开发脚本或依赖后需停止并重新打开，移动源码或更换 Node 路径后需重新生成入口。
+Alternatively, run `npm run install:dev` once to install **CodexBuddy Dev.app**. Opening it starts development in the background, updates saved source automatically, and does not open a terminal. Opening it again brings up the existing workbench. Without a debugging connection, it follows the development launch setting, initially inherited from the everyday installation. Stop background development with `npm run dev:stop`; logs are written to `target/dev/launcher.log`. This launcher depends on the local source tree and development tools. Stop and reopen it after changing development scripts or dependencies; regenerate it after moving the source tree or changing the Node.js path.
 
-开发模式连接真实 Codex；修改界面后自动加载，修改 Rust 后自动编译。命令行启动时按 Ctrl+C 结束。开发配置独立，不覆盖日常安装；内嵌液态与正式版共用 SVG 渲染。
+Development mode connects to real Codex. UI changes reload automatically, and Rust changes trigger a rebuild. For command-line development, press Ctrl+C to stop. Development configuration is separate from the everyday installation. Embedded liquid material uses the same SVG renderer in development and release builds.
 
 ```sh
-npm run verify         # 运行检查
-npm run build          # 编译程序
-npm run package        # 生成程序包和源码包
-npm run install:local  # 将当前代码安装到本机
+npm run verify         # Run checks
+npm run build          # Build the application
+npm run package        # Create binary and source archives
+npm run install:local  # Install the current code locally
 ```
 
-构建、打包不会自动更新已安装程序。提交问题或改进时，请附版本、系统和复现步骤，并移除密钥与私人聊天内容。
+Building or packaging does not update an installed application. When reporting an issue or contributing a change, include the version, OS, and reproduction steps, and remove credentials and private chat content.
 
-## 隐私与许可
+The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync when updating user-facing documentation.
 
-配置保存在本机；生成建议时，相关回答片段会发送给你选择的模型服务。CodexBuddy 不持久化聊天正文，不修改官方应用包；宿主升级可能影响兼容性。
+## Privacy and license
 
-自有源码采用 [MIT License](LICENSE)，第三方依赖保留各自许可。
+Configuration is stored locally. When generating suggestions, relevant answer excerpts are sent to your chosen model service. CodexBuddy does not persist chat bodies or modify the official application bundle. Host updates may affect compatibility.
+
+Original source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
