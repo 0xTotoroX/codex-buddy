@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台合成宿主、既有布局/投影测试辅助。
- * [OUTPUT]: 跟随/锁定、失联恢复、迟到结果、误写保护与冷启动行为回归。
+ * [OUTPUT]: 跟随/锁定、建议缓存恢复与失效、失联恢复、迟到结果、误写保护与冷启动行为回归。
  * [POS]: workbench.mjs 的关联场景；不调用真实模型。
  * [PROTOCOL]: 变更时检查 tests/AGENTS.md。
  */
@@ -76,6 +76,104 @@ export function chatBindingCases({
   output,
 }) {
   return [
+    ...['manual', 'auto'].map((generationMode) => [
+      `binding suggestion cache restores ${generationMode} A-B-A without new requests`,
+      async (page) => {
+        await mode(page, true);
+        await page.evaluate(async (generationMode) => {
+          window.workbenchFixture.deferred = [];
+          const patch = { generationMode };
+          Object.assign(window.workbenchFixture.settings, patch);
+          await window.__companionFloatingPanel.syncSettings(patch);
+        }, generationMode);
+        if (generationMode === 'manual') await page.locator('[data-refresh="next"]').click();
+        await page.waitForFunction(() => window.workbenchFixture.deferred.length === 1);
+        await complete(page, 0, 'A');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts.length === 1,
+        );
+        const original = await snapshot(page);
+
+        // 同一栏位换聊天，回答文字相同也不能复用另一个 session 的建议。
+        await replaceIdentity(page, 'fixture-thread-b');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.scanStatus === 'ready',
+        );
+        assert.equal((await snapshot(page)).prompts.length, 0);
+        if (generationMode === 'manual') await page.locator('[data-refresh="next"]').click();
+        await page.waitForFunction(() => window.workbenchFixture.deferred.length === 2);
+        await complete(page, 1, 'B');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts.length === 1,
+        );
+        assert.equal((await snapshot(page)).prompts[0].label, 'B');
+
+        // 模拟 DOM 重新挂载，不能依靠旧节点或旧上下文恢复。
+        await page.locator('#fixture-host-content .thread-scroll-container').evaluate((node) => {
+          node.replaceWith(node.cloneNode(true));
+        });
+        await replaceIdentity(page, 'fixture-thread-a');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts[0]?.label === 'A',
+        );
+        const restored = await snapshot(page);
+        assert.notEqual(restored.context.generation, original.context.generation);
+        const filled = await page.evaluate(
+          (source) =>
+            window.__companionFloatingPanel.panelCommand({ ...source, kind: 'fill', index: 0 }),
+          restored,
+        );
+        assert.equal(filled.ok, true);
+        assert.equal(await page.locator('#composer-form .ProseMirror').innerText(), 'A 的合成建议');
+        await replaceIdentity(page, 'fixture-thread-b');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts[0]?.label === 'B',
+        );
+        assert.equal(await page.evaluate(() => window.workbenchFixture.deferred.length), 2);
+      },
+    ]),
+    [
+      'binding suggestion cache invalidates changed answer and generation settings',
+      async (page) => {
+        await mode(page, true);
+        await defer(page);
+        await complete(page, 0, 'A');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts.length === 1,
+        );
+        await replaceIdentity(page, 'fixture-thread-b');
+        await page
+          .locator('#answer h2')
+          .first()
+          .evaluate((node) => {
+            node.textContent = '新的回答';
+          });
+        await replaceIdentity(page, 'fixture-thread-a');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.scanStatus === 'ready',
+        );
+        assert.equal((await snapshot(page)).prompts.length, 0);
+        assert.equal(await page.evaluate(() => window.workbenchFixture.deferred.length), 1);
+        await page.locator('[data-refresh="next"]').click();
+        await page.waitForFunction(() => window.workbenchFixture.deferred.length === 2);
+        await complete(page, 1, '新 A');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts.length === 1,
+        );
+        await replaceIdentity(page, 'fixture-thread-b');
+        await page.evaluate(async () => {
+          const f = window.workbenchFixture;
+          f.settings.generationRevision += 1;
+          await window.__companionFloatingPanel.syncSettings();
+        });
+        await replaceIdentity(page, 'fixture-thread-a');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.scanStatus === 'ready',
+        );
+        assert.equal((await snapshot(page)).prompts.length, 0);
+        assert.equal(await page.evaluate(() => window.workbenchFixture.deferred.length), 2);
+      },
+    ],
     [
       'binding same target preserves pending generation reading and request count',
       async (page) => {

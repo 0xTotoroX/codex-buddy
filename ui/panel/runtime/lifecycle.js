@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、启停与通知订阅；来源失联保留只读结果并使异步请求失效。
+ * [OUTPUT]: 扫描、启停与通知订阅；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -211,12 +211,7 @@ function scan(generation = runtimeState.runtimeGeneration, timerId = 0) {
   const hasSuccessfulCache = bridgeResult?.status === 'ok';
   let prompts = [];
 
-  const manualResultVisible =
-    generationMode === 'manual' &&
-    stepwiseState.bridgeStatus === 'ok' &&
-    stepwiseState.bridgeActiveKey === bridgeKey;
-
-  if (generationMode === 'manual' && !manualResultVisible && !manualRequestPending) {
+  if (generationMode === 'manual' && !hasSuccessfulCache && !manualRequestPending) {
     stepwiseState.bridgeStatus = 'manual-ready';
     stepwiseState.bridgeError = '';
     stepwiseState.promptContext = contextSnapshot();
@@ -510,7 +505,7 @@ function install() {
         outlineState.outlineStatus = outlineState.outlineItems.length ? 'ready' : 'idle';
     }),
     onSignal('context', () => {
-      resetStepwiseFeature();
+      resetStepwiseFeature('idle', { preserveCache: true });
       resetOutlineFeature();
     }),
     onSignal('complete', (count) => triggerCompletionBeam(count)),

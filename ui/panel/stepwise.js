@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 回答上下文、独立生成版本、模型桥接与宿主写入接口。
- * [OUTPUT]: 建议生成、预览与草稿保护；来源失联时禁止生成和填入。
+ * [OUTPUT]: 建议生成、按聊天/回答保留的有限内存缓存、预览与草稿保护；来源失联时禁止生成和填入。
  * [POS]: Stepwise 功能单元；不依赖大纲，通过通知请求外壳反馈。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -143,8 +143,16 @@ function payloadPrompts(payload) {
 
 function bridgeRequestKey(userText, assistantText, answerHash = contextState.lastAssistantHash) {
   return hashText(
-    `${contextState.activeContext.sessionId}\n${answerHash}\n${shortText(userText, 2400)}\n\n--- assistant ---\n\n${assistantText}`,
+    `${contextState.activeContext.sessionId || contextState.activeContext.paneKey}\n${answerHash}\n${shortText(userText, 2400)}\n\n--- assistant ---\n\n${assistantText}`,
   );
+}
+
+// 保留最近 32 次结果，切换聊天可复用；不把建议或聊天正文写入持久存储。
+function cacheBridgeResult(key, result) {
+  stepwiseState.bridgeCache.delete(key);
+  stepwiseState.bridgeCache.set(key, result);
+  while (stepwiseState.bridgeCache.size > 32)
+    stepwiseState.bridgeCache.delete(stepwiseState.bridgeCache.keys().next().value);
 }
 
 function requestBridgeStepwise(
@@ -214,7 +222,7 @@ function requestBridgeStepwise(
       if (!requestOwned() || !requestCurrent()) return;
       const prompts = payload?.disabled || payload?.error ? [] : payloadPrompts(payload);
       const bridgeStatus = payload?.disabled ? 'disabled' : payload?.error ? 'failed' : 'ok';
-      stepwiseState.bridgeCache.set(key, {
+      cacheBridgeResult(key, {
         status: bridgeStatus,
         disabled: Boolean(payload?.disabled),
         error: normalizeText(payload?.error || ''),
@@ -227,7 +235,7 @@ function requestBridgeStepwise(
     })
     .catch((error) => {
       if (!requestOwned() || !requestCurrent()) return;
-      stepwiseState.bridgeCache.set(key, {
+      cacheBridgeResult(key, {
         status: 'failed',
         disabled: true,
         error: error.message,
@@ -414,7 +422,7 @@ function fillComposer(prompt, submit = false, options = {}) {
   return false;
 }
 
-function resetStepwiseFeature(status = 'idle') {
+function resetStepwiseFeature(status = 'idle', { preserveCache = false } = {}) {
   stepwiseState.stepwiseEpoch += 1;
   emitSignal('preview', undefined);
   shellState.promptPreviewIndex = 0;
@@ -424,7 +432,7 @@ function resetStepwiseFeature(status = 'idle') {
   stepwiseState.bridgePendingMode = stepwiseGenerationMode();
   stepwiseState.bridgeStatus = status;
   stepwiseState.bridgeError = '';
-  stepwiseState.bridgeCache.clear();
+  if (!preserveCache) stepwiseState.bridgeCache.clear();
   stepwiseState.prompts = [];
   stepwiseState.promptContext = null;
   stepwiseState.currentHash = '';
