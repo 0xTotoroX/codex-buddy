@@ -51,6 +51,85 @@ async function check(name, test, options) {
 }
 try {
   await check(
+    'permanent listboxes and closing overlays do not occupy the official model menu',
+    async (page) => {
+      await page.evaluate(() => {
+        const list = document.createElement('div');
+        list.id = 'tasks';
+        list.setAttribute('role', 'listbox');
+        list.textContent = 'Task list';
+        document.body.append(list);
+        const closing = document.createElement('div');
+        closing.setAttribute('role', 'listbox');
+        closing.dataset.state = 'closed';
+        closing.textContent = 'Closing popup';
+        document.body.append(closing);
+      });
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success');
+      assert.deepEqual(result.snapshot.current, targetBeta);
+      assert.equal(await page.locator('#tasks').isVisible(), true);
+    },
+  );
+  await check(
+    'existing target model menu is adopted instead of rejected or toggled shut',
+    async (page) => {
+      await page.locator('form button').click();
+      const opened = await page.evaluate(() => host.triggerEvents);
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      assert.equal(await page.evaluate(() => host.triggerEvents), opened);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+      await page.locator('form button').click();
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success');
+      assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), targetBeta);
+    },
+  );
+  await check(
+    'existing target submenu closes before parent and does not poison the next readback',
+    async (page) => {
+      await page.locator('form button').click();
+      await page.locator('[role="menuitem"]').first().click();
+      await page.evaluate(() => {
+        const submenu = document.getElementById('sub-chat-a');
+        submenu.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            host.clicks.push({ action: 'close-child' });
+            submenu.remove();
+          }
+        });
+      });
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      const closes = await page.evaluate(() =>
+        host.clicks.filter((v) => v.action.startsWith('close')).map((v) => v.action),
+      );
+      assert.deepEqual(closes, ['close-child', 'close']);
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+    },
+  );
+  await check(
+    'foreign open menu is preserved and never closes or mutates another chat',
+    async (page) => {
+      await page.locator('form button').click();
+      await page.evaluate(() => {
+        const foreign = document.createElement('div');
+        foreign.id = 'foreign-menu';
+        foreign.setAttribute('role', 'menu');
+        foreign.dataset.state = 'open';
+        foreign.textContent = 'Unrelated menu';
+        foreign.addEventListener('keydown', () => host.unexpected.push('foreign-key'));
+        document.body.append(foreign);
+      });
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'failed');
+      assert.match(result.message, /另一个官方菜单/);
+      assert.equal(await page.locator('#foreign-menu').isVisible(), true);
+      assert.equal(await page.locator('#main-chat-a').isVisible(), true);
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+    },
+  );
+  await check(
     'composer identity survives references to another conversation and generic trigger labels',
     async (page) => {
       await page.evaluate(() => {

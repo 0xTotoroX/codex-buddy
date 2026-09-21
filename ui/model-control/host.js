@@ -514,7 +514,35 @@
     }
     guard(op);
   }
-  const menus = () => all(document, MENU).filter((node) => visible(node) && !owned(node));
+  const references = (node, attribute, id) =>
+    !!id && (node.getAttribute(attribute) || '').split(/\s+/).includes(id);
+  const linkedMenu = (trigger, menu) =>
+    references(trigger, 'aria-controls', menu.id) ||
+    references(menu, 'aria-labelledby', trigger.id);
+  function menuOpen(node) {
+    if (!visible(node) || owned(node) || node.getAttribute('data-state') === 'closed') return false;
+    // A permanent listbox (for example a task list) is not a popup menu.
+    return (
+      node.getAttribute('role') !== 'listbox' ||
+      node.getAttribute('data-state') === 'open' ||
+      all(document, '[aria-haspopup][aria-expanded="true"]').some((trigger) =>
+        linkedMenu(trigger, node),
+      )
+    );
+  }
+  const menus = () => all(document, MENU).filter(menuOpen);
+  function menuFamily(main) {
+    const family = [main];
+    const active = menus();
+    for (let i = 0; i < family.length; i++) {
+      const triggers = all(family[i], '[aria-haspopup="menu"]');
+      for (const menu of active) {
+        if (!family.includes(menu) && triggers.some((trigger) => linkedMenu(trigger, menu)))
+          family.push(menu);
+      }
+    }
+    return family;
+  }
   const sectionRow = (menu, section) =>
     one(
       all(menu, '[role="menuitem"][aria-haspopup="menu"]').filter((item) =>
@@ -565,35 +593,74 @@
   }
   async function openMain(op) {
     guard(op);
-    if (menus().length) throw new Error('官方菜单正在使用中');
+    const active = menus();
+    const existing = one(
+      active.filter((menu) => linkedMenu(op.target.trigger, menu) && sectionRow(menu, 'model')),
+    );
+    if (active.length) {
+      if (!existing || active.some((menu) => !menuFamily(existing).includes(menu)))
+        throw new Error('另一个官方菜单仍然打开，请先关闭该菜单再选择模型');
+      // Clicking our control explicitly authorizes this target's already-open menu.
+      // Do not toggle its trigger: that would close the very menu we need to read.
+      op.main = existing;
+      menuFamily(existing).forEach((menu) => op.menus.add(menu));
+      return existing;
+    }
     op.main = null;
     activate(op, op.target.trigger);
     const main = await waitFor(op, () => {
       const id = op.target.trigger.getAttribute('aria-controls');
-      const found = menus().filter((menu) => sectionRow(menu, 'model') && (!id || menu.id === id));
-      return one(found);
+      const found = menus().filter(
+        (menu) =>
+          sectionRow(menu, 'model') &&
+          (!id || references(op.target.trigger, 'aria-controls', menu.id)),
+      );
+      const menu = one(found);
+      if (menu) {
+        op.main = menu;
+        op.menus.add(menu);
+      }
+      return menu;
     });
     guard(op, main);
-    op.main = main;
     return main;
   }
-  async function closeMenu(op) {
-    guard(op);
-    if (!op.main || !visible(op.main)) {
-      op.main = null;
-      return;
-    }
-    // Escape is scoped to our menu; never click body or clean up after a target change.
+  function escapeMenu(op, menu) {
+    guard(op, menu);
     dispatching = true;
     try {
-      op.main.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }),
+      menu.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
       );
     } finally {
       dispatching = false;
     }
-    await waitFor(op, () => !visible(op.main), 500);
+  }
+  async function closeMenu(op) {
     guard(op);
+    if (op.main) menuFamily(op.main).forEach((menu) => op.menus.add(menu));
+    // Escape usually closes the deepest menu first. Some hosts listen only on
+    // the parent; fall back to that same owned parent, never body or another menu.
+    for (const menu of [...op.menus].reverse()) {
+      guard(op);
+      if (!menuOpen(menu)) continue;
+      escapeMenu(op, menu);
+      try {
+        await waitFor(op, () => !menuOpen(menu), 500);
+      } catch (error) {
+        guard(op);
+        if (menu === op.main || !menuOpen(op.main)) throw error;
+        escapeMenu(op, op.main);
+        await waitFor(op, () => !menuOpen(menu), 500);
+      }
+    }
+    guard(op);
+    op.menus.clear();
     op.main = null;
   }
   async function submenu(op, main, section) {
@@ -610,6 +677,7 @@
         ),
       );
     });
+    op.menus.add(menu);
     guard(op, main);
     guard(op, row);
     guard(op, menu);
@@ -663,6 +731,7 @@
       mutated: false,
       aborted: '',
       main: null,
+      menus: new Set(),
       focus: document.activeElement,
       controller: new AbortController(),
       deadline: performance.now() + 11000,

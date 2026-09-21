@@ -260,6 +260,27 @@ test('first model cell click reads official state then preserves Fast without ma
   assert.equal(applied[0].payload.expectedRevision, 'readback-2');
   await cleanup(ctx);
 });
+test('blocked menu during first-click read reports no switch instead of an uncertain write', async () => {
+  const initial = fixture();
+  initial.snapshot.status = 'waiting';
+  initial.snapshot.current = null;
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  f.onRefresh = () => {
+    f.data.snapshot.status = 'unavailable';
+    f.data.snapshot.message = '另一个官方菜单仍然打开，请先关闭该菜单再选择模型';
+  };
+  await modelButton(page, 'alpha', 'high').click();
+  await page.waitForFunction(() =>
+    document.getElementById('notice').textContent.startsWith('未执行切换：'),
+  );
+  assert.equal(
+    f.requests.some((r) => r.operation === 'apply'),
+    false,
+  );
+  await cleanup(ctx);
+});
+
 test('target change during first-click refresh prevents any write and displays source failure', async () => {
   const initial = fixture();
   initial.snapshot.status = 'waiting';

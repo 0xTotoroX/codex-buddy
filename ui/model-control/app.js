@@ -415,6 +415,7 @@ async function apply(selection, restore = false) {
   }
   const source = snapshot();
   const target = { ...source.target };
+  let writeStarted = false;
   // A cell resolves its speed after explicit first-click readback. Hover/polling
   // still never opens the official menu, and presets retain their full selection.
   const resolveSelection = typeof selection === 'function' ? selection : () => selection;
@@ -439,6 +440,7 @@ async function apply(selection, restore = false) {
         expectedRevision: snapshot().revision,
         selection: Object.freeze({ ...resolved }),
       });
+      writeStarted = true;
       const data = await request('apply', frozen);
       accept(data);
       const result = data.result;
@@ -475,7 +477,11 @@ async function apply(selection, restore = false) {
       } catch {
         online = false;
       }
-      notify(`未确认应用结果：${error.message}。请核对实际配置后再操作。`);
+      notify(
+        writeStarted
+          ? `未确认应用结果：${error.message}。请核对实际配置后再操作。`
+          : `未执行切换：${error.message}`,
+      );
     }
   });
 }
