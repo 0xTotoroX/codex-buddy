@@ -242,6 +242,52 @@ async function menu(page, name) {
   await page.getByRole('button', { name, exact: true }).click();
 }
 
+test('one shell reaches compact geometry without padded contour swap or size feedback', async () => {
+  const ctx = await setup();
+  const { page } = ctx;
+  await page.evaluate(() => {
+    window.savedSurface = document.getElementById('surface');
+  });
+  await nativeEvent(page, {
+    expanded: true,
+    animating: true,
+    unfold: 0.8,
+    layoutWidth: 480,
+    width: 400,
+    height: 200,
+  });
+  const before = await page.evaluate(
+    () => window.nativeMessages.filter((m) => m.action === 'content-size').length,
+  );
+  for (const width of [100, 32, 16, 11, 10]) {
+    await page.setViewportSize({ width, height: 80 });
+    await nativeEvent(page, {
+      expanded: false,
+      animating: true,
+      unfold: 0.01,
+      layoutWidth: 480,
+      width,
+      height: 80,
+    });
+    assert.equal(await page.locator('#surface').evaluate((n) => n.clientWidth), width);
+    assert.equal(await page.locator('#panel').evaluate((n) => n.clientWidth), 480);
+  }
+  const lastClip = await page.locator('#surface').evaluate((n) => n.style.clipPath);
+  assert.equal(
+    await page.evaluate(
+      () => window.nativeMessages.filter((m) => m.action === 'content-size').length,
+    ),
+    before,
+  );
+  await nativeEvent(page, { expanded: false, animating: false, unfold: 0, width: 10, height: 80 });
+  assert.equal(await page.locator('#surface').evaluate((n) => n.style.clipPath), lastClip);
+  assert.equal(
+    await page.evaluate(() => window.savedSurface === document.getElementById('surface')),
+    true,
+  );
+  await cleanup(ctx);
+});
+
 test('first model cell uses one apply transaction with speed-preservation intent', async () => {
   const initial = fixture();
   initial.snapshot.status = 'waiting';
@@ -718,7 +764,7 @@ test('theme and placement menus save independent preferences without applying a 
   await nativeEvent(page, { effectiveMaterial: 'frosted', nativeBackdrop: true });
   assert.equal(await page.locator('body').getAttribute('data-material'), 'frosted');
   assert.equal(
-    await page.locator('#panel').evaluate((n) => getComputedStyle(n).backgroundColor),
+    await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
     'rgba(0, 0, 0, 0)',
   );
   await cleanup(ctx);
@@ -734,11 +780,11 @@ test('compact handle and notch flanks retain each selected material', async () =
     };
     await nativeEvent(page, { ...detail, expanded: true });
     const expanded = await page
-      .locator('#panel')
+      .locator('#surface')
       .evaluate((n) => getComputedStyle(n).backgroundColor);
     await nativeEvent(page, { ...detail, expanded: false });
     assert.equal(
-      await page.locator('#handle').evaluate((n) => getComputedStyle(n).backgroundColor),
+      await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
       expanded,
     );
     assert.equal(
@@ -887,7 +933,7 @@ test('opaque black matrix remains independent of workbench material and system t
         nativeBackdrop: true,
       });
       assert.equal(
-        await page.locator('#panel').evaluate((n) => getComputedStyle(n).backgroundColor),
+        await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
         'rgb(0, 0, 0)',
       );
       assert.equal(

@@ -111,6 +111,20 @@ function probePage() {
     pointerDown = null,
     pointer = null;
   const errors = [];
+  const motion = [];
+  window.resetMotion = () => {
+    motion.length = 0;
+  };
+  let lastFrame = 0;
+  function frame(now) {
+    if (window.recordMotion && native?.animating && lastFrame) {
+      motion.push({ theme: native.theme, dt: now - lastFrame });
+      if (motion.length > 1200) motion.shift();
+    }
+    lastFrame = now;
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
   window.addEventListener('error', (event) => errors.push(event.message));
   window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
   window.addEventListener('model-control-pointer', (event) => {
@@ -137,12 +151,13 @@ function probePage() {
         body: JSON.stringify({
           native,
           nativeEvents,
+          motion,
           keyboardActivations,
           errors,
           pointerDown,
           pointer,
-          background: getComputedStyle(document.getElementById('panel')).backgroundColor,
-          handleBackground: getComputedStyle(document.getElementById('handle')).backgroundColor,
+          background: getComputedStyle(document.getElementById('surface')).backgroundColor,
+          handleBackground: getComputedStyle(document.getElementById('surface')).backgroundColor,
           hasFocus: document.hasFocus(),
           active: document.activeElement?.id,
           path: location.pathname,
@@ -467,6 +482,7 @@ try {
     'workbench appearance',
   );
   assert.equal(telemetry.native.effectiveMaterial, 'black');
+  await command('window.resetMotion(); window.recordMotion = true');
   for (const [theme, variant, style] of [
     ['black', 'regular', null],
     ['matte', 'regular', null],
@@ -526,6 +542,22 @@ try {
   await delay(500);
   assert.equal(telemetry.path, '/model-control');
   check('external top-level navigation denied');
+  report.motion = Object.fromEntries(
+    ['black', 'matte', 'frosted', 'native-glass'].map((theme) => {
+      const samples = telemetry.motion
+        .filter((s) => s.theme === theme)
+        .map((s) => s.dt)
+        .sort((a, b) => a - b);
+      return [
+        theme,
+        {
+          samples: samples.length,
+          p95: samples[Math.floor(samples.length * 0.95)],
+          max: samples.at(-1),
+        },
+      ];
+    }),
+  );
   report.errors = telemetry.errors;
   assert.deepEqual(telemetry.errors, []);
   valid = false;

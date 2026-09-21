@@ -9,121 +9,123 @@
   </head>
   <body data-edge="right">
     <div id="notch-mask" aria-hidden="true" hidden></div>
-    <button
-      id="handle"
-      type="button"
-      aria-label="展开模型控制"
-      title="模型快切 · ⌥ 拖动调整位置"
-    ></button>
-    <main id="panel" aria-label="模型控制" hidden>
-      <header>
-        <button
-          id="fast"
-          class="icon-button"
-          type="button"
-          aria-label="Fast"
-          title="Fast"
-          aria-pressed="false"
-        ></button>
-        <div id="presets" class="preset-bar" data-nav aria-label="预设列表"></div>
-        <button
-          id="save"
-          class="icon-button"
-          type="button"
-          aria-label="保存当前预设"
-          title="保存当前预设"
-        ></button>
-        <label id="search-bar" class="search" hidden
-          ><span class="sr-only">搜索模型或预设</span
-          ><input
-            id="search"
-            type="search"
-            placeholder="搜索模型或预设…"
-            autocomplete="off"
-            spellcheck="false"
-        /></label>
-        <button
-          id="keep-open"
-          class="icon-button"
-          type="button"
-          aria-label="保持展开"
-          title="保持展开"
-          aria-pressed="false"
-        ></button>
-        <button
-          id="menu-button"
-          class="icon-button"
-          type="button"
-          aria-label="设置菜单"
-          title="设置菜单"
-          aria-expanded="false"
-          aria-controls="menu"
-        ></button>
-        <button
-          id="collapse"
-          class="icon-button"
-          type="button"
-          aria-label="收起"
-          title="收起 · Esc"
-        ></button>
-      </header>
-      <p id="preview" class="preview" hidden></p>
-      <section class="model-section" aria-label="模型与推理强度">
-        <div id="model-scroll" tabindex="-1">
-          <div class="matrix-toolbar">
-            <div id="matrix-head" class="matrix-head" aria-hidden="true"></div>
-            <button
-              id="resize"
-              type="button"
-              role="separator"
-              aria-label="调整模型名称列宽"
-              aria-orientation="vertical"
-              aria-valuemin="100"
-              aria-valuemax="280"
-              aria-valuenow="144"
-              title="拖动调整名称列宽；双击重置；方向键微调"
-            ></button>
-          </div>
-          <div id="pinned" class="model-list" data-nav aria-label="常用模型"></div>
+    <div id="surface">
+      <button
+        id="handle"
+        type="button"
+        aria-label="展开模型控制"
+        title="模型快切 · ⌥ 拖动调整位置"
+      ></button>
+      <main id="panel" aria-label="模型控制" hidden>
+        <header>
           <button
-            id="others-toggle"
-            class="disclosure"
+            id="fast"
+            class="icon-button"
             type="button"
-            aria-expanded="false"
-            aria-controls="others"
+            aria-label="Fast"
+            title="Fast"
+            aria-pressed="false"
           ></button>
-          <div id="others" class="model-list" data-nav aria-label="其他模型" hidden></div>
-          <p id="empty" class="empty" hidden>没有匹配的模型</p>
+          <div id="presets" class="preset-bar" data-nav aria-label="预设列表"></div>
+          <button
+            id="save"
+            class="icon-button"
+            type="button"
+            aria-label="保存当前预设"
+            title="保存当前预设"
+          ></button>
+          <label id="search-bar" class="search" hidden
+            ><span class="sr-only">搜索模型或预设</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="搜索模型或预设…"
+              autocomplete="off"
+              spellcheck="false"
+          /></label>
+          <button
+            id="keep-open"
+            class="icon-button"
+            type="button"
+            aria-label="保持展开"
+            title="保持展开"
+            aria-pressed="false"
+          ></button>
+          <button
+            id="menu-button"
+            class="icon-button"
+            type="button"
+            aria-label="设置菜单"
+            title="设置菜单"
+            aria-expanded="false"
+            aria-controls="menu"
+          ></button>
+          <button
+            id="collapse"
+            class="icon-button"
+            type="button"
+            aria-label="收起"
+            title="收起 · Esc"
+          ></button>
+        </header>
+        <p id="preview" class="preview" hidden></p>
+        <section class="model-section" aria-label="模型与推理强度">
+          <div id="model-scroll" tabindex="-1">
+            <div class="matrix-toolbar">
+              <div id="matrix-head" class="matrix-head" aria-hidden="true"></div>
+              <button
+                id="resize"
+                type="button"
+                role="separator"
+                aria-label="调整模型名称列宽"
+                aria-orientation="vertical"
+                aria-valuemin="100"
+                aria-valuemax="280"
+                aria-valuenow="144"
+                title="拖动调整名称列宽；双击重置；方向键微调"
+              ></button>
+            </div>
+            <div id="pinned" class="model-list" data-nav aria-label="常用模型"></div>
+            <button
+              id="others-toggle"
+              class="disclosure"
+              type="button"
+              aria-expanded="false"
+              aria-controls="others"
+            ></button>
+            <div id="others" class="model-list" data-nav aria-label="其他模型" hidden></div>
+            <p id="empty" class="empty" hidden>没有匹配的模型</p>
+          </div>
+        </section>
+        <footer>
+          <button id="target" type="button" title="查看关联目标与实际配置">等待连接</button>
+          <span id="status" role="status"></span>
+          <button
+            id="refresh"
+            class="icon-button"
+            type="button"
+            aria-label="刷新可用模型"
+            title="同步：通过官方菜单读取当前配置"
+          ></button>
+          <span id="actual" class="sr-only">尚未读取</span>
+          <span id="speed-note" class="sr-only"></span>
+        </footer>
+        <div id="notice-area" hidden>
+          <p id="notice" role="status" aria-live="polite"></p>
+          <button id="undo" type="button" hidden>恢复之前配置</button>
         </div>
-      </section>
-      <footer>
-        <button id="target" type="button" title="查看关联目标与实际配置">等待连接</button>
-        <span id="status" role="status"></span>
-        <button
-          id="refresh"
-          class="icon-button"
-          type="button"
-          aria-label="刷新可用模型"
-          title="同步：通过官方菜单读取当前配置"
-        ></button>
-        <span id="actual" class="sr-only">尚未读取</span>
-        <span id="speed-note" class="sr-only"></span>
-      </footer>
-      <div id="notice-area" hidden>
-        <p id="notice" role="status" aria-live="polite"></p>
-        <button id="undo" type="button" hidden>恢复之前配置</button>
-      </div>
-      <aside id="menu" class="popover" aria-label="设置" hidden></aside>
-      <form id="editor" class="editor" hidden aria-label="预设名称">
-        <label for="preset-name">预设名称</label
-        ><input id="preset-name" required autocomplete="off" />
-        <p id="editor-description"></p>
-        <div>
-          <button type="button" id="editor-cancel">取消</button
-          ><button type="submit" id="editor-submit">保存</button>
-        </div>
-      </form>
-    </main>
+        <aside id="menu" class="popover" aria-label="设置" hidden></aside>
+        <form id="editor" class="editor" hidden aria-label="预设名称">
+          <label for="preset-name">预设名称</label
+          ><input id="preset-name" required autocomplete="off" />
+          <p id="editor-description"></p>
+          <div>
+            <button type="button" id="editor-cancel">取消</button
+            ><button type="submit" id="editor-submit">保存</button>
+          </div>
+        </form>
+      </main>
+    </div>
     <script type="module" src="/model-control/app.js"></script>
   </body>
 </html>

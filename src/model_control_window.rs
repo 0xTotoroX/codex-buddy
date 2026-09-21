@@ -291,6 +291,7 @@ struct Surface {
     expanded: bool,
     unfold: geometry::Unfold,
     motion_tick: Instant,
+    screen_check: Instant,
     keyboard: bool,
     hidden: bool,
     ready: bool,
@@ -386,18 +387,23 @@ impl Surface {
         if !self.host_attached {
             return Ok(());
         }
-        let screens = screen_snapshots(mtm);
-        let pointer = NSEvent::mouseLocation();
-        let current = self.screen.as_ref().map_or("", |s| s.id.as_str());
-        let selected = geometry::select_screen(
-            &screens,
-            &self.prefs.screen,
-            current,
-            (pointer.x, pointer.y),
-        )
-        .cloned();
-        let changed = selected != self.screen;
-        self.screen = selected;
+        let refresh_screen = self.screen.is_none() || Instant::now() >= self.screen_check;
+        let previous_screen = self.screen.clone();
+        if refresh_screen {
+            self.screen_check = Instant::now() + Duration::from_secs(1);
+            let screens = screen_snapshots(mtm);
+            let pointer = NSEvent::mouseLocation();
+            let current = self.screen.as_ref().map_or("", |s| s.id.as_str());
+            let selected = geometry::select_screen(
+                &screens,
+                &self.prefs.screen,
+                current,
+                (pointer.x, pointer.y),
+            )
+            .cloned();
+            self.screen = selected;
+        }
+        let changed = previous_screen != self.screen;
         let Some(screen) = self.screen.as_ref() else {
             self.panel.orderOut(None);
             return Ok(());
@@ -790,6 +796,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         expanded: false,
         unfold: geometry::Unfold::default(),
         motion_tick: Instant::now(),
+        screen_check: Instant::now(),
         keyboard: false,
         hidden: false,
         ready: false,
@@ -803,9 +810,9 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         last_backdrop: None,
     };
     let mut error = None;
-    let mut next_screen_check = Instant::now();
+    let mut next_tick = Instant::now();
     event_loop.run_return(|event, _, control| {
-        *control = ControlFlow::WaitUntil(next_screen_check);
+        *control = ControlFlow::Wait;
         let result = match event {
             Event::UserEvent(Message::BackendGone) => {
                 *control = ControlFlow::Exit;
@@ -827,18 +834,18 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
                     surface.expand(true, mtm)
                 }
             }
-            Event::MainEventsCleared => {
+            Event::MainEventsCleared if Instant::now() >= next_tick => {
+                next_tick = Instant::now() + Duration::from_millis(16);
                 surface.mouse_passthrough();
                 if surface.keyboard && !surface.panel.isKeyWindow() {
                     surface.panel.ivars().allowed.set(false);
                     surface.keyboard = false;
                     surface.dispatch();
                 }
-                if surface.unfold.active(surface.expanded) {
-                    surface.reflow(mtm)
-                } else if Instant::now() >= next_screen_check {
-                    next_screen_check = Instant::now() + Duration::from_secs(1);
-                    *control = ControlFlow::WaitUntil(next_screen_check);
+                if (surface.unfold.active(surface.expanded)
+                    && surface.motion_tick.elapsed() >= Duration::from_millis(16))
+                    || Instant::now() >= surface.screen_check
+                {
                     surface.reflow(mtm)
                 } else {
                     Ok(())
@@ -857,9 +864,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
             && surface.ready
             && surface.valid
         {
-            *control = ControlFlow::WaitUntil(
-                next_screen_check.min(Instant::now() + Duration::from_millis(16)),
-            );
+            *control = ControlFlow::WaitUntil(next_tick);
         }
     });
     surface.panel.orderOut(None);

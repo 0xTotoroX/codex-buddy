@@ -1,6 +1,6 @@
 /*
  * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何/开合进度与鼠标边界事件。
- * [OUTPUT]: 紧凑模型矩阵、版本保护写入、开合/内容高度 IPC；独立四主题、屏幕/位置设置。
+ * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；独立四主题、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -180,9 +180,7 @@ function setSearch(open) {
   }
 }
 // Keep this quadratic contour aligned with model_control_geometry::surface_contains.
-function shapeSurface(node) {
-  const w = node.clientWidth,
-    h = node.clientHeight;
+function shapeSurface(node, w = node.clientWidth, h = node.clientHeight) {
   if (!w || !h) return;
   const edge = document.body.dataset.edge;
   const a = edge === 'top' ? h : w,
@@ -202,9 +200,9 @@ function shapeSurface(node) {
 function queueSize() {
   cancelAnimationFrame(sizeFrame);
   sizeFrame = requestAnimationFrame(() => {
-    if (!expanded || stopped || nativeState.hidden) return;
+    if (!expanded || stopped || nativeState.hidden || nativeState.animating) return;
     const panel = $('panel');
-    shapeSurface(panel);
+    if (!Number.isFinite(nativeState.width)) shapeSurface($('surface'));
     const natural = [...panel.children]
       .filter(
         (n) =>
@@ -225,6 +223,7 @@ function queueSize() {
 window.addEventListener('model-control-native', (event) => {
   const detail = event.detail || {};
   applyAppearance(detail);
+  const wasAnimating = nativeState.animating === true;
   const wasExpanded = expanded,
     wasKeyboard = nativeState.keyboard === true;
   nativeState = { ...nativeState, ...detail };
@@ -268,17 +267,22 @@ window.addEventListener('model-control-native', (event) => {
   mask.style.height = `${finite(nativeState.notchHeight, 0)}px`;
   mask.style.left = `${notchX}px`;
   const presenting = expanded || detail.animating === true;
+  $('surface').hidden = nativeState.hidden === true;
+  document.body.dataset.presenting = String(presenting);
   $('panel').hidden = !presenting || nativeState.hidden === true;
   $('handle').hidden = presenting || nativeState.hidden === true;
   const progress = Number.isFinite(detail.unfold) ? detail.unfold : expanded ? 1 : 0;
   document.body.dataset.animating = String(detail.animating === true);
   style.setProperty('--content-opacity', String(Math.max(0, Math.min(1, (progress - 0.45) / 0.5))));
-  style.setProperty('--layout-width', `${finite(nativeState.layoutWidth, 480)}px`);
+  style.setProperty(
+    '--layout-width',
+    `${finite(nativeState.layoutWidth, Math.min(480, innerWidth))}px`,
+  );
   style.setProperty(
     '--surface-height',
     `${Math.max(0, innerHeight - (notched ? nativeState.contentOffsetY || 0 : 0))}px`,
   );
-  if (!expanded) {
+  if (!expanded && wasExpanded) {
     closeMenu(false);
     closeEditor();
     keyboard = false;
@@ -293,9 +297,22 @@ window.addEventListener('model-control-native', (event) => {
     requestAnimationFrame(() =>
       $('panel').querySelector('button:not(:disabled)')?.focus({ preventScroll: true }),
     );
-  shapeSurface($('handle'));
-  shapeSurface($('panel'));
-  updateLayout();
+  shapeSurface(
+    $('surface'),
+    presenting
+      ? finite(detail.width, innerWidth)
+      : notched
+        ? Math.min(10, Math.max(0, notchX))
+        : compactWidth,
+    presenting
+      ? Math.max(
+          0,
+          finite(detail.height, innerHeight) - (notched ? nativeState.contentOffsetY || 0 : 0),
+        )
+      : compactHeight,
+  );
+  if (wasExpanded !== expanded || (wasAnimating && !detail.animating) || !detail.animating)
+    updateLayout();
 });
 for (const root of [$('handle'), $('panel')]) {
   root.addEventListener('pointerenter', (event) => {
@@ -495,6 +512,7 @@ function manualSelection(model, reasoning) {
 }
 
 function updateLayout() {
+  if (nativeState.animating) return;
   const font =
     parseFloat(
       getComputedStyle(document.querySelector('.model-label strong') || $('panel')).fontSize,

@@ -1,7 +1,7 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
 // [OUTPUT]: 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
 // [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
-// [PROTOCOL]: 共享材质保持窗口无关；控制条可选内容边缘和刘海两翼裁切，工作台仍用圆角矩形。
+// [PROTOCOL]: 共享材质保持窗口无关；控制条复用形状遮罩更新内容边缘和刘海两翼裁切，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};
 use objc2_app_kit::{
@@ -25,6 +25,7 @@ pub struct Backdrop {
     boundary: Retained<NSView>,
     carrier: Retained<NSView>,
     web: Retained<NSView>,
+    edge_mask: std::cell::OnceCell<Retained<CALayer>>,
 }
 
 impl Backdrop {
@@ -63,6 +64,7 @@ impl Backdrop {
             boundary,
             carrier,
             web,
+            edge_mask: std::cell::OnceCell::new(),
         }
     }
 
@@ -106,7 +108,9 @@ impl Backdrop {
         let Some(class) = AnyClass::get(c"CAShapeLayer") else {
             return;
         };
-        let mask: Retained<CALayer> = unsafe { objc2::msg_send![class, new] };
+        let mask = self
+            .edge_mask
+            .get_or_init(|| unsafe { objc2::msg_send![class, new] });
         let body_height = (height - content_top).max(0.);
         let (a, b) = if edge == "top" {
             (body_height, width)
@@ -153,8 +157,13 @@ impl Backdrop {
                     CGPathAddRect(path, std::ptr::null(), rect);
                 }
             }
-            let _: () = objc2::msg_send![&*mask, setPath: path];
-            layer.setMask(Some(&mask));
+            CATransaction::begin();
+            CATransaction::setDisableActions(true);
+            let _: () = objc2::msg_send![&**mask, setPath: path];
+            if layer.mask().as_deref() != Some(&**mask) {
+                layer.setMask(Some(mask));
+            }
+            CATransaction::commit();
             CGPathRelease(path);
         }
     }
