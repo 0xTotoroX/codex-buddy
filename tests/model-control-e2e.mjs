@@ -320,7 +320,23 @@ try {
   assert.equal(modern.snapshot.status, 'ready');
   const modernFast = await api('apply', command(modern.snapshot, fast));
   assert.equal(modernFast.result.status, 'success', modernFast.result.message);
-  const modernBeta = await api('apply', command(modernFast.snapshot, beta));
+  const opens = await page.evaluate(() => host.triggerEvents);
+  await page.evaluate(() => {
+    const stop = document.createElement('button');
+    stop.textContent = 'Stop';
+    document.querySelector('form').append(stop);
+  });
+  const live = await api('state');
+  const preserved = await api('apply', {
+    ...command(live.snapshot, { ...initial, reasoning: 'low' }),
+    preserveSpeed: true,
+  });
+  assert.equal(preserved.result.status, 'success', preserved.result.message);
+  assert.equal(preserved.snapshot.current.speed, 'fast');
+  assert.equal(await page.evaluate(() => host.triggerEvents), opens + 1);
+  assert.equal(await page.getByRole('button', { name: 'Stop', exact: true }).count(), 1);
+  record('single transaction preserves actual Fast and changes configuration during generation');
+  const modernBeta = await api('apply', command(preserved.snapshot, beta));
   assert.equal(modernBeta.result.status, 'success', modernBeta.result.message);
   assert.deepEqual(modernBeta.snapshot.current, beta);
   assert.equal(await page.locator('[role="menu"]').count(), 0);

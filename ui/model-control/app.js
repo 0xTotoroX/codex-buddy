@@ -1,5 +1,5 @@
 /*
- * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何与鼠标边界事件。
+ * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何/开合进度与鼠标边界事件。
  * [OUTPUT]: 紧凑模型矩阵、版本保护写入、开合/内容高度 IPC；独立四主题、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
@@ -56,15 +56,12 @@ const canApply = () =>
   !busy &&
   ['ready', 'waiting'].includes(snapshot()?.status) &&
   models().length > 0 &&
-  !snapshot()?.generating &&
   !!snapshot()?.target?.id;
 const canSave = () => canApply() && !validate(snapshot()?.current, models());
 const reasonBlocked = () =>
   !online
     ? '连接不可用，请刷新后重试'
-    : snapshot()?.generating
-      ? '正在生成，暂不能修改配置'
-      : snapshot()?.message || statusLabels[snapshot()?.status] || '等待来源就绪';
+    : snapshot()?.message || statusLabels[snapshot()?.status] || '等待来源就绪';
 
 for (const [id, name] of Object.entries({
   'keep-open': 'pin',
@@ -200,11 +197,6 @@ function shapeSurface(node) {
   const clip = `path('${contour(a, b, p)}')`;
   node.style.setProperty('--shell-clip', clip);
   node.style.clipPath = clip;
-  // Same thin silhouette at the edge; only the outline moves, never the text.
-  const depth = Math.min(a, 10),
-    length = Math.min(b, 80);
-  const q = (x, y) => p(a - depth + x, (b - length) / 2 + y);
-  node.style.setProperty('--compact-clip', `path('${contour(depth, length, q)}')`);
 }
 // Natural content height is independent of the current native viewport.
 function queueSize() {
@@ -275,8 +267,17 @@ window.addEventListener('model-control-native', (event) => {
   mask.style.width = `${finite(nativeState.notchWidth, 0)}px`;
   mask.style.height = `${finite(nativeState.notchHeight, 0)}px`;
   mask.style.left = `${notchX}px`;
-  $('panel').hidden = !expanded || nativeState.hidden === true;
-  $('handle').hidden = expanded || nativeState.hidden === true;
+  const presenting = expanded || detail.animating === true;
+  $('panel').hidden = !presenting || nativeState.hidden === true;
+  $('handle').hidden = presenting || nativeState.hidden === true;
+  const progress = Number.isFinite(detail.unfold) ? detail.unfold : expanded ? 1 : 0;
+  document.body.dataset.animating = String(detail.animating === true);
+  style.setProperty('--content-opacity', String(Math.max(0, Math.min(1, (progress - 0.45) / 0.5))));
+  style.setProperty('--layout-width', `${finite(nativeState.layoutWidth, 480)}px`);
+  style.setProperty(
+    '--surface-height',
+    `${Math.max(0, innerHeight - (notched ? nativeState.contentOffsetY || 0 : 0))}px`,
+  );
   if (!expanded) {
     closeMenu(false);
     closeEditor();
@@ -293,6 +294,7 @@ window.addEventListener('model-control-native', (event) => {
       $('panel').querySelector('button:not(:disabled)')?.focus({ preventScroll: true }),
     );
   shapeSurface($('handle'));
+  shapeSurface($('panel'));
   updateLayout();
 });
 for (const root of [$('handle'), $('panel')]) {
@@ -423,22 +425,13 @@ async function apply(selection, restore = false) {
   const source = snapshot();
   const target = { ...source.target };
   let writeStarted = false;
-  // A cell resolves its speed after explicit first-click readback. Hover/polling
-  // still never opens the official menu, and presets retain their full selection.
+  // The host reads and preserves current speed within the same menu transaction.
+  // Presets keep their complete explicit selection; passive polling never opens menus.
   const resolveSelection = typeof selection === 'function' ? selection : () => selection;
   undo = null;
   await mutate(async () => {
     notify('正在核对并应用配置…');
     try {
-      if (!source.current) {
-        accept(await request('refresh', {}));
-        if (
-          snapshot()?.target?.id !== target.id ||
-          snapshot()?.status !== 'ready' ||
-          !snapshot()?.current
-        )
-          throw new Error(snapshot()?.message || '目标已变化或配置无法读取');
-      }
       const resolved = resolveSelection();
       const invalid = validate(resolved, models());
       if (invalid) throw new Error(invalid);
@@ -446,6 +439,7 @@ async function apply(selection, restore = false) {
         target: Object.freeze(target),
         expectedRevision: snapshot().revision,
         selection: Object.freeze({ ...resolved }),
+        preserveSpeed: typeof selection === 'function',
       });
       writeStarted = true;
       const data = await request('apply', frozen);
@@ -532,7 +526,7 @@ function render() {
     !online
       ? '连接不可用'
       : source?.generating
-        ? '正在生成 · 等待回答完成'
+        ? '正在回答 · 可调整后续配置'
         : source?.status === 'ready' && source?.current
           ? ''
           : source?.message || statusLabels[source?.status] || '尚未读取 · 点击选择',

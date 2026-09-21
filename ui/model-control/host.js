@@ -362,7 +362,6 @@
     else if (window.__codexPlusQuickModelPresets) operation.aborted = 'Model Deck 正在运行';
     else if (!sameTarget(operation.target, resolveTarget()))
       operation.aborted = '目标聊天或 DOM 已变化';
-    else if (generating(operation.target)) operation.aborted = '目标聊天开始生成';
     else if (capabilityVersion !== operation.capabilityVersion) {
       if (operation.refresh) operation.capabilityVersion = capabilityVersion;
       else operation.aborted = '官方模型能力已变化';
@@ -430,9 +429,9 @@
     } else if (!target) {
       status = 'unavailable';
       message = '无法唯一确认聊天身份与输入框，请选择目标聊天';
-    } else if (operation || busy) {
+    } else if (operation) {
       status = 'busy';
-      message = busy ? '等待目标聊天生成完成' : '模型菜单操作进行中';
+      message = '模型菜单操作进行中';
     } else if (!models.length) {
       status = 'waiting';
       message = '等待关联的官方 model/list 数据；可刷新官方模型菜单后重试，无需重启';
@@ -866,22 +865,26 @@
     if (sectionRow(main, section)) return submenu(op, main, section);
     return main; // Current host can render reasoning choices directly in the main popup.
   }
-  async function readOfficial(op) {
+  async function readOfficial(op, close = false) {
     const main = await simpleMain(op);
     guard(op, main);
     const current = readMain(op, main);
-    await closeMenu(op);
-    guard(op);
-    return remember(op, current);
+    if (close) {
+      await closeMenu(op);
+      guard(op);
+      return remember(op, current);
+    }
+    return current;
   }
   async function choose(op, section, wanted) {
     let main = await simpleMain(op);
+    const priorStamp = triggerStamp(op.target);
     guard(op, main);
     const checkbox = section === 'speed' && fastCheckbox(main);
     if (section === 'reasoning' && one(all(main, '[data-reasoning-slider]').filter(visible))) {
       // Default recommendation mode can couple slider steps to model changes.
       // Explicitly select this same model first, then use its supported effort range.
-      if (one(all(main, '[data-model-picker-view-toggle]').filter(visible))) {
+      if (!op.explicitModel && one(all(main, '[data-model-picker-view-toggle]').filter(visible))) {
         const current = readMain(op, main);
         await choose(op, 'model', current.model);
         main = await simpleMain(op);
@@ -908,15 +911,26 @@
         throw new Error(`官方 ${section} 选项不存在、重复、锁定或被禁用`);
       phase(op, `选择 ${section} 选项`);
       activate(op, item, true);
+      if (section === 'model') op.explicitModel = true;
     }
-    // Menu can close before the host commits its asynchronous update.
-    await closeMenu(op);
+    if (!menuOpen(op.main) && section !== 'speed' && triggerStamp(op.target) === priorStamp)
+      await waitFor(op, () => triggerStamp(op.target) !== priorStamp);
+    // Reuse the live menu. Reopen only if the official selection itself closed it.
+    // Close an owned child popup without dismissing the parent.
+    for (const menu of [...op.menus].reverse()) {
+      if (menu !== op.main && menuOpen(menu)) {
+        escapeMenu(op, menu);
+        await waitFor(op, () => !menuOpen(menu));
+      }
+    }
     guard(op);
     const deadline = performance.now() + 1800;
     do {
       const actual = await readOfficial(op);
       guard(op);
       if (actual[section] === wanted) return actual;
+      // Legacy popups are snapshots; modern same-root views update in place.
+      if (!all(op.main, '[data-model-picker-view]').length) await closeMenu(op);
       await pause(op, 40);
       guard(op);
     } while (performance.now() < deadline);
@@ -924,7 +938,7 @@
   }
   function begin(refresh = false) {
     const target = resolveTarget();
-    if (!target || generating(target)) throw new Error('目标不可用或正在生成');
+    if (!target) throw new Error('目标不可用');
     operation = {
       target,
       capabilityVersion,
@@ -1034,6 +1048,8 @@
       guard(op);
       if (before.current && JSON.stringify(previous) !== JSON.stringify(before.current))
         throw new Error('官方配置已变化，请刷新后重试');
+      if (request.preserveSpeed === true)
+        selection.speed = previous.speed === 'fast' && model.fast ? 'fast' : 'standard';
       let actual = previous;
       for (const section of ['model', 'reasoning', 'speed']) {
         guard(op);
@@ -1041,7 +1057,7 @@
           actual = await choose(op, section, selection[section]);
         guard(op);
       }
-      actual = await readOfficial(op);
+      actual = await readOfficial(op, true);
       guard(op);
       if (['model', 'reasoning', 'speed'].some((key) => actual[key] !== selection[key]))
         throw new Error('官方完整配置与请求不一致');
@@ -1053,7 +1069,7 @@
         try {
           await closeMenu(op);
           guard(op);
-          await readOfficial(op);
+          await readOfficial(op, true);
           guard(op);
         } catch {
           cache = null;

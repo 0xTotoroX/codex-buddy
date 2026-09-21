@@ -1,11 +1,52 @@
 // [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
-// [OUTPUT]: 贴合物理边缘的内容高度布局、凹角命中与多屏选择。
+// [OUTPUT]: 贴合物理边缘的内容高度布局、凹角命中、多屏选择与可反向连续开合进度。
 // [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
 pub const COMPACT_DEPTH: f64 = 10.;
 pub const COMPACT_LENGTH: f64 = 80.;
 pub const NOTCH_FLANK: f64 = 10.;
+
+// Critically damped 0.42s response, inspired by Codenotch's unfold timing.
+// One continuous value drives window bounds, native material and web contents.
+#[derive(Default)]
+pub struct Unfold {
+    pub value: f64,
+    velocity: f64,
+}
+impl Unfold {
+    pub fn active(&self, expanded: bool) -> bool {
+        (self.value - f64::from(expanded)).abs() > 0.0001 || self.velocity.abs() > 0.001
+    }
+    pub fn step(&mut self, expanded: bool, seconds: f64, reduced: bool) {
+        let target = f64::from(expanded);
+        if reduced {
+            self.value = target;
+            self.velocity = 0.;
+            return;
+        }
+        let omega = std::f64::consts::TAU / 0.42;
+        let dt = seconds.clamp(0., 0.032);
+        let distance = self.value - target;
+        let c = self.velocity + omega * distance;
+        let decay = (-omega * dt).exp();
+        self.value = target + (distance + c * dt) * decay;
+        self.velocity = (self.velocity - omega * c * dt) * decay;
+        if (self.value - target).abs() < 0.001 && self.velocity.abs() < 0.02 {
+            self.value = target;
+            self.velocity = 0.;
+        }
+    }
+    pub fn frame(&self, compact: Rect, expanded: Rect) -> Rect {
+        let mix = |a: f64, b: f64| a + (b - a) * self.value.clamp(0., 1.);
+        Rect {
+            x: mix(compact.x, expanded.x),
+            y: mix(compact.y, expanded.y),
+            width: mix(compact.width, expanded.width),
+            height: mix(compact.height, expanded.height),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
@@ -242,6 +283,47 @@ mod tests {
             notch_width: 0.,
             notch_height: 0.,
             notch_x: 0.,
+        }
+    }
+
+    #[test]
+    fn unfold_is_continuous_reversible_and_respects_reduced_motion() {
+        let mut motion = Unfold::default();
+        motion.step(true, 1. / 60., false);
+        assert!(motion.value > 0. && motion.value < 0.1);
+        for _ in 0..8 {
+            motion.step(true, 1. / 60., false);
+        }
+        let before = motion.value;
+        motion.step(false, 1. / 60., false);
+        assert!((motion.value - before).abs() < 0.12);
+        for _ in 0..120 {
+            motion.step(false, 1. / 60., false);
+        }
+        assert_eq!(motion.value, 0.);
+        assert!(!motion.active(false));
+        motion.step(true, 0., true);
+        assert_eq!(motion.value, 1.);
+        assert!(!motion.active(true));
+    }
+    #[test]
+    fn unfold_keeps_the_screen_edge_attached() {
+        let display = screen("main", 0., 0., 1440., 900.);
+        let motion = Unfold {
+            value: 0.4,
+            velocity: 0.,
+        };
+        for edge in [Edge::Left, Edge::Right, Edge::Top] {
+            let compact = layout(&display, edge, 0.5, false);
+            let expanded = layout(&display, edge, 0.5, true);
+            let shown = motion.frame(compact, expanded);
+            assert!(shown.width > compact.width && shown.width < expanded.width);
+            let anchor = |r: Rect| match edge {
+                Edge::Left => r.x,
+                Edge::Right => r.x + r.width,
+                Edge::Top => r.y + r.height,
+            };
+            assert!((anchor(shown) - anchor(expanded)).abs() < 0.001);
         }
     }
 

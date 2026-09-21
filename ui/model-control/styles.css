@@ -443,17 +443,6 @@ footer {
   button {
     transition: background-color 100ms ease;
   }
-  #panel:not([hidden]) {
-    animation: unfold 235ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  }
-}
-@keyframes unfold {
-  from {
-    clip-path: var(--compact-clip);
-  }
-  to {
-    clip-path: var(--shell-clip);
-  }
 }
 
 body[data-search='true'] header {
@@ -512,4 +501,17 @@ body[data-material='native-glass'][data-native-dark='false'] {
 body:not([data-material='black']):not([data-native-backdrop='true']) #notch-mask::before,
 body:not([data-material='black']):not([data-native-backdrop='true']) #notch-mask::after {
   background: var(--bg);
+}
+
+/* Native bounds provide the only unfold clock, including all four materials. */
+body[data-animating='true'] #panel {
+  height: var(--surface-height);
+  min-height: 0;
+}
+#panel > * {
+  opacity: var(--content-opacity, 1);
+}
+body[data-animating='true'] #panel > :is(header, .model-section, footer, #notice-area) {
+  width: calc(var(--layout-width, 480px) - 32px);
+  flex-shrink: 0;
 }

@@ -10,15 +10,15 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 
 开发版 `window_warp` 动态解析 CGS 私有网格接口，不截屏；原生内容尺寸在动画中固定，合成后网格按临时坐标收束。入场在窗口显示前预置来源网格，再沿收回曲线反向展开，取消起步停顿与淡入遮挡；来源与目标按 NSScreen 全局逻辑坐标分别校验，可跨屏，不乘 backingScaleFactor；失效坐标仍回退。每 16ms 至多更新一次，完成、取消或接管后复位；失败停用，正式构建不加载。临时原生测试可在 debug 程序使用 `CODEX_BUDDY_DEV_GENIE=1`。
 
-模型控制条由独立 model_control 服务与 NSPanel 子进程管理，不调用工作台弹出/收回契约。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；与建议生成的 model.rs 完全分离。私有 model-control.json 仅保存边缘/屏幕位置、独立主题/液态变体、保持展开、模型置顶和配置预设，不保存聊天正文。model-control-diagnostic.json 只保留最近一次显式刷新/切换的阶段与失败计数，0600写入，不含聊天身份、正文或凭据，被动轮询不覆盖。API 鉴权复用现有服务；关闭或后端断开时租约失效。默认关闭，用户从设置或 CLI 开启后记住选择。控制条仅继承字号，默认纯黑凹角外壳；可选哑光/磨砂/液态，收起与展开均复用native_backdrop并按凹角及物理刘海两翼裁切；NSEvent位置采样报告进入/离开与按键状态，由网页统一决定开合。window租约附带已连接宿主的可见性/焦点，原生面板仅在该宿主获得焦点时迁入当前Space，隐藏/失联时撤出，拒绝后台快捷键跨桌面唤起。content-size IPC按内容调整高度，窗口/网页共用凹角命中规则与刘海内容预算。
+模型控制条由独立 model_control 服务与 NSPanel 子进程管理，不调用工作台弹出/收回契约。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；preserveSpeed用于模型格在同一事务内保留实际可用Fast，预设仍指定完整配置；与建议生成的 model.rs 完全分离。私有 model-control.json 仅保存边缘/屏幕位置、独立主题/液态变体、保持展开、模型置顶和配置预设，不保存聊天正文。model-control-diagnostic.json 只保留最近一次显式刷新/切换的阶段与失败计数，0600写入，不含聊天身份、正文或凭据，被动轮询不覆盖。API 鉴权复用现有服务；关闭或后端断开时租约失效。默认关闭，用户从设置或 CLI 开启后记住选择。控制条仅继承字号，默认纯黑凹角外壳；可选哑光/磨砂/液态，收起与展开均复用native_backdrop并按凹角及物理刘海两翼裁切；NSEvent位置采样报告进入/离开与按键状态，由网页统一决定开合。window租约附带已连接宿主的可见性/焦点，原生面板仅在该宿主获得焦点时迁入当前Space，隐藏/失联时撤出，拒绝后台快捷键跨桌面唤起。content-size IPC按内容调整高度，窗口/网页共用凹角命中规则与刘海内容预算。
 
 成员清单：
 
 - [native_backdrop.rs](native_backdrop.rs)：NSWindow/NSPanel 共用的原生磨砂、液态 Regular/Clear、圆角/可选贴边凹角及刘海两翼裁切与网页承载；不持有业务或窗口生命周期。
 
 - [model_control.rs](model_control.rs)：独立控制条服务、串行操作、版本化局部偏好及窗口租约，防止跨聊天迟到结果与并发覆盖。
-- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标边界与冻结区域、按内容调高、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、快捷键和租约退出。
-- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、凹角命中、安全区和显示器选择的纯计算及测试。
+- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标边界与冻结区域、按内容调高、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、减少动态效果时立即完成）、快捷键和租约退出。
+- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、凹角命中、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
 
 
 - [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源。

@@ -242,71 +242,43 @@ async function menu(page, name) {
   await page.getByRole('button', { name, exact: true }).click();
 }
 
-test('first model cell click reads official state then preserves Fast without manual sync', async () => {
+test('first model cell uses one apply transaction with speed-preservation intent', async () => {
   const initial = fixture();
   initial.snapshot.status = 'waiting';
   initial.snapshot.current = null;
   const ctx = await setup({ initial });
   const { page, f } = ctx;
-  f.onRefresh = () => {
-    f.data.snapshot.current = selection('alpha', 'low', 'fast');
-    f.data.snapshot.status = 'ready';
-    f.data.snapshot.revision = 'readback-2';
-  };
-  assert.equal(
-    f.requests.some((r) => r.operation === 'refresh'),
-    false,
-  );
-  await page.locator('.model-row[data-key="alpha"] .choices button[data-key="high"]').click();
-  await page.waitForFunction(() =>
-    document.getElementById('notice').textContent.includes('配置已应用'),
-  );
-  const applied = f.requests.filter((r) => r.operation === 'apply');
-  assert.equal(applied.length, 1);
-  assert.deepEqual(applied[0].payload.selection, selection('alpha', 'high', 'fast'));
-  assert.equal(applied[0].payload.expectedRevision, 'readback-2');
-  await cleanup(ctx);
-});
-test('blocked menu during first-click read reports no switch instead of an uncertain write', async () => {
-  const initial = fixture();
-  initial.snapshot.status = 'waiting';
-  initial.snapshot.current = null;
-  const ctx = await setup({ initial });
-  const { page, f } = ctx;
-  f.onRefresh = () => {
-    f.data.snapshot.status = 'unavailable';
-    f.data.snapshot.message = '另一个官方菜单仍然打开，请先关闭该菜单再选择模型';
-  };
   await modelButton(page, 'alpha', 'high').click();
-  await page.waitForFunction(() =>
-    document.getElementById('notice').textContent.startsWith('未执行切换：'),
-  );
-  assert.equal(
-    f.requests.some((r) => r.operation === 'apply'),
-    false,
-  );
+  await poll(page, () => document.getElementById('notice').textContent.includes('配置已应用'));
+  assert.equal(f.requests.filter((r) => r.operation === 'refresh').length, 0);
+  assert.equal(applies(f).length, 1);
+  assert.equal(applies(f)[0].payload.preserveSpeed, true);
+  assert.equal(applies(f)[0].payload.target.id, initial.snapshot.target.id);
   await cleanup(ctx);
 });
-
-test('target change during first-click refresh prevents any write and displays source failure', async () => {
+test('first-click backend failure stays failure without automatic retry', async () => {
   const initial = fixture();
   initial.snapshot.status = 'waiting';
   initial.snapshot.current = null;
   const ctx = await setup({ initial });
   const { page, f } = ctx;
-  f.onRefresh = () => {
-    f.data.snapshot.target.id = 'task-b';
-    f.data.snapshot.current = selection();
-    f.data.snapshot.status = 'ready';
-  };
-  await page.locator('.model-row[data-key="alpha"] .choices button[data-key="high"]').click();
-  await page.waitForFunction(() =>
-    document.getElementById('notice').textContent.includes('目标已变化'),
-  );
-  assert.equal(
-    f.requests.some((r) => r.operation === 'apply'),
-    false,
-  );
+  f.applyResult = 'failed';
+  await modelButton(page, 'alpha', 'high').click();
+  await poll(page, () => document.getElementById('notice').textContent.includes('未成功'));
+  assert.equal(applies(f).length, 1);
+  assert.equal(f.requests.filter((r) => r.operation === 'refresh').length, 0);
+  await cleanup(ctx);
+});
+test('answer generation does not disable a ready official selector', async () => {
+  const initial = fixture();
+  initial.snapshot.generating = true;
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  assert.equal(await modelButton(page, 'alpha', 'high').isDisabled(), false);
+  assert.match(await page.locator('#status').innerText(), /可调整后续配置/);
+  await modelButton(page, 'alpha', 'high').click();
+  await poll(page, () => document.getElementById('notice').textContent.includes('配置已应用'));
+  assert.equal(applies(f).length, 1);
   await cleanup(ctx);
 });
 
@@ -373,6 +345,7 @@ test('frozen apply, double-click guard, actual-only result and explicit same-tar
     target: { id: 'task-a', title: '合成任务 · 模型控制界面验收' },
     expectedRevision: 'source-1',
     selection: selection('alpha', 'low'),
+    preserveSpeed: true,
   });
   release();
   f.delayApply = null;
@@ -428,9 +401,9 @@ test('unavailable, busy and conflicting sources disable writes', async () => {
   }
   f.data.snapshot.status = 'ready';
   f.data.snapshot.generating = true;
-  await poll(page, () => document.querySelector('#status').textContent.includes('正在生成'));
-  assert.equal(await page.locator('#fast').isDisabled(), true);
-  await shot(page, 'waiting-generation');
+  await poll(page, () => document.querySelector('#status').textContent.includes('正在回答'));
+  assert.equal(await page.locator('#fast').isDisabled(), false);
+  await shot(page, 'generation-next-config');
   f.data.snapshot.generating = false;
   await poll(page, () => !document.querySelector('#save').disabled);
   assert.equal(

@@ -273,7 +273,7 @@ impl App {
             bail!("聊天来源已过期，请刷新后重试");
         }
         let client = self.desktop_client().await.context("尚未连接 Codex")?;
-        let payload = json!({"target":command["target"],"expectedRevision":command["expectedRevision"],"selection":selection});
+        let payload = json!({"target":command["target"],"expectedRevision":command["expectedRevision"],"selection":selection,"preserveSpeed":command["preserveSpeed"] == true});
         let response = client
             .evaluate_with_timeout(
                 format!("window.__codexBuddyModelControl.apply({payload})"),

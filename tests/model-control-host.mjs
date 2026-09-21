@@ -55,7 +55,13 @@ try {
     async (page) => {
       assert.equal((await snapshot(page, true)).status, 'ready');
       const desired = { model: 'alpha', reasoning: 'high', speed: 'fast' };
+      const opens = await page.evaluate(() => host.triggerEvents);
       let result = await apply(page, desired);
+      assert.equal(
+        await page.evaluate(() => host.triggerEvents),
+        opens + 1,
+        'one menu session per modern switch',
+      );
       assert.equal(result.status, 'success', result.message);
       assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), desired);
       result = await apply(page, targetBeta);
@@ -64,6 +70,23 @@ try {
       assert.equal(await page.locator('[role="menu"]').count(), 0);
     },
     { modern: true, defaultRecommendation: true, openPlaceholder: true, speedFlyout: true },
+  );
+  await check(
+    'first manual selection preserves actual speed inside one menu session',
+    async (page) => {
+      await page.evaluate(() => {
+        host.configs['chat-a'].speed = 'fast';
+      });
+      const result = await apply(
+        page,
+        { model: 'alpha', reasoning: 'high', speed: 'standard' },
+        { preserveSpeed: true },
+      );
+      assert.equal(result.status, 'success', result.message);
+      assert.equal(result.snapshot.current.speed, 'fast');
+      assert.equal(await page.evaluate(() => host.triggerEvents), 1);
+    },
+    { modern: true, openPlaceholder: true, speedFlyout: true },
   );
   await check(
     'already-open advanced picker returns through checked item without changing selection',
@@ -261,7 +284,7 @@ try {
     'first apply works without refresh; full preset survives model resetting defaults',
     async (page) => {
       const result = await apply(page, targetBeta);
-      assert.equal(result.status, 'success');
+      assert.equal(result.status, 'success', result.message);
       assert.deepEqual(result.snapshot.current, targetBeta);
       assert.deepEqual(result.previous, { model: 'alpha', reasoning: 'low', speed: 'standard' });
       const restore = await apply(page, result.previous, { restore: true });
@@ -383,7 +406,7 @@ try {
         host.delay = 200;
       });
       const result = await apply(page, targetBeta);
-      assert.equal(result.status, 'success');
+      assert.equal(result.status, 'success', result.message);
       assert.deepEqual(result.snapshot.current, targetBeta);
       assert.deepEqual(
         (await page.evaluate(() => host.changes)).map((entry) => entry.reasoning),
@@ -470,7 +493,7 @@ try {
     { inherited: true },
   );
   await check(
-    'generation blocks at start and aborts mid-flight without further events',
+    'generation alone permits next-configuration changes; disabled official controls still refuse',
     async (page) => {
       await page.evaluate(() => {
         const stop = document.createElement('button');
@@ -478,20 +501,17 @@ try {
         document.querySelector('form').append(stop);
       });
       assert.equal((await snapshot(page)).generating, true);
-      assert.equal((await apply(page, targetBeta)).status, 'failed');
-      assert.equal(await page.evaluate(() => host.clicks.length), 0);
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+      assert.equal(await page.getByRole('button', { name: 'Stop', exact: true }).count(), 1);
       await page.evaluate(() => {
-        document.querySelector('form').lastChild.remove();
-        host.onSelect = (_, pane) => {
-          const stop = document.createElement('button');
-          stop.textContent = 'Stop';
-          pane.append(stop);
-        };
+        document.querySelector('form button').disabled = true;
       });
-      const result = await apply(page, targetBeta);
-      assert.equal(result.status, 'partial');
-      assert.equal(result.snapshot.generating, true);
-      assert.equal((await page.evaluate(() => host.clicks)).at(-1).action, 'select:model:beta');
+      const changes = await page.evaluate(() => host.changes.length);
+      assert.equal(
+        (await apply(page, { model: 'alpha', reasoning: 'high', speed: 'standard' })).status,
+        'failed',
+      );
+      assert.equal(await page.evaluate(() => host.changes.length), changes);
     },
   );
   await check(
@@ -651,8 +671,10 @@ try {
   );
   await check('11 second absolute deadline cancels all later adapter clicks', async (page) => {
     await page.evaluate(() => {
-      host.openDelay = 1420;
-      host.delay = 1520;
+      host.onSelect = () => {
+        const original = performance.now.bind(performance);
+        performance.now = () => original() + 11001;
+      };
     });
     const started = Date.now();
     const result = await apply(page, targetBeta);

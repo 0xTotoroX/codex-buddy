@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync, execFile, spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -257,13 +257,15 @@ function windowInfo() {
         a.kCGWindowBounds.Width * a.kCGWindowBounds.Height,
     )[0];
 }
-function capture(name) {
+async function capture(name) {
   const info = windowInfo();
   const path = join(output, `${name}.png`);
   try {
-    execFileSync('screencapture', ['-x', '-l', String(info.kCGWindowNumber), path], {
-      stdio: 'pipe',
-    });
+    await new Promise((resolve, reject) =>
+      execFile('screencapture', ['-x', '-l', String(info.kCGWindowNumber), path], (error) =>
+        error ? reject(error) : resolve(),
+      ),
+    );
     report.screenshots.push(path);
   } catch {
     report.screenshots.push({ name, unavailable: 'Window screenshot unavailable' });
@@ -336,7 +338,16 @@ try {
       "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:true,buttons:0,hoverSuppressed:false}}))",
     );
   }
-  await until(() => telemetry.native.expanded, 'immediate pointer expansion');
+  await until(
+    () => telemetry.native.expanded && telemetry.native.animating,
+    'unfold starts immediately',
+  );
+  assert.ok(telemetry.native.unfold > 0 && telemetry.native.unfold < 1);
+  const intermediate = windowInfo().kCGWindowBounds;
+  assert.ok(intermediate.Width > 10 && intermediate.Width < 480);
+  await capture('unfold-middle');
+  check('native bounds unfold progressively instead of jumping');
+  await until(() => telemetry.native.expanded && !telemetry.native.animating, 'unfold settles');
   assert.equal(telemetry.native.keyboard, false);
   assert.equal(
     JSON.parse(execFileSync(inputProbe, ['state'], { encoding: 'utf8' })).frontmost,
@@ -347,7 +358,20 @@ try {
       ? 'real native hover expands without stealing focus'
       : 'synthetic native pointer message expands without stealing focus',
   );
-  capture('expanded');
+  await capture('expanded');
+
+  await ipc({ action: 'collapse' });
+  await until(
+    () =>
+      !telemetry.native.expanded && telemetry.native.animating && telemetry.native.unfold < 0.85,
+    'reverse while collapsing',
+  );
+  assert.ok(telemetry.native.unfold > 0);
+  await ipc({ action: 'expand' });
+  await until(() => telemetry.native.expanded && telemetry.native.animating, 'reverse toward open');
+  assert.ok(telemetry.native.unfold > 0 && telemetry.native.unfold < 1);
+  await until(() => telemetry.native.expanded && !telemetry.native.animating, 'reversal settles');
+  check('native unfold reverses before collapse completes');
 
   assert.equal(telemetry.native.keyboard, false);
   if (environment.canPostEvents) {
@@ -383,23 +407,29 @@ try {
   });
 
   await ipc({ action: 'collapse' });
-  await until(() => !telemetry.native.expanded && !telemetry.native.keyboard, 'collapse');
+  await until(
+    () => !telemetry.native.expanded && !telemetry.native.animating && !telemetry.native.keyboard,
+    'collapse',
+  );
   assert.equal(windowInfo().kCGWindowBounds.Width, 10);
   check('collapse shrinks actual WindowServer bounds');
   await command("document.getElementById('panel').dispatchEvent(new PointerEvent('pointerleave'))");
   prefs.keepOpen = true;
   revision++;
-  await until(() => telemetry.native.expanded && telemetry.native.keepOpen, 'keepOpen preference');
+  await until(
+    () => telemetry.native.expanded && !telemetry.native.animating && telemetry.native.keepOpen,
+    'keepOpen preference',
+  );
   await ipc({ action: 'collapse' });
   await until(
-    () => !prefs.keepOpen && !telemetry.native.expanded,
+    () => !prefs.keepOpen && !telemetry.native.expanded && !telemetry.native.animating,
     'explicit collapse overrides keepOpen',
   );
   check('explicit collapse persists keepOpen=false');
 
   await ipc({ action: 'edge', edge: 'left' });
   await until(() => prefs.edge === 'left' && telemetry.native.edge === 'left', 'left edge');
-  capture('left-compact');
+  await capture('left-compact');
   check('left compact', windowInfo().kCGWindowBounds);
   await ipc({ action: 'edge', edge: 'top' });
   await until(() => prefs.edge === 'top' && telemetry.native.edge === 'top', 'top edge');
@@ -407,7 +437,7 @@ try {
   assert.equal(top.Width, telemetry.native.compactWidth);
   assert.equal(top.Height, telemetry.native.compactHeight);
   if (telemetry.native.notchWidth > 0) assert(top.Width >= telemetry.native.notchWidth + 64);
-  capture('top-compact');
+  await capture('top-compact');
   check('physical notch dock or unnotched top fallback', { bounds: top, native: telemetry.native });
   const saved = prefs.screen;
   await delay(1300);
@@ -420,9 +450,12 @@ try {
   check('only explicit drag persists display identity', { screen: prefs.screen });
 
   reveal++;
-  await until(() => telemetry.native.expanded && telemetry.native.keyboard, 'subsequent reveal');
+  await until(
+    () => telemetry.native.expanded && !telemetry.native.animating && telemetry.native.keyboard,
+    'subsequent reveal',
+  );
   check('subsequent reveal expands with keyboard focus');
-  capture('top-expanded');
+  await capture('top-expanded');
   // Material reparenting can send a real pointerleave while the pointer is outside.
   // Keep the screenshot subject open; collapse behavior is exercised above.
   await command("document.getElementById('keep-open').click()");
@@ -444,7 +477,10 @@ try {
   ]) {
     Object.assign(prefs, { theme, liquidVariant: variant });
     await until(
-      () => telemetry.native.theme === theme && telemetry.native.liquidVariant === variant,
+      () =>
+        telemetry.native.theme === theme &&
+        telemetry.native.liquidVariant === variant &&
+        !telemetry.native.animating,
       `theme ${theme}/${variant}`,
     );
     const fallback = theme === 'native-glass' && !telemetry.native.nativeGlassAvailable;
@@ -466,19 +502,25 @@ try {
       assert.notEqual(telemetry.background, 'rgba(0, 0, 0, 0)');
     assert.ok(telemetry.viewport[1] < 320);
     check(`independent theme ${theme}/${variant}`, telemetry.native);
-    capture(`theme-${theme}-${variant}`);
+    await capture(`theme-${theme}-${variant}`);
     const expandedBackground = telemetry.background;
     await ipc({ action: 'collapse' });
-    await until(() => !telemetry.native.expanded, 'compact material');
+    await until(
+      () => !telemetry.native.expanded && !telemetry.native.animating,
+      'compact material',
+    );
     assert.equal(telemetry.native.nativeBackdrop, backed);
     assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
     assert.equal(telemetry.handleBackground, expandedBackground);
     const compactBounds = windowInfo().kCGWindowBounds;
     assert.equal(Math.min(compactBounds.Width, compactBounds.Height), 10);
-    capture(`compact-${theme}-${variant}`);
+    await capture(`compact-${theme}-${variant}`);
     check(`compact retains ${theme}/${variant} material`);
     await ipc({ action: 'expand' });
-    await until(() => telemetry.native.expanded, 'restore expanded material');
+    await until(
+      () => telemetry.native.expanded && !telemetry.native.animating,
+      'restore expanded material',
+    );
   }
   await command("location.href='https://example.invalid/blocked-navigation'");
   await delay(500);

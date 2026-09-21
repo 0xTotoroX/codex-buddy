@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随、独立四主题、显示器枚举与租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -13,7 +13,7 @@ use objc2::{DefinedClass, MainThreadMarker, MainThreadOnly, define_class, msg_se
 use objc2_app_kit::{
     NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua, NSBackingStoreType,
     NSColor, NSEvent, NSEventModifierFlags, NSPanel, NSScreen, NSStatusWindowLevel, NSView,
-    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSWindowAnimationBehavior, NSWindowCollectionBehavior, NSWindowStyleMask, NSWorkspace,
 };
 use objc2_foundation::{NSArray, NSPoint, NSRect, NSSize, ns_string};
 use serde_json::{Value, json};
@@ -289,6 +289,8 @@ struct Surface {
     host: Value,
     host_attached: bool,
     expanded: bool,
+    unfold: geometry::Unfold,
+    motion_tick: Instant,
     keyboard: bool,
     hidden: bool,
     ready: bool,
@@ -315,6 +317,7 @@ impl Surface {
         if !self.ready {
             return;
         }
+        let presenting = self.expanded || self.unfold.active(self.expanded);
         let screen = self.screen.as_ref();
         let size = self.panel.frame().size;
         let compact = screen
@@ -322,19 +325,16 @@ impl Surface {
             .unwrap_or_default();
         let notch = screen
             .map(|s| {
-                geometry::excluded_notch(
-                    s,
-                    rect(self.panel.frame()),
-                    self.prefs.edge,
-                    self.expanded,
-                )
+                geometry::excluded_notch(s, rect(self.panel.frame()), self.prefs.edge, presenting)
             })
             .unwrap_or_default();
         let offset = screen.map_or(0., |s| {
-            geometry::content_offset(s, self.prefs.edge, self.expanded)
+            geometry::content_offset(s, self.prefs.edge, presenting)
         });
         let detail = json!({
-            "expanded": self.expanded, "keyboard": self.keyboard, "edge": self.prefs.edge.as_str(),
+            "expanded": self.expanded, "unfold": self.unfold.value.clamp(0.,1.), "animating": self.unfold.active(self.expanded),
+            "layoutWidth": screen.map_or(480., |s| geometry::layout(s,self.prefs.edge,self.prefs.position,true).width),
+            "keyboard": self.keyboard, "edge": self.prefs.edge.as_str(),
             "position": self.prefs.position, "screen": screen.map(|s| &s.id),
             "preferredScreen": self.prefs.screen, "keepOpen": self.prefs.keep_open, "hidden": self.hidden,
             "notchWidth": screen.map_or(0., |s| s.notch_width), "notchHeight": screen.map_or(0., |s| s.notch_height),
@@ -402,13 +402,23 @@ impl Surface {
             self.panel.orderOut(None);
             return Ok(());
         };
-        let rect = geometry::layout_height(
+        let target = geometry::layout_height(
             screen,
             self.prefs.edge,
             self.prefs.position,
-            self.expanded,
+            true,
             self.content_height,
         );
+        let compact = geometry::layout(screen, self.prefs.edge, self.prefs.position, false);
+        let now = Instant::now();
+        self.unfold.step(
+            self.expanded,
+            (now - self.motion_tick).as_secs_f64(),
+            NSWorkspace::sharedWorkspace().accessibilityDisplayShouldReduceMotion(),
+        );
+        self.motion_tick = now;
+        let presenting = self.expanded || self.unfold.active(self.expanded);
+        let rect = self.unfold.frame(compact, target);
         self._parent
             .0
             .ivars()
@@ -417,10 +427,10 @@ impl Surface {
                 screen,
                 rect,
                 self.prefs.edge,
-                self.expanded,
+                presenting,
             ));
-        let offset = geometry::content_offset(screen, self.prefs.edge, self.expanded);
-        let allowed = if self.prefs.edge == Edge::Top && screen.notch_width > 0. && !self.expanded {
+        let offset = geometry::content_offset(screen, self.prefs.edge, presenting);
+        let allowed = if self.prefs.edge == Edge::Top && screen.notch_width > 0. && !presenting {
             Rect {
                 x: (screen.notch_x - rect.x - geometry::NOTCH_FLANK).max(0.),
                 y: 0.,
@@ -464,7 +474,7 @@ impl Surface {
                     screen.notch_width,
                     screen.notch_height,
                 ));
-                let content_top = if notch.is_some() && !self.expanded {
+                let content_top = if notch.is_some() && !presenting {
                     rect.height
                 } else {
                     offset
@@ -591,6 +601,9 @@ impl Surface {
             return Ok(());
         }
         self.hidden = false;
+        if !self.unfold.active(self.expanded) {
+            self.motion_tick = Instant::now();
+        }
         self.expanded = true;
         self.reflow(mtm)?;
         if keyboard && self.valid && self.ready && self.screen.is_some() {
@@ -633,6 +646,9 @@ impl Surface {
             "collapse" => {
                 self.hover_suppressed = self.hover_regions();
                 self.release_keyboard();
+                if !self.unfold.active(self.expanded) {
+                    self.motion_tick = Instant::now();
+                }
                 self.expanded = false;
                 if self.prefs.keep_open {
                     self.prefs.keep_open = false;
@@ -772,6 +788,8 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         host: Value::Null,
         host_attached: false,
         expanded: false,
+        unfold: geometry::Unfold::default(),
+        motion_tick: Instant::now(),
         keyboard: false,
         hidden: false,
         ready: false,
@@ -816,7 +834,9 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
                     surface.keyboard = false;
                     surface.dispatch();
                 }
-                if Instant::now() >= next_screen_check {
+                if surface.unfold.active(surface.expanded) {
+                    surface.reflow(mtm)
+                } else if Instant::now() >= next_screen_check {
                     next_screen_check = Instant::now() + Duration::from_secs(1);
                     *control = ControlFlow::WaitUntil(next_screen_check);
                     surface.reflow(mtm)
