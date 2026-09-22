@@ -803,7 +803,7 @@ try {
     delete state.snapshot.accentColor;
     await waitFor(() => telemetry?.accentColor !== 'rgb(172, 73, 201)', 'native accent fallback');
     const themeChecks = [];
-    // 宿主投影明暗不得覆盖系统窗口；网页前景跟随 WebKit 的系统颜色方案。
+    // 宿主投影同时驱动 WebView 与 AppKit 外观，不改系统设置。
     for (const material of ['frosted', 'matte', 'native-glass']) {
       commands.push({ kind: 'material', value: material });
       for (const theme of ['light', 'dark', 'light']) {
@@ -814,7 +814,8 @@ try {
             telemetry?.sentAt >= changedAt &&
             telemetry?.material === material &&
             telemetry?.sourceTheme === theme &&
-            telemetry.theme === (telemetry.nativeDark ? 'dark' : 'light'),
+            telemetry.theme === theme &&
+            telemetry.nativeDark === (theme === 'dark'),
           'native appearance mismatch: ' + material + ' ' + theme,
         );
         themeChecks.push({
@@ -912,7 +913,7 @@ try {
       const expandedStyle = telemetry.nativeGlassStyle;
       for (const [width, height] of [
         [524, 504],
-        [428, 444],
+        [428, 464],
       ]) {
         commands.push({ kind: 'viewport', width, height });
         await waitFor(
@@ -933,8 +934,8 @@ try {
         resized: telemetry.rect,
       });
     }
-    if (telemetry.headHeight !== 54 || telemetry.eyeBox !== 'border-box')
-      throw Error('WebKit workbench header differs from the shared 54px layout');
+    if (telemetry.headHeight !== 44 || telemetry.eyeBox !== 'border-box')
+      throw Error('WebKit workbench header differs from the shared 44px layout');
     if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
     if (appearanceOnly) {
       writeFileSync(
@@ -972,7 +973,8 @@ try {
       );
     } else {
       const results = [];
-      for (const theme of [telemetry.nativeDark ? 'dark' : 'light']) {
+      for (const theme of ['light', 'dark']) {
+        state.snapshot.theme = theme;
         await waitFor(() => telemetry?.theme === theme, 'theme');
         for (const material of ['frosted', 'matte', 'native-glass']) {
           commands.push({ kind: 'material', value: material });

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何/开合进度与鼠标边界事件。
- * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；独立四主题、屏幕/位置设置。
+ * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；固定纯黑及三材质宿主配色、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -133,8 +133,29 @@ function scheduleCollapse() {
       collapse();
   }, 450);
 }
+let lastHostTheme = null;
 function applyAppearance(detail) {
-  document.body.dataset.material = detail.effectiveMaterial || 'black';
+  const host = detail.appearance?.hostTheme;
+  if (host?.theme === 'light' || host?.theme === 'dark') lastHostTheme = host;
+  const material = detail.effectiveMaterial || document.body.dataset.material || 'black';
+  const colors = material === 'black' ? null : lastHostTheme?.colors;
+  document.body.dataset.material = material;
+  document.body.dataset.theme = material === 'black' ? 'dark' : lastHostTheme?.theme || 'dark';
+  const variables = {
+    bg: 'surface-opaque',
+    surface: 'surface-opaque',
+    text: 'text',
+    muted: 'muted',
+    line: 'divider',
+    hover: 'hover',
+    accent: 'accent',
+  };
+  for (const [variable, color] of Object.entries(variables)) {
+    const value = colors?.[color];
+    if (value && CSS.supports('color', value))
+      document.body.style.setProperty(`--${variable}`, value);
+    else document.body.style.removeProperty(`--${variable}`);
+  }
   if (typeof detail.nativeDark === 'boolean')
     document.body.dataset.nativeDark = String(detail.nativeDark);
   document.body.dataset.nativeBackdrop = String(detail.nativeBackdrop === true);
@@ -831,9 +852,9 @@ function openSettings() {
     );
   menuAction('屏幕与位置…', () => openPlacement(), { write: false });
   menuAction(
-    '主题…',
+    '材质…',
     () => {
-      openMenu('主题', $('menu-button'));
+      openMenu('材质', $('menu-button'));
       for (const [theme, label] of [
         ['black', '纯黑'],
         ['matte', '哑光'],

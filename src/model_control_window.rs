@@ -136,11 +136,13 @@ struct Appearance {
     material: String,
     liquid_variant: String,
     font_offset: f64,
+    host_theme: Value,
 }
 impl Appearance {
     fn read(value: &Value) -> Self {
         let ui = value;
         Self {
+            host_theme: ui["hostTheme"].clone(),
             material: match ui["material"].as_str() {
                 Some("frosted") => "frosted",
                 Some("native-glass") => "native-glass",
@@ -345,7 +347,7 @@ impl Surface {
             "contentOffsetY": offset, "contentHeight": (size.height - offset).max(0.),
             "shortcutAvailable": self.shortcut_error.is_none(), "shortcutError": self.shortcut_error,
             "preferenceError": if self.preference_error { Some("无法保存模型控窗偏好，请稍后重试") } else { None },
-            "appearance": {"material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant, "fontOffset": self.appearance.font_offset},
+            "appearance": {"material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant, "fontOffset": self.appearance.font_offset, "hostTheme":self.appearance.host_theme},
             "nativeDark": self.panel.effectiveAppearance().bestMatchFromAppearancesWithNames(
                 &NSArray::from_slice(&[unsafe {NSAppearanceNameDarkAqua}, unsafe {NSAppearanceNameAqua}])
             ).is_some_and(|name| name.isEqualToString(unsafe {NSAppearanceNameDarkAqua})),
@@ -467,6 +469,7 @@ impl Surface {
         }
         let backdrop = json!({
             "material": self.effective_material(), "liquidVariant": self.prefs.liquid_variant,
+            "theme": if self.prefs.theme == "black" { json!("dark") } else { self.appearance.host_theme["theme"].clone() },
             "x":0., "y":0., "width":rect.width, "height":rect.height,
             "radius":0., "hidden": self.hidden, "edge":self.prefs.edge.as_str(),
             "viewportWidth":rect.width, "viewportHeight":rect.height,
@@ -707,7 +710,14 @@ impl Surface {
     fn snapshot(&mut self, value: Value, revision: u64, mtm: MainThreadMarker) -> Result<()> {
         self.valid = true;
         self.host = value["host"].clone();
-        self.appearance = Appearance::read(&value["appearance"]);
+        let mut appearance = Appearance::read(&value["appearance"]);
+        if !matches!(
+            appearance.host_theme["theme"].as_str(),
+            Some("light" | "dark")
+        ) {
+            appearance.host_theme = self.appearance.host_theme.clone();
+        }
+        self.appearance = appearance;
         let reveal = value["reveal"].as_u64().unwrap_or(0);
         let requested = self.reveal.is_some_and(|previous| previous != reveal);
         self.reveal = Some(reveal);

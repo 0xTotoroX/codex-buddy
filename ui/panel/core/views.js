@@ -40,8 +40,6 @@ import {
   installThemeObserver,
   installTypographyObserver,
   syncTheme,
-  themeIcon,
-  themeLabel,
 } from './panel-appearance.js';
 import {
   applyPosition,
@@ -363,7 +361,6 @@ function renderFloat(options = {}) {
           ${panelWindowControls()}
           ${IS_POPOUT ? '' : `<button class="csw-icon" data-action="workbench" title="停靠工作台" aria-label="停靠工作台">${iconSvg('dock')}</button>`}
           <button class="csw-icon" type="button" data-action="refresh" title="${escapeAttr(refreshTitle)}" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
-          ${IS_POPOUT ? `<button class="csw-icon" type="button" data-action="theme" title="${escapeAttr(themeLabel())}" aria-label="${escapeAttr(themeLabel())}">${themeIcon()}</button>` : ''}
           <button class="csw-icon" type="button" data-view="settings" data-active="${shellState.activeTab === 'settings'}" aria-pressed="${shellState.activeTab === 'settings'}" title="设置" aria-label="设置">${iconSvg('settings')}</button>
         </div>
       </div>
@@ -404,9 +401,6 @@ function renderFloat(options = {}) {
   shellState.panel
     .querySelector("[data-action='refresh']")
     ?.addEventListener('click', () => void refreshCurrentView());
-  shellState.panel
-    .querySelector("[data-action='theme']")
-    ?.addEventListener('click', () => POPOUT.toggleTheme());
   applyMaterial({ animate: false });
 
   if (shellState.activeTab === 'settings') attachSettingsEvents();

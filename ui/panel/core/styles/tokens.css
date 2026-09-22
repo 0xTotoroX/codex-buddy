@@ -26,7 +26,7 @@
   );
   --csw-faint: color-mix(in srgb, var(--csw-text) 34%, transparent);
   --csw-accent: var(--color-token-charts-blue, var(--buddy-action));
-  --csw-danger: var(--buddy-danger);
+  --csw-danger: var(--color-token-error-foreground, var(--buddy-danger));
   --csw-ready: var(--csw-accent);
   --csw-hover: var(
     --color-token-list-hover-background,
@@ -75,7 +75,7 @@
   );
   --csw-faint: color-mix(in srgb, var(--csw-text) 32%, transparent);
   --csw-accent: var(--color-token-charts-blue, var(--buddy-action));
-  --csw-danger: var(--buddy-danger);
+  --csw-danger: var(--color-token-error-foreground, var(--buddy-danger));
   --csw-ready: var(--csw-accent);
   --csw-hover: var(--color-token-list-hover-background, rgba(255, 255, 255, 0.078));
   --csw-divider: rgba(255, 255, 255, 0.09);

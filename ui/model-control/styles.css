@@ -1,5 +1,5 @@
 /* [INPUT]: 原生几何、动态模型列数与共享字号。
- * [OUTPUT]: 默认黑色及三种可选材质、紧凑矩阵、按需工具及无内边距常驻轮廓过渡。
+ * [OUTPUT]: 固定纯黑外壳及跟随宿主配色的三种可选材质、紧凑矩阵、按需工具及无内边距常驻轮廓过渡。
  * [POS]: 模型快切独立表面，不继承工作台材质。
  * [PROTOCOL]: 凹角轮廓与原生命中/高度协议同步维护。 */
 @import url('/model-control/tokens.css');
@@ -16,7 +16,7 @@
   --line: #ffffff1f;
   --hover: #ffffff12;
   --accent: #75a7ff;
-  --selected: #ffffff18;
+  --selected: color-mix(in srgb, var(--accent) 14%, transparent);
   --model-font: clamp(10px, calc(13px + var(--model-font-offset, 0px)), 24px);
   --name-width: 144px;
 }
@@ -24,6 +24,7 @@
   box-sizing: border-box;
 }
 body {
+  color-scheme: dark;
   margin: 0;
   background: transparent;
   color: var(--text);
@@ -73,7 +74,7 @@ svg {
   position: fixed;
   top: 0;
   pointer-events: none;
-  background: #000;
+  background: var(--bg);
 }
 #notch-mask::before,
 #notch-mask::after {
@@ -81,7 +82,7 @@ svg {
   position: absolute;
   width: 10px;
   height: 100%;
-  background: #000;
+  background: var(--bg);
 }
 #notch-mask::before {
   right: 100%;
@@ -322,12 +323,12 @@ input {
 .choices button {
   min-height: 30px;
   padding: 4px 2px;
-  color: #666;
+  color: var(--muted);
   font-size: 10px;
 }
 .choices button[aria-pressed='true'] {
   color: var(--accent);
-  background: #75a7ff1a;
+  background: var(--selected);
 }
 .choices .unsupported {
   color: var(--muted);
@@ -463,15 +464,7 @@ body[data-search='true'] #presets {
   flex-basis: 100%;
 }
 
-/* Shared workbench materials; black remains an independent default. */
-body[data-material='matte'],
-body[data-material='frosted'],
-body[data-material='native-glass'] {
-  --bg: #292929;
-  --surface: #333;
-  --text: #eee;
-  --muted: #a0a0a0;
-}
+/* The three optional materials follow the connected Codex theme in every state. */
 body:not([data-material='black']) #surface {
   background: var(--bg);
 }
@@ -483,7 +476,7 @@ body[data-native-backdrop='true']:not([data-material='black']) #notch-mask::afte
 body:not([data-material='black']) #surface {
   animation: none;
 }
-body[data-native-dark='false']:not([data-material='black']) {
+body[data-theme='light'] {
   color-scheme: light;
   --bg: #f5f5f5;
   --surface: #fff;
@@ -491,7 +484,7 @@ body[data-native-dark='false']:not([data-material='black']) {
   --muted: #777;
   --line: #0000001f;
   --hover: #0000000a;
-  --selected: #00000012;
+  --selected: color-mix(in srgb, var(--accent) 14%, transparent);
   --accent: #176ade;
 }
 body[data-native-backdrop='true']:not([data-material='black']) .matrix-toolbar {
@@ -503,9 +496,6 @@ body[data-material='native-glass'][data-native-backdrop='true'] #surface,
 body[data-material='native-glass'][data-native-backdrop='true'] #notch-mask::before,
 body[data-material='native-glass'][data-native-backdrop='true'] #notch-mask::after {
   background: color-mix(in srgb, var(--bg) 72%, transparent);
-}
-body[data-material='native-glass'][data-native-dark='false'] {
-  --muted: #444;
 }
 
 body:not([data-material='black']):not([data-native-backdrop='true']) #notch-mask::before,
@@ -523,4 +513,16 @@ body[data-animating='true'] #surface {
 
 body[data-animating='true'] #panel {
   width: var(--layout-width, 480px);
+}
+
+/* Pure black remains an independent fixed palette in every interaction state. */
+body[data-material='black'] {
+  --selected: #ffffff18;
+}
+body[data-material='black'] .choices button {
+  color: #666;
+}
+body[data-material='black'] .choices button[aria-pressed='true'] {
+  color: var(--accent);
+  background: #75a7ff1a;
 }

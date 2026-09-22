@@ -10,7 +10,7 @@ main 挂载设置视图并调用 api；类型来自 ../contracts.ts，API 层处
 - [main.tsx](main.tsx)：页面入口、连续分组设置表单、Field/Toggle 业务组合及操作反馈；页头复用产品图标；挂载设置大纲和模型快切局部设置；启动行为表单选择询问正常重开或直接强制重开，明确强退影响，显式保存；开发构建标明真实调试并固定启动端点和窗口。
 - [settings-outline.tsx](settings-outline.tsx)：按已加载分组提供锚点导航，滚动跟随当前项并支持键盘及深链接；桌面固定侧栏，窄屏顶部横向导航。
 - [panel-settings.tsx](panel-settings.tsx)：哑光/磨砂/液态材质、液态旁的 Clear 星星按钮、字号、摘要、点击、顺序及窗口设置，另提供明确的点击胶囊后展开方式（右侧嵌入/聊天内浮动，两者均留在宿主内）、侧栏宽度及停靠/浮窗各自的分栏/标签编排、选中标签、排列、首个面板、双轴比例和恢复默认，保存偏好不启用功能或更改主题；依据后台 popoutSupported 禁用不支持设备的桌面选项；按版本逐项保存，冲突时读取新状态；说明三材质在内嵌、弹出与旧系统下的实际效果。
-- [model-control-settings.tsx](model-control-settings.tsx)：独立模型快切的显示器、边缘、位置和四主题即时设置；显示器按UUID保存，断开保留选择；版本冲突重读，忽略过期查询，不覆盖工作台外观。
+- [model-control-settings.tsx](model-control-settings.tsx)：独立模型快切的显示器、边缘、位置和四材质即时设置，纯黑配色固定，其他三材质颜色始终跟随 Codex；显示器按UUID保存，断开保留选择；版本冲突重读，忽略过期查询，不覆盖工作台外观。
 - [dev-sources.js](dev-sources.js)：由 Dev 监督进程注入的独立设置入口，显示实际来源与资源确认、切换 worktree；沿用语义外观变量并局部隔离样式，不进入正式页面或聊天前端。
 - [api.ts](api.ts)：公开数据类型、认证请求、错误和 SSE 状态订阅。
 - [styles.css](styles.css)：Tailwind v4 入口、共享语义变量、锚点滚动留白及全局焦点/减少动效规则；只扫描本目录，布局和控件样式均由 TSX 工具类负责。

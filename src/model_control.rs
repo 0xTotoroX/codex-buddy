@@ -376,7 +376,7 @@ impl App {
         let host = if let Some(client) = self.desktop_client().await {
             let presence = client
                 .evaluate_with_timeout(
-                    "window.__codexBuddyModelControl?.presence?.() ?? null".into(),
+                    "({...window.__codexBuddyModelControl?.presence?.(), appearance: window.__companionFloatingPanel?.panelAppearance?.() ?? null})".into(),
                     Duration::from_millis(600),
                 )
                 .await
@@ -394,7 +394,7 @@ impl App {
             Value::Null
         };
         let ui = self.appearance().await.ui;
-        let appearance = json!({"material":ui.material,"liquidVariant":ui.liquid_variant,"fontOffset":ui.font_offset});
+        let appearance = json!({"material":ui.material,"liquidVariant":ui.liquid_variant,"fontOffset":ui.font_offset,"hostTheme":host["appearance"]});
         let mut control = self.model_control.lock().await;
         let valid = !lease.is_empty()
             && control.lease == lease

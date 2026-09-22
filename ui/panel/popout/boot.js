@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 带令牌和租约的启动链接、本机 panel API 与 Wry IPC。
- * [OUTPUT]: 窗口交接和原生通信；位置、置顶、外观写入共用串行队列与修订号，保留外部并发冲突保护。
+ * [OUTPUT]: 宿主主题随背景 IPC 同步； 窗口交接和原生通信；位置、置顶、外观写入共用串行队列与修订号，保留外部并发冲突保护。
  * [POS]: 系统窗口页面引导层，复用共享胶囊而不采集聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -22,7 +22,6 @@
   let saveTimer = 0;
   let moveTimer = 0;
   let noticeTimer = 0;
-  let themePending = false;
   let lastSaved = '';
   let failures = 0;
   let revision;
@@ -93,6 +92,7 @@
         height: rect?.height,
         radius: style ? parseFloat(style.borderTopLeftRadius) : 0,
         material: panel?.material,
+        theme: panel?.theme,
         liquidVariant: panel?.liquidVariant === 'clear' ? 'clear' : 'regular',
         open: panel?.open !== false,
       });
@@ -135,6 +135,7 @@
         'class',
         'style',
         'data-material',
+        'data-theme',
         'data-liquid-variant',
         'data-hidden',
         'data-detached',
@@ -289,19 +290,6 @@
   window.__companionPopout = {
     request,
     native,
-    toggleTheme() {
-      if (themePending) return;
-      if (!window.ipc) {
-        notice('请在 macOS 弹出窗口中切换系统明暗。');
-        return;
-      }
-      themePending = true;
-      native({ kind: 'system-theme', dark: !matchMedia('(prefers-color-scheme: dark)').matches });
-    },
-    themeResult(error) {
-      themePending = false;
-      if (error) notice(error);
-    },
     notice,
     size,
     dock,

@@ -86,6 +86,7 @@ export interface PanelSnapshot {
   scanStatus: string;
   theme: string;
   accentColor?: string;
+  colors?: Record<string, string>;
   hostTypography: HostTypography;
   settings: Settings;
   sourceLabel: string;
@@ -155,8 +156,6 @@ export interface PanelPreferences {
   viewOrder: string[];
 }
 export interface PopoutBridge {
-  toggleTheme(): void;
-  themeResult(error: string | null): void;
   request(path: string, input?: unknown): Promise<CommandResult>;
   size(width: number, height: number): Promise<void>;
   save(ui: PanelPreferences): void;

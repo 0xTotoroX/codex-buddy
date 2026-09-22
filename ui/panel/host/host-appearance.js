@@ -211,7 +211,7 @@ function detectCodexTheme() {
   for (const node of candidates) {
     const color = getComputedStyle(node).backgroundColor;
     const rgb = parseRgb(color);
-    if (rgb && rgb.a > 0.05 && luminance(rgb) > 5) return luminance(rgb) < 128 ? 'dark' : 'light';
+    if (rgb && rgb.a > 0.05) return luminance(rgb) < 128 ? 'dark' : 'light';
   }
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }

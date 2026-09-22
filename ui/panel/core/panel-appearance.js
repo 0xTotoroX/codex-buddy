@@ -1,6 +1,6 @@
 /*
  * [INPUT]: runtime/state.js、宿主主题及 presentation.js 的主题投影。
- * [OUTPUT]: 弹出跟随系统明暗； 三材质、停靠场景独立偏好及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数（浮窗无固定上限，内嵌按渲染空间约束）。
+ * [OUTPUT]: panelAppearance 提供只读明暗/语义色快照； 弹出跟随宿主明暗； 三材质、停靠场景独立偏好及液态分支迁移与实际效果映射、字体、主题、图标与尺寸归一化辅助函数（浮窗无固定上限，内嵌按渲染空间约束）。
  * [POS]: 共享胶囊外观计算层；内嵌模式通过 appearance 事件通知 SVG 液态运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -158,7 +158,7 @@ function applyTypographyVariables() {
 }
 
 function installTypographyObserver() {
-  if (shellState.typographyObserver || !document.documentElement) return;
+  if (IS_POPOUT || shellState.typographyObserver || !document.documentElement) return;
   shellState.typographyObserver = new MutationObserver(() => syncHostTypography());
   const options = {
     attributes: true,
@@ -397,19 +397,42 @@ function toggleLabelOnly(event) {
   return shellState.labelOnly;
 }
 
-function syncTheme() {
-  if (IS_POPOUT) {
-    shellState.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+function panelAppearance() {
+  if (!IS_POPOUT) {
+    shellState.theme = detectCodexTheme();
     shellState.root?.setAttribute('data-theme', shellState.theme);
-    applyTypographyVariables();
-    return;
   }
-  localStorage.removeItem(LEGACY_THEME_MODE_KEY);
+  const style = shellState.root && getComputedStyle(shellState.root);
+  /** @type {Record<string, string>} */
+  const colors = {};
+  for (const name of [
+    'surface-opaque',
+    'text',
+    'muted',
+    'faint',
+    'accent',
+    'hover',
+    'divider',
+    'danger',
+  ]) {
+    const value = style?.getPropertyValue(`--csw-${name}`).trim();
+    if (value && CSS.supports('color', value)) colors[name] = value;
+  }
+  return { theme: IS_POPOUT ? shellState.theme : detectCodexTheme(), colors };
+}
+
+function syncTheme() {
+  if (!IS_POPOUT) {
+    localStorage.removeItem(LEGACY_THEME_MODE_KEY);
+    shellState.theme = detectCodexTheme();
+  }
   shellState.themeMode = 'auto';
-  shellState.theme = detectCodexTheme();
   shellState.root?.setAttribute('data-theme', shellState.theme);
   shellState.root?.setAttribute('data-theme-mode', shellState.themeMode);
-  syncHostTypography();
+  if (IS_POPOUT) {
+    document.documentElement.style.colorScheme = shellState.theme;
+    applyTypographyVariables();
+  } else syncHostTypography();
 }
 
 function syncHostTypography(force = false) {
@@ -420,14 +443,6 @@ function syncHostTypography(force = false) {
   if (changed) shellState.hostTypography = next;
   applyTypographyVariables();
   if (changed || force) persistFontPreference();
-}
-
-function themeLabel() {
-  return `macOS 明暗：${shellState.theme === 'dark' ? '深色；切换到浅色' : '浅色；切换到深色'}`;
-}
-
-function themeIcon() {
-  return shellState.theme === 'dark' ? iconSvg('sun') : iconSvg('moon');
 }
 
 function installThemeObserver() {
@@ -445,16 +460,7 @@ function installThemeObserver() {
     });
   };
 
-  if (IS_POPOUT) {
-    const media = matchMedia('(prefers-color-scheme: dark)');
-    const changed = () => {
-      syncTheme();
-      emitSignal('render', undefined);
-    };
-    media.addEventListener('change', changed);
-    shellState.themeObserver = { disconnect: () => media.removeEventListener('change', changed) };
-    return;
-  }
+  if (IS_POPOUT) return;
   shellState.themeObserver = new MutationObserver(update);
   [document.documentElement, document.body].filter(Boolean).forEach((node) => {
     shellState.themeObserver.observe(node, {
@@ -465,6 +471,7 @@ function installThemeObserver() {
 }
 
 export {
+  panelAppearance,
   applyMaterial,
   currentAppearance,
   bumpFontSize,
@@ -486,8 +493,6 @@ export {
   readPanelHeight,
   readPanelWidth,
   syncTheme,
-  themeIcon,
-  themeLabel,
   toggleLabelOnly,
   toggleMaterial,
   writeMaterial,

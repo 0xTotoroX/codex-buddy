@@ -756,7 +756,7 @@ test('theme and placement menus save independent preferences without applying a 
   const ctx = await setup();
   const { page, f } = ctx;
   await menu(page, '设置菜单');
-  await page.getByRole('menuitem', { name: '主题…', exact: true }).click();
+  await page.getByRole('menuitem', { name: '材质…', exact: true }).click();
   await page.getByRole('menuitemradio', { name: '磨砂', exact: true }).click();
   assert.equal(f.data.preferences.theme, 'frosted');
   await menu(page, '设置菜单');
@@ -929,35 +929,82 @@ test('search matches preset names and full configurations as well as model label
   await cleanup(ctx);
 });
 
-test('opaque black matrix remains independent of workbench material and system theme; typography still follows', async () => {
+test('three materials follow Codex colors while pure black stays fixed in every state', async () => {
   const ctx = await setup();
   const { page, f } = ctx;
-  for (const colorScheme of ['light', 'dark']) {
-    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
-    for (const material of ['matte', 'frosted', 'native-glass']) {
-      await nativeEvent(page, {
-        appearance: { material, liquidVariant: 'clear', fontOffset: 4 },
-        nativeBackdrop: true,
-      });
-      assert.equal(
-        await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
-        'rgb(0, 0, 0)',
-      );
-      assert.equal(
-        await page
-          .locator('.model-label strong')
-          .first()
-          .evaluate((n) => getComputedStyle(n).fontSize),
-        '17px',
-      );
-      assert.equal(
-        await page.locator('#panel').evaluate((n) => getComputedStyle(n).backdropFilter),
-        'none',
-      );
+  for (const theme of ['light', 'dark']) {
+    await page.emulateMedia({
+      colorScheme: theme === 'dark' ? 'light' : 'dark',
+      reducedMotion: 'reduce',
+    });
+    const colors = {
+      'surface-opaque': theme === 'light' ? 'rgb(245, 239, 230)' : 'rgb(29, 32, 36)',
+      text: theme === 'light' ? 'rgb(30, 35, 40)' : 'rgb(232, 238, 244)',
+      muted: 'rgb(120, 125, 130)',
+      accent: 'rgb(172, 73, 201)',
+      hover: 'rgba(172, 73, 201, 0.1)',
+      divider: 'rgba(172, 73, 201, 0.2)',
+    };
+    for (const material of ['black', 'matte', 'frosted', 'native-glass']) {
+      for (const expanded of [true, false]) {
+        await nativeEvent(page, {
+          expanded,
+          effectiveMaterial: material,
+          appearance: { material: 'matte', fontOffset: 4, hostTheme: { theme, colors } },
+          nativeBackdrop: false,
+        });
+        assert.equal(
+          await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
+          material === 'black' ? 'rgb(0, 0, 0)' : colors['surface-opaque'],
+        );
+        assert.equal(
+          await page.locator('body').evaluate((n) => getComputedStyle(n).color),
+          material === 'black' ? 'rgb(238, 238, 238)' : colors.text,
+        );
+        assert.equal(
+          await page.locator('body').getAttribute('data-theme'),
+          material === 'black' ? 'dark' : theme,
+        );
+      }
     }
+    await nativeEvent(page, { expanded: true });
+    const selected = page.locator('.choices button[aria-pressed="true"]').first();
+    assert.equal(await selected.evaluate((n) => getComputedStyle(n).color), colors.accent);
+    await selected.hover();
+    assert.equal(await selected.evaluate((n) => getComputedStyle(n).color), colors.accent);
+    await selected.focus();
+    assert.equal(await selected.evaluate((n) => getComputedStyle(n).outlineColor), colors.accent);
+    assert.equal(
+      await page
+        .locator('.model-label strong')
+        .first()
+        .evaluate((n) => getComputedStyle(n).fontSize),
+      '17px',
+    );
+    await nativeEvent(page, { appearance: { hostTheme: null } });
+    assert.equal(
+      await page.locator('body').getAttribute('data-theme'),
+      theme,
+      'Missing host retains the last theme',
+    );
+    assert.equal(
+      await page.locator('#surface').evaluate((n) => getComputedStyle(n).backgroundColor),
+      colors['surface-opaque'],
+    );
+    await shot(page, `codex-theme-${theme}`);
+    await nativeEvent(page, { effectiveMaterial: 'black', expanded: true });
+    assert.equal(await selected.evaluate((n) => getComputedStyle(n).color), 'rgb(117, 167, 255)');
+    await selected.hover();
+    await selected.focus();
+    assert.equal(
+      await selected.evaluate((n) => getComputedStyle(n).outlineColor),
+      'rgb(117, 167, 255)',
+    );
+    await shot(page, `pure-black-${theme}`);
+    await nativeEvent(page, { effectiveMaterial: 'matte' });
+    assert.equal(await page.locator('body').getAttribute('data-theme'), theme);
   }
   assert.equal(writes(f).length, 0);
-  await shot(page, 'v2-black-matrix');
   await cleanup(ctx);
 });
 

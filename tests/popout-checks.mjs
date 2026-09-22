@@ -77,10 +77,6 @@ export async function checkPopout({
   });
   await pop.exposeFunction('__testNative', async (message) => {
     native.push(message);
-    if (message.kind === 'system-theme') {
-      await pop.emulateMedia({ colorScheme: message.dark ? 'dark' : 'light' });
-      await pop.evaluate(() => window.__companionPopout.themeResult(null));
-    }
     if (message.kind === 'resize') {
       await pop.setViewportSize({ width: 524, height: 504 });
       await pop.waitForFunction(() => window.__companionFloatingPanel.state.height === 480);
@@ -188,6 +184,47 @@ export async function checkPopout({
       async () => (await accent(pop)) === (await accent(desktop)),
       'Removing the host accent left a stale popout color',
     );
+    for (const [hostToken, panelToken, color] of [
+      ['--color-token-text-primary', '--csw-text', 'rgb(30, 35, 40)'],
+      ['--color-background-elevated-primary-opaque', '--csw-surface-opaque', 'rgb(245, 239, 230)'],
+      ['--color-token-list-hover-background', '--csw-hover', 'rgba(172, 73, 201, 0.1)'],
+    ]) {
+      const previous = await desktop.evaluate(
+        ([token, value]) => {
+          const old = document.documentElement.style.getPropertyValue(token);
+          document.documentElement.style.setProperty(token, value);
+          return old;
+        },
+        [hostToken, color],
+      );
+      await waitFor(
+        () =>
+          pop
+            .locator('[data-companion-stepwise-root]')
+            .evaluate(
+              (node, token) => getComputedStyle(node).getPropertyValue(token).trim(),
+              panelToken,
+            )
+            .then((value) => value === color),
+        'Host semantic palette did not reach popout',
+      );
+      await desktop.evaluate(
+        ([token, value]) =>
+          value
+            ? document.documentElement.style.setProperty(token, value)
+            : document.documentElement.style.removeProperty(token),
+        [hostToken, previous],
+      );
+    }
+    const retained = await pop.evaluate(async () => {
+      const panel = window.__companionFloatingPanel;
+      const theme = panel.state.theme;
+      const result = await window.__companionPopout.request('state');
+      result.snapshot = null;
+      await panel.receivePanelState(result, false);
+      return [theme, panel.state.theme];
+    });
+    assert.equal(retained[0], retained[1], 'Missing snapshot retains the last Codex theme');
     record('弹出继承宿主主题色，隐藏内嵌后仍同步换色和默认色恢复');
     await waitFor(
       async () =>
@@ -228,7 +265,11 @@ export async function checkPopout({
           `host/popout ${hostGeometry[i].name} height differs`,
         );
       }
-      assert.equal(hostGeometry[i].font, popGeometry[i].font);
+      assert.equal(
+        hostGeometry[i].font,
+        popGeometry[i].font,
+        JSON.stringify({ hostGeometry, popGeometry }),
+      );
       assert.equal(hostGeometry[i].padding, popGeometry[i].padding);
       assert.equal(popGeometry[i].box, 'border-box');
     }
@@ -252,7 +293,7 @@ export async function checkPopout({
     );
     // Compare actual pixels: a hidden SVG/backdrop surface can still leave a compositor artifact.
     for (const theme of ['light', 'dark']) {
-      await pop.emulateMedia({ colorScheme: theme });
+      await pop.emulateMedia({ colorScheme: theme === 'dark' ? 'light' : 'dark' });
       await desktop.evaluate(
         (theme) => document.documentElement.classList.toggle('dark', theme === 'dark'),
         theme,
@@ -291,27 +332,17 @@ export async function checkPopout({
     await desktop.evaluate(() => document.documentElement.classList.remove('dark'));
     await pop.emulateMedia({ colorScheme: 'light' });
     await waitFor(async () => (await state()).theme === 'light', 'Theme did not restore');
-    await pop.locator('.csw-head').hover();
+    assert.equal(await pop.locator('[data-action=theme]').count(), 0);
     const commandCount = commandResults.length;
-    await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-    await pop.locator('[data-action=theme]').evaluate((node) => node.click());
-    await waitFor(
-      async () => (await state()).theme === 'dark',
-      'System toggle did not update panel',
-    );
+    await pop.emulateMedia({ colorScheme: 'dark' });
+    await delay(500);
+    assert.equal((await state()).theme, 'light');
+    assert.equal(commandResults.length, commandCount);
     assert.equal(
-      await desktop.evaluate(() => document.documentElement.classList.contains('dark')),
+      native.some((message) => message.kind === 'system-theme'),
       false,
     );
-    assert.equal(
-      commandResults.length,
-      commandCount,
-      'system toggle must not reach the Codex command channel',
-    );
-    await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-    await pop.locator('[data-action=theme]').evaluate((node) => node.click());
-    await waitFor(async () => (await state()).theme === 'light', 'System toggle did not restore');
-    record('弹出明暗走原生 IPC，系统变化更新浮窗且不发送 Codex 主题命令');
+    record('浮窗和宿主主题一致，系统明暗变化不覆盖宿主，不再提供主题控制');
     record('三材质 × 明暗模式：弹出后宿主像素与完整移除胶囊完全一致');
     await desktop.evaluate(() => {
       const p = window.__companionFloatingPanel;
@@ -623,7 +654,7 @@ export async function checkPopout({
       document.body.style.background = '#808080';
     });
     for (const theme of ['light', 'dark']) {
-      await pop.emulateMedia({ colorScheme: theme });
+      await pop.emulateMedia({ colorScheme: theme === 'dark' ? 'light' : 'dark' });
       await desktop.evaluate(
         (theme) => document.documentElement.classList.toggle('dark', theme === 'dark'),
         theme,

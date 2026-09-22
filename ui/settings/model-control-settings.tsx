@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立模型控制偏好/显示器API、共享设置控件。
- * [OUTPUT]: 模型快切的屏幕、位置及四主题即时设置。
+ * [OUTPUT]: 模型快切的屏幕、位置及四材质即时设置。
  * [POS]: 设置页局部组件；版本冲突重读，不改工作台外观或模型选择。
  * [PROTOCOL]: 接口变化时同步 ui/settings/AGENTS.md。
  */
@@ -94,7 +94,9 @@ export function ModelControlSettings({ live }: { live: boolean }) {
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-sm font-medium">模型快切</h2>
-          <p className="mt-1 text-xs text-muted-foreground">屏幕、位置和主题独立保存。</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            屏幕、位置和材质独立保存；纯黑保持固定配色，其他材质跟随 Codex。
+          </p>
         </div>
         <Button
           variant="outline"
@@ -184,9 +186,9 @@ export function ModelControlSettings({ live }: { live: boolean }) {
           </span>
         </label>
         <label className="grid grid-cols-[56px_1fr] items-center gap-3">
-          <span className="text-xs text-muted-foreground">主题</span>
+          <span className="text-xs text-muted-foreground">材质</span>
           <NativeSelect
-            aria-label="模型快切主题"
+            aria-label="模型快切材质"
             disabled={disabled}
             value={prefs?.theme || 'black'}
             onChange={(e) => void save({ theme: e.target.value as Preferences['theme'] })}

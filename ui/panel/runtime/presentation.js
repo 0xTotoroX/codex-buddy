@@ -1,9 +1,10 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
+ * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { panelAppearance, syncTheme } from '../core/panel-appearance.js';
 
 import { iconSvg } from '../icons/index.js';
 import { readWorkbenchScroll, writeWorkbenchScroll } from '../workbench/reading.js';
@@ -417,7 +418,8 @@ function exportPanelState() {
     bridgeError: stepwiseState.bridgeError,
     scanBusy: chatBusy(),
     scanStatus: contextState.scanStatus,
-    theme: shellState.theme,
+    theme: panelAppearance().theme,
+    colors: panelAppearance().colors,
     accentColor: getComputedStyle(shellState.root).getPropertyValue('--csw-accent').trim(),
     hostTypography: shellState.hostTypography,
     settings: runtimeState.settings,
@@ -508,10 +510,22 @@ async function receivePanelState(result, initial) {
   shellState.remoteSource = source;
   if (fingerprint === shellState.remoteFingerprint && !initial) return;
   shellState.remoteFingerprint = fingerprint;
-  if (source.accentColor && CSS.supports('color', source.accentColor)) {
-    shellState.root.style.setProperty('--csw-accent', source.accentColor);
-  } else {
-    shellState.root.style.removeProperty('--csw-accent');
+  if (source.theme === 'light' || source.theme === 'dark') shellState.theme = source.theme;
+  for (const name of [
+    'surface-opaque',
+    'text',
+    'muted',
+    'faint',
+    'accent',
+    'hover',
+    'divider',
+    'danger',
+  ]) {
+    const value = source.colors?.[name] || (name === 'accent' ? source.accentColor : null);
+    for (const target of [shellState.root, document.documentElement]) {
+      if (value && CSS.supports('color', value)) target.style.setProperty(`--csw-${name}`, value);
+      else target.style.removeProperty(`--csw-${name}`);
+    }
   }
   normalizePromptState(source.prompts);
   outlineState.outlineItems = source.outlineItems;
@@ -523,6 +537,8 @@ async function receivePanelState(result, initial) {
   contextState.scanStatus = source.scanStatus;
   runtimeState.settings = source.settings;
   shellState.hostTypography = source.hostTypography;
+  syncTheme();
+  window.dispatchEvent(new Event('codex-buddy:appearance'));
   runtimeState.settingsLoaded = true;
   contextState.lastAssistantHash = source.answerHash;
   stepwiseState.promptContext = source.context;

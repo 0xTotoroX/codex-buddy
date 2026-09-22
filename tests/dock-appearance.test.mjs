@@ -120,3 +120,27 @@ test('dock appearances remember independent choices and leave shared window pref
     await browser.close();
   }
 });
+
+test('opaque black host remains dark with a light system preference', async () => {
+  const browser = await chromium.launch({
+    executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),
+    headless: true,
+  });
+  try {
+    const page = await browser.newPage({ colorScheme: 'light' });
+    await page.route('http://fixture.test/**', (route) =>
+      route.fulfill({
+        body: '<html><body style="background:rgb(0,0,0)"></body></html>',
+        contentType: 'text/html',
+      }),
+    );
+    await page.goto('http://fixture.test/');
+    await page.addScriptTag({ content: bundle.outputFiles[0].text });
+    assert.equal(await page.evaluate(() => window.probe.panelAppearance().theme), 'dark');
+    await page.evaluate(() => (document.body.style.background = 'rgb(255,255,255)'));
+    await page.emulateMedia({ colorScheme: 'dark' });
+    assert.equal(await page.evaluate(() => window.probe.panelAppearance().theme), 'light');
+  } finally {
+    await browser.close();
+  }
+});

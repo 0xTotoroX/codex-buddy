@@ -28,11 +28,11 @@ html[data-native-backdrop='true'] .csw-glass {
 
 .csw-popout-confirm {
   max-width: 280px;
-  border: 1px solid #ffffff25;
+  border: 1px solid var(--csw-divider, var(--buddy-border));
   border-radius: 18px;
   padding: 20px;
-  background: #252b35;
-  color: #f4f5f7;
+  background: var(--csw-surface-opaque, var(--buddy-surface));
+  color: var(--csw-text, var(--buddy-text));
   font:
     13px/1.6 -apple-system,
     system-ui,
@@ -54,12 +54,12 @@ html[data-native-backdrop='true'] .csw-glass {
   border: 0;
   border-radius: 8px;
   padding: 7px 10px;
-  background: #ffffff15;
+  background: var(--csw-hover, var(--buddy-subtle));
   color: inherit;
   cursor: pointer;
 }
 .csw-popout-confirm button[data-append] {
-  background: #617ae7;
+  background: color-mix(in srgb, var(--csw-accent, var(--buddy-action)) 18%, transparent);
 }
 
 html[data-presentation='popout'] .csw-resize-handle {

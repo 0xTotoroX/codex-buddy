@@ -25,7 +25,7 @@ import {
 import { forceRefreshStepwise } from '../stepwise.js';
 import { settingsHtml, attachSettingsEvents } from '../core/settings-view.js';
 import { openSettings } from '../runtime/settings-sync.js';
-import { iconSvg, applyMaterial, themeIcon, themeLabel } from '../core/panel-appearance.js';
+import { iconSvg, applyMaterial } from '../core/panel-appearance.js';
 import {
   bindPanelWindowControls,
   panelWindowControls,
@@ -65,7 +65,6 @@ function layoutMenu() {
     <span class="csw-layout-hint" hidden>空间不足，暂以上下排列</span>
     <button data-layout-action="merge">合并为标签</button><button data-layout-action="split">拆回分栏</button><button data-layout-action="swap">交换位置</button><button data-layout-action="reset">恢复默认布局</button></div>
     ${IS_POPOUT ? '' : `<button data-placement="dock" aria-pressed="${shellState.layoutMode === 'workbench'}">固定在聊天右侧</button><button data-placement="floating" aria-pressed="${shellState.layoutMode !== 'workbench'}">在聊天内自由移动</button>`}
-    ${IS_POPOUT ? `<button data-action="theme" title="${themeLabel()}">${themeIcon()}${themeLabel()}</button>` : ''}
   </div></details>`;
 }
 
@@ -263,9 +262,6 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       if (event.target.closest('button'))
         controls.querySelector('details')?.removeAttribute('open');
     };
-    controls
-      .querySelector('[data-action=theme]')
-      ?.addEventListener('click', () => POPOUT.toggleTheme());
     controls.querySelectorAll('[data-layout-mode], [data-layout-action]').forEach((button) => {
       button.addEventListener('click', () =>
         changeLayout(button.dataset.layoutMode || button.dataset.layoutAction),

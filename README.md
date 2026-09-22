@@ -100,7 +100,7 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 
 ### Model quick switch
 
-Open the control from settings or run `codex-buddy model-control`. Its default shell is opaque black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The compact entry and expanded panel use the same theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
+Open the control from settings or run `codex-buddy model-control`. Its default shell stays pure black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The capsule, workbench, desktop window, and the three optional model-control materials follow Codex colors in every state. The pure-black model-control palette stays fixed. Web settings continue to follow the browser theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
 
 The control follows the connected Codex desktop space and hides when the host is hidden or disconnected. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
 

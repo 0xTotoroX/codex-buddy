@@ -47,7 +47,19 @@ const snapshot = {
     { id: 'fixture-b', label: 'Fixture Beta', reasoning: ['medium', 'high'], fast: false },
   ],
 };
-const appearance = { material: 'matte', liquidVariant: 'regular', fontOffset: 0 };
+const appearance = {
+  material: 'matte',
+  liquidVariant: 'regular',
+  fontOffset: 0,
+  hostTheme: {
+    theme: 'light',
+    colors: {
+      'surface-opaque': 'rgb(245, 239, 230)',
+      text: 'rgb(30, 35, 40)',
+      accent: 'rgb(172, 73, 201)',
+    },
+  },
+};
 let valid = true,
   reveal = 5,
   revision = 1,
@@ -482,6 +494,19 @@ try {
     'workbench appearance',
   );
   assert.equal(telemetry.native.effectiveMaterial, 'black');
+  for (const material of ['black', 'matte']) {
+    prefs.theme = material;
+    for (const hostTheme of ['light', 'dark', 'light']) {
+      appearance.hostTheme.theme = hostTheme;
+      await until(
+        () =>
+          telemetry.native.theme === material &&
+          telemetry.native.appearance?.hostTheme?.theme === hostTheme &&
+          telemetry.native.nativeDark === (material === 'black' || hostTheme === 'dark'),
+        'Codex native theme with pure-black exception',
+      );
+    }
+  }
   await command('window.resetMotion(); window.recordMotion = true');
   for (const [theme, variant, style] of [
     ['black', 'regular', null],
@@ -512,6 +537,10 @@ try {
         name: `native glass ${variant}`,
         reason: 'NSGlassEffectView unavailable; matte fallback verified',
       });
+    assert.equal(
+      telemetry.native.nativeDark,
+      theme === 'black' || appearance.hostTheme.theme === 'dark',
+    );
     if (theme === 'black') assert.equal(telemetry.background, 'rgb(0, 0, 0)');
     else if (effective === 'frosted') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
     else if (effective === 'native-glass')
@@ -532,7 +561,7 @@ try {
     assert.equal(Math.min(compactBounds.Width, compactBounds.Height), 10);
     await capture(`compact-${theme}-${variant}`);
     check(`compact retains ${theme}/${variant} material`);
-    await ipc({ action: 'expand' });
+    await ipc({ action: 'expand', keyboard: true });
     await until(
       () => telemetry.native.expanded && !telemetry.native.animating,
       'restore expanded material',

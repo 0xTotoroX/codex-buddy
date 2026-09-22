@@ -420,7 +420,6 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
     let page = format!("http://127.0.0.1:{}/panel", runtime.port);
     let url = format!("{page}#token={}&lease={lease}", runtime.token);
     let proxy = event_loop.create_proxy();
-    let theme_proxy = proxy.clone();
     let allowed = page.clone();
     let builder = WebViewBuilder::new()
         .with_incognito(crate::assets::development().is_some())
@@ -450,7 +449,6 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
     let mut gesture: Option<macos::Gesture> = None;
     let backdrop = macos::Backdrop::new(&window);
     let mut reported_glass_style = None;
-    let mut theme_pending = false;
     let mut window_transition: Option<WindowTransition> = None;
     let mut return_origin: Option<Pose> = None;
     let mut presentation_reported = false;
@@ -469,24 +467,6 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
         *control = ControlFlow::Wait;
         match event {
             Event::UserEvent(message) => match message["kind"].as_str().unwrap_or_default() {
-                "system-theme" if !theme_pending => {
-                    if let Some(dark) = message["dark"].as_bool() {
-                        theme_pending = true;
-                        let proxy = theme_proxy.clone();
-                        std::thread::spawn(move || {
-                            let error = set_system_theme(dark).err().map(|error| error.to_string());
-                            let _ = proxy
-                                .send_event(json!({"kind":"system-theme-result", "error":error}));
-                        });
-                    }
-                }
-                "system-theme-result" => {
-                    theme_pending = false;
-                    let _ = webview.evaluate_script(&format!(
-                        "window.__companionPopout?.themeResult({});",
-                        message["error"]
-                    ));
-                }
                 "backdrop" => {
                     backdrop.update(&window, &message);
                     let style = backdrop.style();
@@ -710,29 +690,6 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
             }
         }
     })
-}
-
-fn set_system_theme(dark: bool) -> Result<()> {
-    let script = format!(
-        "with timeout of 30 seconds\ntell application id \"com.apple.systemevents\" to tell appearance preferences\nset dark mode to {dark}\nreturn dark mode\nend tell\nend timeout"
-    );
-    let output = std::process::Command::new("/usr/bin/osascript")
-        .args(["-e", &script])
-        .output()?;
-    if !output.status.success() {
-        let detail = String::from_utf8_lossy(&output.stderr);
-        if detail.contains("-1743") {
-            anyhow::bail!(
-                "未获准切换 macOS 明暗。请在系统设置 → 隐私与安全性 → 自动化中允许控制 System Events。"
-            );
-        }
-        anyhow::bail!("macOS 明暗切换失败：{}", detail.trim());
-    }
-    anyhow::ensure!(
-        String::from_utf8_lossy(&output.stdout).trim() == dark.to_string(),
-        "macOS 未确认目标明暗状态，请重试。"
-    );
-    Ok(())
 }
 
 fn keep_on_screen(window: &Window) {

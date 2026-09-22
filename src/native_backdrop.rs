@@ -1,10 +1,11 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
-// [OUTPUT]: 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
+// [OUTPUT]: 根据宿主 theme 设置自有 NSWindow 外观； 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
 // [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
 // [PROTOCOL]: 共享材质保持窗口无关；控制条复用形状遮罩更新内容边缘和刘海两翼裁切，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};
 use objc2_app_kit::{
+    NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSAutoresizingMaskOptions, NSGlassEffectView, NSGlassEffectViewStyle, NSView,
     NSVisualEffectBlendingMode, NSVisualEffectMaterial, NSVisualEffectState, NSVisualEffectView,
     NSWindow,
@@ -192,6 +193,20 @@ impl Backdrop {
     }
 
     pub fn update(&self, window: &NSWindow, message: &Value) {
+        let name = match message["theme"].as_str() {
+            Some("dark") => Some(unsafe { NSAppearanceNameDarkAqua }),
+            Some("light") => Some(unsafe { NSAppearanceNameAqua }),
+            _ => None,
+        };
+        if let Some(name) = name
+            && window
+                .appearance()
+                .is_none_or(|current| !current.name().isEqualToString(name))
+            && let Some(appearance) = NSAppearance::appearanceNamed(name)
+        {
+            window.setAppearance(Some(&appearance));
+        }
+
         let root = window.contentView().expect("Wry content view");
         let bounds = root.bounds();
         // 窗口缩放时，上一视口的 DOM 消息可能晚到；不能用它回退或隐藏原生背景。

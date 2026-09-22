@@ -1,9 +1,10 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、启停与通知订阅，连接胶囊与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
+ * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { panelAppearance } from '../core/panel-appearance.js';
 
 import {
   DETACHED_KEY,
@@ -541,6 +542,7 @@ function install() {
     renderFloat,
     panelPreferences,
     exportPanelState,
+    panelAppearance,
     panelReadingState,
     panelWindowAnchor,
     blinkHandoff,

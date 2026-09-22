@@ -70,7 +70,7 @@ test('native backdrop updates even while animation frames are suspended', () => 
     microtasks.shift()?.();
   };
   assert.equal(messages.at(-1)?.material, 'native-glass');
-  assert.equal('theme' in messages.at(-1), false, 'backdrop must inherit system appearance');
+  assert.equal(messages.at(-1)?.theme, 'light', 'backdrop must inherit Codex appearance');
   assert.equal(messages.at(-1)?.open, true);
   state.open = false;
   notify();
@@ -90,7 +90,7 @@ test('native backdrop updates even while animation frames are suspended', () => 
   assert.equal(messages.at(-1)?.liquidVariant, 'regular');
   state.theme = 'dark';
   notify();
-  assert.equal('theme' in messages.at(-1), false);
+  assert.equal(messages.at(-1)?.theme, 'dark');
   state.material = 'frosted';
   notify();
   assert.equal(
@@ -115,14 +115,11 @@ test('native backdrop updates even while animation frames are suspended', () => 
   microtasks.shift()();
   assert.equal(measurements, beforeMeasurements + 1);
   assert.equal(messages.length, count, 'coalescing does not resend unchanged geometry');
-  window.__companionPopout.toggleTheme();
-  assert.deepEqual(messages.at(-1), { kind: 'system-theme', dark: true });
-  const pending = messages.length;
-  window.__companionPopout.toggleTheme();
-  assert.equal(messages.length, pending, 'do not launch overlapping system changes');
-  window.__companionPopout.themeResult('permission denied');
-  window.__companionPopout.toggleTheme();
-  assert.equal(messages.length, pending + 1, 'failure releases the button for retry');
+  assert.equal(window.__companionPopout.toggleTheme, undefined);
+  assert.equal(
+    messages.some((message) => message.kind === 'system-theme'),
+    false,
+  );
 });
 
 test('popout size stays expanded and retains the latest resize request', async () => {

@@ -352,12 +352,12 @@ try {
   settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
   const section = settingsPage.getByRole('region', { name: '模型快切设置' });
-  await settingsPage.getByLabel('模型快切主题', { exact: true }).waitFor();
+  await settingsPage.getByLabel('模型快切材质', { exact: true }).waitFor();
   await settingsPage.waitForFunction(
-    () => !document.querySelector('[aria-label="模型快切主题"]').disabled,
+    () => !document.querySelector('[aria-label="模型快切材质"]').disabled,
   );
   assert.equal(
-    await settingsPage.getByLabel('模型快切主题', { exact: true }).inputValue(),
+    await settingsPage.getByLabel('模型快切材质', { exact: true }).inputValue(),
     'black',
   );
   const change = async (name, value, key) => {
@@ -369,8 +369,8 @@ try {
     await waitFor(async () => (await api('state')).preferences[key] === value, `saved ${key}`);
   };
   const beforeAppearance = (await request('state')).body.panelPreferences;
-  await change('模型快切主题', 'matte', 'theme');
-  await change('模型快切主题', 'frosted', 'theme');
+  await change('模型快切材质', 'matte', 'theme');
+  await change('模型快切材质', 'frosted', 'theme');
   await change('模型快切边缘', 'left', 'edge');
   const screens = await api('displays');
   assert.equal((await request('model-control/displays', undefined, false)).status, 401);
@@ -382,11 +382,11 @@ try {
     async () => (await api('state')).preferences.position === 0,
     'keyboard position saves',
   );
-  await change('模型快切主题', 'native-glass', 'theme');
+  await change('模型快切材质', 'native-glass', 'theme');
   await change('模型快切液态变体', 'clear', 'liquidVariant');
   await settingsPage.reload();
   await settingsPage.waitForFunction(
-    () => document.querySelector('[aria-label="模型快切主题"]')?.value === 'native-glass',
+    () => document.querySelector('[aria-label="模型快切材质"]')?.value === 'native-glass',
   );
   assert.equal(
     await settingsPage.getByLabel('模型快切液态变体', { exact: true }).inputValue(),
