@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 实际设置页、合成 SSE/设置 API 与独立 Chromium。
- * [OUTPUT]: 启动策略默认值、风险说明、显式保存与重载恢复验收。
+ * [OUTPUT]: 启动策略与完整/限长上下文选项、显式保存与重载恢复验收。
  * [POS]: 设置页行为测试，不接触真实宿主或重启应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -14,7 +14,7 @@ import { chromium } from 'playwright';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
-  'startup policy requires explicit save and restores after page reload',
+  'startup policy and context mode require explicit save and restore after reload',
   { timeout: 30000 },
   async () => {
     const bundle = await build({
@@ -93,6 +93,21 @@ test(
       await page.getByRole('button', { name: '保存设置', exact: true }).click();
       await page.getByText('设置已同步到本机', { exact: true }).waitFor();
       assert.equal(saves.at(-1).hostRestartPolicy, 'ask');
+      const context = page.getByLabel('生成上下文', { exact: true });
+      assert.equal(await context.inputValue(), 'limited');
+      await context.selectOption('latest');
+      assert.equal(await page.getByLabel('输入字符上限', { exact: true }).count(), 0);
+      await page.getByRole('button', { name: '保存设置', exact: true }).click();
+      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      assert.equal(saves.at(-1).maxInputChars, 0);
+      await page.reload();
+      await context.waitFor();
+      assert.equal(await context.inputValue(), 'latest');
+      await context.selectOption('limited');
+      await page.getByLabel('输入字符上限', { exact: true }).fill('8000');
+      await page.getByRole('button', { name: '保存设置', exact: true }).click();
+      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      assert.equal(saves.at(-1).maxInputChars, 8000);
       assert.deepEqual(errors, []);
     } finally {
       await browser?.close();

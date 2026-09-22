@@ -133,6 +133,31 @@ export function chatBindingCases({
       },
     ]),
     [
+      'binding suggestion cache checks the complete user question beyond the old prefix',
+      async (page) => {
+        await mode(page, true);
+        const question = '问'.repeat(3000);
+        await page.locator('.user-bubble').evaluate((node, text) => {
+          node.textContent = text + '完整执行全部任务';
+        }, question);
+        await defer(page);
+        await complete(page, 0, 'A');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.prompts.length === 1,
+        );
+        await replaceIdentity(page, 'fixture-thread-b');
+        await page.locator('.user-bubble').evaluate((node, text) => {
+          node.textContent = text + '仅讨论方案不要执行';
+        }, question);
+        await replaceIdentity(page, 'fixture-thread-a');
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.scanStatus === 'ready',
+        );
+        assert.equal((await snapshot(page)).prompts.length, 0);
+        assert.equal(await page.evaluate(() => window.workbenchFixture.deferred.length), 1);
+      },
+    ],
+    [
       'binding suggestion cache invalidates changed answer and generation settings',
       async (page) => {
         await mode(page, true);

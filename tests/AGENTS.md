@@ -17,7 +17,7 @@
 - [model-control-native.mjs](model-control-native.mjs)：独立 NSPanel 的连续开合中间帧、四主题网页帧间隔采样、实际窗口尺寸、焦点、独立四主题在收起/展开时的原生材质、内容高度、宿主隐藏/恢复、租约退出与定位验收；不支持的系统输入事件明确记录跳过。
 - [model-control-probe.swift](model-control-probe.swift)：仅操作指定合成原生面板的窗口、焦点和鼠标验收探针。
 
-- [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、显式保存及页面重载恢复；合成本机 API，不退出真实宿主。
+- [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、完整/限长上下文切换、显式保存及页面重载恢复；合成本机 API，不退出真实宿主。
 
 - [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发 App 后台启动/日志/进程存续/正常退出及身份保护、启动策略参数传递、重复唤起、原目标重连、失败边界、失效锁保留及 shell 转义；设置 CODEX_BUDDY_NATIVE_LAUNCHER_TEST=1 显式验收合成原生窗口的 Dock 策略与焦点交接，不在普通回归中抢焦点。
 
@@ -35,7 +35,7 @@
 
 - [embedded-glass.mjs](embedded-glass.mjs)：真实 Chromium 中用固定高对比背景验证正式构建的 SVG 背景像素、实时更新、B 版 Regular/Clear 液态变体与原生变体隔离、清理及正式构建集成；系统合成器允许透明时要求可见像素差，CI 主机启用“减少透明度”时核对不同效果契约，产品回退由 e2e 单独覆盖；独立命令 test:glass，不读取真实聊天。
 
-- [e2e.mjs](e2e.mjs)：端到端测试入口；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
+- [e2e.mjs](e2e.mjs)：端到端测试入口，验证三种协议下超过旧桥接大小限制的完整中文/emoji 问答与旧限长模式；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
 - [popout-checks.mjs](popout-checks.mjs)：端到端测试的弹出窗口子流程；检查三材质单入口与双向保存、投影、宿主强调色动态同步及回退、收回、受限操作、隐藏像素、表面偏色、哑光/磨砂的单层圆角浅阴影，以及宿主 reset 有无变化时的公共几何、内边距和字体。
 - [lifecycle-test.mjs](lifecycle-test.mjs)：进程生命周期测试入口，不使用真实聊天数据；验证启动器在不支持浮窗时保留内嵌、其他错误仍提示，以及旧默认目录迁移、安装、服务复用、升级、回滚和模型请求取消；报告写入 target/reports/lifecycle.json。 正式程序冷启动覆盖旧胶囊配置、工作台开合意图与独立宽度/比例。
 - [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×46 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 主题及宿主强调色、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；完整检查需屏幕录制权限，`--appearance-only` 可免截图检查主题、材质能力、通过公共头部进入设置并切换三材质后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。

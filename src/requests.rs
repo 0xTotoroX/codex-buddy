@@ -1,5 +1,5 @@
 // [INPUT]: CDP binding 事件、App 设置与模型服务。
-// [OUTPUT]: 桌面请求分发、建议 items 转换及结果回送。
+// [OUTPUT]: 桌面请求分发、完整最近一问一答或限长输入、建议 items 转换及结果回送；生成请求不套用普通设置的字节上限。
 // [POS]: renderer 与独立后台的受限操作边界，生成前后校验上下文。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -38,12 +38,16 @@ pub fn listen(client: Weak<Client>, app: Weak<App>, mut events: mpsc::Receiver<V
             tokio::select! {
                 event = events.recv() => {
                     let Some(event) = event else { break; };
-                    let Some(raw) = event["payload"].as_str().filter(|value| value.len() <= 262144) else { continue; };
+                    let Some(raw) = event["payload"].as_str() else { continue; };
                     let Ok(request) = serde_json::from_str::<Request>(raw) else { continue; };
                     if request.id.len() > 120 { continue; }
                     let Some(client) = client.upgrade() else { break; };
                     let Some(app) = app.upgrade() else { break; };
                     let context_id = event["executionContextId"].clone();
+                    if request.path != "/stepwise/generate" && raw.len() > 262144 {
+                        let _ = reply(&client, &request.id, context_id, json!({"error":"请求内容过大"})).await;
+                        continue;
+                    }
                     if tasks.len() >= 8 {
                         let _ = reply(&client, &request.id, context_id, json!({"error":"请求较多，请稍后再试"})).await;
                         continue;
@@ -131,6 +135,25 @@ async fn current(client: &Client, request: &Value) -> Result<bool> {
     Ok(client.evaluate(expression).await? == true)
 }
 
+// Zero means the complete latest exchange; positive values preserve the legacy budget.
+fn generation_input(user: &str, answer: &str, limit: usize) -> String {
+    if limit == 0 {
+        return format!("紧邻的用户问题：\n{user}\n\n当前回答：\n{answer}");
+    }
+    let question = user.chars().take(2400.min(limit / 4)).collect::<String>();
+    let prefix = format!("紧邻的用户问题：\n{question}\n\n当前回答：\n");
+    let remaining = limit.saturating_sub(prefix.chars().count());
+    let suffix = answer
+        .chars()
+        .rev()
+        .take(remaining)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<String>();
+    format!("{prefix}{suffix}")
+}
+
 async fn generate(app: &Arc<App>, client: &Client, request: &Value) -> Result<Value> {
     let answer = request["lastAssistantMessage"]
         .as_str()
@@ -153,24 +176,7 @@ async fn generate(app: &Arc<App>, client: &Client, request: &Value) -> Result<Va
         bail!("配置已经变化，请等待浮窗同步后重试");
     }
     let user = request["lastUserMessage"].as_str().unwrap_or_default();
-    let question = user
-        .chars()
-        .take(2400.min(model.options.max_input_chars / 4))
-        .collect::<String>();
-    let prefix = format!("紧邻的用户问题：\n{question}\n\n当前回答：\n");
-    let remaining = model
-        .options
-        .max_input_chars
-        .saturating_sub(prefix.chars().count());
-    let suffix = answer
-        .chars()
-        .rev()
-        .take(remaining)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<String>();
-    let input = format!("{prefix}{suffix}");
+    let input = generation_input(user, answer, model.options.max_input_chars);
     let cancelled = async {
         loop {
             sleep(Duration::from_millis(600)).await;
@@ -191,4 +197,24 @@ async fn generate(app: &Arc<App>, client: &Client, request: &Value) -> Result<Va
         bail!("回答或配置已经变化，请重新生成");
     }
     Ok(json!({"status":"ok","items":items(suggestions)}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::generation_input;
+
+    #[test]
+    fn complete_exchange_preserves_long_question_and_answer() {
+        let question = format!("问题开头{}问题结尾", "问🦀".repeat(40000));
+        let answer = format!("先做1，再做2，最后做3。{}回答结尾", "答🦀".repeat(50000));
+        assert_eq!(
+            generation_input(&question, &answer, 0),
+            format!("紧邻的用户问题：\n{question}\n\n当前回答：\n{answer}")
+        );
+        let limited = generation_input(&question, &answer, 12000);
+        assert_eq!(limited.chars().count(), 12000);
+        assert!(limited.starts_with("紧邻的用户问题：\n问题开头"));
+        assert!(limited.ends_with("回答结尾"));
+        assert!(!limited.contains("问题结尾"));
+    }
 }

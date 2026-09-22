@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 回答上下文、独立生成版本、模型桥接与宿主写入接口。
- * [OUTPUT]: 建议生成、按聊天/回答保留的有限内存缓存、预览与草稿保护；来源失联时禁止生成和填入。
+ * [OUTPUT]: 建议生成、按聊天/回答/完整用户问题保留的有限内存缓存、预览与草稿保护；来源失联时禁止生成和填入。
  * [POS]: Stepwise 功能单元；不依赖大纲，通过通知请求外壳反馈。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -34,7 +34,6 @@ import {
   normalizeText,
   runtimeState,
   shellState,
-  shortText,
   stepwiseEnabled,
   stepwiseGenerationMode,
   stepwiseInputText,
@@ -143,7 +142,7 @@ function payloadPrompts(payload) {
 
 function bridgeRequestKey(userText, assistantText, answerHash = contextState.lastAssistantHash) {
   return hashText(
-    `${contextState.activeContext.sessionId || contextState.activeContext.paneKey}\n${answerHash}\n${shortText(userText, 2400)}\n\n--- assistant ---\n\n${assistantText}`,
+    `${contextState.activeContext.sessionId || contextState.activeContext.paneKey}\n${answerHash}\n${userText}\n\n--- assistant ---\n\n${assistantText}`,
   );
 }
 

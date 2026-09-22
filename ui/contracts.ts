@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 启动策略 ask/force、独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份、工作台聊天关联投影及模式命令的共享类型。
+ * [OUTPUT]: 完整上下文哨兵 maxInputChars=0、启动策略 ask/force、独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份、工作台聊天关联投影及模式命令的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -15,6 +15,7 @@ export interface EditableSettings {
   baseUrl: string;
   apiKeyEnv: string;
   maxItems: number;
+  /** 0 preserves the complete latest question and answer; positive values limit input. */
   maxInputChars: number;
   maxOutputTokens: number;
   timeoutMs: number;

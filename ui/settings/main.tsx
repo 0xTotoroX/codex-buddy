@@ -1,6 +1,6 @@
 /*
  * [INPUT]: React、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
- * [OUTPUT]: 模型表单、全量胶囊设置、连接状态和操作反馈。
+ * [OUTPUT]: 模型与完整/限长上下文表单、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -499,17 +499,35 @@ function App() {
                         onChange={(e) => change('maxItems', Number(e.target.value))}
                       />
                     </Field>
-                    <Field id="max-input" label="输入字符上限">
-                      <Input
-                        id="max-input"
-                        type="number"
-                        min="500"
-                        max="32000"
-                        step="100"
-                        value={form.maxInputChars}
-                        onChange={(e) => change('maxInputChars', Number(e.target.value))}
-                      />
+                    <Field
+                      id="context-scope"
+                      label="生成上下文"
+                      hint="最近一次提问与回答，不包含更早历史。"
+                    >
+                      <NativeSelect
+                        id="context-scope"
+                        value={form.maxInputChars === 0 ? 'latest' : 'limited'}
+                        onChange={(e) =>
+                          change('maxInputChars', e.target.value === 'latest' ? 0 : 12000)
+                        }
+                      >
+                        <option value="latest">最近一次聊天（完整）</option>
+                        <option value="limited">自定义字符上限</option>
+                      </NativeSelect>
                     </Field>
+                    {form.maxInputChars !== 0 && (
+                      <Field id="max-input" label="输入字符上限">
+                        <Input
+                          id="max-input"
+                          type="number"
+                          min="500"
+                          max="32000"
+                          step="100"
+                          value={form.maxInputChars}
+                          onChange={(e) => change('maxInputChars', Number(e.target.value))}
+                        />
+                      </Field>
+                    )}
                     <Field
                       id="max-output"
                       label="输出 token 上限"

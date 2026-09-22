@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立 Chromium、合成 fixture、release/debug 程序与模型 stub。
- * [OUTPUT]: target/reports/e2e 下的 CDP、设置、建议、大纲及弹出交互验收报告。
+ * [OUTPUT]: target/reports/e2e 下的 CDP、设置、完整长上下文三协议传输、建议、大纲及弹出交互验收报告。
  * [POS]: 端到端测试入口，委托 popout-checks 验证窗口协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -1106,6 +1106,30 @@ try {
     );
     await patch({ maxInputChars: 12000 });
     record('长中文回答遵循 32000 字符上限，正文截取范围外的更新也使旧建议失效');
+
+    const originalQuestion = await desktop.locator('.user-bubble').textContent();
+    const fullQuestion = '问题开头' + '问🦀'.repeat(35000) + '问题结尾';
+    const fullAnswer =
+      '待办1：实现导出；待办2：验证回归；待办3：更新说明。' + '答🦀'.repeat(45000) + '回答结尾';
+    await desktop.evaluate(
+      ({ user, answer }) => {
+        document.querySelector('.user-bubble').textContent = user;
+        document.querySelector('#answer').textContent = answer;
+      },
+      { user: fullQuestion, answer: fullAnswer },
+    );
+    for (const protocol of ['responses', 'chat_completions', 'anthropic_messages']) {
+      await patch({ protocol, maxInputChars: 0 });
+      await generate();
+      const raw = protocol === 'responses' ? lastBody.input : lastBody.messages.at(-1).content;
+      const sent = JSON.parse(raw).answer;
+      assert.equal(sent, `紧邻的用户问题：\n${fullQuestion}\n\n当前回答：\n${fullAnswer}`);
+    }
+    await desktop
+      .locator('.user-bubble')
+      .evaluate((node, text) => (node.textContent = text), originalQuestion);
+    await patch({ protocol: 'responses', maxInputChars: 12000 });
+    record('完整最近一问一答跨越原字符上限，三种模型协议均无前后端截断');
 
     const layoutBeforeReload = (await api('appearance')).body.ui.dockLayout;
     await desktop.reload();

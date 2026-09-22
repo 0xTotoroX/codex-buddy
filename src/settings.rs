@@ -1,6 +1,6 @@
 // [INPUT]: App、有效模型配置与私有配置/密钥文件。
 // [OUTPUT]: 设置读取/保存、独立启动策略、只读弹出能力、并发保存版本与独立生成版本。
-// [POS]: 设置事务边界；无关大纲开关不取消生成。
+// [POS]: 设置事务边界；无关大纲开关不取消生成；maxInputChars=0 表示完整最近一问一答，旧正数上限保留。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{model::Model, state::App};
@@ -26,6 +26,30 @@ pub struct Options {
 mod tests {
     use super::*;
     use crate::config::{Config, Paths};
+
+    #[tokio::test]
+    async fn complete_context_setting_persists_and_invalidates_generation() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let old: Config = serde_json::from_str(r#"{"stepwise":{"maxInputChars":12000}}"#).unwrap();
+        assert_eq!(Options::default().max_input_chars, 0);
+        assert_eq!(old.stepwise.max_input_chars, 12000);
+        let app = App::new(paths.clone(), old, None, false);
+        let before = app.settings().await;
+        let saved = app
+            .save_settings(serde_json::from_value(json!({"maxInputChars":0})).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(saved["maxInputChars"], 0);
+        assert_ne!(saved["generationRevision"], before["generationRevision"]);
+        assert_eq!(paths.load().unwrap().stepwise.max_input_chars, 0);
+        assert!(
+            app.save_settings(serde_json::from_value(json!({"maxInputChars":100})).unwrap())
+                .await
+                .is_err()
+        );
+        assert_eq!(paths.load().unwrap().stepwise.max_input_chars, 0);
+    }
 
     #[tokio::test]
     async fn restart_policy_is_persisted_without_changing_generation() {
@@ -192,7 +216,7 @@ impl Default for Options {
             protocol: "responses".into(),
             api_key_env: "CODEX_BUDDY_API_KEY".into(),
             max_items: 4,
-            max_input_chars: 12000,
+            max_input_chars: 0,
             max_output_tokens: 2000,
             timeout_ms: 120000,
         }
@@ -316,8 +340,8 @@ impl App {
             options.max_items = value;
         }
         if let Some(value) = patch.max_input_chars {
-            if !(500..=32000).contains(&value) {
-                bail!("输入字符上限应为 500–32000");
+            if value != 0 && !(500..=32000).contains(&value) {
+                bail!("请选择完整最近一次聊天，或将输入字符上限设为 500–32000");
             }
             options.max_input_chars = value;
         }

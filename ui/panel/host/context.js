@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主 DOM、上下文状态和基础可见性工具。
- * [OUTPUT]: 工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标及上下文变更通知。
+ * [OUTPUT]: 工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标、完整相邻问答及上下文变更通知。
  * [POS]: 宿主读取边界，不修改 Stepwise 或大纲的内部状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -11,7 +11,6 @@ import {
   CHIP_WIDTH,
   CONVERSATION_TURN_SELECTOR,
   IS_POPOUT,
-  MAX_TEXT_LENGTH,
   ROOT_ATTR,
 } from '../runtime/constants.js';
 import {
@@ -24,7 +23,6 @@ import {
   normalizeText,
   runtimeState,
   shellState,
-  shortText,
   stripOwnUi,
 } from '../runtime/state.js';
 import { emitSignal } from '../runtime/signals.js';
@@ -894,7 +892,7 @@ function assistantBubbleCandidates() {
       if (shellState.root?.contains(node)) return false;
       if (classTokenMatch(node, 'items-end')) return false;
       const text = directText(node);
-      if (text.length < 24 || text.length > MAX_TEXT_LENGTH) return false;
+      if (text.length < 24) return false;
       return true;
     })
     .map((node) => ({
@@ -1066,7 +1064,6 @@ function assistantContainerForActionRow(actionRow) {
   for (let depth = 0; current && depth < 7; depth += 1, current = current.parentElement) {
     const text = directText(current);
     if (text.length < 24) continue;
-    if (text.length > MAX_TEXT_LENGTH) continue;
     if (!containsActionRow(current)) continue;
     return current;
   }
@@ -1123,12 +1120,12 @@ function findLatestAssistantMessage() {
 
 function findPreviousUserText(message) {
   const snapshotUserText = normalizeText(message?.userText || '');
-  if (snapshotUserText) return shortText(snapshotUserText, 2000);
+  if (snapshotUserText) return snapshotUserText;
 
   const assistantNode = message?.node || message;
   const turn = assistantNode?.closest?.(CONVERSATION_TURN_SELECTOR);
   const turnUserText = conversationTurn(turn)?.userText || '';
-  if (turnUserText) return shortText(turnUserText, 2000);
+  if (turnUserText) return turnUserText;
 
   const candidates = messageCandidates();
   const before = candidates.filter((item) => {
@@ -1141,8 +1138,8 @@ function findPreviousUserText(message) {
 
   for (let cursor = before.length - 1; cursor >= 0; cursor -= 1) {
     const item = before[cursor];
-    if (item.role === 'user') return shortText(item.text, 2000);
-    if (/^(user|you)\b/i.test(item.text)) return shortText(item.text, 2000);
+    if (item.role === 'user') return normalizeText(item.text);
+    if (/^(user|you)\b/i.test(item.text)) return normalizeText(item.text);
   }
   return '';
 }
