@@ -440,24 +440,20 @@ const cases = [
         await page.locator('.csw-workbench').waitFor({ state: 'visible' });
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
         await face.focus();
-        const focus = await face.evaluate((n) => {
-          const probe = document.createElement('span');
-          probe.style.color = 'color-mix(in srgb, var(--csw-text) 35%, transparent)';
-          n.append(probe);
-          const color = getComputedStyle(probe).color;
-          probe.remove();
-          return {
-            width: getComputedStyle(n, '::after').height,
-            color: getComputedStyle(n, '::after').backgroundColor,
-            expected: color,
-          };
+        const focus = await face.evaluate((n) => ({
+          keyboard: n.matches(':focus-visible'),
+          decoration: getComputedStyle(n, '::after').content,
+          eyes: getComputedStyle(n.querySelector('.csw-status-stage')).transform,
+          background: getComputedStyle(n).backgroundColor,
+          outline: getComputedStyle(n).outlineStyle,
+        }));
+        assert.deepEqual(focus, {
+          keyboard: true,
+          decoration: 'none',
+          eyes: 'matrix(1.12, 0, 0, 1.12, 0, 0)',
+          background: 'rgba(0, 0, 0, 0)',
+          outline: 'none',
         });
-        assert.equal(focus.width, '1px');
-        assert.equal(
-          focus.color,
-          focus.expected,
-          'focus uses neutral text color rather than accent',
-        );
         await page.screenshot({ path: resolve(output, `slim-${placement}.png`) });
       }
       assert.equal(
