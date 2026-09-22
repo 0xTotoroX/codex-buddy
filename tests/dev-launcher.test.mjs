@@ -22,6 +22,7 @@ import {
   terminalScript,
   revealDevelopment,
   launcherSource,
+  developmentSettingsUrl,
 } from '../scripts/dev-launcher.mjs';
 
 test('development launcher respects a live owner and leaves stale records for dev cleanup', () => {
@@ -364,3 +365,28 @@ if CommandLine.arguments.count > 1 {
     }
   },
 );
+
+test('Dev settings and reveal follow the selected source session without reopening the host', async (t) => {
+  const { root, requests } = await developmentFixture(t, (req, res) => {
+    res.end(
+      JSON.stringify(
+        req.url === '/api/state' ? { connection: { status: 'connected' } } : { ok: true },
+      ),
+    );
+  });
+  const selected = join(root, 'selected');
+  mkdirSync(selected);
+  copyFileSync(join(root, 'target/dev/real/runtime.json'), join(selected, 'runtime.json'));
+  rmSync(join(root, 'target/dev/real/runtime.json'));
+  writeFileSync(join(root, 'target/dev/owner.json'), JSON.stringify({ pid: process.pid }));
+  writeFileSync(
+    join(root, 'target/dev/session.json'),
+    JSON.stringify({ runtime: selected, url: 'http://127.0.0.1:12345', token: 'fixture-token' }),
+  );
+  assert.equal(developmentSettingsUrl(root), 'http://127.0.0.1:12345/#token=fixture-token');
+  await revealDevelopment(root, { timeout: 500, interval: 5 });
+  assert.deepEqual(
+    requests.map((r) => r.path),
+    ['/api/state', '/api/development/reveal'],
+  );
+});

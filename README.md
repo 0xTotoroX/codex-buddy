@@ -109,6 +109,8 @@ npm run dev
 
 Alternatively, run `npm run install:dev` once to install **CodexBuddy Dev.app**. Opening it starts development in the background, updates saved source automatically, and does not open a terminal. Opening it again brings up the existing workbench. Without a debugging connection, it follows the development launch setting, initially inherited from the everyday installation. Stop background development with `npm run dev:stop`; logs are written to `target/dev/launcher.log`. This launcher depends on the local source tree and development tools. Stop and reopen it after changing development scripts or dependencies; regenerate it after moving the source tree or changing the Node.js path.
 
+For multiple Git worktrees, open **Development source** in the Dev settings page (`npm run dev:settings`). Select a worktree to switch its backend, settings UI, and hot reload together without restarting Codex. The settings address stays the same, and the last successful source is remembered. Each worktree keeps its own configuration. Compilation failure leaves the current source running; connection failure attempts to restore it. Use one Dev supervisor for the target window; stop older standalone Dev sessions before adopting this workflow. An explicit startup override is available with `npm run dev -- --source /path/to/worktree`.
+
 Development mode connects to real Codex. UI changes reload automatically, and Rust changes trigger a rebuild. For command-line development, press Ctrl+C to stop. Development configuration is separate from the everyday installation. Embedded liquid material uses the same SVG renderer in development and release builds.
 
 ```sh

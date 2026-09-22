@@ -101,6 +101,8 @@ npm run dev
 
 也可执行一次 `npm run install:dev`，安装独立的 **CodexBuddy Dev.app**。双击后在后台启动，保存源码自动更新，不弹出终端；重复打开会唤起已有工作台。没有调试连接时按开发设置页「启动行为」处理，首次使用继承日常设置。后台开发可用 `npm run dev:stop` 退出，日志在 `target/dev/launcher.log`。它依赖本机源码和开发工具；修改开发脚本或依赖后需停止并重新打开，移动源码或更换 Node 路径后需重新生成入口。
 
+多个 Git worktree 可通过 Dev 设置页顶部「开发来源」切换，运行 `npm run dev:settings` 打开。切换会同时更换后台、设置界面与热更新来源，保持设置地址，不重启 Codex，并记住最后成功的选择。各 worktree 保留独立配置；编译失败保留当前来源，接入失败尝试恢复原来源。同一目标窗口使用一个 Dev 监督进程；迁入此流程前，先正常退出旧的独立 Dev 会话。也可用 `npm run dev -- --source /path/to/worktree` 显式指定启动来源。
+
 开发模式连接真实 Codex；修改界面后自动加载，修改 Rust 后自动编译。命令行启动时按 Ctrl+C 结束。开发配置独立，不覆盖日常安装；内嵌液态与正式版共用 SVG 渲染。
 
 ```sh

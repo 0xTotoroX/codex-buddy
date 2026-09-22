@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机后台 runtime 信息与开发会话令牌。
- * [OUTPUT]: 稳定设置页代理及受控子进程工具，可捕获端点输出及失败原因。
+ * [OUTPUT]: 稳定设置页代理、认证开发来源路由及受控子进程工具，可捕获端点输出及失败原因。
  * [POS]: 开发环境基础设施；不创建浏览器或模拟模型。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -67,7 +67,7 @@ const listen = (server) =>
     server.listen(0, '127.0.0.1', resolve);
   });
 
-export async function startGateway(token, getRuntime) {
+export async function startGateway(token, getRuntime, development) {
   const server = createServer(async (req, res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
     res.setHeader('Cache-Control', 'no-store');
@@ -82,6 +82,47 @@ export async function startGateway(token, getRuntime) {
       if (req.url?.startsWith('/api/')) {
         if (req.headers.authorization !== `Bearer ${token}`) {
           res.writeHead(401).end();
+          return;
+        }
+        if (development && req.url === '/api/dev/sources') {
+          if (!['GET', 'POST'].includes(req.method)) {
+            res.writeHead(405).end();
+            return;
+          }
+          let body = '';
+          for await (const chunk of req) {
+            body += chunk;
+            if (Buffer.byteLength(body) > 8192) {
+              res.writeHead(413).end();
+              return;
+            }
+          }
+          try {
+            if (req.method === 'POST') await development.switch(JSON.parse(body).path);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(await development.status()));
+          } catch (error) {
+            res.writeHead(409, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ ok: false, message: error.message }));
+          }
+          return;
+        }
+        if (development?.busy?.()) {
+          res
+            .writeHead(503, { 'Content-Type': 'application/json' })
+            .end(JSON.stringify({ ok: false, message: '开发来源正在切换，请等待完成。' }));
+          return;
+        }
+        if (
+          development?.epoch &&
+          !['GET', 'HEAD'].includes(req.method) &&
+          req.headers['x-codex-buddy-source'] !== development.epoch()
+        ) {
+          res
+            .writeHead(409, { 'Content-Type': 'application/json' })
+            .end(
+              JSON.stringify({ ok: false, message: '开发来源已改变，请刷新此设置页后再保存。' }),
+            );
           return;
         }
         const runtime = getRuntime();

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log。
+ * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -220,14 +220,16 @@ export async function revealDevelopment(
       checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json'));
     if (failure)
       throw new Error(failure.message || '开发模式启动失败，请查看 target/dev/launcher.log。');
-    const runtime = readJson(join(directory, 'target/dev/real/runtime.json'));
+    const session = readJson(join(directory, 'target/dev/session.json'));
+    const data = session?.runtime || join(directory, 'target/dev/real');
+    const runtime = readJson(join(data, 'runtime.json'));
     if (runtime) {
       try {
         const state = await requestRuntime(runtime, 'state');
         if (state.connection.status === 'disconnected' && !reconnected) {
           // Reuse the pinned development target; never discover a different window or restart it.
           reconnected = true;
-          const config = readJson(join(directory, 'target/dev/real/config.json'), {});
+          const config = readJson(join(data, 'config.json'), {});
           await requestRuntime(runtime, 'connect', {
             endpoint: config.cdpEndpoint,
             targetId: config.targetId,
@@ -246,11 +248,33 @@ export async function revealDevelopment(
   );
 }
 
+export function developmentSettingsUrl(directory) {
+  const session = readJson(join(directory, 'target/dev/session.json'));
+  if (!session?.url || !session.token || !hasDevelopmentOwner(directory))
+    throw new Error('开发会话尚未运行，请先打开 CodexBuddy Dev.app。');
+  const url = new URL(session.url);
+  if (
+    url.protocol !== 'http:' ||
+    url.hostname !== '127.0.0.1' ||
+    !url.port ||
+    url.username ||
+    url.password
+  )
+    throw new Error('开发设置地址无效。');
+  url.hash = new URLSearchParams({ token: session.token }).toString();
+  return url.href;
+}
+
 async function main() {
   if (process.platform !== 'darwin') throw new Error('开发 App 入口仅适用于 macOS。');
   const mode = process.argv[2];
   if (!mode) return install();
-  if (!['--open', '--run', '--stop'].includes(mode)) throw new Error('用法：npm run install:dev');
+  if (!['--open', '--run', '--stop', '--settings'].includes(mode))
+    throw new Error('用法：npm run install:dev');
+  if (mode === '--settings') {
+    command('open', [developmentSettingsUrl(root)]);
+    return;
+  }
   if (mode === '--stop') {
     await stopBackgroundDevelopment(root);
     console.log('后台开发会话已退出。');

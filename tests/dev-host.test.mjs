@@ -162,12 +162,18 @@ test('no-host startup reports one useful error and leaves the old restoration jo
   mkdirSync(data, { recursive: true });
   for (const file of [
     'dev.mjs',
+    'dev-sources.mjs',
     'dev-host.mjs',
     'dev-panel.mjs',
     'dev-runtime.mjs',
     'build-panel.mjs',
   ])
     copyFileSync(resolve(import.meta.dirname, '../scripts', file), join(scripts, file));
+  mkdirSync(join(root, 'ui/settings'), { recursive: true });
+  copyFileSync(
+    resolve(import.meta.dirname, '../ui/settings/dev-sources.js'),
+    join(root, 'ui/settings/dev-sources.js'),
+  );
   symlinkSync(resolve(import.meta.dirname, '../node_modules'), join(root, 'node_modules'), 'dir');
   const requests = [];
   const api = await server(t, (req, res) => {
@@ -368,12 +374,18 @@ test('an orphan development backend blocks startup before touching installation 
   mkdirSync(data, { recursive: true });
   for (const file of [
     'dev.mjs',
+    'dev-sources.mjs',
     'dev-host.mjs',
     'dev-panel.mjs',
     'dev-runtime.mjs',
     'build-panel.mjs',
   ])
     copyFileSync(resolve(import.meta.dirname, '../scripts', file), join(scripts, file));
+  mkdirSync(join(root, 'ui/settings'), { recursive: true });
+  copyFileSync(
+    resolve(import.meta.dirname, '../ui/settings/dev-sources.js'),
+    join(root, 'ui/settings/dev-sources.js'),
+  );
   symlinkSync(resolve(import.meta.dirname, '../node_modules'), join(root, 'node_modules'), 'dir');
   writeFileSync(join(data, 'runtime.json'), JSON.stringify({ pid: process.pid }));
   const requests = [];

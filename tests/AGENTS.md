@@ -10,6 +10,11 @@
 
 成员清单：
 
+- [dev-sources.test.mjs](dev-sources.test.mjs)：Git 清单/共享偏好、路径限制、跨目标互斥、并发切换/失败回退与认证开发 API 回归。
+- [dev-sources-integration.test.mjs](dev-sources-integration.test.mjs)：完整监督脚本、真实 Vite/浏览器、临时双 worktree 的进程级交接/回退、热更新、稳定设置地址、旧标签页写保护与重开恢复；全部使用合成宿主。
+- [dev-source-fixture.mjs](dev-source-fixture.mjs)：上项测试的可控编译器和单实例后台夹具，不连接用户应用。
+
+
 - [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、引用身份隔离、新旧菜单/内联/隐藏视图、菜单打开占位文字/速度可访问标签/高级视图返回、推理滑块、锁定选项、重复失败清理与完整回读、单次菜单事务、生成期间调整与官方禁用、迟到/部分失败及清理的合成宿主回归。
 - [model-control-view.mjs](model-control-view.mjs)：控制条预设、矩阵、排序、列宽、首次点击单事务/目标变化拦截、10pt末帧轮廓一致与动画无尺寸回传、读回状态及键盘交互的浏览器回归。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
