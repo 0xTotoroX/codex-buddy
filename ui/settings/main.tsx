@@ -1,6 +1,6 @@
 /*
- * [INPUT]: React、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
- * [OUTPUT]: 模型与完整/限长上下文表单、全量胶囊设置、连接状态和操作反馈。
+ * [INPUT]: React、use-settings-form.ts、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
+ * [OUTPUT]: 自动/手动保存的模型与完整/限长上下文表单、常用提示词编辑、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -32,6 +32,7 @@ import {
 import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
 import { ModelControlSettings } from './model-control-settings';
+import { useSettingsForm } from './use-settings-form';
 import type { EditableSettings, Settings } from './api';
 
 function editable(value: Settings): EditableSettings {
@@ -46,6 +47,7 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    quickPrompts,
     maxInputChars,
     maxOutputTokens,
     timeoutMs,
@@ -61,6 +63,7 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    quickPrompts,
     maxInputChars,
     maxOutputTokens,
     timeoutMs,
@@ -69,12 +72,6 @@ function editable(value: Settings): EditableSettings {
 
 function App() {
   const { view, live, error } = useCompanion();
-  const [saved, setSaved] = useState<Settings | null>(null);
-  const [form, setForm] = useState<EditableSettings | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [remoteChanged, setRemoteChanged] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [clearKey, setClearKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
@@ -89,65 +86,27 @@ function App() {
     setMessage(text);
     setFailure(failed);
   };
-  function load(value: Settings) {
-    setSaved(value);
-    setForm(editable(value));
-    setDirty(false);
-    setRemoteChanged(false);
-    setApiKey('');
-    setClearKey(false);
-  }
-  useEffect(() => {
-    if (!live) return;
-    let disposed = false;
-    const refresh = async () => {
-      try {
-        const value = await request<Settings>('settings');
-        if (disposed) return;
-        if (!dirty) load(value);
-        else if (saved && value.configurationRevision !== saved.configurationRevision)
-          setRemoteChanged(true);
-      } catch (error) {
-        if (!disposed) notify((error as Error).message, true);
-      }
-    };
-    void refresh();
-    return () => {
-      disposed = true;
-    };
-  }, [live, dirty, view?.configurationRevision]);
+  const {
+    saved,
+    form,
+    dirty,
+    remoteChanged,
+    apiKey,
+    clearKey,
+    saving,
+    load,
+    change,
+    save,
+    schedule,
+    setApiKey,
+    setClearKey,
+  } = useSettingsForm(live, view?.configurationRevision, editable, notify);
   useEffect(() => {
     if (!connectionEdited && view?.connection.endpoint) {
       setEndpoint(view.connection.endpoint);
       setTargetId(view.connection.targetId || '');
     }
   }, [view?.connection.endpoint, view?.connection.targetId, connectionEdited]);
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
-
-  function change<K extends keyof EditableSettings>(key: K, value: EditableSettings[K]) {
-    setForm((previous) => (previous ? { ...previous, [key]: value } : previous));
-    setDirty(true);
-    setMessage('');
-  }
-  async function save() {
-    if (!form || !saved) return;
-    const value = await request<Settings>('settings', {
-      ...form,
-      apiKey,
-      clearApiKey: clearKey,
-      expectedRevision: saved.configurationRevision,
-    });
-    load(value);
-    notify('设置已保存，桌面浮窗会自动同步。');
-    return value;
-  }
   async function run(name: string, action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(name);
@@ -232,6 +191,16 @@ function App() {
               </Card>
             ) : (
               <form
+                onBlurCapture={(event) => {
+                  if (!(
+                    event.relatedTarget instanceof Element &&
+                    event.relatedTarget.closest('button[type="submit"]')
+                  ))
+                    schedule(event.currentTarget);
+                }}
+                onChange={(event) => {
+                  if (event.target instanceof HTMLSelectElement) schedule(event.currentTarget);
+                }}
                 onSubmit={(event) => {
                   event.preventDefault();
                   void run('save', save);
@@ -348,8 +317,7 @@ function App() {
                             value={apiKey}
                             onChange={(e) => {
                               setApiKey(e.target.value);
-                              setDirty(true);
-                              setClearKey(false);
+                              setClearKey(false, false);
                             }}
                             placeholder={saved.storedApiKey ? '已保存 · 留空保留' : '输入 API key'}
                             autoComplete="off"
@@ -374,7 +342,6 @@ function App() {
                             checked={clearKey}
                             onChange={(e) => {
                               setClearKey(e.target.checked);
-                              setDirty(true);
                             }}
                           />
                           保存时清除已存密钥
@@ -473,6 +440,77 @@ function App() {
                   <p className="mt-[7px] text-[10px] leading-[1.7] text-muted-foreground">
                     连接测试使用固定示例，不读取你的聊天。
                   </p>
+                </Card>
+                <Card aria-labelledby="quick-prompts-title">
+                  <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
+                    常用提示词
+                  </h2>
+                  <p className="mb-4 text-xs text-muted-foreground">
+                    显示在下一步面板中，点击只填入，不自动发送。
+                  </p>
+                  <div className="space-y-3">
+                    {form.quickPrompts.map((item, index) => (
+                      <div
+                        key={index}
+                        className="grid grid-cols-[90px_minmax(0,1fr)_auto] gap-2 items-start"
+                      >
+                        <Input
+                          aria-label={`常用提示词 ${index + 1} 名称`}
+                          value={item.label}
+                          maxLength={20}
+                          required
+                          onChange={(e) =>
+                            change(
+                              'quickPrompts',
+                              form.quickPrompts.map((p, i) =>
+                                i === index ? { ...p, label: e.target.value } : p,
+                              ),
+                            )
+                          }
+                        />
+                        <textarea
+                          aria-label={`常用提示词 ${index + 1} 内容`}
+                          value={item.prompt}
+                          maxLength={4000}
+                          required
+                          rows={2}
+                          className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-xs"
+                          onChange={(e) =>
+                            change(
+                              'quickPrompts',
+                              form.quickPrompts.map((p, i) =>
+                                i === index ? { ...p, prompt: e.target.value } : p,
+                              ),
+                            )
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-label={`删除常用提示词 ${index + 1}`}
+                          onClick={() => {
+                            change(
+                              'quickPrompts',
+                              form.quickPrompts.filter((_, i) => i !== index),
+                            );
+                            schedule();
+                          }}
+                        >
+                          删除
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={form.quickPrompts.length >= 8}
+                      onClick={() =>
+                        change('quickPrompts', [...form.quickPrompts, { label: '', prompt: '' }])
+                      }
+                    >
+                      添加提示词
+                    </Button>
+                  </div>
                 </Card>
                 <Card aria-labelledby="limits-title">
                   <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
@@ -607,8 +645,14 @@ function App() {
                   </div>
                 )}
                 <div className="flex items-center justify-between px-0.5 py-1.5 [&>span]:text-[11px] [&>span]:text-muted-foreground max-[650px]:sticky max-[650px]:bottom-0 max-[650px]:bg-background max-[650px]:px-px max-[650px]:py-3">
-                  <span>{dirty ? '有尚未保存的更改' : '设置已同步到本机'}</span>
-                  <Button type="submit" disabled={!!busy || !dirty || remoteChanged}>
+                  <span>
+                    {saving
+                      ? '正在保存…'
+                      : dirty
+                        ? '编辑中，离开输入框后自动保存'
+                        : '设置已同步到本机'}
+                  </span>
+                  <Button type="submit" disabled={!!busy || saving || !dirty || remoteChanged}>
                     {busy === 'save' ? (
                       <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={16} />
                     ) : (

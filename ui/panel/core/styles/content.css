@@ -596,3 +596,35 @@ html:not([data-presentation='popout']) .csw-popover[data-view='settings'] .csw-r
 .csw-resize-handle[data-corner='br'] {
   right: 0;
 }
+
+.csw-next-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.csw-quick-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-bottom: 10px;
+}
+.csw-quick-prompt {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--csw-border, #8884);
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.csw-quick-prompt:hover {
+  background: var(--csw-hover, #8882);
+}
+.csw-quick-prompt:focus-visible {
+  outline: 2px solid var(--csw-accent);
+  outline-offset: 2px;
+}
+.csw-next-content > .csw-empty,
+.csw-next-content > .csw-progress {
+  flex: 1;
+}

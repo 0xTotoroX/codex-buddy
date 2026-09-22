@@ -1,12 +1,19 @@
 // [INPUT]: App、有效模型配置与私有配置/密钥文件。
 // [OUTPUT]: 设置读取/保存、独立启动策略、只读弹出能力、并发保存版本与独立生成版本。
-// [POS]: 设置事务边界；无关大纲开关不取消生成；maxInputChars=0 表示完整最近一问一答，旧正数上限保留。
+// [POS]: 设置事务边界；无关大纲开关与常用提示词修改不取消生成；maxInputChars=0 表示完整最近一问一答，旧正数上限保留。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{model::Model, state::App};
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct QuickPrompt {
+    pub label: String,
+    pub prompt: String,
+}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -17,6 +24,7 @@ pub struct Options {
     pub protocol: String,
     pub api_key_env: String,
     pub max_items: usize,
+    pub quick_prompts: Vec<QuickPrompt>,
     pub max_input_chars: usize,
     pub max_output_tokens: usize,
     pub timeout_ms: u64,
@@ -26,6 +34,41 @@ pub struct Options {
 mod tests {
     use super::*;
     use crate::config::{Config, Paths};
+
+    #[tokio::test]
+    async fn quick_prompts_persist_without_invalidating_suggestions() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let app = App::new(paths.clone(), Config::default(), None, false);
+        let before = app.settings().await;
+        assert_eq!(before["quickPrompts"][0]["prompt"], "继续");
+        let saved = app
+            .save_settings(
+                serde_json::from_value(
+                    json!({"quickPrompts":[{"label":"解释", "prompt":"解释刚才的概念"}]}),
+                )
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(before["generationRevision"], saved["generationRevision"]);
+        assert_eq!(
+            paths.load().unwrap().stepwise.quick_prompts[0].prompt,
+            "解释刚才的概念"
+        );
+        assert!(
+            app.save_settings(
+                serde_json::from_value(json!({"quickPrompts":[{"label":"", "prompt":"x"}]}))
+                    .unwrap()
+            )
+            .await
+            .is_err()
+        );
+        app.save_settings(serde_json::from_value(json!({"quickPrompts":[]})).unwrap())
+            .await
+            .unwrap();
+        assert!(paths.load().unwrap().stepwise.quick_prompts.is_empty());
+    }
 
     #[tokio::test]
     async fn complete_context_setting_persists_and_invalidates_generation() {
@@ -216,6 +259,13 @@ impl Default for Options {
             protocol: "responses".into(),
             api_key_env: "CODEX_BUDDY_API_KEY".into(),
             max_items: 4,
+            quick_prompts: ["继续", "执行"]
+                .into_iter()
+                .map(|text| QuickPrompt {
+                    label: text.into(),
+                    prompt: text.into(),
+                })
+                .collect(),
             max_input_chars: 0,
             max_output_tokens: 2000,
             timeout_ms: 120000,
@@ -239,6 +289,7 @@ pub struct Update {
     pub clear_api_key: bool,
     pub api_key_env: Option<String>,
     pub max_items: Option<usize>,
+    pub quick_prompts: Option<Vec<QuickPrompt>>,
     pub max_input_chars: Option<usize>,
     pub max_output_tokens: Option<usize>,
     pub timeout_ms: Option<u64>,
@@ -332,6 +383,23 @@ impl App {
                 bail!("密钥环境变量名无效");
             }
             options.api_key_env = value.to_owned();
+        }
+        if let Some(mut value) = patch.quick_prompts {
+            if value.len() > 8 {
+                bail!("常用提示词最多 8 个");
+            }
+            for item in &mut value {
+                item.label = item.label.trim().to_owned();
+                item.prompt = item.prompt.trim().to_owned();
+                if item.label.is_empty()
+                    || item.label.chars().count() > 20
+                    || item.prompt.is_empty()
+                    || item.prompt.chars().count() > 4000
+                {
+                    bail!("常用提示词需要 1–20 字的名称和 1–4000 字的内容");
+                }
+            }
+            options.quick_prompts = value;
         }
         if let Some(value) = patch.max_items {
             if !(1..=6).contains(&value) {

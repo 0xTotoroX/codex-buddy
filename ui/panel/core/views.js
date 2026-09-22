@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立功能视图、外壳状态、交互和设置视图。
- * [OUTPUT]: 紧凑胶囊及唯一展开工作台的组合渲染与建议预览；未知停靠宿主保留紧凑入口。
+ * [OUTPUT]: 紧凑胶囊及唯一展开工作台的组合渲染、常用提示词按钮与建议预览；未知停靠宿主保留紧凑入口。
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -427,6 +427,16 @@ function nextProgressState() {
 }
 
 function nextHtml() {
+  const buttons = (runtimeState.settings?.quickPrompts || [])
+    .map(
+      (item, index) =>
+        `<button type="button" class="csw-quick-prompt" data-quick-prompt="${index}" title="${escapeAttr('填入：' + item.prompt)}">${escapeHtml(item.label)}</button>`,
+    )
+    .join('');
+  return `<div class="csw-next-content">${buttons ? `<div class="csw-quick-prompts" aria-label="常用提示词">${buttons}</div>` : ''}${nextSuggestionsHtml()}</div>`;
+}
+
+function nextSuggestionsHtml() {
   const progress = nextProgressState();
   if (progress) {
     return `<div class="csw-progress" aria-label="${progress.title}">
@@ -504,6 +514,12 @@ function nextEmptyState() {
 }
 
 function attachNextEvents(root = shellState.panel) {
+  root.querySelectorAll('[data-quick-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = runtimeState.settings?.quickPrompts?.[Number(button.dataset.quickPrompt)];
+      if (item?.prompt) fillComposer(item.prompt, false, { quick: true });
+    });
+  });
   root.querySelectorAll('.csw-row').forEach((button) => {
     button.addEventListener('pointerenter', () => schedulePromptPreview(button));
     button.addEventListener('pointerleave', cancelScheduledPromptPreview);

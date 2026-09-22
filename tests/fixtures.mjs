@@ -17,6 +17,10 @@ export const fixtureSettings = {
   baseUrl: 'http://127.0.0.1:1',
   apiKeyEnv: '',
   maxItems: 4,
+  quickPrompts: [
+    { label: '继续', prompt: '继续' },
+    { label: '执行', prompt: '执行' },
+  ],
   maxInputChars: 12000,
   maxOutputTokens: 2000,
   timeoutMs: 120000,

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 回答上下文、独立生成版本、模型桥接与宿主写入接口。
- * [OUTPUT]: 建议生成、按聊天/回答/完整用户问题保留的有限内存缓存、预览与草稿保护；来源失联时禁止生成和填入。
+ * [OUTPUT]: 建议生成、按聊天/回答/完整用户问题保留的有限内存缓存、预览与普通/快捷词填入的草稿保护；来源失联时禁止生成和填入。
  * [POS]: Stepwise 功能单元；不依赖大纲，通过通知请求外壳反馈。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -340,13 +340,17 @@ function clearPromptsForNewAssistant(hash) {
 function fillComposer(prompt, submit = false, options = {}) {
   if (!bindingSourceReady()) return false;
   if (IS_POPOUT) {
-    void remotePanelAction('fill', {
-      index: stepwiseState.prompts.findIndex((item) => item.prompt === prompt),
+    void remotePanelAction(options.quick ? 'quick-fill' : 'fill', {
+      index: options.quick
+        ? runtimeState.settings.quickPrompts.findIndex((item) => item.prompt === prompt)
+        : stepwiseState.prompts.findIndex((item) => item.prompt === prompt),
       submit,
     });
     return true;
   }
-  const context = stepwiseState.promptContext || contextState.activeContext;
+  const context = options.quick
+    ? contextState.activeContext
+    : stepwiseState.promptContext || contextState.activeContext;
   const epoch = stepwiseState.stepwiseEpoch;
   const generation = runtimeState.runtimeGeneration;
   const intent = {

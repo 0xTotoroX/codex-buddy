@@ -76,6 +76,85 @@ export function chatBindingCases({
   output,
 }) {
   return [
+    [
+      'binding quick prompts fill independently and reject stale popout shortcuts',
+      async (page) => {
+        await mode(page, true);
+        await page.locator('[data-quick-prompt="0"]').waitFor();
+        await page.screenshot({ path: resolve(output, 'quick-prompts.png') });
+        const before = await page.evaluate(
+          () =>
+            window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate').length,
+        );
+        await page.locator('[data-quick-prompt="0"]').click();
+        const composer = page.locator('#composer-form .ProseMirror');
+        assert.equal(await composer.innerText(), '继续');
+        assert.equal(
+          await page.evaluate(
+            () =>
+              window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate')
+                .length,
+          ),
+          before,
+        );
+        await composer.fill('');
+        const stale = await snapshot(page);
+        await page.evaluate(async () => {
+          window.workbenchFixture.settings.quickPrompts = [
+            { label: '解释', prompt: '解释这个概念' },
+          ];
+          window.workbenchFixture.settings.configurationRevision += 1;
+          await window.__companionFloatingPanel.syncSettings();
+        });
+        await page.getByRole('button', { name: '解释', exact: true }).waitFor();
+        const rejected = await page.evaluate(
+          (source) =>
+            window.__companionFloatingPanel.panelCommand({
+              ...source,
+              kind: 'quick-fill',
+              index: 0,
+            }),
+          stale,
+        );
+        assert.equal(rejected.ok, false);
+        assert.equal((await composer.innerText()).trim(), '');
+        const current = await snapshot(page);
+        const filled = await page.evaluate(
+          (source) =>
+            window.__companionFloatingPanel.panelCommand({
+              ...source,
+              kind: 'quick-fill',
+              index: 0,
+              submit: true,
+            }),
+          current,
+        );
+        assert.equal(filled.ok, true);
+        assert.equal(await composer.innerText(), '解释这个概念');
+        await composer.fill('已有草稿');
+        const drafts = await snapshot(page);
+        const protectedDraft = await page.evaluate(
+          (source) =>
+            window.__companionFloatingPanel.panelCommand({
+              ...source,
+              kind: 'quick-fill',
+              index: 0,
+            }),
+          drafts,
+        );
+        assert.equal(protectedDraft.needsConfirmation, true);
+        assert.equal(await composer.innerText(), '已有草稿');
+        assert.equal(await page.evaluate(() => window.submitCount || 0), 0);
+        assert.equal(
+          await page.evaluate(
+            () =>
+              window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate')
+                .length,
+          ),
+          before,
+        );
+      },
+    ],
     ...['manual', 'auto'].map((generationMode) => [
       `binding suggestion cache restores ${generationMode} A-B-A without new requests`,
       async (page) => {

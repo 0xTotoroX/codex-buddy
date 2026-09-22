@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共享大纲与 Stepwise 视图、当前聊天身份、工作台布局偏好。
- * [OUTPUT]: 唯一展开外壳、居中共享表情、来源及布局位置菜单、双面板编排和明确收起/收回入口。
+ * [OUTPUT]: 唯一展开外壳、居中共享表情、来源及布局位置菜单、快捷词配置同步、双面板编排和明确收起/收回入口。
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -332,6 +332,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
             contextState.scanStatus,
             contextState.scanBusy,
             runtimeState.settings?.generationMode,
+            runtimeState.settings?.quickPrompts,
           ])
         : content;
     const restorePreview =

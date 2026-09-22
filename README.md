@@ -29,7 +29,7 @@ CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, gen
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. For a plan with related tasks, suggestions prioritize one follow-up that advances the whole plan, with other suggestions offering useful checks or alternatives. Suggestions are generated in Chinese.
+In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. One model request returns multiple self-contained Chinese suggestions, favoring continuation from the answer and its references, questions about gaps or assumptions, and explanations of relevant terms. The intents adapt to the content; related tasks can be advanced together rather than split into individual choices.
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
 
@@ -56,13 +56,14 @@ After installation, open **CodexBuddy** from Applications. Node.js and Rust are 
 
 ### 2. Configure the suggestions model
 
-Open settings from the capsule. Choose your existing Codex login or enter your model API settings, save, and test the connection. Using an existing login requires a working local Codex CLI installation and login session.
+Open settings from the capsule. Choose your existing Codex login or enter your model API settings, then test the connection. Text fields save when focus leaves them; selections save automatically. The Save button remains available for immediate saving. Using an existing login requires a working local Codex CLI installation and login session.
 
 The workbench has five visible states: expanded sidebar or narrow entry, expanded floating workbench or compact capsule inside the chat, and an expanded independent window. Split direction, tabs, and focus only change the contents; insufficient space is a reason for collapsing, not another shape.
 
 ### 3. Use the workbench
 
 - **Navigate an answer:** open the outline and click a heading to jump to the source text.
+- **Quick prompts:** the next-step panel starts with “继续” and “执行”. Clicking fills the composer without sending. Edit labels and text, add, or remove buttons in Web settings under “常用提示词”; they use no model requests and do not count toward generated suggestions.
 - **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
 - **View both panels:** choose a fixed right sidebar or a freely movable embedded workbench in Web settings under chat placement. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, the right-edge entry explains why and offers an independent window or a directly expanded floating workbench. Once space returns, click it to reopen the sidebar. You can still pop out or return the entire workbench.
 - **Adjust the window:** use the top controls to move to an independent window or put it back in the chat; the separate minus button collapses the embedded workbench. Then drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; Web settings provide always-on-top and appearance controls.
