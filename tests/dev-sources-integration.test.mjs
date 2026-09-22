@@ -202,7 +202,11 @@ test(
         () => readRecord(join(other, 'target/dev/panel.json')).revision !== revision,
         'selected worktree hot update',
       );
-      assert.equal((await (await send('dev/sources')).json()).loaded, true);
+      // Snapshot publication precedes backend application; wait for the same real readback gate.
+      await until(
+        async () => (await (await send('dev/sources')).json()).loaded === true,
+        'selected worktree hot update applied',
+      );
       // Mount the actual injected selector on a minimal settings page; API remains the real supervisor.
       const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
       browser = await chromium.launch({

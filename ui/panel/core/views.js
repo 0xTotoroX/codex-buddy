@@ -101,7 +101,7 @@ import {
 } from './interaction.js';
 import { installStyle } from './install-styles.js';
 import { pushDiagnostic } from '../runtime/diagnostics.js';
-import { reloadSettings } from '../runtime/settings-sync.js';
+import { reloadSettings, openSettings } from '../runtime/settings-sync.js';
 import { toggleCodexTheme } from '../host/host-appearance.js';
 
 import {
@@ -388,6 +388,10 @@ function renderFloat(options = {}) {
         return;
       }
       const nextTab = button.dataset.view || 'next';
+      if (nextTab === 'settings') {
+        void openSettings();
+        return;
+      }
       if (nextTab === shellState.activeTab) return;
       void switchView(nextTab);
     });

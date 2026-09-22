@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时核对 tests/AGENTS.md；入口与地图由主任务维护。
  */
 import assert from 'node:assert/strict';
+import { showRetainedSettings } from './workbench-actions.mjs';
 import { chatBindingCases } from './workbench-binding.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -84,7 +85,8 @@ async function setup(page) {
       const { id, path, payload } = JSON.parse(raw);
       fixture.requests.push({ path, payload });
       let reply;
-      if (path === '/stepwise/settings') reply = { settings: fixture.settings };
+      if (path === '/settings/open') reply = { status: 'ok' };
+      else if (path === '/stepwise/settings') reply = { settings: fixture.settings };
       else if (path === '/stepwise/generate' && fixture.deferred) {
         fixture.deferred.push({ id, payload });
         return;
@@ -299,11 +301,17 @@ async function createPopout(host, preserveSnapshot = false) {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${hostUrl}/popout`);
   await page.evaluate((settings) => {
-    window.popoutFixture = { saves: [], unexpected: [] };
+    window.popoutFixture = { saves: [], unexpected: [], settingsOpens: 0 };
     window.__companionHostRequest = (raw) => {
       const { id, path } = JSON.parse(raw);
-      if (path !== '/stepwise/settings') window.popoutFixture.unexpected.push(path);
-      queueMicrotask(() => window.__companionDesktop.complete(id, { settings }));
+      if (path === '/settings/open') window.popoutFixture.settingsOpens++;
+      else if (path !== '/stepwise/settings') window.popoutFixture.unexpected.push(path);
+      queueMicrotask(() =>
+        window.__companionDesktop.complete(
+          id,
+          path === '/settings/open' ? { status: 'ok' } : { settings },
+        ),
+      );
     };
     window.__companionPopout = {
       save: (ui) => window.popoutFixture.saves.push(structuredClone(ui)),
@@ -602,7 +610,10 @@ const cases = [
           near(rect.height, 18, 'shared icon height');
         }
       }
-      await page.locator('[data-workbench-settings]').click();
+      await showRetainedSettings(
+        page,
+        !(await page.locator('.csw-workbench-settings').isVisible()),
+      );
       for (const material of ['matte', 'frosted', 'native-glass']) {
         await page.locator('[data-action=material]').selectOption(material);
         assert.equal(
@@ -620,7 +631,10 @@ const cases = [
         near(center, centers[0], 'settings values share a vertical axis'),
       );
       await page.screenshot({ path: resolve(output, 'unified-icons-settings.png') });
-      await page.locator('[data-workbench-settings]').click();
+      await showRetainedSettings(
+        page,
+        !(await page.locator('.csw-workbench-settings').isVisible()),
+      );
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-placement=floating]').evaluate((node) => node.click());
       assert.equal(await page.locator(slotSelector).count(), 0);
@@ -965,13 +979,19 @@ const cases = [
       const pref = () => page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       const horizontal = (await pref()).popoutLayout.horizontalRatio;
       // 布局入口在设置覆盖页打开时也应立即显示选中状态。
-      await page.locator('[data-workbench-settings]').click();
+      await showRetainedSettings(
+        page,
+        !(await page.locator('.csw-workbench-settings').isVisible()),
+      );
       await chooseLayout(page, 'vertical');
       assert.equal(
         await page.locator('[data-layout-mode="vertical"]').getAttribute('aria-pressed'),
         'true',
       );
-      await page.locator('[data-workbench-settings]').click();
+      await showRetainedSettings(
+        page,
+        !(await page.locator('.csw-workbench-settings').isVisible()),
+      );
 
       await chooseLayout(page, 'vertical');
       await page.getByRole('separator', { name: '调整大纲与下一步比例' }).press('ArrowDown');
@@ -1547,6 +1567,57 @@ const cases = [
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
       await layout(page);
+    },
+  ],
+  [
+    'settings gear opens external web settings without replacing dock floating or popout content',
+    async (host) => {
+      await mode(host, true);
+      const { page: popout, errors } = await createPopout(host);
+      await scrollPanes(popout, 43, 37, 31);
+      for (const surface of ['dock', 'floating', 'popout']) {
+        const page = surface === 'popout' ? popout : host;
+        if (surface === 'floating') {
+          await page.locator('[data-placement=floating]').evaluate((node) => node.click());
+        }
+        await settle(page);
+        const before = await page.evaluate(() => {
+          window.settingsTestPanes = [...document.querySelectorAll('.csw-workbench-pane')];
+          return window.__companionFloatingPanel.panelPreferences();
+        });
+        const readingBefore = await reading(page);
+        assert.equal(
+          await page.getByRole('button', { name: '旧版内置设置', exact: true }).count(),
+          0,
+        );
+        const gear = page.getByRole('button', { name: '设置', exact: true });
+        await gear.click();
+        await settle(page);
+        assert.equal(await page.locator('.csw-workbench-settings').isVisible(), false);
+        assert.equal(await page.locator('.csw-workbench-panes').isVisible(), true);
+        assert.equal(await gear.getAttribute('title'), '在浏览器中打开设置');
+        assert.equal(
+          await page.evaluate(() => window.settingsTestPanes.every((node) => node.isConnected)),
+          true,
+        );
+        assert.deepEqual(
+          await page.evaluate(() => window.__companionFloatingPanel.panelPreferences()),
+          before,
+        );
+        // Keyboard follows the same external route and never opens the legacy overlay.
+        await gear.press('Enter');
+        await settle(page);
+        assert.equal(await page.locator('.csw-settings:visible').count(), 0);
+        assert.deepEqual(await reading(page), readingBefore);
+      }
+      assert.equal(
+        await host.evaluate(
+          () => window.workbenchFixture.requests.filter((r) => r.path === '/settings/open').length,
+        ),
+        4,
+      );
+      assert.equal(await popout.evaluate(() => window.popoutFixture.settingsOpens), 2);
+      assert.deepEqual(errors, []);
     },
   ],
   ...[false, true].map((foreground) => [

@@ -237,14 +237,16 @@ function probePage() {
           select.value = cmd.action;
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
-        if (cmd.kind === 'workbench-settings')
-          document.querySelector('[data-workbench-settings]')?.click();
+        if (cmd.kind === 'retained-settings') {
+          document.querySelector('[data-legacy-settings]')?.click();
+        }
         if (cmd.kind === 'pane-scroll') {
           const body = document.querySelector(`[data-view-body="${cmd.pane}"]`);
           if (body) body.scrollTop = cmd.top;
         }
-        if (cmd.kind === 'tab' && document.querySelector('.csw-workbench-settings')?.hidden)
-          document.querySelector('[data-workbench-settings]')?.click();
+        if (cmd.kind === 'tab' && document.querySelector('.csw-workbench-settings')?.hidden) {
+          document.querySelector('[data-legacy-settings]')?.click();
+        }
         if (cmd.kind === 'open') panel.setOpen(cmd.value);
         if (cmd.kind === 'viewport')
           window.__companionPopout.native({
@@ -521,22 +523,22 @@ try {
       )
         throw Error('Stepwise does not scroll independently');
       const scrolled = assertLayout();
-      await command({ kind: 'workbench-settings' });
+      await command({ kind: 'retained-settings' });
       await waitFor(
         () => telemetry.workbench.settings?.visible && !telemetry.workbench.panesVisible,
-        'explicit workbench settings button did not open overlay',
+        'retained settings template did not render',
       );
       const overlay = telemetry.workbench.settings;
       if (
         !overlay.textLength ||
         overlay.rect.height <= 0 ||
-        telemetry.workbench.settingsLabel !== '返回工作台'
+        telemetry.workbench.settingsLabel !== '设置'
       )
         throw Error('Workbench settings overlay/return control is empty');
-      await command({ kind: 'workbench-settings' });
+      await command({ kind: 'retained-settings' });
       await waitFor(
         () => telemetry.workbench.panesVisible && !telemetry.workbench.settings.visible,
-        'settings button did not return to workbench',
+        'retained settings template did not close',
       );
       assertLayout();
       if (

@@ -15,6 +15,8 @@
 
 CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, generate follow-up questions, and keep your tools inside the conversation or in a desktop window.
 
+The gear in the workbench header opens settings in your browser without replacing the outline or suggestions.
+
 ## Features
 
 | Feature | What it does |

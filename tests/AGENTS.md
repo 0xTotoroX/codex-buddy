@@ -58,10 +58,12 @@
 - [source-audit.test.mjs](source-audit.test.mjs)：公开边界、递归许可与真实依赖声明的行为测试；覆盖嵌套署名、显式路径、来源补充和原文引用，以及无 Git 源码清单和私有文件/符号链接拒绝。
 
 - [popout-preferences.test.mjs](popout-preferences.test.mjs)：位置写入延迟时并发置顶/外观串行推进修订号，真实外部冲突仍拒绝。
-- [workbench-actions.mjs](workbench-actions.mjs)：端到端检查通过设置、标题/标签双击或 Esc 选择内容，替代旧展开页标签。
+- [workbench-actions.mjs](workbench-actions.mjs)：端到端检查通过标题/标签双击或 Esc 选择内容；showRetainedSettings 显式调用隐藏旧入口，仅供保留模板的兼容回归，不代表产品入口。
 
 workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹出时公共表情与明确收回入口，以及紧凑双击的出发状态。窄入口覆盖空间不足的可见解释、明确替代展开与取消；侧栏宽度排除文件侧栏并保持保存偏好，来源文字与关联菜单均隐藏。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
 工作台回归覆盖精简后可见按钮数量、标题单击/双击/键盘放大恢复、窗口往返文案、头部中轴/图标尺寸、显式设置选择与文字对齐、单击收起/重新停靠和简化窄入口；外观测试依据轮廓/实心 SVG 几何区别验证 Clear 状态，不依赖 stroke/fill 的绘制方式。
+
+设置入口回归覆盖停靠、聊天内浮动和独立浮窗：鼠标与 Enter 均只请求外部网页，保持面板实例/偏好及阅读位置；旧模板测试明确通过隐藏入口执行，原生兼容检查不点击真实网页启动器。
