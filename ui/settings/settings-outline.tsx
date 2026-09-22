@@ -23,7 +23,9 @@ export function SettingsOutline({
         ? [
             { id: 'settings-features', label: '桌面浮窗' },
             { id: 'settings-model', label: 'Stepwise 模型' },
-            { id: 'settings-limits', label: '生成限制' },
+            { id: 'settings-directions', label: '建议方向' },
+            { id: 'settings-quick-prompts', label: '常用提示词' },
+            { id: 'settings-limits', label: '生成设置' },
             { id: 'settings-startup', label: '启动行为' },
           ]
         : []),

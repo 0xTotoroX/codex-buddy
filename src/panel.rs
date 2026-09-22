@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令，以及保留原实例的开发唤起目标。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -569,7 +569,7 @@ impl App {
             "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", input.command
         )).await?;
         if result["ok"] == true
-            && ["fill", "outline-jump", "outline-anchor"]
+            && ["fill", "quick-fill", "outline-jump", "outline-anchor"]
                 .contains(&input.command["kind"].as_str().unwrap_or_default())
         {
             let _ = client.request("Page.bringToFront", json!({})).await;

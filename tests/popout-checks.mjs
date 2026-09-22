@@ -415,6 +415,19 @@ export async function checkPopout({
     assert.equal(await composer.textContent(), '确认期间修改了草稿');
     await composer.fill('');
     record('独立浮窗填入、取消／确认追加、追加前再次修改草稿均保持保护');
+    await pop.locator('[data-quick-prompt="1"]').click();
+    await waitFor(
+      async () => (await composer.textContent()) === '执行',
+      'Popout shortcut did not fill host',
+    );
+    assert.equal(await desktop.evaluate(() => window.submitCount), submissions);
+    await composer.fill('已有草稿');
+    await pop.locator('[data-quick-prompt="0"]').click();
+    await pop.locator('dialog').waitFor();
+    await pop.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(await composer.textContent(), '已有草稿');
+    await composer.fill('');
+    record('常用提示词经浮窗填入关联聊天，保持草稿保护且不自动发送');
 
     await pop.locator('.csw-head').hover();
     await showWorkbenchView(pop, 'outline');

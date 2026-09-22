@@ -1,6 +1,6 @@
 /*
- * [INPUT]: React、settings-outline.tsx、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
- * [OUTPUT]: 分组锚点导航、模型表单、全量胶囊设置、连接状态和操作反馈。
+ * [INPUT]: React、settings-outline.tsx、use-settings-form.ts、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
+ * [OUTPUT]: 分组锚点导航、自动/手动保存的模型与完整/限长上下文表单、方向配置与常用提示词编辑、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -33,6 +33,8 @@ import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
 import { SettingsOutline } from './settings-outline';
 import { ModelControlSettings } from './model-control-settings';
+import { DirectionSettings } from './direction-settings';
+import { useSettingsForm } from './use-settings-form';
 import type { EditableSettings, Settings } from './api';
 
 function editable(value: Settings): EditableSettings {
@@ -47,6 +49,11 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    directionSource,
+    directionLibrary,
+    selectedDirections,
+    jev,
+    quickPrompts,
     maxInputChars,
     maxOutputTokens,
     timeoutMs,
@@ -62,6 +69,11 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    directionSource,
+    directionLibrary,
+    selectedDirections,
+    jev,
+    quickPrompts,
     maxInputChars,
     maxOutputTokens,
     timeoutMs,
@@ -70,12 +82,6 @@ function editable(value: Settings): EditableSettings {
 
 function App() {
   const { view, live, error } = useCompanion();
-  const [saved, setSaved] = useState<Settings | null>(null);
-  const [form, setForm] = useState<EditableSettings | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [remoteChanged, setRemoteChanged] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [clearKey, setClearKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState<string[]>([]);
   const [busy, setBusy] = useState('');
@@ -90,65 +96,31 @@ function App() {
     setMessage(text);
     setFailure(failed);
   };
-  function load(value: Settings) {
-    setSaved(value);
-    setForm(editable(value));
-    setDirty(false);
-    setRemoteChanged(false);
-    setApiKey('');
-    setClearKey(false);
-  }
-  useEffect(() => {
-    if (!live) return;
-    let disposed = false;
-    const refresh = async () => {
-      try {
-        const value = await request<Settings>('settings');
-        if (disposed) return;
-        if (!dirty) load(value);
-        else if (saved && value.configurationRevision !== saved.configurationRevision)
-          setRemoteChanged(true);
-      } catch (error) {
-        if (!disposed) notify((error as Error).message, true);
-      }
-    };
-    void refresh();
-    return () => {
-      disposed = true;
-    };
-  }, [live, dirty, view?.configurationRevision]);
+  const {
+    saved,
+    form,
+    dirty,
+    remoteChanged,
+    apiKey,
+    clearKey,
+    saving,
+    load,
+    change,
+    save,
+    schedule,
+    setApiKey,
+    setClearKey,
+    jevApiKey,
+    clearJevKey,
+    setJevApiKey,
+    setClearJevKey,
+  } = useSettingsForm(live, view?.configurationRevision, editable, notify);
   useEffect(() => {
     if (!connectionEdited && view?.connection.endpoint) {
       setEndpoint(view.connection.endpoint);
       setTargetId(view.connection.targetId || '');
     }
   }, [view?.connection.endpoint, view?.connection.targetId, connectionEdited]);
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
-
-  function change<K extends keyof EditableSettings>(key: K, value: EditableSettings[K]) {
-    setForm((previous) => (previous ? { ...previous, [key]: value } : previous));
-    setDirty(true);
-    setMessage('');
-  }
-  async function save() {
-    if (!form || !saved) return;
-    const value = await request<Settings>('settings', {
-      ...form,
-      apiKey,
-      clearApiKey: clearKey,
-      expectedRevision: saved.configurationRevision,
-    });
-    load(value);
-    notify('设置已保存，桌面浮窗会自动同步。');
-    return value;
-  }
   async function run(name: string, action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(name);
@@ -163,8 +135,15 @@ function App() {
   }
   async function test() {
     if (dirty) await save();
-    const result = await request<{ items: unknown[] }>('settings/test', {});
-    notify(`连接正常，已生成 ${result.items.length} 条测试建议。`);
+    const result = await request<{ items: unknown[]; generationAttempted: boolean }>(
+      'settings/test',
+      {},
+    );
+    notify(
+      result.generationAttempted === false
+        ? 'Jev 判断成功，示例没有合适方向；生成阶段已跳过，生成服务尚未验证。'
+        : `连接正常，已生成 ${result.items.length} 条测试建议。`,
+    );
   }
   async function connect() {
     await request('connect', { endpoint, targetId: targetId || null });
@@ -233,6 +212,16 @@ function App() {
                 </Card>
               ) : (
                 <form
+                  onBlurCapture={(event) => {
+                    if (!(
+                      event.relatedTarget instanceof Element &&
+                      event.relatedTarget.closest('button[type="submit"]')
+                    ))
+                      schedule(event.currentTarget);
+                  }}
+                  onChange={(event) => {
+                    if (event.target instanceof HTMLSelectElement) schedule(event.currentTarget);
+                  }}
                   onSubmit={(event) => {
                     event.preventDefault();
                     void run('save', save);
@@ -353,8 +342,7 @@ function App() {
                               value={apiKey}
                               onChange={(e) => {
                                 setApiKey(e.target.value);
-                                setDirty(true);
-                                setClearKey(false);
+                                setClearKey(false, false);
                               }}
                               placeholder={
                                 saved.storedApiKey ? '已保存 · 留空保留' : '输入 API key'
@@ -381,7 +369,6 @@ function App() {
                               checked={clearKey}
                               onChange={(e) => {
                                 setClearKey(e.target.checked);
-                                setDirty(true);
                               }}
                             />
                             保存时清除已存密钥
@@ -483,6 +470,91 @@ function App() {
                       连接测试使用固定示例，不读取你的聊天。
                     </p>
                   </Card>
+                  <DirectionSettings
+                    form={form}
+                    saved={saved}
+                    change={change}
+                    schedule={schedule}
+                    apiKey={jevApiKey}
+                    clearKey={clearJevKey}
+                    setApiKey={setJevApiKey}
+                    setClearKey={setClearJevKey}
+                  />
+                  <Card
+                    tabIndex={-1}
+                    id="settings-quick-prompts"
+                    aria-labelledby="quick-prompts-title"
+                  >
+                    <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
+                      常用提示词
+                    </h2>
+                    <p className="mb-4 text-xs text-muted-foreground">
+                      显示在下一步面板中，点击只填入，不自动发送。
+                    </p>
+                    <div className="space-y-3">
+                      {form.quickPrompts.map((item, index) => (
+                        <div
+                          key={index}
+                          className="grid grid-cols-[90px_minmax(0,1fr)_auto] gap-2 items-start"
+                        >
+                          <Input
+                            aria-label={`常用提示词 ${index + 1} 名称`}
+                            value={item.label}
+                            maxLength={20}
+                            required
+                            onChange={(e) =>
+                              change(
+                                'quickPrompts',
+                                form.quickPrompts.map((p, i) =>
+                                  i === index ? { ...p, label: e.target.value } : p,
+                                ),
+                              )
+                            }
+                          />
+                          <textarea
+                            aria-label={`常用提示词 ${index + 1} 内容`}
+                            value={item.prompt}
+                            maxLength={4000}
+                            required
+                            rows={2}
+                            className="w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-xs"
+                            onChange={(e) =>
+                              change(
+                                'quickPrompts',
+                                form.quickPrompts.map((p, i) =>
+                                  i === index ? { ...p, prompt: e.target.value } : p,
+                                ),
+                              )
+                            }
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            aria-label={`删除常用提示词 ${index + 1}`}
+                            onClick={() => {
+                              change(
+                                'quickPrompts',
+                                form.quickPrompts.filter((_, i) => i !== index),
+                              );
+                              schedule();
+                            }}
+                          >
+                            删除
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={form.quickPrompts.length >= 8}
+                        onClick={() =>
+                          change('quickPrompts', [...form.quickPrompts, { label: '', prompt: '' }])
+                        }
+                      >
+                        添加提示词
+                      </Button>
+                    </div>
+                  </Card>
                   <Card tabIndex={-1} id="settings-limits" aria-labelledby="limits-title">
                     <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
                       <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
@@ -493,32 +565,40 @@ function App() {
                           className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
                           id="limits-title"
                         >
-                          生成限制
+                          生成设置
                         </h2>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-[22px] gap-y-[18px] [&>div]:mb-0 max-[650px]:gap-x-[15px]">
-                      <Field id="max-items" label="最多建议数量">
-                        <Input
-                          id="max-items"
-                          type="number"
-                          min="1"
-                          max="6"
-                          value={form.maxItems}
-                          onChange={(e) => change('maxItems', Number(e.target.value))}
-                        />
+                      <Field
+                        id="context-scope"
+                        label="输入上下文"
+                        hint="最近一次提问与回答，不包含更早历史。"
+                      >
+                        <NativeSelect
+                          id="context-scope"
+                          value={form.maxInputChars === 0 ? 'latest' : 'limited'}
+                          onChange={(e) =>
+                            change('maxInputChars', e.target.value === 'latest' ? 0 : 12000)
+                          }
+                        >
+                          <option value="latest">最近一次聊天（完整）</option>
+                          <option value="limited">自定义字符上限</option>
+                        </NativeSelect>
                       </Field>
-                      <Field id="max-input" label="输入字符上限">
-                        <Input
-                          id="max-input"
-                          type="number"
-                          min="500"
-                          max="32000"
-                          step="100"
-                          value={form.maxInputChars}
-                          onChange={(e) => change('maxInputChars', Number(e.target.value))}
-                        />
-                      </Field>
+                      {form.maxInputChars !== 0 && (
+                        <Field id="max-input" label="输入字符上限">
+                          <Input
+                            id="max-input"
+                            type="number"
+                            min="500"
+                            max="32000"
+                            step="100"
+                            value={form.maxInputChars}
+                            onChange={(e) => change('maxInputChars', Number(e.target.value))}
+                          />
+                        </Field>
+                      )}
                       <Field
                         id="max-output"
                         label="输出 token 上限"
@@ -598,8 +678,14 @@ function App() {
                     </div>
                   )}
                   <div className="flex items-center justify-between px-0.5 py-1.5 [&>span]:text-[11px] [&>span]:text-muted-foreground max-[650px]:sticky max-[650px]:bottom-0 max-[650px]:bg-background max-[650px]:px-px max-[650px]:py-3">
-                    <span>{dirty ? '有尚未保存的更改' : '设置已同步到本机'}</span>
-                    <Button type="submit" disabled={!!busy || !dirty || remoteChanged}>
+                    <span>
+                      {saving
+                        ? '正在保存…'
+                        : dirty
+                          ? '编辑中，离开输入框后自动保存'
+                          : '设置已同步到本机'}
+                    </span>
+                    <Button type="submit" disabled={!!busy || saving || !dirty || remoteChanged}>
                       {busy === 'save' ? (
                         <LoaderCircle
                           className="animate-spin [animation-duration:1.2s]"

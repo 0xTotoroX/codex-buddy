@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
+ * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -398,7 +398,11 @@ function exportPanelState() {
     ]),
   );
   const promptToken = hashText(
-    JSON.stringify([runtimeState.settings?.generationRevision, stepwiseState.prompts]),
+    JSON.stringify([
+      runtimeState.settings?.generationRevision,
+      stepwiseState.prompts,
+      runtimeState.settings?.quickPrompts,
+    ]),
   );
   const outlineToken = hashText(JSON.stringify(outline));
   const panelReading = readingState(viewToken);
@@ -441,6 +445,7 @@ function panelCommand(command) {
     ![
       'association',
       'fill',
+      'quick-fill',
       'generate',
       'outline-refresh',
       'outline-jump',
@@ -455,9 +460,13 @@ function panelCommand(command) {
   if (command.kind === 'association') return changeChatBinding(command.action, command.sessionId);
   if (!bindingSourceReady() || !contextMatches(command.context))
     return { ok: false, message: '聊天来源暂不可用或已变化，请重新确认。' };
-  if (['fill', 'generate'].includes(command.kind) && command.promptToken !== current.promptToken)
+  if (
+    ['fill', 'quick-fill', 'generate'].includes(command.kind) &&
+    command.promptToken !== current.promptToken
+  )
     return { ok: false, message: '建议或生成配置已经更新，请刷新后重试。' };
-  if (chatBusy()) return { ok: false, message: '回答正在生成，请等待完成。' };
+  if (chatBusy() && command.kind !== 'quick-fill')
+    return { ok: false, message: '回答正在生成，请等待完成。' };
   if (command.kind === 'generate') {
     forceRefreshStepwise();
     return { ok: true };
@@ -472,14 +481,17 @@ function panelCommand(command) {
     return { ok: outlineJumpTo(command.id), message: '找不到对应小节，请刷新后重试。' };
   if (command.kind === 'outline-anchor')
     return { ok: outlineJumpToAnchor(command.anchor), message: '找不到当前回答位置。' };
-  if (command.kind === 'fill') {
+  if (command.kind === 'fill' || command.kind === 'quick-fill') {
     if (command.promptToken !== current.promptToken)
       return { ok: false, message: '建议已经更新，请重新选择。' };
     const index = Number(command.index);
-    const prompt = Number.isInteger(index) ? stepwiseState.prompts[index]?.prompt : null;
+    const items =
+      command.kind === 'quick-fill' ? runtimeState.settings?.quickPrompts : stepwiseState.prompts;
+    const prompt = Number.isInteger(index) ? items?.[index]?.prompt : null;
     if (!prompt) return { ok: false, message: '这条建议已经失效。' };
-    const result = fillComposer(prompt, command.submit === true, {
+    const result = fillComposer(prompt, command.kind === 'fill' && command.submit === true, {
       remote: true,
+      quick: command.kind === 'quick-fill',
       append: command.append === true,
       draftFingerprint: command.draftFingerprint,
     });

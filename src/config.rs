@@ -1,5 +1,5 @@
 // [INPUT]: 环境变量、命令参数与独立私有数据目录。
-// [OUTPUT]: Config、HostRestartPolicy（ask/force）、Paths、默认参数及私有文件读写。
+// [OUTPUT]: Config、旧建议数量迁移、Paths 及生成/Jev 独立私有密钥读写。
 // [POS]: Rust 配置基础层，管理独立的应用数据目录。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -73,27 +73,41 @@ impl Paths {
         if !self.config().exists() {
             return Ok(Config::default());
         }
-        serde_json::from_slice(&std::fs::read(self.config())?).context("config.json 格式错误")
+        let mut value: serde_json::Value = serde_json::from_slice(&std::fs::read(self.config())?)
+            .context("config.json 格式错误")?;
+        // An existing config without an explicit count used the previous default of four.
+        if let Some(root) = value.as_object_mut() {
+            let stepwise = root
+                .entry("stepwise")
+                .or_insert_with(|| serde_json::json!({}));
+            if let Some(options) = stepwise.as_object_mut() {
+                options.entry("maxItems").or_insert(serde_json::json!(4));
+            }
+        }
+        serde_json::from_value(value).context("config.json 格式错误")
     }
     pub fn save(&self, config: &Config) -> Result<()> {
         write_private(&self.config(), &serde_json::to_vec_pretty(config)?)
     }
     pub fn load_key(&self) -> Result<Option<String>> {
+        self.load_named_key("apiKey")
+    }
+    pub fn load_named_key(&self, name: &str) -> Result<Option<String>> {
         let path = self.root.join("secrets.json");
         if !path.exists() {
             return Ok(None);
         }
         let value: serde_json::Value =
             serde_json::from_slice(&std::fs::read(path)?).context("secrets.json 格式错误")?;
-        Ok(value["apiKey"]
+        Ok(value[name]
             .as_str()
             .filter(|key| !key.is_empty())
             .map(str::to_owned))
     }
-    pub fn save_key(&self, key: Option<&str>) -> Result<()> {
+    pub fn save_keys(&self, key: Option<&str>, jev_key: Option<&str>) -> Result<()> {
         write_private(
             &self.root.join("secrets.json"),
-            &serde_json::to_vec(&serde_json::json!({"apiKey":key}))?,
+            &serde_json::to_vec(&serde_json::json!({"apiKey":key,"jevApiKey":jev_key}))?,
         )
     }
 }

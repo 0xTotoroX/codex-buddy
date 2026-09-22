@@ -1,5 +1,5 @@
 // [INPUT]: CDP binding 事件、App 设置与模型服务。
-// [OUTPUT]: 桌面请求分发、建议 items 转换及结果回送。
+// [OUTPUT]: 桌面请求分发、角色分明的最近一问一答快照及完整性标记、建议 items 转换及结果回送；生成请求不套用普通设置的字节上限。
 // [POS]: renderer 与独立后台的受限操作边界，生成前后校验上下文。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -38,12 +38,16 @@ pub fn listen(client: Weak<Client>, app: Weak<App>, mut events: mpsc::Receiver<V
             tokio::select! {
                 event = events.recv() => {
                     let Some(event) = event else { break; };
-                    let Some(raw) = event["payload"].as_str().filter(|value| value.len() <= 262144) else { continue; };
+                    let Some(raw) = event["payload"].as_str() else { continue; };
                     let Ok(request) = serde_json::from_str::<Request>(raw) else { continue; };
                     if request.id.len() > 120 { continue; }
                     let Some(client) = client.upgrade() else { break; };
                     let Some(app) = app.upgrade() else { break; };
                     let context_id = event["executionContextId"].clone();
+                    if request.path != "/stepwise/generate" && raw.len() > 262144 {
+                        let _ = reply(&client, &request.id, context_id, json!({"error":"请求内容过大"})).await;
+                        continue;
+                    }
                     if tasks.len() >= 8 {
                         let _ = reply(&client, &request.id, context_id, json!({"error":"请求较多，请稍后再试"})).await;
                         continue;
@@ -153,24 +157,7 @@ async fn generate(app: &Arc<App>, client: &Client, request: &Value) -> Result<Va
         bail!("配置已经变化，请等待浮窗同步后重试");
     }
     let user = request["lastUserMessage"].as_str().unwrap_or_default();
-    let question = user
-        .chars()
-        .take(2400.min(model.options.max_input_chars / 4))
-        .collect::<String>();
-    let prefix = format!("紧邻的用户问题：\n{question}\n\n当前回答：\n");
-    let remaining = model
-        .options
-        .max_input_chars
-        .saturating_sub(prefix.chars().count());
-    let suffix = answer
-        .chars()
-        .rev()
-        .take(remaining)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<String>();
-    let input = format!("{prefix}{suffix}");
+    let input = crate::directions::Exchange::new(user, answer, model.options.max_input_chars);
     let cancelled = async {
         loop {
             sleep(Duration::from_millis(600)).await;
@@ -182,7 +169,12 @@ async fn generate(app: &Arc<App>, client: &Client, request: &Value) -> Result<Va
         }
     };
     let suggestions = tokio::select! {
-        result = app.until_shutdown(model.generate(&input)) => result?,
+        result = app.until_shutdown(model.generate_exchange_checked(&input, || async {
+            if !current(client, request).await? || app.generation_revision.load(Ordering::SeqCst) != revision {
+                bail!("回答或配置已经变化，未启动后续模型请求");
+            }
+            Ok(())
+        })) => result?.suggestions,
         _ = cancelled => bail!("回答、模式或模型配置已经变化，旧请求已取消"),
     };
     if app.generation_revision.load(Ordering::SeqCst) != revision

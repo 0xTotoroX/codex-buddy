@@ -93,7 +93,9 @@ impl App {
             },
             enabled: true,
         };
-        let model = Model::load(&config).with_key(paths.load_key().ok().flatten());
+        let model = Model::load(&config)
+            .with_key(paths.load_key().ok().flatten())
+            .with_jev_key(paths.load_named_key("jevApiKey").ok().flatten());
         let (views, _) = watch::channel(View {
             version: crate::config::VERSION.into(),
             connection: Connection {
