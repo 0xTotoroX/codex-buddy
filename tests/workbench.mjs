@@ -769,6 +769,27 @@ const cases = [
       );
       assert.equal(await page.locator('[data-workbench-close]').count(), 0);
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 9);
+      const face = page.locator('.csw-workbench-face');
+      // A new window can focus its first button without a pointer event.
+      await page.keyboard.press('Tab');
+      await face.focus();
+      assert.equal(await face.evaluate((node) => node.matches(':focus-visible')), true);
+      assert.deepEqual(
+        await face.evaluate((node) => ({
+          decoration: getComputedStyle(node, '::after').content,
+          eyes: getComputedStyle(node.querySelector('.csw-status-stage')).transform,
+        })),
+        { decoration: 'none', eyes: 'matrix(1.12, 0, 0, 1.12, 0, 0)' },
+        'focused pop-out eyes have no underline and retain keyboard feedback',
+      );
+      await face.click();
+      assert.equal(
+        await face
+          .locator('.csw-status-stage')
+          .evaluate((node) => getComputedStyle(node).transform),
+        'none',
+        'pointer input clears the keyboard feedback',
+      );
       const pin = page.locator('[data-action="pin"]');
       assert.equal(await pin.count(), 1);
       assert.equal(await pin.getAttribute('aria-pressed'), 'true');

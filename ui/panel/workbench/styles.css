@@ -383,17 +383,12 @@
   width: var(--csw-default-chip-width);
   height: var(--csw-default-chip-height);
 }
-/* Keyboard focus marks the eyes with a short line, never a second capsule shell. */
-.csw-workbench-face:focus-visible::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  width: 16px;
-  height: 1px;
-  background: color-mix(in srgb, var(--csw-text) 35%, transparent);
-}
+/* Focus changes the eyes themselves, without adding a line or capsule shell. */
 .csw-workbench-face .csw-status-stage {
   transform: none;
+}
+.csw-workbench-face:focus-visible .csw-status-stage {
+  transform: scale(1.12);
 }
 
 .csw-association-menu {
