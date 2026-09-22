@@ -9,8 +9,8 @@ import { resolve } from 'node:path';
 
 const snapshot = (page) => page.evaluate(() => window.__companionFloatingPanel.exportPanelState());
 async function associate(page, action) {
-  await page.getByRole('button', { name: '聊天关联', exact: true }).click();
-  await page.locator(`[data-association="${action}"]`).click();
+  // 前端入口暂时隐藏，通过保留的处理器验证关联功能没有被删除。
+  await page.locator(`[data-association="${action}"]`).evaluate((button) => button.click());
 }
 async function defer(page) {
   await page.evaluate(() => {
@@ -202,7 +202,9 @@ export function chatBindingCases({
           () => window.__companionFloatingPanel.state.prompts.length === 1,
         );
         assert.equal((await snapshot(page)).prompts[0].label, 'A');
-        await page.getByRole('button', { name: '聊天关联', exact: true }).click();
+        assert.equal(await page.getByRole('button', { name: '聊天关联', exact: true }).count(), 0);
+        assert.equal(await page.locator('.csw-association-menu').isHidden(), true);
+        assert.match(await page.locator('.csw-workbench-source').innerText(), /已锁定/);
         await page
           .locator('.csw-workbench')
           .screenshot({ path: resolve(output, 'binding-light.png') });

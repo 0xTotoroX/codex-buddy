@@ -69,6 +69,8 @@
   padding: 4px 6px;
 }
 .csw-workbench-source {
+  grid-column: 1;
+  grid-row: 1;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -487,4 +489,9 @@
 .csw-dock-entry:focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -2px;
+}
+
+/* 仅隐藏入口，保留关联状态与受限命令。 */
+.csw-association-menu[hidden] {
+  display: none;
 }

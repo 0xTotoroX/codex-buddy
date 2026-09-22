@@ -33,7 +33,7 @@ Inside Codex, click the face to expand or collapse the workbench. Double-click i
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. The heading's **⋯** menu also provides move, group, and split commands. Focus a panel temporarily, then click the focus button again or press Esc to restore the layout. Press Esc during a drag to cancel it.
 
-Click the chat name at the top of the workbench to follow the current chat or lock to that chat. Both panels share the same source. If the source becomes unavailable, previous results remain available for reading until it reconnects.
+Both panels share the same chat source, shown at the top of the workbench. The follow/lock menu is temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
 ## Installation and use
 
