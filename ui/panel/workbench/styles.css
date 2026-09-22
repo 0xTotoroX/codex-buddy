@@ -524,9 +524,9 @@
     opacity: 0;
     transition: opacity 140ms ease-out;
   }
-  .csw-workbench-head:hover .csw-workbench-controls,
+  .csw-workbench:hover .csw-workbench-controls,
   .csw-workbench-head:has(:focus-visible) .csw-workbench-controls,
-  .csw-workbench-pane > header:hover [data-refresh],
+  .csw-workbench:hover .csw-workbench-pane > header [data-refresh],
   .csw-workbench-pane > header:has(:focus-visible) [data-refresh] {
     opacity: 1;
   }

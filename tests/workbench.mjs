@@ -463,7 +463,7 @@ const cases = [
     },
   ],
   [
-    'controls reveal on local hover or keyboard focus without moving content',
+    'controls reveal across the workbench and hide on pointer exit without moving content',
     async (page) => {
       await mode(page, true);
       const controls = page.locator('.csw-workbench-controls');
@@ -475,21 +475,26 @@ const cases = [
         () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '0',
       );
       assert.equal(await opacity(refresh), 0);
-      await page.locator('.csw-workbench-head').hover();
+      await page.locator('[data-view-body="next"]').hover();
       await page.waitForFunction(
         () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '1',
       );
-      assert.equal(await opacity(refresh), 0, 'top controls do not expose unrelated refresh');
-      await page.locator('[data-pane="next"] > header').hover();
       await page.waitForFunction(
         () => getComputedStyle(document.querySelector('[data-refresh="next"]')).opacity === '1',
       );
+      assert.equal(await opacity(page.locator('[data-refresh="outline"]')), 1);
+      await page.locator('[data-refresh="outline"]').click();
       near(
         (await box(page, '.csw-workbench-face')).x,
         face.x,
         'revealing controls never shifts the face',
       );
       await page.mouse.move(10, 10);
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll('.csw-workbench-controls, [data-refresh]')].every(
+          (node) => getComputedStyle(node).opacity === '0',
+        ),
+      );
       await page.keyboard.press('Tab');
       await page.locator('[data-workbench-settings]').focus();
       await page.waitForFunction(
@@ -1299,6 +1304,12 @@ const cases = [
       );
       near(arrived.promptScrollTop, hostReading.promptScrollTop, 'outbound preview reading');
       await page.evaluate(() => window.__companionFloatingPanel.setDetached(true));
+      near(
+        (await page.locator(slotSelector).boundingBox()).width,
+        0,
+        'popout releases the entire dock width',
+      );
+      assert.equal(await page.locator('.csw-dock-entry').count(), 0, 'no orphan sidebar entry');
       assert.equal(
         await page.locator('.csw-workbench').isVisible(),
         false,
@@ -1316,6 +1327,7 @@ const cases = [
       );
       await popout.close();
       await settle(page);
+      assert.ok((await box(page, slotSelector)).width >= 300, 'return restores expanded dock');
       const restored = await reading(page);
       near(
         restored.panes.outline.scrollTop,
