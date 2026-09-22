@@ -102,7 +102,7 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 
 Open the control from settings or run `codex-buddy model-control`. Its default shell stays pure black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The capsule, workbench, desktop window, and the three optional model-control materials follow Codex colors in every state. The pure-black model-control palette stays fixed. Web settings continue to follow the browser theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
 
-The control follows the connected Codex desktop space and hides when the host is hidden or disconnected. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
+The control stays on the selected display across desktop Spaces and full-screen apps, even when Codex loses focus or is hidden. If Codex disconnects, the control remains visible but model actions require a valid target. Closing the control or stopping the Buddy service removes it. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
 
 Models and reasoning efforts share a matrix. Open search from the menu or with `⌘F`. Hovering does not steal keyboard focus; search, editing, and keyboard interaction can request it. `⌘⇧M` toggles the panel, and the menu lets you keep it open or close the control.
 

@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、宿主桌面跟随、统一开合进度与独立四主题、显示器枚举与租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -102,7 +102,7 @@ impl ControlPanel {
         unsafe { panel.setReleasedWhenClosed(false) };
         panel.setLevel(NSStatusWindowLevel);
         panel.setCollectionBehavior(
-            NSWindowCollectionBehavior::Default
+            NSWindowCollectionBehavior::CanJoinAllSpaces
                 | NSWindowCollectionBehavior::Stationary
                 | NSWindowCollectionBehavior::FullScreenAuxiliary,
         );
@@ -288,8 +288,6 @@ struct Surface {
     prefs: Preferences,
     appearance: Appearance,
     screen: Option<Screen>,
-    host: Value,
-    host_attached: bool,
     expanded: bool,
     unfold: geometry::Unfold,
     motion_tick: Instant,
@@ -339,6 +337,8 @@ impl Surface {
             "layoutWidth": screen.map_or(480., |s| geometry::layout(s,self.prefs.edge,self.prefs.position,true).width),
             "keyboard": self.keyboard, "edge": self.prefs.edge.as_str(),
             "position": self.prefs.position, "screen": screen.map(|s| &s.id),
+            "allSpaces": self.panel.collectionBehavior().contains(NSWindowCollectionBehavior::CanJoinAllSpaces),
+            "fullScreenAuxiliary": self.panel.collectionBehavior().contains(NSWindowCollectionBehavior::FullScreenAuxiliary),
             "preferredScreen": self.prefs.screen, "keepOpen": self.prefs.keep_open, "hidden": self.hidden,
             "notchWidth": screen.map_or(0., |s| s.notch_width), "notchHeight": screen.map_or(0., |s| s.notch_height),
             "width": size.width, "height": size.height,
@@ -368,27 +368,7 @@ impl Surface {
     }
 
     fn reflow(&mut self, mtm: MainThreadMarker) -> Result<()> {
-        if self.host["visible"] != true {
-            self.release_keyboard();
-            self.panel.orderOut(None);
-            return Ok(());
-        }
-        // Only the connected host acquiring focus may move this panel to a Space.
-        // Background polling, hover and a global hotkey must never bring it elsewhere.
-        if self.host["focused"] == true {
-            self.host_attached = true;
-            if self.ready && self.valid && !self.hidden && !self.panel.isOnActiveSpace() {
-                let behavior = self.panel.collectionBehavior();
-                self.panel.setCollectionBehavior(
-                    behavior | NSWindowCollectionBehavior::MoveToActiveSpace,
-                );
-                self.panel.orderFrontRegardless();
-                self.panel.setCollectionBehavior(behavior);
-            }
-        }
-        if !self.host_attached {
-            return Ok(());
-        }
+        // The selected display owns placement; Spaces and host focus do not.
         let refresh_screen = self.screen.is_none() || Instant::now() >= self.screen_check;
         let previous_screen = self.screen.clone();
         if refresh_screen {
@@ -498,12 +478,7 @@ impl Surface {
             }
             self.last_backdrop = Some(backdrop);
         }
-        if self.valid
-            && self.ready
-            && !self.hidden
-            && !self.panel.isVisible()
-            && (self.host["focused"] == true || self.panel.isOnActiveSpace())
-        {
+        if self.valid && self.ready && !self.hidden && !self.panel.isVisible() {
             self.panel.orderFrontRegardless();
         }
         if changed || resized {
@@ -603,12 +578,6 @@ impl Surface {
     }
 
     fn expand(&mut self, keyboard: bool, mtm: MainThreadMarker) -> Result<()> {
-        if self.host["visible"] != true
-            || !self.host_attached
-            || (self.host["focused"] != true && !self.panel.isOnActiveSpace())
-        {
-            return Ok(());
-        }
         self.hidden = false;
         if !self.unfold.active(self.expanded) {
             self.motion_tick = Instant::now();
@@ -709,7 +678,6 @@ impl Surface {
 
     fn snapshot(&mut self, value: Value, revision: u64, mtm: MainThreadMarker) -> Result<()> {
         self.valid = true;
-        self.host = value["host"].clone();
         let mut appearance = Appearance::read(&value["appearance"]);
         if !matches!(
             appearance.host_theme["theme"].as_str(),
@@ -801,8 +769,6 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         prefs: Preferences::default(),
         appearance: Appearance::read(&Value::Null),
         screen: None,
-        host: Value::Null,
-        host_attached: false,
         expanded: false,
         unfold: geometry::Unfold::default(),
         motion_tick: Instant::now(),

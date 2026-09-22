@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已构建的 codex-buddy、真实模型控制页面和隔离 loopback fixture。
- * [OUTPUT]: target/reports/model-control-native 的几何/焦点/租约证据及可选截图。
+ * [OUTPUT]: target/reports/model-control-native 的跨桌面策略/几何/焦点/租约证据及可选截图。
  * [POS]: 只创建本工具合成窗口；不连接、读取或重启官方宿主。运行前 cargo build --locked。
  * [PROTOCOL]: 由集成任务同步 tests/AGENTS.md。
  */
@@ -74,9 +74,9 @@ const report = {
   checks: [],
   skipped: [
     {
-      name: 'real Spaces migration with connected host',
+      name: 'real Spaces and full-screen transitions',
       reason:
-        'Visibility and focus gates use fixture presence; actual Mission Control switching requires manual acceptance',
+        'Native all-Spaces/full-screen flags and host-independent visibility are checked; actual Mission Control and full-screen transitions require manual acceptance',
     },
     ...(!environment.canPostEvents
       ? [
@@ -111,7 +111,8 @@ const report = {
   screenshots: [],
   errors: [],
 };
-let hostPresence = { visible: true, focused: true };
+let hostPresence = { visible: false, focused: false };
+let windowPolls = 0;
 const envelope = () => ({ preferences: prefs, snapshot, revision });
 
 // Probe code is served only by this synthetic backend, never added to a product page/build.
@@ -214,8 +215,10 @@ const server = createServer(async (request, response) => {
   }
   if (path.startsWith('/api/')) {
     if (request.headers.authorization !== 'Bearer native-fixture-token') return json({}, 401);
-    if (path.endsWith('/window'))
+    if (path.endsWith('/window')) {
+      windowPolls++;
       return json({ valid, preferences: prefs, reveal, appearance, host: hostPresence });
+    }
     if (path.endsWith('/preferences')) {
       Object.assign(prefs, JSON.parse(body).patch);
       revision++;
@@ -347,15 +350,36 @@ try {
   assert.equal(initial.kCGWindowBounds.Width, 10);
   assert.equal(initial.kCGWindowBounds.Height, 80);
   check('initial reveal baseline is compact', initial.kCGWindowBounds);
-  hostPresence = { visible: false, focused: false };
-  await until(() => !windowInfo(), 'host hidden removes native panel');
+  assert.equal(telemetry.native.allSpaces, true);
+  assert.equal(telemetry.native.fullScreenAuxiliary, true);
+  const screen = telemetry.native.screen;
+  check('all-Spaces panel starts without host focus or visibility', initial.kCGWindowBounds);
+  for (const presence of [
+    { visible: true, focused: true },
+    { visible: true, focused: false },
+    { visible: false, focused: false },
+    null,
+  ]) {
+    hostPresence = presence;
+    const before = windowPolls;
+    await until(() => windowPolls > before + 1, 'host presence consumed');
+    assert.ok(windowInfo(), 'Host presence must not hide the display control');
+    assert.equal(telemetry.native.screen, screen);
+    assert.equal(telemetry.native.keyboard, false);
+    assert.equal(telemetry.native.expanded, false);
+  }
   await ipc({ action: 'focus' });
-  await delay(200);
-  assert.equal(windowInfo(), undefined);
-  check('hidden host suppresses panel and explicit focus cannot resurrect it elsewhere');
+  await until(() => telemetry.native.keyboard && telemetry.native.expanded, 'focus without host');
+  check(
+    'host hide, blur and disconnect preserve display placement; explicit focus remains available',
+  );
+  await ipc({ action: 'collapse' });
+  await until(() => !telemetry.native.expanded && !telemetry.native.animating, 'restore compact');
+  // Re-arm hover after the explicit collapse before testing pointer entry.
+  await command(
+    "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:false,buttons:0,hoverSuppressed:false}}))",
+  );
   hostPresence = { visible: true, focused: true };
-  await until(() => !!windowInfo(), 'host return restores panel');
-  check('host focus restores existing panel without a new process');
 
   if (environment.canPostEvents) {
     const bounds = windowInfo().kCGWindowBounds;
