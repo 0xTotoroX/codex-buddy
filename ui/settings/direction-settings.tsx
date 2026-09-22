@@ -79,7 +79,7 @@ export function DirectionSettings({
           ? '根据最近一问一答自由探索，不受方向库限制。'
           : form.directionSource === 'manual'
             ? '按所选方向生成具体提问；不适用的方向会跳过。'
-            : 'Jev 判断方向是否适用，再由生成模型选择互补方向并写出提问。'}
+            : 'Jev 仅判断候选方向是否适用；具体提问由你配置的生成模型撰写。'}
       </p>
       {form.directionSource !== 'manual' ? (
         <div className="mt-4">

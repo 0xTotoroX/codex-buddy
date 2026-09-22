@@ -37,7 +37,7 @@ In Web settings, choose **输入上下文 → 最近一次聊天（完整）** t
 
 - **自动探索 (Explore):** one generation request discovers directions freely, up to the configured count.
 - **我来选择 (Choose):** select and reorder direction slots; one request generates up to one suggestion per slot. Inapplicable directions are skipped.
-- **智能挑选 (Smart, experimental):** Jev evaluates enabled directions in one batch, then the generation model chooses a complementary subset and writes prompts. Requires separate TypeSafe credentials and explicit consent to send the latest question and answer to that service. Other modes make no Jev calls; failures do not silently switch modes.
+- **智能挑选 (Smart, experimental):** Jev serves only as an applicability evaluator for candidate directions, assessing enabled directions against the current context in one batch. It does not discover open-ended directions, generate suggestions or prompts, or execute actions. The user-configured generation model selects complementary directions and writes the follow-up prompts. Requires separate TypeSafe credentials and explicit consent to send the latest question and answer to that service. Other modes make no Jev calls; failures do not silently switch modes.
 
 Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
