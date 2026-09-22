@@ -37,6 +37,29 @@ Drag a panel heading or tab to another panel's edge to split the layout, or to i
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
+## Operations and state transitions
+
+Single-click and double-click below refer to **the eyes on the capsule or at the top of the workbench**.
+
+```mermaid
+%%{init: {"flowchart": {"curve": "linear"}}}%%
+flowchart LR
+    capsule["Capsule"] <-->|Single-click eyes| inside["Inside Codex<br/>(floating panel / docked sidebar)"]
+    inside <-->|Double-click eyes| popout["Pop-out window"]
+```
+
+The diagram shows the usual path. You can also double-click the capsule to pop out directly. Returning always restores the state you left, without requiring an intermediate state.
+
+| Current state | Action | Result |
+| --- | --- | --- |
+| Capsule | Single-click eyes | Expand inside Codex as a floating panel or docked sidebar, using your Web settings preference |
+| Inside Codex | Single-click eyes | Collapse to the capsule and release the sidebar space |
+| Capsule / Inside Codex | Double-click eyes | Open an independent window and remember the previous state |
+| Pop-out window | Double-click eyes | Return to Codex, restoring the previous compact or expanded state and placement preference |
+| Pop-out window | Single-click eyes | Stay expanded |
+
+With the eyes focused, **Alt+Enter** is equivalent to a double-click. Floating and docked are two placements of the second state, selected in Web settings; repeated clicks do not cycle through them. The pop-out window stays on top by default; the pin toggles this, and the gear opens Web settings. Splits, tabs, and temporary panel focus only arrange the contents; they do not add window states.
+
 ## Installation and use
 
 ### 1. Install
