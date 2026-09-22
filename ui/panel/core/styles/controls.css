@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 胶囊设置控件（单一材质选择）、焦点和响应式布局。
+ * [OUTPUT]: 胶囊设置控件（单一材质选择）、透明按钮悬停反馈、焦点和响应式布局。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -372,7 +372,7 @@
 .csw-control-button:hover,
 .csw-step-button:hover,
 .csw-command-button:hover {
-  background: var(--csw-hover);
+  color: var(--csw-text);
 }
 
 .csw-command-deck {
@@ -754,7 +754,7 @@
 }
 .csw-control-button.csw-liquid-star:hover {
   color: var(--csw-text);
-  background: color-mix(in srgb, currentColor 5%, transparent);
+  background: transparent;
 }
 
 .csw-head-face[data-action='panel-face'] {

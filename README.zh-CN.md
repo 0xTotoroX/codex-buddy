@@ -42,13 +42,21 @@ CodexBuddy 为 Codex / ChatGPT 增加一个随手可用的辅助面板：快速�
 以下单击、双击均指**胶囊或工作台顶部的眼睛表情**。
 
 ```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    capsule["胶囊态"] <-->|单击表情| inside["Codex 内浮动<br/>（悬浮窗 / 侧栏嵌入）"]
-    inside <-->|双击表情| popout["弹出窗口"]
+%%{init: {"themeCSS": ".edgeLabel span { background-color: Canvas; color: CanvasText; }"}}%%
+block-beta
+    columns 3
+    capsule["胶囊态"] space inside["Codex 内浮动<br/>（悬浮窗 / 侧栏嵌入）"]
+    space:3
+    space popout["弹出窗口"] space
+    inside --> capsule
+    popout --> capsule
+    popout --> inside
+    capsule -- "单击：展开 / 收起" --> inside
+    capsule -- "双击：胶囊往返" --> popout
+    inside -- "双击：展开台往返" --> popout
 ```
 
-图示常用路径；胶囊态也可直接双击弹出。收回始终恢复弹出前的状态，不必经过中间形态。
+三对连线均可往返。双击从胶囊直接弹出后，只收回胶囊；从 Codex 内展开台弹出后，只收回原展开台。返回目标由出发状态决定，不会随机切换。弹出窗口单击保持展开，因此不另画自循环。
 
 | 当前状态 | 操作 | 结果 |
 | --- | --- | --- |

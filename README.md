@@ -42,13 +42,21 @@ Both panels share the same chat source. The source label and follow/lock menu ar
 Single-click and double-click below refer to **the eyes on the capsule or at the top of the workbench**.
 
 ```mermaid
-%%{init: {"flowchart": {"curve": "linear"}}}%%
-flowchart LR
-    capsule["Capsule"] <-->|Single-click eyes| inside["Inside Codex<br/>(floating panel / docked sidebar)"]
-    inside <-->|Double-click eyes| popout["Pop-out window"]
+%%{init: {"themeCSS": ".edgeLabel span { background-color: Canvas; color: CanvasText; }"}}%%
+block-beta
+    columns 3
+    capsule["Capsule"] space inside["Inside Codex<br/>(floating panel / docked sidebar)"]
+    space:3
+    space popout["Pop-out window"] space
+    inside --> capsule
+    popout --> capsule
+    popout --> inside
+    capsule -- "Click: expand / collapse" --> inside
+    capsule -- "Double-click" --> popout
+    inside -- "Double-click" --> popout
 ```
 
-The diagram shows the usual path. You can also double-click the capsule to pop out directly. Returning always restores the state you left, without requiring an intermediate state.
+All three connections work in both directions. A window opened directly from the capsule returns to the capsule; one opened from the in-Codex workbench returns to that workbench. The starting state determines the return destination. A single click in the pop-out keeps it expanded, so no self-loop is drawn.
 
 | Current state | Action | Result |
 | --- | --- | --- |

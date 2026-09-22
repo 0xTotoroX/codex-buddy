@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 建议列表、预览、大纲和内容状态的布局与外观。
+ * [OUTPUT]: 建议列表、预览、大纲和内容状态的布局与外观，定位按钮透明无底块。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -401,6 +401,7 @@
 }
 
 .csw-outline-nav-button {
+  box-shadow: none;
   align-items: center;
   appearance: none;
   background: transparent;
@@ -423,9 +424,13 @@
 
 .csw-outline-nav-button:hover,
 .csw-outline-nav-button:focus-visible {
-  background: color-mix(in srgb, var(--csw-text) 8%, transparent);
   color: var(--csw-text);
   outline: none;
+}
+
+.csw-outline-nav-button:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -2px;
 }
 
 .csw-outline-nav-button:active {

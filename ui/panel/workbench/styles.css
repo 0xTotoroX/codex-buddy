@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 中轴表情、统一控件、分隔线和各级菜单样式。
+ * [OUTPUT]: 中轴表情、透明工具按钮、无底块标签选中反馈、分隔线和各级菜单样式。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -91,15 +91,6 @@
 .csw-workbench .csw-icon {
   width: 28px;
   height: 28px;
-}
-/* Header glyphs share the shell; hover must not add a second rounded surface. */
-.csw-workbench-controls > .csw-icon,
-.csw-workbench-controls > .csw-icon:hover {
-  background: transparent;
-  box-shadow: none;
-}
-.csw-workbench-controls > .csw-icon[aria-pressed='true'] {
-  color: var(--csw-text);
 }
 .csw-workbench-panes {
   display: grid;
@@ -238,7 +229,8 @@
 }
 .csw-layout-options button:hover,
 .csw-layout-options button[aria-pressed='true'] {
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .csw-layout-options button[aria-pressed='true']::after {
   content: '✓';
@@ -302,7 +294,8 @@
 }
 .csw-workbench-tabs button[aria-selected='true'] {
   color: var(--csw-text);
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .csw-workbench :is(.csw-workbench-tabs button, .csw-pane-arrange):focus-visible {
   outline: 2px solid var(--csw-accent);
@@ -502,7 +495,8 @@
   cursor: pointer;
 }
 .csw-dock-menu :is(button, summary):hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .csw-dock-menu :is(button, summary):focus-visible {
   outline: 2px solid currentColor;

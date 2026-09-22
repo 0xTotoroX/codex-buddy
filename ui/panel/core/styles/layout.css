@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 隔离宿主默认样式的公共基础规则、外壳、眼睛、标题和几何；不包含材质配方。
+ * [OUTPUT]: 隔离宿主默认样式的公共基础规则、外壳、眼睛、标题和几何；工具按钮统一透明底色、悬停明暗反馈；不包含材质配方。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -510,12 +510,7 @@
   width: var(--csw-default-chip-width);
 }
 
-.csw-head-face:hover {
-  background: color-mix(in srgb, var(--csw-text) 4%, transparent);
-}
-
 .csw-head-face:active {
-  background: color-mix(in srgb, var(--csw-text) 6%, transparent);
   transform: scale(0.97);
 }
 
@@ -545,10 +540,6 @@
   cursor: grabbing;
 }
 
-.csw-head-face:focus-visible {
-  background: color-mix(in srgb, var(--csw-text) 5%, transparent);
-}
-
 .csw-popover[data-morphing='true'] .csw-head-face {
   opacity: 0;
   visibility: hidden;
@@ -561,7 +552,7 @@
 }
 
 .csw-view-tabs {
-  background: color-mix(in srgb, var(--csw-text) 3.5%, transparent);
+  background: transparent;
   border-radius: 10px;
   isolation: isolate;
   padding: 2px;
@@ -569,7 +560,8 @@
 }
 
 .csw-view-indicator {
-  background: color-mix(in srgb, var(--csw-surface-opaque) 74%, transparent);
+  display: none;
+  background: transparent;
   border-radius: var(--buddy-radius-small);
   height: 28px;
   left: 2px;
@@ -584,6 +576,7 @@
 }
 
 .csw-icon {
+  box-shadow: none;
   align-items: center;
   appearance: none;
   background: transparent;
@@ -624,8 +617,8 @@
 }
 
 .csw-icon[data-active='true'],
+.csw-icon[aria-pressed='true'],
 .csw-icon:hover {
-  background: var(--csw-hover);
   color: var(--csw-text);
 }
 
@@ -633,6 +626,16 @@
   background: transparent;
   box-shadow: none;
   transform: scale(1);
+}
+
+.csw-icon:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -2px;
+  color: var(--csw-text);
+}
+
+.csw-view-tabs .csw-icon[aria-selected='true'] {
+  border-bottom: 1px solid currentColor;
 }
 
 .csw-icon:disabled {
