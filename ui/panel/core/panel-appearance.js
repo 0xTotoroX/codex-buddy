@@ -423,8 +423,7 @@ function syncHostTypography(force = false) {
 }
 
 function themeLabel() {
-  const target = IS_POPOUT ? 'macOS' : 'Codex';
-  return `${target} 明暗：${shellState.theme === 'dark' ? '深色；切换到浅色' : '浅色；切换到深色'}`;
+  return `macOS 明暗：${shellState.theme === 'dark' ? '深色；切换到浅色' : '浅色；切换到深色'}`;
 }
 
 function themeIcon() {

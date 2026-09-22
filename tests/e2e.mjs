@@ -813,8 +813,7 @@ try {
     );
     record('表情拖动不误收起或弹出');
 
-    await desktop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-    await desktop.getByRole('button', { name: '收起工作台', exact: true }).click();
+    await desktop.locator('.csw-workbench-face').click();
     await settle();
     assert.equal((await panelState()).open, false);
     await desktop.locator('.csw-fab').click();
@@ -843,6 +842,94 @@ try {
     await page.goto(`${base}/#token=${runtime.token}`);
     await page.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
     assert.equal(page.url(), `${base}/`);
+    assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).count(), 0);
+    assert.equal(await desktop.locator('[data-action="theme"]').count(), 0);
+    assert.equal(
+      await desktop.evaluate(() => typeof window.__companionFloatingPanel.setThemeMode),
+      'undefined',
+    );
+    const outline = page.getByRole('navigation', { name: '设置大纲' });
+    const sections = [
+      'settings-model-control',
+      'settings-capsule',
+      'settings-features',
+      'settings-model',
+      'settings-limits',
+      'settings-startup',
+      'settings-connection',
+    ];
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    for (const width of [1280, 780, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const id of sections) {
+        await outline.locator(`a[href="#${id}"]`).click();
+        await waitFor(
+          () =>
+            outline
+              .locator(`a[href="#${id}"]`)
+              .getAttribute('aria-current')
+              .then((v) => v === 'location'),
+          `Outline did not track ${id} at ${width}`,
+        );
+        const rect = await page.locator(`#${id}`).boundingBox();
+        assert.ok(rect.y >= 0 && rect.y < 900, `Section ${id} must be visible`);
+      }
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+      );
+      await outline.locator('a[href="#settings-model-control"]').click();
+      await waitFor(
+        () =>
+          outline
+            .locator('a[href="#settings-model-control"]')
+            .getAttribute('aria-current')
+            .then((value) => value === 'location'),
+        'Outline did not return to first group',
+      );
+      assert.equal(
+        await outline
+          .locator('[aria-current="location"]')
+          .evaluate((node) => getComputedStyle(node).fontWeight),
+        '500',
+      );
+      await page.screenshot({ path: join(output, `settings-outline-${width}.png`) });
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    await page.locator('#settings-model').evaluate((node) => node.scrollIntoView());
+    await waitFor(
+      () =>
+        outline
+          .locator('a[href="#settings-model"]')
+          .getAttribute('aria-current')
+          .then((v) => v === 'location'),
+      'Outline did not follow scrolling',
+    );
+    await outline.locator('a[href="#settings-capsule"]').focus();
+    await page.keyboard.press('Enter');
+    await waitFor(
+      () =>
+        outline
+          .locator('a[href="#settings-capsule"]')
+          .getAttribute('aria-current')
+          .then((v) => v === 'location'),
+      'Keyboard navigation failed',
+    );
+    await page.reload();
+    await page.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
+    await waitFor(
+      () =>
+        outline
+          .locator('a[href="#settings-capsule"]')
+          .getAttribute('aria-current')
+          .then((v) => v === 'location'),
+      'Deep link did not restore after reload',
+    );
+    record('设置大纲桌面/窄屏跳转、滚动跟随、键盘与深链接；Codex 主题写入入口移除');
+
     assert.equal(await page.locator('option[value="desktop"]').isDisabled(), false);
     const gatedSettings = await context.newPage();
     await gatedSettings.route('**/api/settings', async (route) => {
@@ -1320,6 +1407,22 @@ try {
 } catch (error) {
   console.error(error);
   console.error('PAGE_ERRORS', JSON.stringify(errors));
+  if (page && !page.isClosed()) {
+    console.error(
+      'SETTINGS_NAV',
+      await page.evaluate(() => ({
+        scrollY,
+        height: innerHeight,
+        total: document.documentElement.scrollHeight,
+        hash: location.hash,
+        current: document.querySelector('[aria-current="location"]')?.getAttribute('href'),
+        sections: [...document.querySelectorAll('main section[id]')].map((n) => ({
+          id: n.id,
+          top: n.getBoundingClientRect().top,
+        })),
+      })),
+    );
+  }
   console.error('SERVICE_LOG', serviceLog.slice(-3000));
   if (desktop && !desktop.isClosed()) {
     console.error(

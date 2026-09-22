@@ -32,6 +32,15 @@
   --radius-lg: var(--buddy-radius-small);
 }
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 24px;
+  }
+  @media (max-width: 850px) {
+    html {
+      scroll-padding-top: 80px;
+    }
+  }
   :root {
     font-family:
       Inter,

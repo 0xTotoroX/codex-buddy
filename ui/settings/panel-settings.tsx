@@ -14,16 +14,12 @@ import type { AppearanceSettings, PanelPreferences, WorkbenchLayout } from '../c
 
 export function PanelSettings({
   value,
-  theme,
   fontBase = 13,
-  connected,
   popoutSupported,
   notify,
 }: {
   value?: AppearanceSettings;
-  theme?: string | null;
   fontBase?: number;
-  connected: boolean;
   popoutSupported: boolean;
   notify: (text: string, failed?: boolean) => void;
 }) {
@@ -213,7 +209,7 @@ export function PanelSettings({
     );
   };
   return (
-    <Card aria-label="胶囊设置">
+    <Card tabIndex={-1} id="settings-capsule" aria-label="胶囊设置">
       <div className="mb-[22px] flex items-center justify-between [&>span]:text-[11px] [&>span]:text-muted-foreground">
         <h2 className="text-[15px] font-semibold leading-normal tracking-[-0.3px]">胶囊</h2>
         <span>即时保存</span>
@@ -232,7 +228,7 @@ export function PanelSettings({
             {workbenchLayout('dockLayout', '停靠')}
             {workbenchLayout('popoutLayout', '浮窗')}
           </div>
-          <div className="flex items-end gap-2 [&>label]:flex-1">
+          <div className="col-span-full flex items-end gap-2 [&>label]:flex-1">
             {select('材质', 'material', [
               ['matte', '哑光'],
               ['frosted', '磨砂'],
@@ -259,19 +255,6 @@ export function PanelSettings({
               </button>
             )}
           </div>
-          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-            <span>Codex 明暗</span>
-            <NativeSelect
-              aria-label="Codex 明暗"
-              value={theme || ''}
-              disabled={!connected}
-              onChange={(e) => void action('appearance/theme', { mode: e.target.value })}
-            >
-              {!theme && <option value="">未连接</option>}
-              <option value="light">浅色</option>
-              <option value="dark">深色</option>
-            </NativeSelect>
-          </label>
           <p className="col-span-full text-xs leading-normal text-muted-foreground">
             内嵌液态使用 SVG；弹出液态使用 macOS 26+ 原生 Regular /
             Clear，旧系统仅弹出液态回退哑光。

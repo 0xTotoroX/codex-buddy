@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主页面标记、字体与主题。
- * [OUTPUT]: 宿主字体、主题、可用内容区域读取与主题切换。
+ * [OUTPUT]: 宿主字体、主题、可用内容区域只读适配。
  * [POS]: 宿主外观适配边界，不依赖胶囊视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -18,8 +18,7 @@ import {
   ITEM_FONT_RATIO,
   PANEL_SAFE_MARGIN,
 } from '../runtime/constants.js';
-import { clamp, contextState, roundPixel, shellState } from '../runtime/state.js';
-import { emitSignal } from '../runtime/signals.js';
+import { clamp, roundPixel } from '../runtime/state.js';
 
 function contentSafeBounds() {
   if (IS_POPOUT)
@@ -225,78 +224,10 @@ function visibleTypographyNode(selector) {
   );
 }
 
-function appActionModuleCandidates() {
-  const candidates = new Set();
-  const add = (value) => {
-    if (!value) return;
-    try {
-      const url = new URL(value, location.href);
-      if (/\/assets\/rpc-[^/]+\.js$/.test(url.pathname)) candidates.add(`.${url.pathname}`);
-    } catch {}
-  };
-
-  document.querySelectorAll('script[src],link[href]').forEach((node) => {
-    add(node.getAttribute('src') || node.getAttribute('href'));
-  });
-  const resources = performance.getEntriesByType?.('resource') || [];
-  resources.forEach((entry) => add(entry.name));
-  return Array.from(candidates);
-}
-
-async function getCodexAppActions() {
-  if (!contextState.codexAppActionsPromise) {
-    contextState.codexAppActionsPromise = (async () => {
-      const errors = [];
-      for (const candidate of appActionModuleCandidates()) {
-        try {
-          const module = await import(candidate);
-          const appActions = module?.n?.appActions || module?.appServices?.appActions;
-          if (typeof appActions?.runInPrimaryWindow === 'function') return appActions;
-          errors.push(`${candidate}: missing appActions`);
-        } catch (error) {
-          errors.push(`${candidate}: ${error.message}`);
-        }
-      }
-      throw new Error(`Codex app actions unavailable (${errors.join('; ')})`);
-    })();
-  }
-
-  try {
-    return await contextState.codexAppActionsPromise;
-  } catch (error) {
-    contextState.codexAppActionsPromise = null;
-    throw error;
-  }
-}
-
-async function setCodexThemeMode(theme) {
-  if (theme !== 'light' && theme !== 'dark') return;
-  const appActions = await getCodexAppActions();
-  await appActions.runInPrimaryWindow({
-    action: { type: 'app.appearance.set_mode', mode: theme },
-  });
-}
-
-function toggleCodexTheme() {
-  const nextTheme = detectCodexTheme() === 'dark' ? 'light' : 'dark';
-  setCodexThemeMode(nextTheme)
-    .then(() => {
-      const before = `${shellState.themeMode}:${shellState.theme}`;
-      emitSignal('theme', undefined);
-      if (shellState.open && before !== `${shellState.themeMode}:${shellState.theme}`)
-        emitSignal('render', undefined);
-    })
-    .catch((error) => {
-      console.warn('[CodexBuddy Stepwise] Failed to switch Codex theme', error);
-    });
-}
-
 export {
   contentSafeBounds,
   detectCodexTheme,
   fallbackHostTypography,
   readHostTypography,
-  toggleCodexTheme,
-  setCodexThemeMode,
   typographyFingerprint,
 };

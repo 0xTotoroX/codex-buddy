@@ -129,7 +129,6 @@ function readChatBinding() {
 
 function createContextState(preferences) {
   return {
-    codexAppActionsPromise: null,
     lastAssistantHash: '',
     lastAssistantAt: 0,
     scanStatus: 'idle',

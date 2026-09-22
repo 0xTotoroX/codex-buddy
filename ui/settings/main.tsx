@@ -1,6 +1,6 @@
 /*
- * [INPUT]: React、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
- * [OUTPUT]: 模型表单、全量胶囊设置、连接状态和操作反馈。
+ * [INPUT]: React、settings-outline.tsx、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
+ * [OUTPUT]: 分组锚点导航、模型表单、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
+import { SettingsOutline } from './settings-outline';
 import { ModelControlSettings } from './model-control-settings';
 import type { EditableSettings, Settings } from './api';
 
@@ -196,555 +197,571 @@ function App() {
               : '服务未连接'}
         </span>
       </header>
-      <main>
-        <div className="pt-9 pb-[27px] max-[650px]:pt-[27px] max-[650px]:pb-[23px]">
-          <div className="mb-3 flex items-center gap-1.5 text-[11px] tracking-[0.5px] text-muted-foreground">
-            <Settings2 size={14} />
-            偏好设置
+      <div className="grid grid-cols-[160px_minmax(0,1fr)] items-start gap-9 max-[850px]:block">
+        <SettingsOutline panelReady={!!view?.panelPreferences} formReady={!!form && !!saved} />
+        <main className="min-w-0">
+          <div className="pt-9 pb-[27px] max-[650px]:pt-[27px] max-[650px]:pb-[23px]">
+            <div className="mb-3 flex items-center gap-1.5 text-[11px] tracking-[0.5px] text-muted-foreground">
+              <Settings2 size={14} />
+              偏好设置
+            </div>
+            <h1 className="text-[27px] font-semibold leading-[1.4] tracking-[-1px] max-[850px]:text-2xl max-[650px]:text-[22px] max-[650px]:tracking-[-0.7px]">
+              让浮窗按你的习惯工作。
+            </h1>
           </div>
-          <h1 className="text-[27px] font-semibold leading-[1.4] tracking-[-1px] max-[850px]:text-2xl max-[650px]:text-[22px] max-[650px]:tracking-[-0.7px]">
-            让浮窗按你的习惯工作。
-          </h1>
-        </div>
-        <ModelControlSettings live={live} />
-        {error && (
-          <div
-            className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"
-            role="alert"
-          >
-            {error}
-          </div>
-        )}
-        <div className="grid grid-cols-[minmax(0,1fr)_300px] items-start gap-[22px] max-[850px]:grid-cols-[minmax(0,1fr)_260px] max-[850px]:gap-[15px] max-[650px]:flex max-[650px]:flex-col max-[650px]:gap-0">
-          <div className="min-w-0 max-[650px]:w-full">
-            <PanelSettings
-              value={view?.panelPreferences}
-              theme={view?.panelTheme}
-              fontBase={view?.panelFontBase}
-              popoutSupported={saved?.popoutSupported === true}
-              connected={!!connected}
-              notify={notify}
-            />
-            {!form || !saved ? (
-              <Card className="flex items-center gap-3 text-xs text-muted-foreground p-9">
-                <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={22} />
-                <span>{live ? '正在读取设置…' : '等待本地服务…'}</span>
-              </Card>
-            ) : (
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void run('save', save);
-                }}
-              >
-                <Card aria-labelledby="features-title">
-                  <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
-                    <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
-                      <Layers2 size={18} />
-                    </span>
-                    <div>
-                      <h2
-                        className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
-                        id="features-title"
-                      >
-                        桌面浮窗
-                      </h2>
-                    </div>
-                  </div>
-                  <Toggle
-                    label="Stepwise"
-                    checked={form.enabled}
-                    onChange={(value) => change('enabled', value)}
-                  />
-                  <Toggle
-                    label="回答大纲"
-                    checked={form.answerOutlineEnabled}
-                    onChange={(value) => change('answerOutlineEnabled', value)}
-                  />
-                  <div className="pt-3">
-                    <Field id="generation-mode" label="建议生成方式">
-                      <NativeSelect
-                        id="generation-mode"
-                        value={form.generationMode}
-                        onChange={(e) =>
-                          change('generationMode', e.target.value as 'auto' | 'manual')
-                        }
-                      >
-                        <option value="manual">手动刷新</option>
-                        <option value="auto">自动生成</option>
-                      </NativeSelect>
-                    </Field>
-                  </div>
+          <ModelControlSettings live={live} />
+          {error && (
+            <div
+              className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"
+              role="alert"
+            >
+              {error}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="min-w-0 max-[650px]:w-full">
+              <PanelSettings
+                value={view?.panelPreferences}
+                fontBase={view?.panelFontBase}
+                popoutSupported={saved?.popoutSupported === true}
+                notify={notify}
+              />
+              {!form || !saved ? (
+                <Card className="flex items-center gap-3 text-xs text-muted-foreground p-9">
+                  <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={22} />
+                  <span>{live ? '正在读取设置…' : '等待本地服务…'}</span>
                 </Card>
-                <Card aria-labelledby="model-title">
-                  <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
-                    <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
-                      <Sparkles size={18} />
-                    </span>
-                    <div>
-                      <h2
-                        className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
-                        id="model-title"
-                      >
-                        Stepwise 模型
-                      </h2>
+              ) : (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void run('save', save);
+                  }}
+                >
+                  <Card tabIndex={-1} id="settings-features" aria-labelledby="features-title">
+                    <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
+                      <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
+                        <Layers2 size={18} />
+                      </span>
+                      <div>
+                        <h2
+                          className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
+                          id="features-title"
+                        >
+                          桌面浮窗
+                        </h2>
+                      </div>
                     </div>
-                  </div>
-                  {saved.environmentOverrides.length > 0 && (
-                    <div className="mb-4 rounded-[9px] border border-notice-border bg-notice px-[13px] py-[11px] text-[11px] leading-[1.8] text-notice-foreground [overflow-wrap:anywhere]">
-                      当前进程环境变量优先：{saved.environmentOverrides.join('、')}
-                      。修改对应字段后需去掉环境覆盖并重启。
-                    </div>
-                  )}
-                  <Field id="provider" label="模型来源">
-                    <NativeSelect
-                      id="provider"
-                      value={form.provider}
-                      onChange={(e) => change('provider', e.target.value as 'codex' | 'api')}
-                    >
-                      <option value="codex">现有 Codex 登录</option>
-                      <option value="api">指定 API</option>
-                    </NativeSelect>
-                  </Field>
-                  {form.provider === 'api' && (
-                    <>
-                      <Field id="protocol" label="API 协议">
+                    <Toggle
+                      label="Stepwise"
+                      checked={form.enabled}
+                      onChange={(value) => change('enabled', value)}
+                    />
+                    <Toggle
+                      label="回答大纲"
+                      checked={form.answerOutlineEnabled}
+                      onChange={(value) => change('answerOutlineEnabled', value)}
+                    />
+                    <div className="pt-3">
+                      <Field id="generation-mode" label="建议生成方式">
                         <NativeSelect
-                          id="protocol"
-                          value={form.protocol}
+                          id="generation-mode"
+                          value={form.generationMode}
                           onChange={(e) =>
-                            change('protocol', e.target.value as EditableSettings['protocol'])
+                            change('generationMode', e.target.value as 'auto' | 'manual')
                           }
                         >
-                          <option value="responses">OpenAI Responses</option>
-                          <option value="chat_completions">Chat Completions</option>
-                          <option value="anthropic_messages">Anthropic Messages</option>
-                          <option value="auto">自动识别</option>
+                          <option value="manual">手动刷新</option>
+                          <option value="auto">自动生成</option>
                         </NativeSelect>
                       </Field>
-                      <Field id="base-url" label="API 地址" hint="填写 API 根地址或完整请求端点。">
-                        <Input
-                          id="base-url"
-                          type="url"
-                          value={form.baseUrl}
-                          onChange={(e) => change('baseUrl', e.target.value)}
-                          placeholder="https://api.openai.com/v1"
-                          spellCheck={false}
-                        />
-                      </Field>
-                      <Field
-                        id="api-key"
-                        label="API 密钥"
-                        hint={
-                          saved.apiKeyConfigured
-                            ? '已配置。留空保留现有密钥，保存后不会回显。'
-                            : '密钥只保存在本机后台，桌面浮窗不会收到密钥。'
-                        }
+                    </div>
+                  </Card>
+                  <Card tabIndex={-1} id="settings-model" aria-labelledby="model-title">
+                    <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
+                      <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
+                        <Sparkles size={18} />
+                      </span>
+                      <div>
+                        <h2
+                          className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
+                          id="model-title"
+                        >
+                          Stepwise 模型
+                        </h2>
+                      </div>
+                    </div>
+                    {saved.environmentOverrides.length > 0 && (
+                      <div className="mb-4 rounded-[9px] border border-notice-border bg-notice px-[13px] py-[11px] text-[11px] leading-[1.8] text-notice-foreground [overflow-wrap:anywhere]">
+                        当前进程环境变量优先：{saved.environmentOverrides.join('、')}
+                        。修改对应字段后需去掉环境覆盖并重启。
+                      </div>
+                    )}
+                    <Field id="provider" label="模型来源">
+                      <NativeSelect
+                        id="provider"
+                        value={form.provider}
+                        onChange={(e) => change('provider', e.target.value as 'codex' | 'api')}
                       >
-                        <div className="relative flex items-center [&_input]:pr-[43px]">
+                        <option value="codex">现有 Codex 登录</option>
+                        <option value="api">指定 API</option>
+                      </NativeSelect>
+                    </Field>
+                    {form.provider === 'api' && (
+                      <>
+                        <Field id="protocol" label="API 协议">
+                          <NativeSelect
+                            id="protocol"
+                            value={form.protocol}
+                            onChange={(e) =>
+                              change('protocol', e.target.value as EditableSettings['protocol'])
+                            }
+                          >
+                            <option value="responses">OpenAI Responses</option>
+                            <option value="chat_completions">Chat Completions</option>
+                            <option value="anthropic_messages">Anthropic Messages</option>
+                            <option value="auto">自动识别</option>
+                          </NativeSelect>
+                        </Field>
+                        <Field
+                          id="base-url"
+                          label="API 地址"
+                          hint="填写 API 根地址或完整请求端点。"
+                        >
                           <Input
-                            id="api-key"
-                            type={showKey ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => {
-                              setApiKey(e.target.value);
-                              setDirty(true);
-                              setClearKey(false);
-                            }}
-                            placeholder={saved.storedApiKey ? '已保存 · 留空保留' : '输入 API key'}
-                            autoComplete="off"
+                            id="base-url"
+                            type="url"
+                            value={form.baseUrl}
+                            onChange={(e) => change('baseUrl', e.target.value)}
+                            placeholder="https://api.openai.com/v1"
                             spellCheck={false}
                           />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-1"
-                            aria-label={showKey ? '隐藏密钥' : '显示密钥'}
-                            onClick={() => setShowKey(!showKey)}
-                          >
-                            {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </Button>
-                        </div>
-                      </Field>
-                      {saved.storedApiKey && (
-                        <label className="-mt-1.5 mb-5 flex items-center gap-1.5 text-[10px] text-muted-foreground [&_input]:accent-primary">
-                          <input
-                            type="checkbox"
-                            checked={clearKey}
-                            onChange={(e) => {
-                              setClearKey(e.target.checked);
-                              setDirty(true);
-                            }}
-                          />
-                          保存时清除已存密钥
-                        </label>
-                      )}
-                      <Field
-                        id="api-key-env"
-                        label="或使用密钥环境变量"
-                        hint="填写变量名，读取后台进程的环境；环境值优先于已存密钥。"
-                      >
-                        <Input
+                        </Field>
+                        <Field
+                          id="api-key"
+                          label="API 密钥"
+                          hint={
+                            saved.apiKeyConfigured
+                              ? '已配置。留空保留现有密钥，保存后不会回显。'
+                              : '密钥只保存在本机后台，桌面浮窗不会收到密钥。'
+                          }
+                        >
+                          <div className="relative flex items-center [&_input]:pr-[43px]">
+                            <Input
+                              id="api-key"
+                              type={showKey ? 'text' : 'password'}
+                              value={apiKey}
+                              onChange={(e) => {
+                                setApiKey(e.target.value);
+                                setDirty(true);
+                                setClearKey(false);
+                              }}
+                              placeholder={
+                                saved.storedApiKey ? '已保存 · 留空保留' : '输入 API key'
+                              }
+                              autoComplete="off"
+                              spellCheck={false}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-1"
+                              aria-label={showKey ? '隐藏密钥' : '显示密钥'}
+                              onClick={() => setShowKey(!showKey)}
+                            >
+                              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                            </Button>
+                          </div>
+                        </Field>
+                        {saved.storedApiKey && (
+                          <label className="-mt-1.5 mb-5 flex items-center gap-1.5 text-[10px] text-muted-foreground [&_input]:accent-primary">
+                            <input
+                              type="checkbox"
+                              checked={clearKey}
+                              onChange={(e) => {
+                                setClearKey(e.target.checked);
+                                setDirty(true);
+                              }}
+                            />
+                            保存时清除已存密钥
+                          </label>
+                        )}
+                        <Field
                           id="api-key-env"
-                          value={form.apiKeyEnv}
-                          onChange={(e) => change('apiKeyEnv', e.target.value)}
-                          placeholder="CODEX_BUDDY_API_KEY"
+                          label="或使用密钥环境变量"
+                          hint="填写变量名，读取后台进程的环境；环境值优先于已存密钥。"
+                        >
+                          <Input
+                            id="api-key-env"
+                            value={form.apiKeyEnv}
+                            onChange={(e) => change('apiKeyEnv', e.target.value)}
+                            placeholder="CODEX_BUDDY_API_KEY"
+                            spellCheck={false}
+                          />
+                        </Field>
+                      </>
+                    )}
+                    <Field
+                      id="model"
+                      label="模型名称"
+                      hint={
+                        form.provider === 'codex'
+                          ? '留空沿用 Codex 当前模型。'
+                          : '可以手动输入，或保存连接后读取可用模型。'
+                      }
+                    >
+                      <div className="relative flex items-center [&_input]:pr-[110px]">
+                        <Input
+                          id="model"
+                          value={form.model}
+                          list="available-models"
+                          onChange={(e) => change('model', e.target.value)}
+                          placeholder={form.provider === 'codex' ? '沿用当前模型' : '模型 ID'}
                           spellCheck={false}
                         />
-                      </Field>
-                    </>
-                  )}
-                  <Field
-                    id="model"
-                    label="模型名称"
-                    hint={
-                      form.provider === 'codex'
-                        ? '留空沿用 Codex 当前模型。'
-                        : '可以手动输入，或保存连接后读取可用模型。'
-                    }
-                  >
-                    <div className="relative flex items-center [&_input]:pr-[110px]">
-                      <Input
-                        id="model"
-                        value={form.model}
-                        list="available-models"
-                        onChange={(e) => change('model', e.target.value)}
-                        placeholder={form.provider === 'codex' ? '沿用当前模型' : '模型 ID'}
-                        spellCheck={false}
-                      />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="absolute right-[5px]"
+                          disabled={!!busy || dirty}
+                          onClick={() =>
+                            void run('models', async () => {
+                              const result = await request<{ models: string[] }>('settings/models');
+                              setModels(result.models);
+                              notify(
+                                `已读取 ${result.models.length} 个模型，可在模型输入框中选择。`,
+                              );
+                            })
+                          }
+                        >
+                          <RefreshCw
+                            size={14}
+                            className={
+                              busy === 'models' ? 'animate-spin [animation-duration:1.2s]' : ''
+                            }
+                          />
+                          读取模型
+                        </Button>
+                      </div>
+                      <datalist id="available-models">
+                        {models.map((model) => (
+                          <option key={model} value={model} />
+                        ))}
+                      </datalist>
+                    </Field>
+                    <div className="mt-5 flex items-center justify-between gap-2.5 border-t border-border pt-4 [&>span]:flex [&>span]:items-center [&>span]:gap-1.5 [&>span]:text-[10px] [&>span]:text-muted-foreground">
+                      <span>
+                        <i
+                          className={
+                            saved.available
+                              ? 'inline-block size-1.5 rounded-full bg-[#648b74]'
+                              : 'inline-block size-1.5 rounded-full bg-[#b59463]'
+                          }
+                        />
+                        {saved.available ? '模型配置完整' : saved.reason || '等待配置'}
+                      </span>
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="absolute right-[5px]"
-                        disabled={!!busy || dirty}
-                        onClick={() =>
-                          void run('models', async () => {
-                            const result = await request<{ models: string[] }>('settings/models');
-                            setModels(result.models);
-                            notify(`已读取 ${result.models.length} 个模型，可在模型输入框中选择。`);
-                          })
-                        }
+                        disabled={!!busy || remoteChanged}
+                        onClick={() => void run('test', test)}
                       >
-                        <RefreshCw
-                          size={14}
-                          className={
-                            busy === 'models' ? 'animate-spin [animation-duration:1.2s]' : ''
-                          }
-                        />
-                        读取模型
+                        {busy === 'test' ? (
+                          <LoaderCircle
+                            className="animate-spin [animation-duration:1.2s]"
+                            size={15}
+                          />
+                        ) : (
+                          <Plug size={15} />
+                        )}
+                        {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
                       </Button>
                     </div>
-                    <datalist id="available-models">
-                      {models.map((model) => (
-                        <option key={model} value={model} />
-                      ))}
-                    </datalist>
-                  </Field>
-                  <div className="mt-5 flex items-center justify-between gap-2.5 border-t border-border pt-4 [&>span]:flex [&>span]:items-center [&>span]:gap-1.5 [&>span]:text-[10px] [&>span]:text-muted-foreground">
-                    <span>
-                      <i
-                        className={
-                          saved.available
-                            ? 'inline-block size-1.5 rounded-full bg-[#648b74]'
-                            : 'inline-block size-1.5 rounded-full bg-[#b59463]'
+                    <p className="mt-[7px] text-[10px] leading-[1.7] text-muted-foreground">
+                      连接测试使用固定示例，不读取你的聊天。
+                    </p>
+                  </Card>
+                  <Card tabIndex={-1} id="settings-limits" aria-labelledby="limits-title">
+                    <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
+                      <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
+                        <Settings2 size={18} />
+                      </span>
+                      <div>
+                        <h2
+                          className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
+                          id="limits-title"
+                        >
+                          生成限制
+                        </h2>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-[22px] gap-y-[18px] [&>div]:mb-0 max-[650px]:gap-x-[15px]">
+                      <Field id="max-items" label="最多建议数量">
+                        <Input
+                          id="max-items"
+                          type="number"
+                          min="1"
+                          max="6"
+                          value={form.maxItems}
+                          onChange={(e) => change('maxItems', Number(e.target.value))}
+                        />
+                      </Field>
+                      <Field id="max-input" label="输入字符上限">
+                        <Input
+                          id="max-input"
+                          type="number"
+                          min="500"
+                          max="32000"
+                          step="100"
+                          value={form.maxInputChars}
+                          onChange={(e) => change('maxInputChars', Number(e.target.value))}
+                        />
+                      </Field>
+                      <Field
+                        id="max-output"
+                        label="输出 token 上限"
+                        hint={
+                          form.provider === 'codex'
+                            ? '此项用于 API 模式；Codex CLI 由模型控制输出上限。'
+                            : undefined
                         }
-                      />
-                      {saved.available ? '模型配置完整' : saved.reason || '等待配置'}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={!!busy || remoteChanged}
-                      onClick={() => void run('test', test)}
+                      >
+                        <Input
+                          id="max-output"
+                          type="number"
+                          min="128"
+                          max="16000"
+                          step="1"
+                          disabled={form.provider === 'codex'}
+                          value={form.maxOutputTokens}
+                          onChange={(e) => change('maxOutputTokens', Number(e.target.value))}
+                        />
+                      </Field>
+                      <Field id="timeout" label="请求超时（秒）">
+                        <Input
+                          id="timeout"
+                          type="number"
+                          min="1"
+                          max="300"
+                          value={form.timeoutMs / 1000}
+                          onChange={(e) => change('timeoutMs', Number(e.target.value) * 1000)}
+                        />
+                      </Field>
+                    </div>
+                  </Card>
+                  <Card tabIndex={-1} id="settings-startup" aria-labelledby="startup-title">
+                    <h2 id="startup-title" className="mb-5 text-[15px] font-semibold">
+                      启动行为
+                    </h2>
+                    <Field
+                      id="host-restart-policy"
+                      label="ChatGPT 已打开，但没有调试连接时"
+                      hint={
+                        form.hostRestartPolicy === 'force'
+                          ? '直接强制退出并重开，可能中断任务或丢失未保存内容。已有调试连接时不会重启。'
+                          : '先询问；确认后请求正常退出，再重开并注入。取消或未能正常退出时保留应用。'
+                      }
                     >
-                      {busy === 'test' ? (
+                      <NativeSelect
+                        id="host-restart-policy"
+                        value={form.hostRestartPolicy}
+                        onChange={(e) =>
+                          change(
+                            'hostRestartPolicy',
+                            e.target.value as EditableSettings['hostRestartPolicy'],
+                          )
+                        }
+                      >
+                        <option value="ask">询问后正常重开</option>
+                        <option value="force">直接强制重开</option>
+                      </NativeSelect>
+                    </Field>
+                  </Card>
+                  {remoteChanged && (
+                    <div
+                      className="mb-4 rounded-[9px] border border-notice-border bg-notice px-[13px] py-[11px] text-[11px] leading-[1.8] text-notice-foreground [overflow-wrap:anywhere]"
+                      role="alert"
+                    >
+                      设置已在桌面或其他窗口更新。
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="min-h-0 p-2"
+                        onClick={() =>
+                          void run('reload', async () => load(await request<Settings>('settings')))
+                        }
+                      >
+                        重新载入设置
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between px-0.5 py-1.5 [&>span]:text-[11px] [&>span]:text-muted-foreground max-[650px]:sticky max-[650px]:bottom-0 max-[650px]:bg-background max-[650px]:px-px max-[650px]:py-3">
+                    <span>{dirty ? '有尚未保存的更改' : '设置已同步到本机'}</span>
+                    <Button type="submit" disabled={!!busy || !dirty || remoteChanged}>
+                      {busy === 'save' ? (
                         <LoaderCircle
                           className="animate-spin [animation-duration:1.2s]"
-                          size={15}
+                          size={16}
                         />
                       ) : (
-                        <Plug size={15} />
+                        <Save size={16} />
                       )}
-                      {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
+                      {busy === 'save' ? '正在保存…' : '保存设置'}
                     </Button>
                   </div>
-                  <p className="mt-[7px] text-[10px] leading-[1.7] text-muted-foreground">
-                    连接测试使用固定示例，不读取你的聊天。
-                  </p>
-                </Card>
-                <Card aria-labelledby="limits-title">
-                  <div className="mb-[22px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
-                    <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
-                      <Settings2 size={18} />
-                    </span>
-                    <div>
-                      <h2
-                        className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
-                        id="limits-title"
-                      >
-                        生成限制
-                      </h2>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-[22px] gap-y-[18px] [&>div]:mb-0 max-[650px]:gap-x-[15px]">
-                    <Field id="max-items" label="最多建议数量">
-                      <Input
-                        id="max-items"
-                        type="number"
-                        min="1"
-                        max="6"
-                        value={form.maxItems}
-                        onChange={(e) => change('maxItems', Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field id="max-input" label="输入字符上限">
-                      <Input
-                        id="max-input"
-                        type="number"
-                        min="500"
-                        max="32000"
-                        step="100"
-                        value={form.maxInputChars}
-                        onChange={(e) => change('maxInputChars', Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field
-                      id="max-output"
-                      label="输出 token 上限"
-                      hint={
-                        form.provider === 'codex'
-                          ? '此项用于 API 模式；Codex CLI 由模型控制输出上限。'
-                          : undefined
-                      }
+                </form>
+              )}
+            </div>
+            <div className="mt-6">
+              <Card
+                className="p-[22px] max-[850px]:p-[18px] max-[650px]:p-5"
+                tabIndex={-1}
+                id="settings-connection"
+                aria-labelledby="connection-title"
+              >
+                <div className="mb-[15px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
+                  <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
+                    <Monitor size={18} />
+                  </span>
+                  <div>
+                    <h2
+                      className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
+                      id="connection-title"
                     >
-                      <Input
-                        id="max-output"
-                        type="number"
-                        min="128"
-                        max="16000"
-                        step="1"
-                        disabled={form.provider === 'codex'}
-                        value={form.maxOutputTokens}
-                        onChange={(e) => change('maxOutputTokens', Number(e.target.value))}
-                      />
-                    </Field>
-                    <Field id="timeout" label="请求超时（秒）">
-                      <Input
-                        id="timeout"
-                        type="number"
-                        min="1"
-                        max="300"
-                        value={form.timeoutMs / 1000}
-                        onChange={(e) => change('timeoutMs', Number(e.target.value) * 1000)}
-                      />
-                    </Field>
+                      桌面连接
+                    </h2>
+                    <p>
+                      {import.meta.env.DEV
+                        ? '真实 Codex 调试'
+                        : connected
+                          ? '已连接官方 Codex'
+                          : '连接一个可调试的 Codex 窗口'}
+                    </p>
                   </div>
-                </Card>
-                <Card aria-labelledby="startup-title">
-                  <h2 id="startup-title" className="mb-5 text-[15px] font-semibold">
-                    启动行为
-                  </h2>
-                  <Field
-                    id="host-restart-policy"
-                    label="ChatGPT 已打开，但没有调试连接时"
-                    hint={
-                      form.hostRestartPolicy === 'force'
-                        ? '直接强制退出并重开，可能中断任务或丢失未保存内容。已有调试连接时不会重启。'
-                        : '先询问；确认后请求正常退出，再重开并注入。取消或未能正常退出时保留应用。'
-                    }
-                  >
+                </div>
+                <p className="mb-[21px] text-[11px] leading-[1.7] text-muted-foreground">
+                  {import.meta.env.DEV
+                    ? '连接启动时选定的真实窗口。开发配置独立保存；模型请求使用真实服务。'
+                    : view?.connection.message || '正在连接本地服务…'}
+                </p>
+                <Field id="cdp-endpoint" label="本机调试端口">
+                  <Input
+                    id="cdp-endpoint"
+                    readOnly={import.meta.env.DEV}
+                    value={endpoint}
+                    onChange={(e) => {
+                      setEndpoint(e.target.value);
+                      setTargetId('');
+                      setConnectionEdited(true);
+                    }}
+                    placeholder="9229 或 http://127.0.0.1:9229"
+                    spellCheck={false}
+                  />
+                </Field>
+                {(view?.connection.targets.length || 0) > 1 && (
+                  <Field id="target" label="Codex 窗口">
                     <NativeSelect
-                      id="host-restart-policy"
-                      value={form.hostRestartPolicy}
-                      onChange={(e) =>
-                        change(
-                          'hostRestartPolicy',
-                          e.target.value as EditableSettings['hostRestartPolicy'],
-                        )
-                      }
+                      id="target"
+                      disabled={import.meta.env.DEV}
+                      value={targetId}
+                      onChange={(e) => {
+                        setTargetId(e.target.value);
+                        setConnectionEdited(true);
+                      }}
                     >
-                      <option value="ask">询问后正常重开</option>
-                      <option value="force">直接强制重开</option>
+                      <option value="">自动选择</option>
+                      {view?.connection.targets.map((target) => (
+                        <option key={target.id} value={target.id}>
+                          {target.title}
+                        </option>
+                      ))}
                     </NativeSelect>
                   </Field>
-                </Card>
-                {remoteChanged && (
-                  <div
-                    className="mb-4 rounded-[9px] border border-notice-border bg-notice px-[13px] py-[11px] text-[11px] leading-[1.8] text-notice-foreground [overflow-wrap:anywhere]"
-                    role="alert"
+                )}
+                <div className="mt-4 flex items-center justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!live || !!busy}
+                    onClick={() => void run('connect', connect)}
                   >
-                    设置已在桌面或其他窗口更新。
+                    {busy === 'connect' ? (
+                      <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={15} />
+                    ) : (
+                      <Plug size={15} />
+                    )}
+                    {connected ? '重新连接' : '连接 Codex'}
+                  </Button>
+                  {connected && (
                     <Button
                       type="button"
                       variant="ghost"
                       className="min-h-0 p-2"
+                      disabled={!!busy}
                       onClick={() =>
-                        void run('reload', async () => load(await request<Settings>('settings')))
+                        void run('disconnect', async () => {
+                          await request('disconnect', {});
+                          notify('连接已断开，桌面浮窗已移除。');
+                        })
                       }
                     >
-                      重新载入设置
+                      断开
+                    </Button>
+                  )}
+                </div>
+                {!import.meta.env.DEV && (
+                  <div className="mt-[23px] border-t border-border pt-[17px] text-[10px] text-muted-foreground [&>button]:mt-[9px] [&>button]:w-full [&>button]:justify-between [&_code]:font-mono [&_code]:text-[8.5px] [&_code]:leading-[1.4] [&_code]:whitespace-nowrap max-[850px]:[&_code]:text-[7.4px] max-[650px]:[&_code]:text-[11px]">
+                    <span>首次接入：等待任务结束并完整退出 ChatGPT，再在终端运行</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-label="复制启动命令"
+                      onClick={() =>
+                        void run('copy', async () => {
+                          await navigator.clipboard.writeText(
+                            'codex-buddy launch --restart-running',
+                          );
+                          notify('已复制启动命令；将按启动行为设置处理已打开的 ChatGPT。');
+                        })
+                      }
+                    >
+                      <code>codex-buddy launch</code>
+                      <ChevronRight size={14} />
                     </Button>
                   </div>
                 )}
-                <div className="flex items-center justify-between px-0.5 py-1.5 [&>span]:text-[11px] [&>span]:text-muted-foreground max-[650px]:sticky max-[650px]:bottom-0 max-[650px]:bg-background max-[650px]:px-px max-[650px]:py-3">
-                  <span>{dirty ? '有尚未保存的更改' : '设置已同步到本机'}</span>
-                  <Button type="submit" disabled={!!busy || !dirty || remoteChanged}>
-                    {busy === 'save' ? (
-                      <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={16} />
-                    ) : (
-                      <Save size={16} />
-                    )}
-                    {busy === 'save' ? '正在保存…' : '保存设置'}
-                  </Button>
-                </div>
-              </form>
+              </Card>
+              <div className="flex justify-between border-t border-border px-1 py-4 text-[9px] text-muted-foreground [&>span]:opacity-65">
+                CodexBuddy {view?.version || '—'}
+                <span>本机运行</span>
+              </div>
+            </div>
+          </div>
+          <div
+            className={`fixed bottom-6 left-1/2 z-10 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-[9px] rounded-[11px] border border-border bg-card px-[15px] py-[13px] text-xs shadow-[0_5px_35px_#0002] empty:hidden [&_svg]:shrink-0 max-[650px]:bottom-[14px] max-[650px]:min-w-[280px] max-[650px]:text-[11px] ${failure ? 'text-[#b15555]' : ''}`}
+            role={failure ? 'alert' : 'status'}
+            aria-live="polite"
+          >
+            {message && (
+              <>
+                <Check size={16} />
+                <span>{message}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  aria-label="关闭提示"
+                  onClick={() => setMessage('')}
+                >
+                  ×
+                </Button>
+              </>
             )}
           </div>
-          <aside className="sticky top-[25px] max-[650px]:static max-[650px]:mt-5 max-[650px]:w-full">
-            <Card
-              className="p-[22px] max-[850px]:p-[18px] max-[650px]:p-5"
-              aria-labelledby="connection-title"
-            >
-              <div className="mb-[15px] flex items-start gap-[11px] [&_p]:mt-1 [&_p]:text-[11px] [&_p]:leading-[1.6] [&_p]:text-muted-foreground max-[650px]:[&_p]:text-[10px]">
-                <span className="grid size-[33px] shrink-0 place-items-center rounded-[10px] bg-muted text-foreground">
-                  <Monitor size={18} />
-                </span>
-                <div>
-                  <h2
-                    className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
-                    id="connection-title"
-                  >
-                    桌面连接
-                  </h2>
-                  <p>
-                    {import.meta.env.DEV
-                      ? '真实 Codex 调试'
-                      : connected
-                        ? '已连接官方 Codex'
-                        : '连接一个可调试的 Codex 窗口'}
-                  </p>
-                </div>
-              </div>
-              <p className="mb-[21px] text-[11px] leading-[1.7] text-muted-foreground">
-                {import.meta.env.DEV
-                  ? '连接启动时选定的真实窗口。开发配置独立保存；模型请求使用真实服务。'
-                  : view?.connection.message || '正在连接本地服务…'}
-              </p>
-              <Field id="cdp-endpoint" label="本机调试端口">
-                <Input
-                  id="cdp-endpoint"
-                  readOnly={import.meta.env.DEV}
-                  value={endpoint}
-                  onChange={(e) => {
-                    setEndpoint(e.target.value);
-                    setTargetId('');
-                    setConnectionEdited(true);
-                  }}
-                  placeholder="9229 或 http://127.0.0.1:9229"
-                  spellCheck={false}
-                />
-              </Field>
-              {(view?.connection.targets.length || 0) > 1 && (
-                <Field id="target" label="Codex 窗口">
-                  <NativeSelect
-                    id="target"
-                    disabled={import.meta.env.DEV}
-                    value={targetId}
-                    onChange={(e) => {
-                      setTargetId(e.target.value);
-                      setConnectionEdited(true);
-                    }}
-                  >
-                    <option value="">自动选择</option>
-                    {view?.connection.targets.map((target) => (
-                      <option key={target.id} value={target.id}>
-                        {target.title}
-                      </option>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              )}
-              <div className="mt-4 flex items-center justify-between">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!live || !!busy}
-                  onClick={() => void run('connect', connect)}
-                >
-                  {busy === 'connect' ? (
-                    <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={15} />
-                  ) : (
-                    <Plug size={15} />
-                  )}
-                  {connected ? '重新连接' : '连接 Codex'}
-                </Button>
-                {connected && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="min-h-0 p-2"
-                    disabled={!!busy}
-                    onClick={() =>
-                      void run('disconnect', async () => {
-                        await request('disconnect', {});
-                        notify('连接已断开，桌面浮窗已移除。');
-                      })
-                    }
-                  >
-                    断开
-                  </Button>
-                )}
-              </div>
-              {!import.meta.env.DEV && (
-                <div className="mt-[23px] border-t border-border pt-[17px] text-[10px] text-muted-foreground [&>button]:mt-[9px] [&>button]:w-full [&>button]:justify-between [&_code]:font-mono [&_code]:text-[8.5px] [&_code]:leading-[1.4] [&_code]:whitespace-nowrap max-[850px]:[&_code]:text-[7.4px] max-[650px]:[&_code]:text-[11px]">
-                  <span>首次接入：等待任务结束并完整退出 ChatGPT，再在终端运行</span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-label="复制启动命令"
-                    onClick={() =>
-                      void run('copy', async () => {
-                        await navigator.clipboard.writeText('codex-buddy launch --restart-running');
-                        notify('已复制启动命令；将按启动行为设置处理已打开的 ChatGPT。');
-                      })
-                    }
-                  >
-                    <code>codex-buddy launch</code>
-                    <ChevronRight size={14} />
-                  </Button>
-                </div>
-              )}
-            </Card>
-            <div className="flex justify-between border-t border-border px-1 py-4 text-[9px] text-muted-foreground [&>span]:opacity-65">
-              CodexBuddy {view?.version || '—'}
-              <span>本机运行</span>
-            </div>
-          </aside>
-        </div>
-        <div
-          className={`fixed bottom-6 left-1/2 z-10 flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-[9px] rounded-[11px] border border-border bg-card px-[15px] py-[13px] text-xs shadow-[0_5px_35px_#0002] empty:hidden [&_svg]:shrink-0 max-[650px]:bottom-[14px] max-[650px]:min-w-[280px] max-[650px]:text-[11px] ${failure ? 'text-[#b15555]' : ''}`}
-          role={failure ? 'alert' : 'status'}
-          aria-live="polite"
-        >
-          {message && (
-            <>
-              <Check size={16} />
-              <span>{message}</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                type="button"
-                aria-label="关闭提示"
-                onClick={() => setMessage('')}
-              >
-                ×
-              </Button>
-            </>
-          )}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

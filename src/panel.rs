@@ -686,18 +686,6 @@ impl App {
         .await
     }
 
-    pub async fn set_panel_theme(&self, input: Value) -> Result<Value> {
-        let mode = input["mode"].as_str().context("缺少主题")?;
-        if !["light", "dark"].contains(&mode) {
-            bail!("主题无效");
-        }
-        let client = self.desktop_client().await.context("请先连接 Codex")?;
-        client.evaluate(format!(
-            "(async () => {{const p=window.__companionFloatingPanel; if (!p?.setThemeMode) throw new Error('请重新连接 Codex'); await p.setThemeMode({}); return {{ok:true}};}})()",
-            json!(mode)
-        )).await
-    }
-
     pub(crate) async fn observe_panel_ui(&self, revision: u64, ui: Value) -> Result<()> {
         let mut panel = self.panel.lock().await;
         if panel.ready || panel.prefs.detached || panel.prefs.revision != revision {
@@ -1180,7 +1168,6 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(app.appearance().await, changed);
-        assert!(app.set_panel_theme(json!({"mode":"dark"})).await.is_err());
     }
 
     #[test]

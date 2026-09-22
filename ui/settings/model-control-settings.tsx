@@ -85,7 +85,12 @@ export function ModelControlSettings({ live }: { live: boolean }) {
   const disabled = !live || busy || !prefs;
   const missing = prefs?.screen && !displays.screens.some((s) => s.id === prefs.screen);
   return (
-    <section aria-label="模型快切设置" className="mb-5 rounded-xl border border-border bg-card p-4">
+    <section
+      tabIndex={-1}
+      id="settings-model-control"
+      aria-label="模型快切设置"
+      className="mb-5 rounded-xl border border-border bg-card p-4"
+    >
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-sm font-medium">模型快切</h2>

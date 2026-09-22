@@ -134,7 +134,6 @@ fn router(service: Service) -> Router {
         .route("/panel/open", post(panel_open))
         .route("/panel/close", post(close_panel))
         .route("/appearance", get(appearance).post(save_appearance))
-        .route("/appearance/theme", post(panel_theme))
         .route("/panel/ready", post(panel_ready))
         .route("/panel/anchor", post(panel_anchor))
         .route("/panel/presented", post(panel_presented))
@@ -649,7 +648,14 @@ mod tests {
             token: "test-token".into(),
             port: 47831,
         });
-        for path in ["select-message", "navigate", "stepwise", "cancel", "fill"] {
+        for path in [
+            "select-message",
+            "navigate",
+            "stepwise",
+            "cancel",
+            "fill",
+            "appearance/theme",
+        ] {
             let response = router
                 .clone()
                 .oneshot(
@@ -723,12 +729,6 @@ async fn save_appearance(
     Json(input): Json<Value>,
 ) -> Result<Json<crate::panel::Preferences>, ApiError> {
     Ok(Json(service.app.save_appearance(input).await?))
-}
-async fn panel_theme(
-    State(service): State<Service>,
-    Json(input): Json<Value>,
-) -> Result<Json<Value>, ApiError> {
-    Ok(Json(service.app.set_panel_theme(input).await?))
 }
 async fn close_panel(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_panel().await?))

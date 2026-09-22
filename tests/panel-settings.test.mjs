@@ -17,7 +17,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
         import { createRoot } from 'react-dom/client';
         import { PanelSettings } from './ui/settings/panel-settings';
         window.renderSettings = (value) => createRoot(document.getElementById('root')).render(
-          <PanelSettings value={value} theme="dark" connected={true} popoutSupported={true}
+          <PanelSettings value={value} popoutSupported={true}
             notify={(text, failed) => window.notices.push({text, failed})} />);`,
       resolveDir: new URL('..', import.meta.url).pathname,
       loader: 'tsx',
@@ -144,7 +144,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.equal(prefs.ui.popoutLayout.mode, 'auto');
     assert.equal(prefs.ui.dockLayout.verticalRatio, 0.6);
 
-    assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).inputValue(), 'dark');
+    assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).count(), 0);
     assert.equal(prefs.ui.width, 510);
     assert.equal(prefs.ui.height, 600);
     assert.equal(prefs.ui.material, 'frosted');

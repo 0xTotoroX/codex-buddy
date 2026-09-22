@@ -88,7 +88,7 @@ import {
   setDetached,
   syncPanelPreferences,
 } from './presentation.js';
-import { fallbackHostTypography, setCodexThemeMode } from '../host/host-appearance.js';
+import { fallbackHostTypography } from '../host/host-appearance.js';
 import { installStyle } from '../core/install-styles.js';
 import {
   invalidateOutline,
@@ -546,7 +546,6 @@ function install() {
     blinkHandoff,
     panelCommand,
     setDetached,
-    setThemeMode: setCodexThemeMode,
     syncPanelPreferences,
     receivePanelState,
     panelDisconnected,
