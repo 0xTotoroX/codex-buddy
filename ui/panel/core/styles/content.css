@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 建议列表、预览、大纲和内容状态的布局与外观，定位按钮透明无底块。
+ * [OUTPUT]: 建议列表、预览、大纲和内容状态的布局与外观，定位按钮透明无底块，鼠标离开后仅键盘聚焦保留导航。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -394,7 +394,7 @@
 }
 
 .csw-popover[data-open='true']:hover .csw-outline-toolbar,
-.csw-popover[data-open='true']:focus-within .csw-outline-toolbar {
+.csw-popover[data-open='true'] .csw-outline-toolbar:has(:focus-visible) {
   opacity: 1;
   pointer-events: auto;
   transform: translateY(0);

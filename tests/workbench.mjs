@@ -807,6 +807,53 @@ const cases = [
         })),
         { background: 'rgba(0, 0, 0, 0)', shadow: 'none' },
       );
+      await page.keyboard.press('Tab');
+      await gear.focus();
+      assert.deepEqual(
+        await gear.evaluate((node) => {
+          const style = getComputedStyle(node);
+          return {
+            keyboard: node.matches(':focus-visible'),
+            neutral: style.outlineColor === style.color,
+            width: style.outlineWidth,
+          };
+        }),
+        { keyboard: true, neutral: true, width: '1px' },
+        'tool icons retain the shared neutral keyboard outline',
+      );
+      const nav = page.locator('.csw-outline-nav-button').first();
+      const toolbar = page.locator('.csw-outline-toolbar');
+      await nav.click();
+      await page.mouse.move(0, 0);
+      await settle(page);
+      assert.deepEqual(
+        await toolbar.evaluate((node) => ({
+          hovered: node.closest('.csw-popover').matches(':hover'),
+          opacity: getComputedStyle(node).opacity,
+          pointerEvents: getComputedStyle(node).pointerEvents,
+          keyboard: document.activeElement.matches(':focus-visible'),
+        })),
+        { hovered: false, opacity: '0', pointerEvents: 'none', keyboard: false },
+        'mouse focus does not leave outline navigation visible after exiting',
+      );
+      await page.keyboard.press('Tab');
+      await nav.focus();
+      assert.equal(await toolbar.evaluate((node) => getComputedStyle(node).opacity), '1');
+      await page.keyboard.press('Tab');
+      assert.equal(
+        await page
+          .locator('.csw-outline-nav-button')
+          .last()
+          .evaluate((node) => node === document.activeElement),
+        true,
+        'hidden navigation remains reachable and visible using the keyboard',
+      );
+      await gear.focus();
+      assert.equal(
+        await toolbar.evaluate((node) => getComputedStyle(node).opacity),
+        '0',
+        'keyboard focus elsewhere does not expose outline navigation',
+      );
       await page.screenshot({ path: resolve(output, 'unified-shell-focus.png') });
       await page.locator('.csw-workbench-face').press('Alt+Enter');
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 10);

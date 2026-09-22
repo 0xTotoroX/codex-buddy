@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 胶囊设置控件（单一材质选择）、透明按钮悬停反馈、焦点和响应式布局。
+ * [OUTPUT]: 胶囊设置控件（单一材质选择）、透明按钮悬停反馈、工具图标沿用公共中性色焦点和响应式布局。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -452,7 +452,6 @@
   color: color-mix(in srgb, var(--csw-danger) 78%, var(--csw-muted));
 }
 
-.csw-icon:focus-visible,
 .csw-control-button:focus-visible,
 .csw-metric-action:focus-visible,
 .csw-step-button:focus-visible,
