@@ -1096,6 +1096,77 @@ test('no pins shows all models directly; compact content sizes and wide matrices
   await cleanup(ctx);
 });
 
+test('native contour uses a prepared fixed viewport and acknowledges only current scenes', async () => {
+  const ctx = await setup({
+    expand: false,
+    viewport: { width: 480, height: 300 },
+    controlledClock: true,
+  });
+  const { page } = ctx;
+  const scene = {
+    nativeShell: true,
+    sceneRevision: 1,
+    expanded: false,
+    unfold: 0,
+    width: 480,
+    height: 300,
+    layoutWidth: 480,
+    layoutHeight: 300,
+    layoutX: 0,
+    layoutY: 0,
+    compactX: 470,
+    compactY: 110,
+    compactWidth: 10,
+    compactHeight: 80,
+    edge: 'right',
+  };
+  await nativeEvent(page, scene);
+  await nativeEvent(page, { sceneRevision: 2 });
+  await page.clock.runFor(80);
+  const acks = await page.evaluate(() =>
+    window.nativeMessages.filter((m) => m.action === 'scene-ready'),
+  );
+  assert.deepEqual(
+    acks.map((m) => m.revision),
+    [2],
+  );
+  const surface = () =>
+    page.locator('#surface').evaluate((n) => ({
+      clip: getComputedStyle(n).clipPath,
+      width: n.clientWidth,
+      height: n.clientHeight,
+      left: n.getBoundingClientRect().left,
+      top: n.getBoundingClientRect().top,
+    }));
+  const expected = { clip: 'none', width: 480, height: 300, left: 0, top: 0 };
+  assert.deepEqual(await surface(), expected);
+  assert.equal(await page.locator('#panel').evaluate((n) => n.clientWidth), 480);
+  assert.equal(await page.locator('#panel').evaluate((n) => n.inert), true);
+  assert.equal((await page.locator('#handle').boundingBox()).x, 470);
+  assert.ok(
+    await page.evaluate(() =>
+      window.nativeMessages.some((m) => m.action === 'content-size' && m.height > 144),
+    ),
+  );
+  for (const edge of ['right', 'left', 'top']) {
+    for (const unfold of [0.08, 0.3, 0.7, 1, 0.6, 0]) {
+      await nativeEvent(page, {
+        edge,
+        expanded: unfold > 0,
+        animating: unfold > 0 && unfold < 1,
+        unfold,
+      });
+      assert.deepEqual(await surface(), expected);
+      if (unfold > 0)
+        assert.ok(await page.locator('#panel').evaluate((n) => +getComputedStyle(n).opacity > 0));
+      // No geometry messages during these frames: a delayed WebView retains full background coverage.
+      await page.clock.runFor(100);
+      assert.deepEqual(await surface(), expected);
+    }
+  }
+  await cleanup(ctx);
+});
+
 try {
   for (const { name, run } of cases) {
     if (process.env.MODEL_CONTROL_CASE && !name.includes(process.env.MODEL_CONTROL_CASE)) continue;

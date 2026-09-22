@@ -1,5 +1,5 @@
 // [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
-// [OUTPUT]: 贴合物理边缘的内容高度布局、精确点击/稳定悬停命中、多屏选择与可反向连续开合进度。
+// [OUTPUT]: 稳定承载窗口的整点包围盒、贴合物理边缘的内容高度布局、精确点击/稳定悬停命中、多屏选择与可反向连续开合进度。
 // [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
@@ -8,7 +8,7 @@ pub const COMPACT_LENGTH: f64 = 80.;
 pub const NOTCH_FLANK: f64 = 10.;
 
 // Critically damped 0.42s response, inspired by Codenotch's unfold timing.
-// One continuous value drives window bounds, native material and web contents.
+// One continuous value drives the native contour inside a stable window.
 #[derive(Default)]
 pub struct Unfold {
     pub value: f64,
@@ -58,6 +58,35 @@ pub struct Rect {
 }
 
 impl Rect {
+    pub fn union(self, other: Self) -> Self {
+        let x = self.x.min(other.x);
+        let y = self.y.min(other.y);
+        Self {
+            x,
+            y,
+            width: (self.x + self.width).max(other.x + other.width) - x,
+            height: (self.y + self.height).max(other.y + other.height) - y,
+        }
+    }
+    // AppKit rounds NSWindow origins; enclose fractional layouts without clipping their far edge.
+    pub fn integral(self) -> Self {
+        let x = self.x.floor();
+        let y = self.y.floor();
+        Self {
+            x,
+            y,
+            width: (self.x + self.width).ceil() - x,
+            height: (self.y + self.height).ceil() - y,
+        }
+    }
+    pub fn relative_to(self, host: Self) -> Self {
+        Self {
+            x: self.x - host.x,
+            y: self.y - host.y,
+            ..self
+        }
+    }
+
     pub fn contains(self, x: f64, y: f64) -> bool {
         x >= self.x && x < self.x + self.width && y >= self.y && y < self.y + self.height
     }
@@ -336,6 +365,46 @@ mod tests {
             notch_width: 0.,
             notch_height: 0.,
             notch_x: 0.,
+        }
+    }
+
+    #[test]
+    fn stable_host_contains_every_frame_and_preserves_physical_edge() {
+        let mut display = screen("offset", -1728., 180., 1728., 1117.);
+        for notched in [false, true] {
+            display.notch_width = if notched { 200. } else { 0. };
+            display.notch_height = if notched { 32. } else { 0. };
+            display.notch_x = -964.;
+            display.usable.height = if notched { 1085. } else { 1117. };
+            for edge in [Edge::Left, Edge::Right, Edge::Top] {
+                for position in [0., 0.23, 0.5, 1.] {
+                    let compact = layout(&display, edge, position, false);
+                    let expanded = layout_height(&display, edge, position, true, 312.);
+                    let host = compact.union(expanded).integral();
+                    for progress in [0., 0.02, 0.15, 0.5, 0.98, 1., 0.7, 0.] {
+                        let shell = Unfold {
+                            value: progress,
+                            velocity: 0.,
+                        }
+                        .frame(compact, expanded)
+                        .relative_to(host);
+                        assert!(shell.x >= -1e-8 && shell.y >= -1e-8);
+                        assert!(shell.x + shell.width <= host.width + 1e-8);
+                        assert!(shell.y + shell.height <= host.height + 1e-8);
+                        let gap = match edge {
+                            Edge::Left => shell.x,
+                            Edge::Right => host.width - shell.x - shell.width,
+                            Edge::Top => host.height - shell.y - shell.height,
+                        };
+                        assert!(gap.abs() < 1e-8);
+                    }
+                    if notched && edge == Edge::Top {
+                        let hole = excluded_notch(&display, host, edge, true);
+                        assert_eq!(hole.x + host.x, display.notch_x);
+                        assert_eq!(hole.y + hole.height, host.height);
+                    }
+                }
+            }
         }
     }
 

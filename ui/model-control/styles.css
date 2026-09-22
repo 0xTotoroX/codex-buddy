@@ -1,7 +1,7 @@
 /* [INPUT]: 原生几何、动态模型列数与共享字号。
  * [OUTPUT]: 固定纯黑外壳及跟随宿主配色的三种可选材质、紧凑矩阵、按需工具及无内边距常驻轮廓过渡。
  * [POS]: 模型快切独立表面，不继承工作台材质。
- * [PROTOCOL]: 凹角轮廓与原生命中/高度协议同步维护。 */
+ * [PROTOCOL]: 原生模式保持整视口背景和固定内容布局，由原生根遮罩裁切；浏览器回退保留凹角路径。 */
 @import url('/model-control/tokens.css');
 :root {
   color-scheme: dark;
@@ -525,4 +525,29 @@ body[data-material='black'] .choices button {
 body[data-material='black'] .choices button[aria-pressed='true'] {
   color: var(--accent);
   background: #75a7ff1a;
+}
+
+/* The native root mask owns the contour; delayed JS cannot detach it from the edge. */
+body[data-native-shell='true'] #surface {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  clip-path: none;
+}
+body[data-native-shell='true'] #panel {
+  position: absolute;
+  left: var(--layout-x, 0px);
+  top: var(--layout-y, 0px);
+  width: var(--layout-width, 480px);
+  max-height: var(--layout-height, 100vh);
+}
+body[data-native-shell='true'][data-presenting='false'] #panel {
+  visibility: hidden;
+}
+body[data-native-shell='true'] #handle {
+  position: absolute;
+  left: var(--compact-x, 0px);
+  top: var(--compact-y, 0px);
 }

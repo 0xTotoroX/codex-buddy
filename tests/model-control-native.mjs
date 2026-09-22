@@ -117,6 +117,26 @@ const envelope = () => ({ preferences: prefs, snapshot, revision });
 
 // Probe code is served only by this synthetic backend, never added to a product page/build.
 function probePage() {
+  const send = window.ipc.postMessage.bind(window.ipc);
+  window.heldScenes = [];
+  let holdScenes = true;
+  window.fixturePostMessage = (raw) => {
+    if (holdScenes && JSON.parse(raw).action === 'scene-ready') window.heldScenes.push(raw);
+    else send(raw);
+  };
+  window.releaseScenes = () => {
+    holdScenes = false;
+    for (const raw of window.heldScenes.splice(0)) send(raw);
+  };
+  const dispatch = window.dispatchEvent.bind(window);
+  window.dispatchEvent = (event) => {
+    if (window.deferNative && event.type === 'model-control-native') {
+      window.delayedNative = event.detail;
+      return true;
+    }
+    return dispatch(event);
+  };
+
   let native = null,
     nativeEvents = 0,
     keyboardActivations = 0,
@@ -164,6 +184,9 @@ function probePage() {
         body: JSON.stringify({
           native,
           nativeEvents,
+          heldScenes: window.heldScenes.length,
+          delayedNative: window.delayedNative,
+          clip: getComputedStyle(document.getElementById('surface')).clipPath,
           motion,
           keyboardActivations,
           errors,
@@ -249,7 +272,14 @@ const server = createServer(async (request, response) => {
     response.writeHead(200, {
       'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript',
     });
-    return response.end(readFileSync(join(root, files[path])));
+    let source = readFileSync(join(root, files[path]), 'utf8');
+    if (path === '/model-control/app.js') {
+      // Wry's IPC object is immutable: fault-inject only the fixture's transport call.
+      const call = 'window.ipc.postMessage(JSON.stringify(message))';
+      assert.ok(source.includes(call));
+      source = source.replace(call, 'window.fixturePostMessage(JSON.stringify(message))');
+    }
+    return response.end(source);
   }
   response.writeHead(404);
   response.end();
@@ -340,16 +370,28 @@ try {
     }),
   );
   start();
+  await until(() => telemetry?.heldScenes > 0, 'initial scene laid out while presentation is held');
+  assert.equal(telemetry.native.painted, false);
+  assert.ok(!windowInfo() || windowInfo().kCGWindowAlpha === 0);
+  await ipc({ action: 'scene-ready', revision: telemetry.native.sceneRevision - 1 });
+  await delay(150);
+  assert.equal(telemetry.native.painted, false);
+  assert.ok(!windowInfo() || windowInfo().kCGWindowAlpha === 0);
+  await command('window.releaseScenes()');
   await until(
-    () => telemetry?.native?.width === 10 && telemetry.native.height === 80,
+    () =>
+      telemetry?.native?.painted &&
+      telemetry.native.shell.width === 10 &&
+      telemetry.native.shell.height === 80,
     'initial compact',
   );
   assert.equal(telemetry.native.expanded, false);
   assert.equal(telemetry.native.keyboard, false);
   const initial = windowInfo();
-  assert.equal(initial.kCGWindowBounds.Width, 10);
-  assert.equal(initial.kCGWindowBounds.Height, 80);
-  check('initial reveal baseline is compact', initial.kCGWindowBounds);
+  assert.equal(initial.kCGWindowBounds.Width, 480);
+  assert.deepEqual(telemetry.viewport, [480, initial.kCGWindowBounds.Height]);
+  check('initial painted compact shell has a prepared stable viewport', initial.kCGWindowBounds);
+  check('initial presentation waits for current scene and rejects stale paint acknowledgements');
   assert.equal(telemetry.native.allSpaces, true);
   assert.equal(telemetry.native.fullScreenAuxiliary, true);
   const screen = telemetry.native.screen;
@@ -383,7 +425,11 @@ try {
 
   if (environment.canPostEvents) {
     const bounds = windowInfo().kCGWindowBounds;
-    execFileSync(inputProbe, ['move', String(bounds.X + bounds.Width / 2), String(bounds.Y + 40)]);
+    execFileSync(inputProbe, [
+      'move',
+      String(bounds.X + telemetry.native.compactX + 5),
+      String(bounds.Y + telemetry.native.compactY + 40),
+    ]);
   } else {
     await command(
       "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:true,buttons:0,hoverSuppressed:false}}))",
@@ -395,9 +441,11 @@ try {
   );
   assert.ok(telemetry.native.unfold > 0 && telemetry.native.unfold < 1);
   const intermediate = windowInfo().kCGWindowBounds;
-  assert.ok(intermediate.Width > 10 && intermediate.Width < 480);
+  assert.equal(intermediate.Width, 480);
+  assert.ok(telemetry.native.shell.width > 10 && telemetry.native.shell.width < 480);
+  assert.ok(Math.abs(telemetry.native.shell.x + telemetry.native.shell.width - 480) < 0.001);
   await capture('unfold-middle');
-  check('native bounds unfold progressively instead of jumping');
+  check('native contour unfolds against a fixed screen edge inside a stable window');
   await until(() => telemetry.native.expanded && !telemetry.native.animating, 'unfold settles');
   assert.equal(telemetry.native.keyboard, false);
   assert.equal(
@@ -410,6 +458,31 @@ try {
       : 'synthetic native pointer message expands without stealing focus',
   );
   await capture('expanded');
+  const stableBounds = windowInfo().kCGWindowBounds;
+  await command('window.deferNative = true');
+  await ipc({ action: 'collapse' });
+  await until(
+    () =>
+      telemetry.delayedNative &&
+      !telemetry.delayedNative.animating &&
+      !telemetry.delayedNative.expanded,
+    'native collapse while JS geometry is delayed',
+  );
+  assert.equal(telemetry.native.expanded, true, 'page has not received the collapse');
+  assert.equal(telemetry.delayedNative.shell.width, 10);
+  assert.deepEqual(windowInfo().kCGWindowBounds, stableBounds);
+  assert.equal(telemetry.clip, 'none');
+  await capture('delayed-webview-native-compact');
+  await command(
+    "window.deferNative = false; window.dispatchEvent(new CustomEvent('model-control-native',{detail:window.delayedNative}))",
+  );
+  await until(() => !telemetry.native.expanded, 'deliver held native geometry');
+  check('native contour collapses independently while WebView geometry delivery is withheld');
+  await ipc({ action: 'expand' });
+  await until(
+    () => telemetry.native.expanded && !telemetry.native.animating,
+    'restore after delayed delivery',
+  );
 
   await ipc({ action: 'collapse' });
   await until(
@@ -462,8 +535,9 @@ try {
     () => !telemetry.native.expanded && !telemetry.native.animating && !telemetry.native.keyboard,
     'collapse',
   );
-  assert.equal(windowInfo().kCGWindowBounds.Width, 10);
-  check('collapse shrinks actual WindowServer bounds');
+  assert.equal(windowInfo().kCGWindowBounds.Width, 480);
+  assert.equal(telemetry.native.shell.width, 10);
+  check('collapse retains prepared viewport and shrinks only the native contour');
   await command("document.getElementById('panel').dispatchEvent(new PointerEvent('pointerleave'))");
   prefs.keepOpen = true;
   revision++;
@@ -485,9 +559,13 @@ try {
   await ipc({ action: 'edge', edge: 'top' });
   await until(() => prefs.edge === 'top' && telemetry.native.edge === 'top', 'top edge');
   const top = windowInfo().kCGWindowBounds;
-  assert.equal(top.Width, telemetry.native.compactWidth);
-  assert.equal(top.Height, telemetry.native.compactHeight);
-  if (telemetry.native.notchWidth > 0) assert(top.Width >= telemetry.native.notchWidth + 64);
+  assert.equal(telemetry.native.shell.width, telemetry.native.compactWidth);
+  assert.equal(telemetry.native.shell.height, telemetry.native.compactHeight);
+  assert.ok(
+    Math.abs(telemetry.native.shell.y + telemetry.native.shell.height - top.Height) < 0.001,
+  );
+  if (telemetry.native.notchWidth > 0)
+    assert(telemetry.native.shell.width >= telemetry.native.notchWidth + 20);
   await capture('top-compact');
   check('physical notch dock or unnotched top fallback', { bounds: top, native: telemetry.native });
   const saved = prefs.screen;
@@ -554,8 +632,12 @@ try {
     const backed = ['frosted', 'native-glass'].includes(effective);
     assert.equal(telemetry.native.nativeBackdrop, backed);
     assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
-    assert.equal(windowInfo().kCGWindowBounds.Width, 480);
-    assert.deepEqual(telemetry.viewport, [480, windowInfo().kCGWindowBounds.Height]);
+    const bounds = windowInfo().kCGWindowBounds;
+    assert.ok(
+      bounds.Width >= telemetry.native.layoutWidth &&
+        bounds.Width <= telemetry.native.layoutWidth + 1,
+    );
+    assert.deepEqual(telemetry.viewport, [bounds.Width, bounds.Height]);
     if (fallback)
       report.skipped.push({
         name: `native glass ${variant}`,
@@ -581,8 +663,7 @@ try {
     assert.equal(telemetry.native.nativeBackdrop, backed);
     assert.equal(telemetry.native.backdropStyle, fallback ? null : style);
     assert.equal(telemetry.handleBackground, expandedBackground);
-    const compactBounds = windowInfo().kCGWindowBounds;
-    assert.equal(Math.min(compactBounds.Width, compactBounds.Height), 10);
+    assert.equal(Math.min(telemetry.native.shell.width, telemetry.native.shell.height), 10);
     await capture(`compact-${theme}-${variant}`);
     check(`compact retains ${theme}/${variant} material`);
     await ipc({ action: 'expand', keyboard: true });

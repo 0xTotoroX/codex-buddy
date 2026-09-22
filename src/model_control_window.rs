@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
+// [OUTPUT]: macOS 14+ 稳定视口与原生整树轮廓、首帧就绪门控的非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -52,6 +52,18 @@ struct HitRegion {
     excluded: Cell<Rect>,
     allowed: Cell<Rect>,
     edge: Cell<Edge>,
+    flanks: Cell<[Rect; 2]>,
+}
+impl HitRegion {
+    fn contains(&self, x: f64, y: f64) -> bool {
+        !self.excluded.get().contains(x, y)
+            && (SurfaceRegion {
+                rect: self.allowed.get(),
+                edge: self.edge.get(),
+            }
+            .contains(x, y)
+                || self.flanks.get().iter().any(|r| r.contains(x, y)))
+    }
 }
 
 define_class!(
@@ -64,8 +76,7 @@ define_class!(
     impl ControlView {
         #[unsafe(method(hitTest:))]
         fn hit_test(&self, point: NSPoint) -> *mut NSView {
-            if !(SurfaceRegion {rect: self.ivars().allowed.get(), edge: self.ivars().edge.get()}).contains(point.x, point.y)
-                || self.ivars().excluded.get().contains(point.x, point.y) { return std::ptr::null_mut(); }
+            if !self.ivars().contains(point.x, point.y) { return std::ptr::null_mut(); }
             unsafe { msg_send![super(self), hitTest: point] }
         }
     }
@@ -106,6 +117,8 @@ impl ControlPanel {
                 | NSWindowCollectionBehavior::Stationary
                 | NSWindowCollectionBehavior::FullScreenAuxiliary,
         );
+        panel.setIgnoresMouseEvents(true);
+        panel.setAlphaValue(0.);
         panel.setOpaque(false);
         panel.setBackgroundColor(Some(&NSColor::clearColor()));
         panel.setHasShadow(false);
@@ -295,6 +308,11 @@ struct Surface {
     keyboard: bool,
     hidden: bool,
     ready: bool,
+    painted: bool,
+    scene_revision: u64,
+    painted_revision: u64,
+    last_scene: Option<Value>,
+    shell: Rect,
     valid: bool,
     reveal: Option<u64>,
     pending_keyboard: bool,
@@ -320,7 +338,19 @@ impl Surface {
         }
         let presenting = self.expanded || self.unfold.active(self.expanded);
         let screen = self.screen.as_ref();
+        let host = rect(self.panel.frame());
         let size = self.panel.frame().size;
+        let target = screen
+            .map(|s| {
+                geometry::layout_height(
+                    s,
+                    self.prefs.edge,
+                    self.prefs.position,
+                    true,
+                    self.content_height,
+                )
+            })
+            .unwrap_or_default();
         let compact = screen
             .map(|s| geometry::layout(s, self.prefs.edge, self.prefs.position, false))
             .unwrap_or_default();
@@ -329,10 +359,37 @@ impl Surface {
                 geometry::excluded_notch(s, rect(self.panel.frame()), self.prefs.edge, presenting)
             })
             .unwrap_or_default();
-        let offset = screen.map_or(0., |s| {
-            geometry::content_offset(s, self.prefs.edge, presenting)
+        let offset = screen.map_or(0., |s| geometry::content_offset(s, self.prefs.edge, true));
+        let scene = json!([
+            self.valid,
+            self.expanded,
+            host.width,
+            host.height,
+            target.x - host.x,
+            target.y - host.y,
+            target.width,
+            target.height,
+            compact.x - host.x,
+            compact.y - host.y,
+            self.prefs.edge.as_str(),
+            self.prefs.theme,
+            self.prefs.liquid_variant,
+            self.appearance.host_theme,
+            self.appearance.font_offset
+        ]);
+        if self.last_scene.as_ref() != Some(&scene) {
+            self.scene_revision += 1;
+            self.last_scene = Some(scene);
+        }
+        let shell = self.shell.relative_to(host);
+        let layout = json!({
+            "nativeShell": true, "sceneRevision": self.scene_revision, "painted": self.painted,
+            "shell": {"x":shell.x,"y":shell.y,"width":shell.width,"height":shell.height},
+            "layoutX": target.x-host.x, "layoutY":host.height-(target.y-host.y)-target.height+offset,
+            "layoutHeight":target.height-offset,
+            "compactX":compact.x-host.x, "compactY":host.height-(compact.y-host.y)-compact.height,
         });
-        let detail = json!({
+        let mut detail = json!({
             "expanded": self.expanded, "unfold": self.unfold.value.clamp(0.,1.), "animating": self.unfold.active(self.expanded),
             "layoutWidth": screen.map_or(480., |s| geometry::layout(s,self.prefs.edge,self.prefs.position,true).width),
             "keyboard": self.keyboard, "edge": self.prefs.edge.as_str(),
@@ -357,6 +414,10 @@ impl Surface {
             "nativeGlassAvailable": crate::native_backdrop::glass_available(),
             "nativeBackdrop": self.backdrop.style().is_some(), "backdropStyle": self.backdrop.style(),
         });
+        detail
+            .as_object_mut()
+            .unwrap()
+            .extend(layout.as_object().unwrap().clone());
         // 页面用 keyboard 变化安排输入焦点；重复轮询不能把预设编辑器的焦点抢回搜索框。
         if self.last_detail.as_ref() == Some(&detail) {
             return;
@@ -370,7 +431,6 @@ impl Surface {
     fn reflow(&mut self, mtm: MainThreadMarker) -> Result<()> {
         // The selected display owns placement; Spaces and host focus do not.
         let refresh_screen = self.screen.is_none() || Instant::now() >= self.screen_check;
-        let previous_screen = self.screen.clone();
         if refresh_screen {
             self.screen_check = Instant::now() + Duration::from_secs(1);
             let screens = screen_snapshots(mtm);
@@ -385,7 +445,6 @@ impl Surface {
             .cloned();
             self.screen = selected;
         }
-        let changed = previous_screen != self.screen;
         let Some(screen) = self.screen.as_ref() else {
             self.panel.orderOut(None);
             return Ok(());
@@ -406,84 +465,75 @@ impl Surface {
         );
         self.motion_tick = now;
         let presenting = self.expanded || self.unfold.active(self.expanded);
-        let rect = self.unfold.frame(compact, target);
-        self._parent
-            .0
-            .ivars()
-            .excluded
-            .set(geometry::excluded_notch(
-                screen,
-                rect,
-                self.prefs.edge,
-                presenting,
-            ));
-        let offset = geometry::content_offset(screen, self.prefs.edge, presenting);
-        let allowed = if self.prefs.edge == Edge::Top && screen.notch_width > 0. && !presenting {
-            Rect {
-                x: (screen.notch_x - rect.x - geometry::NOTCH_FLANK).max(0.),
-                y: 0.,
-                width: geometry::NOTCH_FLANK,
-                height: rect.height,
-            }
+        self.shell = self.unfold.frame(compact, target);
+        let host = compact.union(target).integral();
+        let local = self.shell.relative_to(host);
+        let notch = geometry::excluded_notch(screen, host, self.prefs.edge, presenting);
+        let content_top = if notch.width > 0. {
+            geometry::content_offset(screen, self.prefs.edge, true).min(local.height)
         } else {
-            Rect {
-                x: 0.,
-                y: 0.,
-                width: rect.width,
-                height: (rect.height - offset).max(0.),
-            }
+            0.
         };
-        self._parent.0.ivars().allowed.set(allowed);
-        self._parent.0.ivars().edge.set(self.prefs.edge);
+        let regions = self._parent.0.ivars();
+        regions.excluded.set(notch);
+        regions.allowed.set(Rect {
+            height: (local.height - content_top).max(0.),
+            ..local
+        });
+        regions.edge.set(self.prefs.edge);
+        regions.flanks.set(if notch.width > 0. {
+            [
+                Rect {
+                    x: notch.x - geometry::NOTCH_FLANK,
+                    width: geometry::NOTCH_FLANK,
+                    ..notch
+                },
+                Rect {
+                    x: notch.x + notch.width,
+                    width: geometry::NOTCH_FLANK,
+                    ..notch
+                },
+            ]
+        } else {
+            [Rect::default(); 2]
+        });
         let frame = NSRect::new(
-            NSPoint::new(rect.x, rect.y),
-            NSSize::new(rect.width, rect.height),
+            NSPoint::new(host.x, host.y),
+            NSSize::new(host.width, host.height),
         );
         let resized = self.panel.frame() != frame;
         if resized {
             self.panel.setFrame_display(frame, false);
             self.webview.set_bounds(wry::Rect {
                 position: wry::dpi::LogicalPosition::new(0., 0.).into(),
-                size: wry::dpi::LogicalSize::new(rect.width, rect.height).into(),
+                size: wry::dpi::LogicalSize::new(host.width, host.height).into(),
             })?;
         }
         let backdrop = json!({
-            "material": self.effective_material(), "liquidVariant": self.prefs.liquid_variant,
-            "theme": if self.prefs.theme == "black" { json!("dark") } else { self.appearance.host_theme["theme"].clone() },
-            "x":0., "y":0., "width":rect.width, "height":rect.height,
-            "radius":0., "hidden": self.hidden, "edge":self.prefs.edge.as_str(),
-            "viewportWidth":rect.width, "viewportHeight":rect.height,
+            "material":self.effective_material(), "liquidVariant":self.prefs.liquid_variant,
+            "theme":if self.prefs.theme == "black" { json!("dark") } else { self.appearance.host_theme["theme"].clone() },
+            "x":0.,"y":0.,"width":host.width,"height":host.height,"radius":0.,"hidden":self.hidden,
+            "viewportWidth":host.width,"viewportHeight":host.height,
         });
         if self.last_backdrop.as_ref() != Some(&backdrop) {
             self.backdrop.resize_viewport(&self.panel, false);
             self.backdrop.update(&self.panel, &backdrop);
-            if self.backdrop.style().is_some() {
-                let notch = (self.prefs.edge == Edge::Top && screen.notch_width > 0.).then_some((
-                    screen.notch_x - rect.x,
-                    screen.notch_width,
-                    screen.notch_height,
-                ));
-                let content_top = if notch.is_some() && !presenting {
-                    rect.height
-                } else {
-                    offset
-                };
-                self.backdrop.clip_edge(
-                    rect.width,
-                    rect.height,
-                    self.prefs.edge.as_str(),
-                    content_top,
-                    notch,
-                );
-            }
             self.last_backdrop = Some(backdrop);
         }
+        self.backdrop.clip_control(
+            &self.panel,
+            NSRect::new(
+                NSPoint::new(local.x, local.y),
+                NSSize::new(local.width, local.height),
+            ),
+            self.prefs.edge.as_str(),
+            content_top,
+            (notch.width > 0.).then_some((notch.x - local.x, notch.width, notch.height)),
+        );
         if self.valid && self.ready && !self.hidden && !self.panel.isVisible() {
             self.panel.orderFrontRegardless();
         }
-        if changed || resized {
-            self.dispatch();
-        }
+        self.dispatch();
         self.mouse_passthrough();
         Ok(())
     }
@@ -502,6 +552,7 @@ impl Surface {
 
     fn mouse_passthrough(&mut self) {
         if !self.ready
+            || !self.painted
             || !self.valid
             || self.hidden
             || !self.panel.isVisible()
@@ -515,15 +566,7 @@ impl Surface {
         let x = point.x - frame.x;
         let y = point.y - frame.y;
         let regions = self._parent.0.ivars();
-        let excluded = regions.excluded.get().contains(x, y);
-        let ignored = buttons == 0
-            && frame.contains(point.x, point.y)
-            && (!SurfaceRegion {
-                rect: regions.allowed.get(),
-                edge: self.prefs.edge,
-            }
-            .contains(x, y)
-                || excluded);
+        let ignored = buttons == 0 && !regions.contains(x, y);
         if self.panel.ignoresMouseEvents() != ignored {
             self.panel.setIgnoresMouseEvents(ignored);
         }
@@ -562,16 +605,28 @@ impl Surface {
         }
         self.expanded = true;
         self.reflow(mtm)?;
-        if keyboard && self.valid && self.ready && self.screen.is_some() {
+        if keyboard {
+            self.pending_keyboard = true;
+            self.focus_pending()?;
+        }
+        self.dispatch();
+        Ok(())
+    }
+
+    fn focus_pending(&mut self) -> Result<()> {
+        if self.pending_keyboard
+            && self.expanded
+            && self.valid
+            && self.ready
+            && self.painted_revision == self.scene_revision
+            && self.screen.is_some()
+        {
             self.panel.ivars().allowed.set(true);
             self.panel.makeKeyWindow();
             self.webview.focus()?;
             self.keyboard = self.panel.isKeyWindow();
             self.pending_keyboard = false;
-        } else if keyboard {
-            self.pending_keyboard = true;
         }
-        self.dispatch();
         Ok(())
     }
 
@@ -590,12 +645,28 @@ impl Surface {
         match value["action"].as_str().unwrap_or_default() {
             "ready" => {
                 self.ready = true;
+                self.painted = false;
+                self.panel.setAlphaValue(0.);
+                self.last_scene = None;
                 self.last_detail = None;
                 self.pointer_state = None;
                 self.reflow(mtm)?;
                 if self.pending_keyboard {
                     self.expand(true, mtm)?;
                 }
+            }
+            "scene-ready"
+                if self.ready
+                    && self.valid
+                    && value["revision"].as_u64() == Some(self.scene_revision) =>
+            {
+                self.painted_revision = self.scene_revision;
+                if !self.painted {
+                    self.painted = true;
+                    self.panel.setAlphaValue(1.);
+                }
+                self.focus_pending()?;
+                self.reflow(mtm)?;
             }
             "expand" => self.expand(value["keyboard"] == true, mtm)?,
             "focus" => self.expand(true, mtm)?,
@@ -754,6 +825,11 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         keyboard: false,
         hidden: false,
         ready: false,
+        painted: false,
+        scene_revision: 0,
+        painted_revision: 0,
+        last_scene: None,
+        shell: Rect::default(),
         valid: false,
         reveal: None,
         pending_keyboard: false,

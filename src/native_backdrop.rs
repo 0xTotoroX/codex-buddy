@@ -1,7 +1,7 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
 // [OUTPUT]: 根据宿主 theme 设置自有 NSWindow 外观； 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
 // [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
-// [PROTOCOL]: 共享材质保持窗口无关；控制条复用形状遮罩更新内容边缘和刘海两翼裁切，工作台仍用圆角矩形。
+// [PROTOCOL]: 共享材质保持窗口无关；控制条在根视图统一裁切背景与网页，更新内容边缘和刘海两翼，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};
 use objc2_app_kit::{
@@ -94,16 +94,19 @@ impl Backdrop {
             })
     }
 
-    // Optional edge contour for the model control. Workbench keeps its rounded rectangle.
-    pub fn clip_edge(
+    // Control-only root mask clips both material and WebView in one native transaction.
+    // Workbench keeps its separate rounded material boundary.
+    pub fn clip_control(
         &self,
-        width: f64,
-        height: f64,
+        window: &NSWindow,
+        shell: NSRect,
         edge: &str,
         content_top: f64,
         notch: Option<(f64, f64, f64)>,
     ) {
-        let Some(layer) = self.boundary.layer() else {
+        let root = window.contentView().expect("control content view");
+        root.setWantsLayer(true);
+        let Some(layer) = root.layer() else {
             return;
         };
         let Some(class) = AnyClass::get(c"CAShapeLayer") else {
@@ -112,6 +115,8 @@ impl Backdrop {
         let mask = self
             .edge_mask
             .get_or_init(|| unsafe { objc2::msg_send![class, new] });
+        let width = shell.size.width;
+        let height = shell.size.height;
         let body_height = (height - content_top).max(0.);
         let (a, b) = if edge == "top" {
             (body_height, width)
@@ -120,10 +125,13 @@ impl Backdrop {
         };
         let lip = 8_f64.min(a / 2.).min(b / 4.);
         let r = 18_f64.min(a - lip).min((b - 2. * lip) / 2.);
-        let p = |x: f64, y: f64| match edge {
-            "left" => (width - x, body_height - y),
-            "top" => (y, x),
-            _ => (x, body_height - y),
+        let p = |x: f64, y: f64| {
+            let (x, y) = match edge {
+                "left" => (width - x, body_height - y),
+                "top" => (y, x),
+                _ => (x, body_height - y),
+            };
+            (shell.origin.x + x, shell.origin.y + y)
         };
         unsafe {
             let path = CGPathCreateMutable();
@@ -153,13 +161,16 @@ impl Backdrop {
             if let Some((x, w, h)) = notch {
                 // Only the two visible flanks share the material; the hardware hole stays empty.
                 for left in [x - 10., x + w] {
-                    let rect =
-                        NSRect::new(NSPoint::new(left.max(0.), height - h), NSSize::new(10., h));
+                    let rect = NSRect::new(
+                        NSPoint::new(shell.origin.x + left.max(0.), shell.origin.y + height - h),
+                        NSSize::new(10., h),
+                    );
                     CGPathAddRect(path, std::ptr::null(), rect);
                 }
             }
             CATransaction::begin();
             CATransaction::setDisableActions(true);
+            mask.setFrame(root.bounds());
             let _: () = objc2::msg_send![&**mask, setPath: path];
             if layer.mask().as_deref() != Some(&**mask) {
                 layer.setMask(Some(mask));

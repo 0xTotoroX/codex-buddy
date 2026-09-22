@@ -1,6 +1,6 @@
 /*
  * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何/开合进度与鼠标边界事件。
- * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；固定纯黑及按需更新的三材质宿主配色、屏幕/位置设置。
+ * [OUTPUT]: 原生裁切的常驻整视口外壳与场景就绪确认、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；固定纯黑及按需更新的三材质宿主配色、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -38,6 +38,7 @@ let nativePointer = false,
   searchOpen = false,
   sizeFrame;
 let lastNativeError = '';
+let acknowledgedScene = null;
 let online = false,
   message = '';
 const statusLabels = {
@@ -232,7 +233,13 @@ function shapeSurface(node, w = node.clientWidth, h = node.clientHeight) {
 function queueSize() {
   cancelAnimationFrame(sizeFrame);
   sizeFrame = requestAnimationFrame(() => {
-    if (!expanded || stopped || nativeState.hidden || nativeState.animating) return;
+    if (
+      (!expanded && !nativeState.nativeShell) ||
+      stopped ||
+      nativeState.hidden ||
+      nativeState.animating
+    )
+      return;
     const panel = $('panel');
     if (!Number.isFinite(nativeState.width)) shapeSurface($('surface'));
     const natural = [...panel.children]
@@ -301,11 +308,13 @@ window.addEventListener('model-control-native', (event) => {
   const presenting = expanded || detail.animating === true;
   $('surface').hidden = nativeState.hidden === true;
   document.body.dataset.presenting = String(presenting);
-  $('panel').hidden = !presenting || nativeState.hidden === true;
+  document.body.dataset.nativeShell = String(nativeState.nativeShell === true);
+  $('panel').hidden = (!presenting && !nativeState.nativeShell) || nativeState.hidden === true;
+  $('panel').inert = !presenting;
   $('handle').hidden = presenting || nativeState.hidden === true;
   const progress = Number.isFinite(detail.unfold) ? detail.unfold : expanded ? 1 : 0;
   document.body.dataset.animating = String(detail.animating === true);
-  style.setProperty('--content-opacity', String(Math.max(0, Math.min(1, (progress - 0.45) / 0.5))));
+  style.setProperty('--content-opacity', String(Math.max(0, Math.min(1, progress))));
   style.setProperty(
     '--layout-width',
     `${finite(nativeState.layoutWidth, Math.min(480, innerWidth))}px`,
@@ -329,20 +338,45 @@ window.addEventListener('model-control-native', (event) => {
     requestAnimationFrame(() =>
       $('panel').querySelector('button:not(:disabled)')?.focus({ preventScroll: true }),
     );
-  shapeSurface(
-    $('surface'),
-    presenting
-      ? finite(detail.width, innerWidth)
-      : notched
-        ? Math.min(10, Math.max(0, notchX))
-        : compactWidth,
-    presenting
-      ? Math.max(
-          0,
-          finite(detail.height, innerHeight) - (notched ? nativeState.contentOffsetY || 0 : 0),
-        )
-      : compactHeight,
-  );
+  if (nativeState.nativeShell) {
+    $('surface').style.clipPath = 'none';
+    mask.hidden = true;
+    for (const [name, value] of Object.entries({
+      'layout-x': nativeState.layoutX,
+      'layout-y': nativeState.layoutY,
+      'layout-height': nativeState.layoutHeight,
+      'compact-x': notched ? notchX - 10 : nativeState.compactX,
+      'compact-y': nativeState.compactY,
+    })) {
+      if (Number.isFinite(value)) style.setProperty(`--${name}`, `${value}px`);
+    }
+    const revision = nativeState.sceneRevision;
+    if (Number.isFinite(revision) && acknowledgedScene !== revision) {
+      acknowledgedScene = revision;
+      // Mount and lay out the full surface before the native window reveals it.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (nativeState.sceneRevision === revision && !stopped)
+            native({ action: 'scene-ready', revision });
+        }),
+      );
+    }
+  } else {
+    shapeSurface(
+      $('surface'),
+      presenting
+        ? finite(detail.width, innerWidth)
+        : notched
+          ? Math.min(10, Math.max(0, notchX))
+          : compactWidth,
+      presenting
+        ? Math.max(
+            0,
+            finite(detail.height, innerHeight) - (notched ? nativeState.contentOffsetY || 0 : 0),
+          )
+        : compactHeight,
+    );
+  }
   if (wasExpanded !== expanded || (wasAnimating && !detail.animating) || !detail.animating)
     updateLayout();
 });
