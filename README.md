@@ -29,7 +29,7 @@ CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, gen
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **生成上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. For a plan with related tasks, suggestions prioritize one follow-up that advances the whole plan, with other suggestions offering useful checks or alternatives. Suggestions are generated in Chinese.
+In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. For a plan with related tasks, suggestions prioritize one follow-up that advances the whole plan, with other suggestions offering useful checks or alternatives. Suggestions are generated in Chinese.
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
 

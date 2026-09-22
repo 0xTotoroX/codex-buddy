@@ -484,7 +484,7 @@ function App() {
                         className="text-[15px] font-semibold leading-normal tracking-[-0.3px]"
                         id="limits-title"
                       >
-                        生成限制
+                        生成设置
                       </h2>
                     </div>
                   </div>
@@ -501,7 +501,7 @@ function App() {
                     </Field>
                     <Field
                       id="context-scope"
-                      label="生成上下文"
+                      label="输入上下文"
                       hint="最近一次提问与回答，不包含更早历史。"
                     >
                       <NativeSelect

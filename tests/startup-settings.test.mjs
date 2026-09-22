@@ -93,7 +93,7 @@ test(
       await page.getByRole('button', { name: '保存设置', exact: true }).click();
       await page.getByText('设置已同步到本机', { exact: true }).waitFor();
       assert.equal(saves.at(-1).hostRestartPolicy, 'ask');
-      const context = page.getByLabel('生成上下文', { exact: true });
+      const context = page.getByLabel('输入上下文', { exact: true });
       assert.equal(await context.inputValue(), 'limited');
       await context.selectOption('latest');
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).count(), 0);
