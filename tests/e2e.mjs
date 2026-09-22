@@ -783,8 +783,8 @@ try {
     assert.ok(Math.abs(leftResizedBox.y - resizedBox.y) < 2, 'Left resize must keep the top fixed');
     assert.ok(Math.abs(leftResizedBox.width - resizedBox.width - 30) < 2);
     resizedBox = leftResizedBox;
-    await desktop.locator('[data-pane-focus]:visible').click();
-    await desktop.locator('[data-pane-arrange="next"]').selectOption('top');
+    await desktop.keyboard.press('Escape');
+    await desktop.locator('[data-pane-arrange="next"]').selectOption('top', { force: true });
     assert.equal(
       await desktop.evaluate(
         () => window.__companionFloatingPanel.panelPreferences().dockLayout.first,
@@ -813,7 +813,7 @@ try {
     );
     record('表情拖动不误收起或弹出');
 
-    await desktop.locator('.csw-layout-menu summary').click();
+    await desktop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
     await desktop.getByRole('button', { name: '收起工作台', exact: true }).click();
     await settle();
     assert.equal((await panelState()).open, false);

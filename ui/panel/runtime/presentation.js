@@ -551,12 +551,12 @@ function panelDisconnected(message) {
 function panelWindowControls({ includePin = true } = {}) {
   const unsupported = !IS_POPOUT && runtimeState.settings?.popoutSupported !== true;
   const label = IS_POPOUT
-    ? '收回 Codex'
+    ? '放回聊天'
     : unsupported
       ? '桌面浮窗仅支持 macOS 15 及以上的 Apple Silicon 设备'
       : shellState.detachPending
         ? '正在弹出…'
-        : '弹出到桌面';
+        : '移到独立窗口';
   const popIcon = iconSvg(IS_POPOUT ? 'return' : 'detach');
   const pinTitle = shellState.pinnedOnTop ? '取消窗口置顶' : '窗口置顶';
   const pin =

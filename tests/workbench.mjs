@@ -376,13 +376,9 @@ async function splitGeometry(page) {
 }
 
 async function chooseLayout(page, action) {
-  const menu = page.locator('.csw-layout-menu');
-  if (!(await menu.getAttribute('open'))) {
-    // Empty-string open attribute is present on a native details element.
-    if (!(await menu.evaluate((node) => node.open))) await menu.locator('summary').click();
-  }
-  await menu.locator(`[data-layout-mode="${action}"], [data-layout-action="${action}"]`).click();
-  await menu.locator('summary').press('Escape');
+  await page
+    .locator(`[data-layout-mode="${action}"], [data-layout-action="${action}"]`)
+    .evaluate((button) => button.click());
   await settle(page);
 }
 
@@ -441,6 +437,25 @@ const cases = [
             window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate').length,
         );
       const before = await requestCount();
+      assert.equal(await page.locator('.csw-layout-menu').isVisible(), false);
+      assert.equal(await page.locator('.csw-pane-menu:visible').count(), 0);
+      assert.equal(await page.locator('.csw-workbench-pane > header > button:visible').count(), 2);
+      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 3);
+      assert.equal(
+        await page.locator('[data-action=detach]').getAttribute('aria-label'),
+        '移到独立窗口',
+      );
+      const title = page.locator('[data-pane-focus="next"]');
+      await title.click();
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'split');
+      await title.dblclick();
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'focus');
+      await title.dblclick();
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'split');
+      await title.press('Enter');
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'focus');
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'split');
       const widthHandle = page.getByRole('separator', { name: '调整工作台宽度' });
       for (const key of ['ArrowRight', 'ArrowLeft']) {
         for (let i = 0; i < 16; i++) await widthHandle.press(key);
@@ -479,8 +494,8 @@ const cases = [
       );
       await page.screenshot({ path: resolve(output, 'unified-icons-settings.png') });
       await page.locator('[data-workbench-settings]').click();
-      await page.locator('.csw-layout-menu summary').click();
-      await page.locator('[data-placement=floating]').click();
+      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+      await page.locator('[data-placement=floating]').evaluate((node) => node.click());
       assert.equal(await page.locator(slotSelector).count(), 0);
       await page.locator('.csw-workbench-face').click();
       await page.waitForFunction(
@@ -511,9 +526,9 @@ const cases = [
         compact.y + compact.height / 2,
         'morph endpoint vertical continuity',
       );
-      await page.locator('.csw-layout-menu summary').click();
-      await page.locator('[data-placement=dock]').click();
-      await page.locator('.csw-workbench-face').click();
+      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+      await page.locator('[data-placement=dock]').evaluate((node) => node.click());
+      await page.locator('[data-workbench-close]').click();
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
@@ -543,8 +558,8 @@ const cases = [
         await host.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockOpen),
         true,
       );
-      await host.locator('.csw-layout-menu summary').click();
-      await host.locator('[data-placement=floating]').click();
+      await host.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+      await host.locator('[data-placement=floating]').evaluate((node) => node.click());
       await host.locator('.csw-workbench-face').click();
       await host.locator('.csw-fab').waitFor({ state: 'visible' });
       await host.waitForFunction(() => !window.__companionFloatingPanel.state.open);
@@ -565,8 +580,9 @@ const cases = [
         };
       });
       for (const action of ['merge', 'split', 'focus']) {
-        if (action === 'focus') await page.locator('[data-pane-focus="outline"]').click();
-        else await page.locator('[data-pane-arrange="outline"]').selectOption(action);
+        if (action === 'focus') await page.locator('[data-pane-focus="outline"]').dblclick();
+        else
+          await page.locator('[data-pane-arrange="outline"]').selectOption(action, { force: true });
         for (const material of ['matte', 'frosted', 'native-glass']) {
           await page.evaluate(
             (material) => window.__companionFloatingPanel.setMaterial(material),
@@ -580,6 +596,12 @@ const cases = [
           assert.equal(await page.locator('.csw-workbench').count(), 1);
         }
       }
+      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 2);
+      assert.equal(
+        await page.locator('[data-action=detach]').getAttribute('aria-label'),
+        '放回聊天',
+      );
+      assert.equal(await page.locator('[data-workbench-close]').count(), 0);
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 9);
       await page.screenshot({ path: resolve(output, 'unified-shell-focus.png') });
       await page.locator('[data-action="detach"]').click();
@@ -602,7 +624,7 @@ const cases = [
       });
       const before = await scrollPanes(page, 100, 30, 80);
       const arrange = (pane, action) =>
-        page.locator(`[data-pane-arrange="${pane}"]`).selectOption(action);
+        page.locator(`[data-pane-arrange="${pane}"]`).selectOption(action, { force: true });
       await arrange('outline', 'merge');
       assert.equal(await page.locator('[data-pane="next"]').isVisible(), false);
       assert.equal((await reading(page)).promptScrollTop, before.preview);
@@ -641,7 +663,7 @@ const cases = [
         'next',
       );
       const prefs = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
-      await page.locator('[data-pane-focus="next"]').click();
+      await page.getByRole('tab', { name: '下一步', exact: true }).dblclick();
       assert.equal(await page.locator('.csw-workbench').getAttribute('data-composition'), 'focus');
       assert.deepEqual(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences()),
@@ -924,7 +946,7 @@ const cases = [
       });
       assert.deepEqual(reset.dockLayout, saved.dockLayout);
       await chooseLayout(host, 'vertical');
-      await host.locator('.csw-layout-menu summary').click();
+      await host.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await host.screenshot({ path: resolve(output, 'layout-docked-menu.png') });
       assert.deepEqual(errors, []);
       assert.deepEqual(await reopened.page.evaluate(() => window.popoutFixture.unexpected), []);
@@ -1174,7 +1196,7 @@ const cases = [
         'same B context through handoff',
       );
       assert.deepEqual(errors, []);
-      await page.locator('.csw-layout-menu summary').click();
+      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-workbench-close]').click();
       const closed = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       assert.equal(closed.dockOpen, false, 'explicit close updates intent');
@@ -1527,7 +1549,7 @@ const cases = [
     'collapsed rail keeps one primary action and secondary placement commands',
     async (page, baseline) => {
       await mode(page, true);
-      await page.locator('.csw-layout-menu summary').click();
+      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
@@ -1573,7 +1595,7 @@ const cases = [
       await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.csw-workbench').count(), 1);
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await page.locator('.csw-layout-menu summary').click();
+      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
       await page.locator('.csw-fab').waitFor({ state: 'visible' });
       await box(page, '.csw-fab');

@@ -1,10 +1,9 @@
 /*
  * [INPUT]: 工作台 DOM、当前布局与统一提交回调、功能可用状态。
- * [OUTPUT]: 面板移动菜单、标签键盘交互、可取消的窗内落位预览、临时专注查看。
+ * [OUTPUT]: 标题/标签拖动、双击及键盘放大、隐藏编排命令、可取消落位预览与标签导航。
  * [POS]: 只编排现有视图；不创建窗口、不读取正文、不发业务请求。
  * [PROTOCOL]: 变更时核对 workbench/AGENTS.md。
  */
-import { iconSvg } from '../icons/index.js';
 import { arrangeWorkbench } from './model.js';
 
 export function installArrangement(root, { read, write, update, enabled }) {
@@ -74,12 +73,31 @@ export function installArrangement(root, { read, write, update, enabled }) {
         suppressClick = false;
         return;
       }
-      const focus = event.target.closest('[data-pane-focus]');
       const tab = event.target.closest('[data-pane-tab]');
-      if (focus) command(focus.dataset.paneFocus, 'focus');
       if (tab) command(tab.dataset.paneTab, 'activate');
     },
     { capture: true, signal: events.signal },
+  );
+  root.addEventListener(
+    'dblclick',
+    (event) => {
+      const title = event.target.closest('[data-pane-focus], [data-pane-tab]');
+      if (!title || suppressClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+      command(title.dataset.paneFocus || title.dataset.paneTab, 'focus');
+    },
+    { signal: events.signal },
+  );
+  root.addEventListener(
+    'keydown',
+    (event) => {
+      const title = event.target.closest('[data-pane-focus]');
+      if (!title || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      command(title.dataset.paneFocus, 'focus');
+    },
+    { signal: events.signal },
   );
   root.addEventListener(
     'keydown',
@@ -268,15 +286,14 @@ export function installArrangement(root, { read, write, update, enabled }) {
               height,
             );
       }
-      for (const button of root.querySelectorAll('[data-pane-focus]')) {
-        const icon = focused ? 'restore' : 'focus';
-        if (button.dataset.icon !== icon) {
-          button.innerHTML = iconSvg(icon);
-          button.dataset.icon = icon;
-        }
-        button.setAttribute('aria-label', focused ? '恢复编排' : '专注查看');
-        button.setAttribute('title', focused ? '恢复编排' : '专注查看');
-        button.setAttribute('aria-pressed', String(focused === button.dataset.paneFocus));
+      for (const title of root.querySelectorAll('[data-pane-focus]')) {
+        const expanded = focused === title.dataset.paneFocus;
+        title.setAttribute(
+          'aria-label',
+          `${title.textContent}：${expanded ? '恢复原布局' : '放大查看'}`,
+        );
+        title.title = expanded ? '双击恢复；Esc 退出放大' : '拖动调整位置；双击放大';
+        title.setAttribute('aria-pressed', String(expanded));
       }
     },
     destroy() {

@@ -78,7 +78,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
-    const mode = page.getByLabel('布局模式', { exact: true });
+    const mode = page.getByLabel('聊天内位置', { exact: true });
     await mode.waitFor();
     assert.equal(await mode.inputValue(), 'capsule');
     await mode.selectOption('workbench');

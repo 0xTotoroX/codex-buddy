@@ -229,7 +229,9 @@ function probePage() {
             .querySelector(`[data-layout-mode="${cmd.value}"], [data-layout-action="${cmd.value}"]`)
             ?.click();
         if (cmd.kind === 'pane-focus')
-          document.querySelector(`[data-pane-focus="${cmd.pane}"]`)?.click();
+          document
+            .querySelector(`[data-pane-focus="${cmd.pane}"]`)
+            ?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
         if (cmd.kind === 'pane-arrange') {
           const select = document.querySelector(`[data-pane-arrange="${cmd.pane}"]`);
           select.value = cmd.action;

@@ -327,7 +327,7 @@
   display: none;
 }
 .csw-workbench-tabs {
-  padding-right: 100px;
+  padding-right: 36px;
 }
 
 .csw-association-menu {
@@ -493,5 +493,19 @@
 
 /* 仅隐藏入口，保留关联状态与受限命令。 */
 .csw-association-menu[hidden] {
+  display: none;
+}
+
+.csw-pane-menu[hidden],
+.csw-layout-options > [hidden] {
+  display: none;
+}
+.csw-workbench-pane > header [data-pane-focus]:focus-visible {
+  outline: 2px solid var(--csw-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.csw-layout-menu[hidden] {
   display: none;
 }

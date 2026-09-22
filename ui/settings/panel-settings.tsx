@@ -221,9 +221,9 @@ export function PanelSettings({
       <fieldset className="m-0 min-w-0 border-0 p-0" disabled={busy}>
         <div className="grid grid-cols-2 gap-5">
           <div className="col-span-full grid grid-cols-2 gap-5">
-            {select('布局模式', 'layoutMode', [
-              ['capsule', '胶囊'],
-              ['workbench', '工作台'],
+            {select('聊天内位置', 'layoutMode', [
+              ['capsule', '在聊天内自由移动'],
+              ['workbench', '固定在聊天右侧'],
             ])}
             {number('侧栏宽度（px）', ui.dockWidth, 300, 460, (v) => change('dockWidth', v))}
             {workbenchLayout('dockLayout', '停靠')}
@@ -326,9 +326,9 @@ export function PanelSettings({
                   void action(e.target.value === 'desktop' ? 'panel/open' : 'panel/close')
                 }
               >
-                <option value="embedded">Codex 内嵌</option>
+                <option value="embedded">聊天内</option>
                 <option value="desktop" disabled={!popoutSupported}>
-                  {popoutSupported ? '桌面浮窗' : '桌面浮窗（需 macOS 15+ Apple Silicon）'}
+                  {popoutSupported ? '独立窗口' : '独立窗口（需 macOS 15+ Apple Silicon）'}
                 </option>
               </NativeSelect>
             </label>
@@ -342,7 +342,7 @@ export function PanelSettings({
           </div>
           <Check label="展开胶囊" checked={ui.open} onChange={(v) => change('open', v)} />
           <Check
-            label="桌面浮窗置顶"
+            label="独立窗口置顶"
             checked={prefs.alwaysOnTop}
             onChange={(v) => void update({ alwaysOnTop: v })}
           />

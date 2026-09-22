@@ -15,9 +15,9 @@ export async function showWorkbenchView(page, name) {
   if ((await workbench.getAttribute('data-composition')) === 'focus') {
     const current = page.locator('[data-pane]:not([hidden])');
     if ((await current.getAttribute('data-pane')) === name) return;
-    await current.locator('[data-pane-focus]').click();
+    await page.keyboard.press('Escape');
   }
   if ((await workbench.getAttribute('data-composition')) === 'tabs')
-    await page.locator(`[data-pane-tab="${name}"]`).click();
-  await page.locator(`[data-pane-focus="${name}"]`).click();
+    await page.locator(`[data-pane-tab="${name}"]`).dblclick();
+  else await page.locator(`[data-pane-focus="${name}"]`).dblclick();
 }

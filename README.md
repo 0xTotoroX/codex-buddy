@@ -31,7 +31,7 @@ Outlines are parsed locally and do not require a model. Next-step suggestions re
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
 
-Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. The heading's **⋯** menu also provides move, group, and split commands. Focus a panel temporarily, then click the focus button again or press Esc to restore the layout. Press Esc during a drag to cancel it.
+Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
 
 Both panels share the same chat source, shown at the top of the workbench. The follow/lock menu is temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
@@ -60,8 +60,8 @@ Open settings from the capsule. Choose your existing Codex login or enter your m
 
 - **Navigate an answer:** open the outline and click a heading to jump to the source text.
 - **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
-- **View both panels:** choose the docked sidebar from the layout and position menu, or return to the embedded floating view. Drag the left edge to resize the sidebar and the internal divider to change proportions. Choose automatic, vertical, or horizontal layout, swap panels, or restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, it collapses to a right-edge entry that you can reopen. You can still pop out or return the entire workbench.
-- **Adjust the window:** use the top controls to pop out or return, drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; its menu provides always-on-top and light/dark controls.
+- **View both panels:** choose a fixed right sidebar or a freely movable embedded workbench in Web settings under chat placement. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, it collapses to a right-edge entry that you can reopen. You can still pop out or return the entire workbench.
+- **Adjust the window:** use the top controls to move to an independent window or put it back in the chat; the separate minus button collapses the embedded workbench. Then drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; Web settings provide always-on-top and appearance controls.
 
 ### Model quick switch
 

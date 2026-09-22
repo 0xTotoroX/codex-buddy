@@ -293,8 +293,8 @@ export async function checkPopout({
     await waitFor(async () => (await state()).theme === 'light', 'Theme did not restore');
     await pop.locator('.csw-head').hover();
     const commandCount = commandResults.length;
-    await pop.locator('.csw-layout-menu summary').click();
-    await pop.locator('[data-action=theme]').click();
+    await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+    await pop.locator('[data-action=theme]').evaluate((node) => node.click());
     await waitFor(
       async () => (await state()).theme === 'dark',
       'System toggle did not update panel',
@@ -308,8 +308,8 @@ export async function checkPopout({
       commandCount,
       'system toggle must not reach the Codex command channel',
     );
-    await pop.locator('.csw-layout-menu summary').click();
-    await pop.locator('[data-action=theme]').click();
+    await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+    await pop.locator('[data-action=theme]').evaluate((node) => node.click());
     await waitFor(async () => (await state()).theme === 'light', 'System toggle did not restore');
     record('弹出明暗走原生 IPC，系统变化更新浮窗且不发送 Codex 主题命令');
     record('三材质 × 明暗模式：弹出后宿主像素与完整移除胶囊完全一致');
@@ -476,8 +476,8 @@ export async function checkPopout({
     await waitFor(async () => (await state()).count === 4, 'Generation from popout failed');
     record('大纲回到关联宿主定位，回答变化拒绝旧操作并从桌面窗口重新生成');
 
-    await pop.locator('.csw-layout-menu summary').click();
-    await pop.locator('[data-action="pin"]').click();
+    await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
+    await pop.locator('[data-action="pin"]').evaluate((node) => node.click());
     await waitFor(
       () => JSON.parse(readFileSync(join(dataDir, 'panel.json'))).alwaysOnTop,
       'Pin setting not saved',
@@ -523,7 +523,7 @@ export async function checkPopout({
     const surfaces = [];
     assert.equal(
       await pop.locator('[data-action="detach"]').getAttribute('aria-label'),
-      '收回 Codex',
+      '放回聊天',
     );
     assert.notEqual(await pop.locator('[data-action="detach"] svg').innerHTML(), detachIcon);
     for (const material of ['matte', 'frosted', 'native-glass']) {
