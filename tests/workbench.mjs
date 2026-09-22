@@ -1549,6 +1549,100 @@ const cases = [
       await layout(page);
     },
   ],
+  ...[false, true].map((foreground) => [
+    `annotation editor keeps ${foreground ? 'foreground chat' : 'main chat'} docking stable`,
+    async (page) => {
+      await mode(page, true);
+      if (foreground) await openChatSurface(page);
+      await settle(page);
+      const before = await page.evaluate(() => {
+        const slot = document.querySelector('[data-codex-buddy-dock]');
+        window.workbenchFixture.annotationSlot = slot;
+        return {
+          width: slot.getBoundingClientRect().width,
+          prefs: window.__companionFloatingPanel.panelPreferences(),
+        };
+      });
+      for (const explicitNonModal of [false, true]) {
+        await page.evaluate(
+          ({ foreground, explicitNonModal }) => {
+            const composer = document.querySelector(
+              foreground ? '#foreground-composer' : '#composer-form',
+            );
+            const chip = document.createElement('button');
+            chip.id = 'annotation-chip';
+            chip.type = 'button';
+            chip.textContent = '已添加的注释';
+            composer.prepend(chip);
+            const editor = document.createElement('div');
+            editor.id = 'annotation-editor';
+            editor.setAttribute('role', 'dialog');
+            if (explicitNonModal) editor.setAttribute('aria-modal', 'false');
+            editor.style.cssText =
+              'position:fixed;left:320px;top:420px;width:300px;height:130px;background:white;z-index:100';
+            editor.innerHTML =
+              '<textarea aria-label="修改注释" style="width:260px;height:60px">合成注释</textarea><button type="button">删除注释</button>';
+            editor.querySelector('button').onclick = () => {
+              chip.remove();
+              editor.remove();
+            };
+            chip.onclick = () => document.body.append(editor);
+          },
+          { foreground, explicitNonModal },
+        );
+        await page.locator('#annotation-chip').click();
+        await settle(page);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.state.dockStatus),
+          'open',
+          'annotation popover must not suspend docking',
+        );
+        await page.getByRole('textbox', { name: '修改注释' }).fill('修改后的合成注释');
+        // Cross the editor/workbench boundary repeatedly; focus must not pick a different surface.
+        for (let i = 0; i < 3; i++) {
+          await page.locator('.csw-workbench').hover();
+          await page.getByRole('textbox', { name: '修改注释' }).click();
+          const stable = await page.evaluate(async () => {
+            const original = window.workbenchFixture.annotationSlot;
+            const samples = [];
+            for (let frame = 0; frame < 6; frame++) {
+              await new Promise(requestAnimationFrame);
+              samples.push(
+                original.isConnected &&
+                  document.querySelector('[data-codex-buddy-dock]') === original &&
+                  window.__companionFloatingPanel.state.dockStatus === 'open',
+              );
+            }
+            return {
+              stable: samples.every(Boolean),
+              width: original.getBoundingClientRect().width,
+            };
+          });
+          assert.equal(stable.stable, true, 'same dock stays mounted across frames');
+          near(stable.width, before.width, 'annotation does not shift chat width');
+        }
+        assert.equal(
+          await page.getByRole('textbox', { name: '修改注释' }).inputValue(),
+          '修改后的合成注释',
+        );
+        await page.getByRole('button', { name: '删除注释', exact: true }).click();
+        await settle(page);
+        assert.equal(await page.locator('#annotation-chip,#annotation-editor').count(), 0);
+      }
+      assert.deepEqual(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences()),
+        before.prefs,
+      );
+      assert.equal(await page.locator(slotSelector).count(), 1);
+      assert.equal(
+        await page.evaluate(
+          () =>
+            window.workbenchFixture.requests.filter((r) => r.path === '/stepwise/generate').length,
+        ),
+        0,
+      );
+    },
+  ]),
   [
     'modal suspends docking and restores foreground chat without changing preferences',
     async (page) => {

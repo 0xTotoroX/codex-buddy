@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主可见对话框、聊天滚动区和输入框结构。
- * [OUTPUT]: 前景界面及可停靠聊天容器识别。
+ * [OUTPUT]: 模态窗口及独立聊天容器识别；普通注释/编辑浮层不改变停靠目标。
  * [POS]: 布局和聊天关联共用的只读宿主识别，不读取正文。
  * [PROTOCOL]: 变更时检查 host/AGENTS.md。
  */
@@ -18,10 +18,11 @@ export function foregroundSurface() {
   const modal = dialogs.filter(
     (node) => node.getAttribute('aria-modal') === 'true' || node.matches(':modal'),
   );
+  // 注释编辑等非模态浮层也使用 role=dialog。它们不接管聊天布局，
+  // 否则让位会移动其锚点，鼠标离开后又恢复停靠，形成反复收放。
+  const chats = dialogs.filter((node) => node.matches('section[class*="floatingSurface"]'));
   const dialog =
-    modal.at(-1) ||
-    dialogs.findLast((node) => node.contains(document.activeElement)) ||
-    dialogs.at(-1);
+    modal.at(-1) || chats.findLast((node) => node.contains(document.activeElement)) || chats.at(-1);
   if (!dialog) return null;
   const thread = dialog.querySelector('.thread-scroll-container');
   const composer = dialog.querySelector('.ProseMirror,[contenteditable="true"]');
