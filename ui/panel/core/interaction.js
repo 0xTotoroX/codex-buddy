@@ -101,6 +101,13 @@ function beginDrag(event, source) {
   if (source === 'fab' && shellState.open) return;
   if (source === 'panel' && (!shellState.open || dragTargetBlocked(event.target))) return;
 
+  const face = event.target instanceof Element && event.target.closest('.csw-fab,.csw-head-face');
+  if (face instanceof HTMLElement) {
+    // 鼠标接管表情时结束旧键盘焦点，不在点击/拖动后残留焦点环。
+    face.blur();
+    event.preventDefault();
+  }
+
   if (IS_POPOUT) {
     nativePanelDrag(event, source);
     return;

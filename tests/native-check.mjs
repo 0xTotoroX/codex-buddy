@@ -56,7 +56,7 @@ const sourceAnchor = {
   x: sourceScreen.x + 300,
   y: sourceScreen.y + 180,
   width: chipAnchor ? 84 : 404,
-  height: chipAnchor ? 46 : motionOnly ? 376 : 420,
+  height: chipAnchor ? 36 : motionOnly ? 376 : 420,
 };
 const destinationPosition = crossScreen
   ? {
@@ -1032,7 +1032,7 @@ try {
       const entry = motionSamples.filter(
         (s) => s.at <= entryFinishedAt && s.alpha > 0 && s.bounds?.Height,
       );
-      const sourceHeight = (chipAnchor ? 46 : 376) + 24;
+      const sourceHeight = (chipAnchor ? 36 : 376) + 24;
       if (!entry.length || entry[0].bounds.Height > sourceHeight + 16)
         throw Error('Genie first visible frame was not at the source');
       if (

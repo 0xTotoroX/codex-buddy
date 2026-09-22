@@ -219,9 +219,15 @@
   transform: scale(0.96);
 }
 
-.csw-fab:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--csw-accent) 76%, transparent);
-  outline-offset: 4px;
+.csw-fab:focus,
+.csw-head-face:focus {
+  outline: none;
+}
+
+.csw-fab:focus-visible,
+.csw-head-face:focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--csw-text) 35%, transparent);
+  outline-offset: 2px;
 }
 
 .csw-fab-face {

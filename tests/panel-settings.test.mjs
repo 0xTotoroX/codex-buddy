@@ -78,8 +78,12 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
-    const mode = page.getByLabel('聊天内位置', { exact: true });
+    const mode = page.getByLabel('点击胶囊后展开为', { exact: true });
     await mode.waitFor();
+    assert.deepEqual(await mode.locator('option').allTextContents(), [
+      '聊天内浮动工作台',
+      '右侧嵌入工作台',
+    ]);
     assert.equal(await mode.inputValue(), 'capsule');
     await mode.selectOption('workbench');
     await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
@@ -145,6 +149,9 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.equal(prefs.ui.height, 600);
     assert.equal(prefs.ui.material, 'frosted');
     assert.equal(prefs.ui.dockOpen, true);
+    await mode.selectOption('capsule');
+    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+    assert.deepEqual(saves.at(-1).ui, { layoutMode: 'capsule' });
     assert.equal(await page.evaluate(() => window.notices.filter((item) => item.failed).length), 2);
   } finally {
     await browser.close();

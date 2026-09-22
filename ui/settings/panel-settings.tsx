@@ -1,6 +1,6 @@
 /*
  * [INPUT]: SSE 外观快照、后台弹出能力与经过认证的外观 API。
- * [OUTPUT]: Web 胶囊设置与工作台布局偏好；逐项保存并处理其他窗口的并发更新，不改变功能开关。
+ * [OUTPUT]: Web 胶囊展开方式与工作台布局偏好；逐项保存并处理其他窗口的并发更新，不改变功能开关。
  * [POS]: 设置页外观、交互与窗口控件；不接收聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -221,11 +221,14 @@ export function PanelSettings({
       <fieldset className="m-0 min-w-0 border-0 p-0" disabled={busy}>
         <div className="grid grid-cols-2 gap-5">
           <div className="col-span-full grid grid-cols-2 gap-5">
-            {select('聊天内位置', 'layoutMode', [
-              ['capsule', '在聊天内自由移动'],
-              ['workbench', '固定在聊天右侧'],
+            {select('点击胶囊后展开为', 'layoutMode', [
+              ['capsule', '聊天内浮动工作台'],
+              ['workbench', '右侧嵌入工作台'],
             ])}
             {number('侧栏宽度（px）', ui.dockWidth, 300, 460, (v) => change('dockWidth', v))}
+            <p className="col-span-full m-0 text-xs leading-relaxed text-muted-foreground">
+              两种方式都留在当前聊天内；浮动工作台可拖动位置，右侧嵌入会为聊天预留空间。双击表情另行弹出独立窗口。
+            </p>
             {workbenchLayout('dockLayout', '停靠')}
             {workbenchLayout('popoutLayout', '浮窗')}
           </div>

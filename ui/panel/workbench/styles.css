@@ -61,11 +61,12 @@
 .csw-workbench .csw-head {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) var(--csw-default-chip-width) minmax(0, 1fr);
   align-items: center;
   gap: 4px;
-  flex: 0 0 54px;
-  height: 54px;
+  flex: 0 0 calc(var(--csw-default-chip-height) + 8px);
+  height: calc(var(--csw-default-chip-height) + 8px);
+  min-height: 0;
   padding: 4px 6px;
 }
 .csw-workbench-source {
@@ -373,8 +374,8 @@
 .csw-workbench .csw-workbench-face {
   grid-column: 2;
   grid-row: 1;
-  width: 84px;
-  height: 46px;
+  width: var(--csw-default-chip-width);
+  height: var(--csw-default-chip-height);
 }
 .csw-workbench-face .csw-status-stage {
   transform: none;

@@ -384,6 +384,85 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'slim capsule restores either saved in-chat placement with neutral keyboard focus',
+    async (page) => {
+      for (const [index, placement] of ['capsule', 'workbench'].entries()) {
+        await page.evaluate(
+          ({ placement, revision }) => {
+            const api = window.__companionFloatingPanel;
+            api.syncPanelPreferences(
+              {
+                ...api.panelPreferences(),
+                layoutMode: placement,
+                open: false,
+                dockOpen: false,
+                material: 'matte',
+              },
+              revision,
+              false,
+            );
+          },
+          { placement, revision: 100 + index },
+        );
+        await settle(page);
+        const chip = await box(page, '.csw-fab');
+        near(chip.width, 84, 'capsule width');
+        near(chip.height, 36, 'capsule height');
+        await page.locator('.csw-fab').press('Enter');
+        await page.locator('.csw-workbench').waitFor({ state: 'visible' });
+        await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
+        assert.equal(await page.locator(slotSelector).count(), placement === 'workbench' ? 1 : 0);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.state.detached),
+          false,
+        );
+        const face = page.locator('.csw-workbench-face');
+        near((await face.boundingBox()).height, 36, 'expanded expression shares slim geometry');
+        await face.hover();
+        await page.mouse.down();
+        assert.equal(await face.evaluate((n) => getComputedStyle(n).outlineStyle), 'none');
+        await page.mouse.up();
+        await page.waitForFunction(
+          () =>
+            !window.__companionFloatingPanel.state.open &&
+            !window.__companionFloatingPanel.state.morphAnimation,
+        );
+        await page.locator('.csw-fab').press('Enter');
+        await page.locator('.csw-workbench').waitFor({ state: 'visible' });
+        await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
+        await face.focus();
+        const focus = await face.evaluate((n) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'color-mix(in srgb, var(--csw-text) 35%, transparent)';
+          n.append(probe);
+          const color = getComputedStyle(probe).color;
+          probe.remove();
+          return {
+            width: getComputedStyle(n).outlineWidth,
+            color: getComputedStyle(n).outlineColor,
+            expected: color,
+          };
+        });
+        assert.equal(focus.width, '1px');
+        assert.equal(
+          focus.color,
+          focus.expected,
+          'focus uses neutral text color rather than accent',
+        );
+        await page.screenshot({ path: resolve(output, `slim-${placement}.png`) });
+      }
+      assert.equal(
+        await page.evaluate(
+          () =>
+            window.workbenchFixture.requests.filter(
+              (r) => r.path === '/stepwise/generate' || r.path === '/panel/detach',
+            ).length,
+        ),
+        0,
+      );
+    },
+  ],
+  [
     'controls reveal on local hover or keyboard focus without moving content',
     async (page) => {
       await mode(page, true);
@@ -1962,7 +2041,7 @@ const cases = [
         );
         assert.ok(anchor, 'collapsed rail has a window anchor');
         near(anchor.width, 84, 'space collapse returns to the shared capsule');
-        near(anchor.height, 46, 'shared capsule height');
+        near(anchor.height, 36, 'shared capsule height');
         await page.evaluate(() => window.__companionFloatingPanel.setDetached(true));
         const detachedAnchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
