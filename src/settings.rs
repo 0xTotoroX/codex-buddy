@@ -1,5 +1,5 @@
 // [INPUT]: App、有效模型配置与私有配置/密钥文件。
-// [OUTPUT]: 设置读取/保存、独立启动策略、只读弹出能力、并发保存版本与独立生成版本。
+// [OUTPUT]: 三种方向来源/库/位置/Jev 设置与独立密钥保存、并发保存版本与有效生成版本。
 // [POS]: 设置事务边界；无关大纲开关与常用提示词修改不取消生成；maxInputChars=0 表示完整最近一问一答，旧正数上限保留。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -24,6 +24,10 @@ pub struct Options {
     pub protocol: String,
     pub api_key_env: String,
     pub max_items: usize,
+    pub direction_source: crate::directions::DirectionSource,
+    pub direction_library: Vec<crate::directions::Direction>,
+    pub selected_directions: Vec<String>,
+    pub jev: crate::jev::Options,
     pub quick_prompts: Vec<QuickPrompt>,
     pub max_input_chars: usize,
     pub max_output_tokens: usize,
@@ -157,7 +161,7 @@ mod tests {
         assert_eq!(noop["generationRevision"], initial["generationRevision"]);
         let generation = app
             .save_settings(Update {
-                max_items: Some(3),
+                max_items: Some(2),
                 ..Default::default()
             })
             .await
@@ -258,7 +262,11 @@ impl Default for Options {
             generation_mode: "manual".into(),
             protocol: "responses".into(),
             api_key_env: "CODEX_BUDDY_API_KEY".into(),
-            max_items: 4,
+            max_items: 3,
+            direction_source: Default::default(),
+            direction_library: crate::directions::defaults(),
+            selected_directions: vec![],
+            jev: Default::default(),
             quick_prompts: ["继续", "执行"]
                 .into_iter()
                 .map(|text| QuickPrompt {
@@ -289,6 +297,13 @@ pub struct Update {
     pub clear_api_key: bool,
     pub api_key_env: Option<String>,
     pub max_items: Option<usize>,
+    pub direction_source: Option<crate::directions::DirectionSource>,
+    pub direction_library: Option<Vec<crate::directions::Direction>>,
+    pub selected_directions: Option<Vec<String>>,
+    pub jev: Option<crate::jev::Options>,
+    pub jev_consent: Option<bool>,
+    pub jev_api_key: Option<String>,
+    pub clear_jev_api_key: bool,
     pub quick_prompts: Option<Vec<QuickPrompt>>,
     pub max_input_chars: Option<usize>,
     pub max_output_tokens: Option<usize>,
@@ -309,6 +324,8 @@ impl App {
             "baseUrl": model.base_url, "available": info.available, "reason": info.reason,
             "apiKeyConfigured": model.has_key() || model.provider == "codex" && info.available,
             "storedApiKey": self.paths.load_key().ok().flatten().is_some(),
+            "jevKeyConfigured": model.has_jev_key(),
+            "storedJevApiKey": self.paths.load_named_key("jevApiKey").ok().flatten().is_some(),
             "baseUrlConfigured": model.provider == "codex" || !model.base_url.is_empty(),
             "configurationRevision": self.settings_revision.load(std::sync::atomic::Ordering::SeqCst),
             "generationRevision": self.generation_revision.load(std::sync::atomic::Ordering::SeqCst),
@@ -425,6 +442,38 @@ impl App {
             }
             options.timeout_ms = value;
         }
+        if let Some(value) = patch.direction_source {
+            options.direction_source = value;
+        }
+        if let Some(value) = patch.direction_library {
+            options.direction_library = value;
+        }
+        if let Some(value) = patch.selected_directions {
+            options.selected_directions = value;
+        }
+        if let Some(value) = patch.jev {
+            options.jev = value;
+        }
+        if let Some(value) = patch.jev_consent {
+            options.jev.consent = value;
+        }
+        crate::directions::validate(&mut options.direction_library, &options.selected_directions)?;
+        options.jev.validate()?;
+        let old_jev_key = self.paths.load_named_key("jevApiKey")?;
+        let jev_key = if patch.clear_jev_api_key {
+            None
+        } else {
+            patch
+                .jev_api_key
+                .filter(|key| !key.trim().is_empty())
+                .or(old_jev_key.clone())
+        };
+        if jev_key
+            .as_ref()
+            .is_some_and(|key| key.len() > 8192 || key.contains(['\r', '\n']))
+        {
+            bail!("Jev 密钥格式无效");
+        }
         let old_key = self.paths.load_key()?;
         let key = if patch.clear_api_key {
             None
@@ -440,12 +489,13 @@ impl App {
         {
             bail!("API 密钥格式无效");
         }
-        self.paths.save_key(key.as_deref())?;
+        self.paths.save_keys(key.as_deref(), jev_key.as_deref())?;
         if let Err(error) = self.paths.save(&next) {
-            self.paths.save_key(old_key.as_deref())?;
+            self.paths
+                .save_keys(old_key.as_deref(), old_jev_key.as_deref())?;
             return Err(error);
         }
-        let model = Model::load(&next).with_key(key);
+        let model = Model::load(&next).with_key(key).with_jev_key(jev_key);
         {
             let mut current = self.model.write().await;
             if !current.same_generation_config(&model) {
@@ -470,9 +520,32 @@ impl App {
     }
 
     pub async fn test_settings(&self) -> Result<Value> {
-        let model = self.model.read().await.clone();
-        let suggestions = self.until_shutdown(model.generate("这是一条连接测试。一个本机 Codex 工具将回答大纲和下一步建议显示在桌面浮窗，用户通过浏览器配置模型。请为验收桌面显示、模型连接和草稿保护生成后续提问。")).await?;
-        Ok(json!({"ok":true,"status":"ok","items":crate::requests::items(suggestions)}))
+        let guard = self.model.read().await;
+        let revision = self
+            .generation_revision
+            .load(std::sync::atomic::Ordering::SeqCst);
+        let model = guard.clone();
+        drop(guard);
+        let input = crate::directions::Exchange::new(
+            "只讨论可验证的后续提问，不执行或发布",
+            "一个本机 Codex 工具将回答大纲和下一步建议显示在桌面浮窗，用户通过浏览器配置模型。首版待办包括桌面显示、模型连接和草稿保护。",
+            model.options.max_input_chars,
+        );
+        let result = self
+            .until_shutdown(model.generate_exchange_checked(&input, || async {
+                if self
+                    .generation_revision
+                    .load(std::sync::atomic::Ordering::SeqCst)
+                    != revision
+                {
+                    bail!("配置已变化，连接测试已取消");
+                }
+                Ok(())
+            }))
+            .await?;
+        Ok(
+            json!({"ok":true,"status":"ok","generationAttempted":result.generation_attempted,"items":crate::requests::items(result.suggestions)}),
+        )
     }
 
     pub async fn list_models(&self) -> Result<Value> {

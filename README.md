@@ -29,7 +29,15 @@ CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, gen
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. One model request returns multiple self-contained Chinese suggestions, favoring continuation from the answer and its references, questions about gaps or assumptions, and explanations of relevant terms. The intents adapt to the content; related tasks can be advanced together rather than split into individual choices.
+In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
+
+**Suggestion directions** are independent of when generation starts:
+
+- **自动探索 (Explore):** one generation request discovers directions freely, up to the configured count.
+- **我来选择 (Choose):** select and reorder direction slots; one request generates up to one suggestion per slot. Inapplicable directions are skipped.
+- **智能挑选 (Smart, experimental):** Jev evaluates enabled directions in one batch, then the generation model chooses a complementary subset and writes prompts. Requires separate TypeSafe credentials and explicit consent to send the latest question and answer to that service. Other modes make no Jev calls; failures do not silently switch modes.
+
+Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
 
@@ -127,6 +135,6 @@ The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync w
 
 ## Privacy and license
 
-Configuration is stored locally. When generating suggestions, relevant answer excerpts are sent to your chosen model service. CodexBuddy does not persist chat bodies or modify the official application bundle. Host updates may affect compatibility.
+Configuration is stored locally. When generating suggestions, the latest question and answer are sent to your chosen model service, subject to your input-context setting. Smart mode also sends that exchange to the configured Jev service after explicit consent. CodexBuddy does not persist chat bodies or modify the official application bundle. Host updates may affect compatibility.
 
 Original source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.

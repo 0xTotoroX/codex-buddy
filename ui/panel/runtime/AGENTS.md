@@ -11,7 +11,7 @@ presentation 的 panelReadingState 由 lifecycle 导出，记录标签、预览�
 成员清单：
 
 - [constants.js](constants.js)：稳定 DOM 标识、尺寸与时间参数；构建标志区分开发版及其独立存储键。
-- [state.js](state.js)：五组状态及独立停靠/浮窗布局的初始化（弹出始终展开）、能力判断、受限 bridgeCall 与完整/限长生成输入工具（maxInputChars=0 不截断）；不导入上层。
+- [state.js](state.js)：五组状态及独立停靠/浮窗布局的初始化（弹出始终展开）、能力判断、受限 bridgeCall 与完整生成输入采集（预算仅在后台应用）及自选方向位置数量；不导入上层。
 - [signals.js](signals.js)：固定的同步通知类型及订阅，包括 windowToggle 手势请求；不承载状态或业务实现。
 - [diagnostics.js](diagnostics.js)：可见几何和本地限量诊断，不保存聊天正文。
 - [settings-sync.js](settings-sync.js)：openSettings 打开统一配置页，不传未使用的页面定位参数；设置请求、保存、推送同步和 15 秒恢复检查；两个功能独立重置。

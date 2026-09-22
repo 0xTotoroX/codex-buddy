@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的默认偏好； 稳定常量、初始化偏好与页面桥接。
- * [OUTPUT]: 五组状态与宿主本地聊天锁定元数据（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、完整/限长输入工具和能力判断。
+ * [OUTPUT]: 五组状态与宿主本地聊天锁定元数据（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、完整输入采集、自选位置数量和能力判断（字符预算仅在后台应用）。
  * [POS]: 无上层依赖的状态基础层，初始化由 lifecycle 显式调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -354,18 +354,18 @@ function persistViewOrder(order) {
 }
 
 function configuredMaxPromptItems(settings = runtimeState.settings) {
-  const value = Number(settings?.maxItems);
+  const value = Number(
+    settings?.directionSource === 'manual'
+      ? settings.selectedDirections?.length
+      : settings?.maxItems,
+  );
   if (!Number.isFinite(value)) return DEFAULT_STEPWISE_ITEMS;
   return clamp(Math.floor(value), 1, MAX_STEPWISE_ITEMS);
 }
 
 function stepwiseInputText(value) {
-  const configured = Number(runtimeState.settings?.maxInputChars);
-  if (configured === 0) return normalizeText(value);
-  const limit = Number.isFinite(configured)
-    ? clamp(Math.floor(configured), 500, 32000)
-    : MAX_TEXT_LENGTH;
-  return Array.from(normalizeText(value)).slice(-limit).join('');
+  // Budgeting happens once in the backend so original lengths and role boundaries survive.
+  return normalizeText(value);
 }
 
 function normalizeActiveTab(tab = shellState.activeTab) {

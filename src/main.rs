@@ -6,6 +6,8 @@
 mod assets;
 mod cdp;
 mod config;
+mod directions;
+mod jev;
 mod lifecycle;
 mod model;
 mod model_control;
@@ -17,6 +19,8 @@ mod requests;
 mod server;
 mod settings;
 mod state;
+#[cfg(test)]
+mod stepwise_tests;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

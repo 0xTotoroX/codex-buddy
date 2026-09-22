@@ -7,8 +7,9 @@ main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责�
 成员清单：
 
 - [index.html](index.html)：设置页 HTML 入口，加载同目录 main.tsx；标签页图标复用 ../icon.png。
+- [direction-settings.tsx](direction-settings.tsx)：自动探索/自选/智能挑选、方向库增删改、有序位置、启用候选和 Jev 同意/独立凭据；共用自动保存，无面板新入口。
 - [main.tsx](main.tsx)：页面入口、设置表单（最近一次聊天完整上下文/自定义字符上限）、Field/Toggle 业务组合、常用提示词名称/内容及操作反馈；页头复用产品图标；挂载模型快切局部设置；启动行为表单选择询问正常重开或直接强制重开，明确强退影响；开发构建标明真实调试并固定启动端点和窗口。
-- [use-settings-form.ts](use-settings-form.ts)：模型表单草稿、修订校验、自动/手动保存队列及并发编辑合并，不触发模型调用或宿主重启。
+- [use-settings-form.ts](use-settings-form.ts)：模型表单和两套独立密钥草稿、修订校验、自动/手动保存队列及并发编辑合并，不触发模型调用或宿主重启。
 - [panel-settings.tsx](panel-settings.tsx)：哑光/磨砂/液态材质、液态旁的 Clear 星星按钮、字号、摘要、点击、顺序及窗口设置，另提供明确的聊天内位置（固定右侧/自由移动）、侧栏宽度及停靠/浮窗各自的分栏/标签编排、选中标签、排列、首个面板、双轴比例和恢复默认，保存偏好不启用功能或更改主题；依据后台 popoutSupported 禁用不支持设备的桌面选项；按版本逐项保存，冲突时读取新状态；说明三材质在内嵌、弹出与旧系统下的实际效果。
 - [model-control-settings.tsx](model-control-settings.tsx)：独立模型快切的显示器、边缘、位置和四主题即时设置；显示器按UUID保存，断开保留选择；版本冲突重读，忽略过期查询，不覆盖工作台外观。
 - [api.ts](api.ts)：公开数据类型、认证请求、错误和 SSE 状态订阅。

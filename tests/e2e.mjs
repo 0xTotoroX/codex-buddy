@@ -1092,13 +1092,17 @@ try {
       'Long answer did not settle',
     );
     await generate();
-    const longInput = JSON.parse(lastBody.input).answer;
-    assert.equal(Array.from(longInput).length, 32000);
-    assert.ok(longInput.includes('末尾验证标记'));
-    assert.ok(longInput.includes('紧邻的用户问题'));
+    const longInput = JSON.parse(lastBody.input).exchange;
+    assert.equal(
+      Array.from(longInput.userQuestion).length + Array.from(longInput.assistantAnswer).length,
+      32000,
+    );
+    assert.equal(longInput.truncated, true);
+    assert.ok(longInput.assistantAnswer.startsWith('长回答开头'));
+    assert.ok(longInput.userQuestion.length > 0);
     assert.equal((await panelState()).count, 4);
     await desktop.evaluate(() =>
-      document.querySelector('#answer').prepend(document.createTextNode('在截取范围外新增内容')),
+      document.querySelector('#answer').append(document.createTextNode('在截取范围外新增内容')),
     );
     await waitFor(
       async () => (await panelState()).count === 0,
@@ -1122,8 +1126,10 @@ try {
       await patch({ protocol, maxInputChars: 0 });
       await generate();
       const raw = protocol === 'responses' ? lastBody.input : lastBody.messages.at(-1).content;
-      const sent = JSON.parse(raw).answer;
-      assert.equal(sent, `紧邻的用户问题：\n${fullQuestion}\n\n当前回答：\n${fullAnswer}`);
+      const sent = JSON.parse(raw).exchange;
+      assert.equal(sent.userQuestion, fullQuestion);
+      assert.equal(sent.assistantAnswer, fullAnswer);
+      assert.equal(sent.truncated, false);
     }
     await desktop
       .locator('.user-bubble')

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: React、use-settings-form.ts、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
- * [OUTPUT]: 自动/手动保存的模型与完整/限长上下文表单、常用提示词编辑、全量胶囊设置、连接状态和操作反馈。
+ * [OUTPUT]: 自动/手动保存的模型与完整/限长上下文表单、方向配置与常用提示词编辑、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -32,6 +32,7 @@ import {
 import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
 import { ModelControlSettings } from './model-control-settings';
+import { DirectionSettings } from './direction-settings';
 import { useSettingsForm } from './use-settings-form';
 import type { EditableSettings, Settings } from './api';
 
@@ -47,6 +48,10 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    directionSource,
+    directionLibrary,
+    selectedDirections,
+    jev,
     quickPrompts,
     maxInputChars,
     maxOutputTokens,
@@ -63,6 +68,10 @@ function editable(value: Settings): EditableSettings {
     baseUrl,
     apiKeyEnv,
     maxItems,
+    directionSource,
+    directionLibrary,
+    selectedDirections,
+    jev,
     quickPrompts,
     maxInputChars,
     maxOutputTokens,
@@ -100,6 +109,10 @@ function App() {
     schedule,
     setApiKey,
     setClearKey,
+    jevApiKey,
+    clearJevKey,
+    setJevApiKey,
+    setClearJevKey,
   } = useSettingsForm(live, view?.configurationRevision, editable, notify);
   useEffect(() => {
     if (!connectionEdited && view?.connection.endpoint) {
@@ -121,8 +134,15 @@ function App() {
   }
   async function test() {
     if (dirty) await save();
-    const result = await request<{ items: unknown[] }>('settings/test', {});
-    notify(`连接正常，已生成 ${result.items.length} 条测试建议。`);
+    const result = await request<{ items: unknown[]; generationAttempted: boolean }>(
+      'settings/test',
+      {},
+    );
+    notify(
+      result.generationAttempted === false
+        ? 'Jev 判断成功，示例没有合适方向；生成阶段已跳过，生成服务尚未验证。'
+        : `连接正常，已生成 ${result.items.length} 条测试建议。`,
+    );
   }
   async function connect() {
     await request('connect', { endpoint, targetId: targetId || null });
@@ -441,6 +461,16 @@ function App() {
                     连接测试使用固定示例，不读取你的聊天。
                   </p>
                 </Card>
+                <DirectionSettings
+                  form={form}
+                  saved={saved}
+                  change={change}
+                  schedule={schedule}
+                  apiKey={jevApiKey}
+                  clearKey={clearJevKey}
+                  setApiKey={setJevApiKey}
+                  setClearKey={setClearJevKey}
+                />
                 <Card aria-labelledby="quick-prompts-title">
                   <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
                     常用提示词
@@ -527,16 +557,6 @@ function App() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-x-[22px] gap-y-[18px] [&>div]:mb-0 max-[650px]:gap-x-[15px]">
-                    <Field id="max-items" label="最多建议数量">
-                      <Input
-                        id="max-items"
-                        type="number"
-                        min="1"
-                        max="6"
-                        value={form.maxItems}
-                        onChange={(e) => change('maxItems', Number(e.target.value))}
-                      />
-                    </Field>
                     <Field
                       id="context-scope"
                       label="输入上下文"
