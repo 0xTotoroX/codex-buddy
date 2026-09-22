@@ -56,7 +56,7 @@ After installation, open **CodexBuddy** from Applications. Node.js and Rust are 
 
 Open settings from the capsule. Choose your existing Codex login or enter your model API settings, save, and test the connection. Using an existing login requires a working local Codex CLI installation and login session.
 
-The workbench has five visible states: expanded sidebar or narrow entry, expanded floating workbench or compact capsule inside the chat, and an expanded independent window. Split direction, tabs, and focus only change the contents; insufficient space is a reason for collapsing, not another shape.
+The workbench has three main forms: a compact capsule, an expanded in-chat workbench, and an independent window. Inside the chat it can dock on the right or float freely. Collapsing or running out of room returns it to the capsule and releases all sidebar space; a click restores the preferred position. Split direction, tabs, and focus only change the contents. Top controls and refresh buttons appear when their header is hovered or receives keyboard focus, and remain visible on touch devices.
 
 ### 3. Use the workbench
 

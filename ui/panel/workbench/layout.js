@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台偏好、宿主占位适配、运行时通知。
- * [OUTPUT]: 停靠生命周期与独立偏好；位置切换与开合分离，浮动工作台不清理交互监听。
+ * [OUTPUT]: 停靠生命周期与独立偏好；位置切换与开合分离，共用胶囊恢复停靠，迁移前保存表情位置与阅读。
  * [POS]: 工作台布局控制器；不导入视图和业务模块。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -38,6 +38,13 @@ export function setWorkbench(enabled, { expanded = false } = {}) {
   if (!enabled && !IS_POPOUT) settleMorph(expanded ? 1 : 0, expanded ? 'panel' : 'chip');
   saveWorkbench();
 }
+export function openWorkbench() {
+  shellState.dockOpen = true;
+  dock?.reopen();
+  emitSignal('render', undefined);
+  if (shellState.dockStatus === 'space') dock?.showOptions(shellState.fab?.getBoundingClientRect());
+  saveWorkbench();
+}
 export function closeWorkbench() {
   shellState.dockOpen = false;
   emitSignal('render', undefined);
@@ -58,16 +65,18 @@ export function syncWorkbench() {
         if (!syncing) emitSignal('render', undefined);
       },
       () => {
-        shellState.dockOpen = true;
-        dock.reopen();
-        emitSignal('render', undefined);
-        saveWorkbench();
-      },
-      () => {
         emitSignal('windowToggle', undefined);
       },
       () => setWorkbench(false, { expanded: true }),
-      () => rememberWorkbenchReading(shellState.panel),
+      () => {
+        rememberWorkbenchReading(shellState.panel);
+        if (shellState.dockStatus === 'open') {
+          const face = shellState.panel
+            ?.querySelector('.csw-workbench-face')
+            ?.getBoundingClientRect();
+          if (face?.width) shellState.position = { x: face.left, y: face.top };
+        }
+      },
     );
   dock.update({
     width: clamp(shellState.dockWidth, 300, 460),

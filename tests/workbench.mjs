@@ -384,6 +384,49 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'controls reveal on local hover or keyboard focus without moving content',
+    async (page) => {
+      await mode(page, true);
+      const controls = page.locator('.csw-workbench-controls');
+      const refresh = page.locator('[data-refresh="next"]');
+      const opacity = (locator) => locator.evaluate((n) => Number(getComputedStyle(n).opacity));
+      const face = await box(page, '.csw-workbench-face');
+      await page.mouse.move(10, 10);
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '0',
+      );
+      assert.equal(await opacity(refresh), 0);
+      await page.locator('.csw-workbench-head').hover();
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '1',
+      );
+      assert.equal(await opacity(refresh), 0, 'top controls do not expose unrelated refresh');
+      await page.locator('[data-pane="next"] > header').hover();
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('[data-refresh="next"]')).opacity === '1',
+      );
+      near(
+        (await box(page, '.csw-workbench-face')).x,
+        face.x,
+        'revealing controls never shifts the face',
+      );
+      await page.mouse.move(10, 10);
+      await page.keyboard.press('Tab');
+      await page.locator('[data-workbench-settings]').focus();
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '1',
+      );
+      await page.locator('#fixture-host-content .app-bar').click();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(await controls.evaluate((n) => getComputedStyle(n).transitionDuration), '0s');
+      await page.mouse.move(10, 10);
+      await page.screenshot({ path: resolve(output, 'workbench-quiet.png') });
+      await page.locator('.csw-workbench-head').hover();
+      await page.screenshot({ path: resolve(output, 'workbench-hover.png') });
+    },
+  ],
+
+  [
     'expression remains visible in both morph directions and slow dock double click restores origin',
     async (page) => {
       await mode(page, false);
@@ -532,7 +575,7 @@ const cases = [
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
-      await page.getByRole('button', { name: '打开停靠工作台', exact: true }).click();
+      await page.locator('.csw-fab').click();
       assert.equal(await requestCount(), before, 'UI changes must not generate suggestions');
       await page.screenshot({ path: resolve(output, 'unified-icons-dock.png') });
     },
@@ -1028,6 +1071,14 @@ const cases = [
         node.scrollTop = 120;
         window.workbenchFixture.outlineBody = node;
       });
+      await page.getByRole('button', { name: '收起工作台', exact: true }).click();
+      await page.locator('.csw-fab').press('Enter');
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      await settle(page);
+      near((await reading(page)).panes.outline.scrollTop, 120, 'capsule reopen retains reading');
+      await page.locator('[data-view-body="outline"]').evaluate((node) => {
+        window.workbenchFixture.outlineBody = node;
+      });
       await page.locator('[data-refresh="next"]').click();
       await page.waitForFunction(() => window.workbenchFixture.deferred.length === 1);
       for (const action of ['horizontal', 'swap', 'vertical', 'auto', 'swap', 'merge', 'split'])
@@ -1139,7 +1190,11 @@ const cases = [
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'space',
       );
-      near((await box(page, slotSelector)).width, 44, 'space collapse only leaves rail');
+      near(
+        (await page.locator(slotSelector).boundingBox()).width,
+        0,
+        'collapse releases the chat width',
+      );
       await page.setViewportSize(wide);
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
@@ -1149,7 +1204,7 @@ const cases = [
       );
       for (const key of ['dockOpen', 'dockWidth', 'splitRatio'])
         assert.equal(collapsed[key], preferences[key], `${key} retains user intent`);
-      await page.getByRole('button', { name: '打开停靠工作台' }).click();
+      await page.locator('.csw-fab').click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
       await layout(page);
@@ -1389,7 +1444,11 @@ const cases = [
       );
       await openChatSurface(page, 720);
       assert.equal(await page.locator('.csw-workbench').isVisible(), false);
-      near((await box(page, '#foreground-chat [data-codex-buddy-dock]')).width, 44, 'narrow rail');
+      near(
+        (await page.locator('#foreground-chat [data-codex-buddy-dock]').boundingBox()).width,
+        0,
+        'no collapsed rail',
+      );
       const current = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       assert.equal(current.dockOpen, preferences.dockOpen);
       assert.equal(current.dockWidth, preferences.dockWidth);
@@ -1546,7 +1605,7 @@ const cases = [
     },
   ],
   [
-    'collapsed rail opens normally and offers explicit alternatives only when space is insufficient',
+    'collapsed capsule frees the sidebar and offers explicit alternatives only when space is insufficient',
     async (page, baseline) => {
       await mode(page, true);
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
@@ -1554,16 +1613,25 @@ const cases = [
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
       const rail = page.locator(slotSelector);
-      const entry = rail.getByRole('button', { name: '打开停靠工作台', exact: true });
-      assert.equal(await rail.locator(':scope > button:visible').count(), 1);
+      const entry = page.locator('.csw-fab');
+      assert.equal(await rail.locator(':scope > button:visible').count(), 0);
+      near((await rail.boundingBox()).width, 0, 'no empty sidebar');
+      assert.equal(await entry.isVisible(), true);
+      assert.equal(
+        await page
+          .locator('[data-companion-stepwise-root]')
+          .evaluate((n) => n.parentNode === document.body),
+        true,
+      );
       assert.equal(await rail.locator('summary:visible').count(), 0);
-      await entry.click();
+      await page.screenshot({ path: resolve(output, 'collapsed-capsule.png') });
+      await entry.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await page.setViewportSize({ width: 880, height: 960 });
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'space',
       );
-      await entry.click();
+      await entry.press('Enter');
       assert.equal(await rail.getByRole('group', { name: '展开工作台' }).isVisible(), true);
       assert.match(await rail.locator('.csw-dock-reason').innerText(), /聊天区域太窄/);
       assert.equal(
@@ -1576,10 +1644,10 @@ const cases = [
       );
       await page.keyboard.press('Escape');
       assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
-      await entry.click();
-      await entry.click();
+      await entry.press('Enter');
+      await entry.press('Enter');
       assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
-      await entry.click();
+      await entry.press('Enter');
       await page.evaluate(() => document.documentElement.classList.add('dark'));
       await page.screenshot({ path: resolve(output, 'space-open-options.png') });
       await rail.getByRole('button', { name: '在聊天内展开', exact: true }).click();
@@ -1608,8 +1676,8 @@ const cases = [
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'space',
       );
-      const entry = page.getByRole('button', { name: '打开停靠工作台', exact: true });
-      await entry.click();
+      const entry = page.locator('.csw-fab');
+      await entry.press('Enter');
       assert.equal(await page.locator('.csw-dock-reason').isVisible(), true);
       await page
         .locator('#fixture-file-panel')
@@ -1618,7 +1686,7 @@ const cases = [
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
       assert.equal(await page.locator('.csw-dock-reason').isVisible(), false);
-      await entry.click();
+      await entry.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       near(
         (await box(page, '#fixture-host-content')).width,
@@ -1882,15 +1950,19 @@ const cases = [
         );
         await settle(page);
         assert.equal(await page.locator('.csw-workbench').isVisible(), false);
-        near((await box(page, slotSelector)).width, 44, 'collapsed entry width');
-        const entry = page.getByRole('button', { name: '打开停靠工作台' });
+        near(
+          (await page.locator(slotSelector).boundingBox()).width,
+          0,
+          'collapsed slot has zero width',
+        );
+        const entry = page.locator('.csw-fab');
         assert.match(await entry.getAttribute('title'), /空间不足/);
         const anchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
         );
         assert.ok(anchor, 'collapsed rail has a window anchor');
-        near(anchor.width, 44, 'space collapse uses rail width, not saved expanded width');
-        near(anchor.height, 44, 'space collapse uses a compact entry anchor');
+        near(anchor.width, 84, 'space collapse returns to the shared capsule');
+        near(anchor.height, 46, 'shared capsule height');
         await page.evaluate(() => window.__companionFloatingPanel.setDetached(true));
         const detachedAnchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
@@ -1915,7 +1987,7 @@ const cases = [
         const after = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
         for (const key of ['dockOpen', 'dockWidth', 'splitRatio'])
           assert.equal(after[key], preferences[key], `${key} survives space collapse`);
-        await entry.click();
+        await entry.press('Enter');
         await page.waitForFunction(
           () => window.__companionFloatingPanel.state.dockStatus === 'open',
         );

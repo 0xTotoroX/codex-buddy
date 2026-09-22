@@ -18,7 +18,7 @@
   box-sizing: border-box;
   overflow: hidden;
 }
-[data-codex-buddy-dock]::after {
+[data-codex-buddy-dock][data-expanded='true']::after {
   content: '';
   position: absolute;
   inset: calc(var(--csw-dock-inset, 0px) + 20px) auto 20px 0;
@@ -427,14 +427,6 @@
   font-size: 0;
 }
 
-.csw-dock-entry {
-  place-items: center;
-}
-.csw-dock-entry svg,
-.csw-dock-menu svg {
-  width: 18px;
-  height: 18px;
-}
 .csw-dock-menu {
   position: absolute;
   top: 100px;
@@ -489,8 +481,7 @@
 .csw-dock-menu :is(button, summary):hover {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
-.csw-dock-menu :is(button, summary):focus-visible,
-.csw-dock-entry:focus-visible {
+.csw-dock-menu :is(button, summary):focus-visible {
   outline: 2px solid currentColor;
   outline-offset: -2px;
 }
@@ -521,4 +512,27 @@
   margin: 4px 8px 6px;
   opacity: 0.7;
   line-height: 1.6;
+}
+
+[data-companion-stepwise-root][data-dock-suspended='true'] {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .csw-workbench-controls,
+  .csw-workbench-pane > header [data-refresh] {
+    opacity: 0;
+    transition: opacity 140ms ease-out;
+  }
+  .csw-workbench-head:hover .csw-workbench-controls,
+  .csw-workbench-head:has(:focus-visible) .csw-workbench-controls,
+  .csw-workbench-pane > header:hover [data-refresh],
+  .csw-workbench-pane > header:has(:focus-visible) [data-refresh] {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .csw-workbench-controls,
+  .csw-workbench-pane > header [data-refresh] {
+    transition: none;
+  }
 }

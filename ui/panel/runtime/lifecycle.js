@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 扫描、启停与通知订阅；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
+ * [OUTPUT]: 扫描、启停与通知订阅，连接胶囊与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -98,7 +98,7 @@ import {
 } from '../outline.js';
 import { nativeGestureEnded, panelPreferences } from '../popout/transport.js';
 import { cancelFaceClick, onResize } from '../core/interaction.js';
-import { stopWorkbench, setWorkbench } from '../workbench/layout.js';
+import { stopWorkbench, setWorkbench, openWorkbench, closeWorkbench } from '../workbench/layout.js';
 import { onSignal } from './signals.js';
 import { pushDiagnostic, readDiagnostics } from './diagnostics.js';
 import {
@@ -517,6 +517,7 @@ function install() {
     onSignal('verify', () => scan()),
     onSignal('theme', () => syncTheme()),
     onSignal('windowToggle', () => void togglePanelWindow()),
+    onSignal('workbenchToggle', (expanded) => (expanded ? openWorkbench() : closeWorkbench())),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
   window[API_KEY] = {

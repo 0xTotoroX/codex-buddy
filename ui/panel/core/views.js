@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立功能视图、外壳状态、交互和设置视图。
- * [OUTPUT]: 紧凑胶囊及唯一展开工作台的组合渲染与建议预览；未知停靠宿主保留紧凑入口。
+ * [OUTPUT]: 紧凑胶囊及唯一展开工作台的组合渲染与建议预览；侧栏收起复用胶囊并清理编排，宿主暂时让位保留节点。
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -258,13 +258,20 @@ function renderFloat(options = {}) {
   shellState.activeTab = normalizeActiveTab();
   syncWorkbench();
   const unsupportedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'unsupported';
-  if (unsupportedDock) shellState.open = false;
-  if (!unsupportedDock && (IS_POPOUT || shellState.open || isWorkbench())) {
+  const suspendedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'suspended';
+  if (suspendedDock && shellState.root) {
+    shellState.root.dataset.dockSuspended = 'true';
+    return;
+  }
+  const compactDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus !== 'open';
+  if (compactDock) shellState.open = false;
+  if (!compactDock && (IS_POPOUT || shellState.open || isWorkbench())) {
     installStyle();
     installFloat();
     attachWorkbenchRoot();
     syncTheme();
     normalizePromptState();
+    delete shellState.root.dataset.dockSuspended;
     shellState.root.dataset.workbench = 'true';
     shellState.root.dataset.dockVisible = String(
       IS_POPOUT ||
@@ -284,6 +291,8 @@ function renderFloat(options = {}) {
     delete shellState.root.dataset.workbench;
     delete shellState.root.dataset.dockVisible;
   }
+  shellState.workbenchLayoutCleanup?.();
+  shellState.workbenchLayoutCleanup = null;
   const viewScroll = captureViewScroll();
   clearPromptInteractionTimers();
   shellState.viewReorderCleanup?.();
@@ -292,6 +301,10 @@ function renderFloat(options = {}) {
   installStyle();
   installFloat();
   if (!shellState.fab || !shellState.popover || !shellState.panel || !shellState.glass) return;
+  attachWorkbenchRoot();
+  shellState.root.dataset.dockSuspended = String(
+    compactDock && shellState.dockStatus === 'suspended',
+  );
   syncTheme();
   normalizePromptState();
   const expressionNow = Date.now();
@@ -401,6 +414,11 @@ function renderFloat(options = {}) {
   installPanelDrag();
   syncEyeTracking();
   if (!options.preserveMorph && !shellState.morphAnimation) settleMorph(shellState.open ? 1 : 0);
+  if (compactDock && !unsupportedDock)
+    shellState.fab.title =
+      shellState.dockStatus === 'space'
+        ? '空间不足；单击选择打开方式，双击移到独立窗口'
+        : '单击展开侧栏；双击移到独立窗口';
 }
 
 function nextProgressState() {

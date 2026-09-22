@@ -10,11 +10,11 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 - [install-styles.js](install-styles.js)：将共享变量、styles/ 的职责层、native.css 与内嵌 glass/lab.css 按顺序安装为单个样式节点；开发时可强制替换样式而不重建胶囊。
 - [styles/AGENTS.md](styles/AGENTS.md)：变量、布局、内容、控件、材质与动画分层。
 - [effects.js](effects.js)：高光和视线跟踪；不读取业务正文。
-- [geometry.js](geometry.js)：位置、内嵌收放形变、吸边、尺寸与滚动位置；弹出强制保持展开；宿主边界来自 host/host-appearance。
+- [geometry.js](geometry.js)：位置、内嵌收放形变、吸边、尺寸与滚动位置；弹出强制保持展开；宿主边界来自 host/host-appearance，胶囊恢复停靠通过 workbenchToggle 通知布局层。
 - [shell.js](shell.js)：表情派生、完成光效与视图过渡；不负责识别宿主。
 - [interaction.js](interaction.js)：表情鼠标单击等待 100ms 收放、稳定外层识别双击窗口切换，记录首击前 open 并取消首击触发的收放后直接弹出，拖拽、固定对角 1:1 缩放、排序和快捷键；原生手势交给 popout/transport；连续缩放仅更新几何，结束时保存尺寸；窗口交接缩放不保存中间尺寸。
 - [settings-view.js](settings-view.js)：胶囊设置模板、外观/显示/生成/点击行为的显式选择器和内嵌与弹出“外观”框内液态旁中性色星星（空心 Regular、实心 Clear）等控件绑定；网络操作交给 runtime/settings-sync。
-- [views.js](views.js)：创建胶囊 DOM、组合视图与下一步预览交互，选择工作台时委托双面板渲染；表情提示单/双击及拖动，弹出眼睛单击不收起、双击收回。
+- [views.js](views.js)：创建胶囊 DOM、组合视图与下一步预览交互，侧栏收起时显示共用胶囊并清理编排监听，未知前景界面仅隐藏保留节点；展开时委托双面板渲染；表情提示单/双击及拖动，弹出眼睛单击不收起、双击收回。
 
 展开后由 views 统一委托 workbench，不再显示旧的大号胶囊外壳；shell 提供唯一表情模板。紧凑表情单击展开/双击弹出，展开表情在内嵌单击收起、双击弹出，桌面仅双击收回；菜单提供明确收起入口。geometry 在形变完成后刷新对应外壳。
 

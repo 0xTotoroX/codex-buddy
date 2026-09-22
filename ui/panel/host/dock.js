@@ -1,10 +1,9 @@
 /*
  * [INPUT]: 已识别的 Codex 主内容与前景聊天布局、期望侧栏宽度和开合状态。
- * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态。
+ * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，替代菜单锚定共用胶囊。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
-import { iconSvg } from '../icons/index.js';
 import { foregroundSurface } from './surfaces.js';
 const SLOT = 'data-codex-buddy-dock';
 const OWN_UI = `[${SLOT}],[data-companion-stepwise-root]`;
@@ -34,7 +33,7 @@ export function findDockHost() {
   return null;
 }
 
-export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () => {}) {
+export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
   let host = null,
     slot = null,
     frame = 0,
@@ -43,6 +42,7 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
   let blocked = false;
   let observer = null;
   let attachedRoot = null;
+  let dockExpanded = false;
   const blockedRows = new WeakMap();
   const schedule = () => {
     if (!frame)
@@ -94,10 +94,19 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
   document.addEventListener('focusin', schedule);
   const closeMenu = (event) => {
     const menu = slot?.querySelector('.csw-dock-menu');
-    if (menu && !menu.contains(event.target) && !event.target.closest('.csw-dock-entry'))
+    if (menu && !menu.contains(event.target) && !event.target.closest('.csw-fab'))
       menu.removeAttribute('open');
   };
+  const escapeMenu = (event) => {
+    const menu = slot?.querySelector('.csw-dock-menu');
+    if (event.key !== 'Escape' || !menu?.open) return;
+    menu.open = false;
+    attachedRoot?.querySelector('.csw-fab')?.focus();
+    event.preventDefault();
+    event.stopPropagation();
+  };
   document.addEventListener('pointerdown', closeMenu);
+  window.addEventListener('keydown', escapeMenu, true);
 
   function removeSlot() {
     if (slot) beforeMove();
@@ -135,18 +144,6 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       slot.setAttribute('aria-label', 'CodexBuddy 工作台入口');
       slot.style.cssText =
         'order:1;flex:0 0 auto;min-width:0;position:relative;align-self:stretch;overflow:visible;padding:0;border:0;margin:0;box-sizing:border-box;';
-      const entry = document.createElement('button');
-      entry.type = 'button';
-      entry.innerHTML = iconSvg('dock');
-      entry.className = 'csw-dock-entry';
-      entry.setAttribute('aria-label', '打开停靠工作台');
-      entry.style.cssText =
-        'position:absolute;top:56px;right:4px;width:36px;height:36px;border:0;border-radius:10px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;cursor:pointer;font-size:22px;';
-      entry.onclick = () => {
-        if (options.detached) return;
-        if (slot.dataset.reason === 'space') menu.open = !menu.open;
-        else onOpen();
-      };
       const menu = document.createElement('details');
       menu.className = 'csw-dock-menu';
       menu.innerHTML = `<summary hidden>展开工作台</summary><div role="group" aria-label="展开工作台"><p role="status" class="csw-dock-reason"></p><button data-dock-popout>移到独立窗口</button><button data-dock-floating>在聊天内展开</button></div>`;
@@ -158,17 +155,7 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
         menu.open = false;
         onExit();
       });
-      menu.addEventListener('toggle', () => {
-        entry.setAttribute('aria-expanded', String(menu.open));
-      });
-      slot.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && menu.open) {
-          menu.open = false;
-          entry.focus();
-          event.stopPropagation();
-        }
-      });
-      slot.append(entry, menu);
+      slot.append(menu);
       host.row.append(slot);
       observer = new ResizeObserver(schedule);
       observer.observe(host.row);
@@ -189,14 +176,15 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
     if (!options.open) blocked = false;
     const returnExpanded = options.open && enough && !blocked;
     const expanded = !options.detached && returnExpanded;
-    const width = expanded ? requestedWidth : 44;
+    if (dockExpanded && !expanded) beforeMove();
+    dockExpanded = expanded;
+    slot.dataset.expanded = String(expanded);
+    placeRoot();
+    const width = expanded ? requestedWidth : 0;
     if (slot.style.width !== `${width}px`) slot.style.width = `${width}px`;
-    const entry = slot.firstElementChild;
     const menu = slot.querySelector('.csw-dock-menu');
-    entry.style.display = expanded ? 'none' : 'grid';
     menu.hidden = expanded || options.detached || enough;
     if (menu.hidden) menu.open = false;
-    entry.disabled = options.detached;
     const popout = /** @type {HTMLButtonElement} */ (menu.querySelector('[data-dock-popout]'));
     popout.disabled = !options.popoutSupported;
     popout.title = options.popoutSupported ? '移到独立窗口' : '当前系统不支持独立窗口';
@@ -204,11 +192,6 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       availableWidth < 560 + requestedWidth
         ? '聊天区域太窄。收起右侧面板或加宽聊天后，可重新打开侧栏。'
         : '聊天区域太矮。增高窗口后，可重新打开侧栏。';
-    entry.title = options.detached
-      ? '浮窗已弹出，请在浮窗中收回'
-      : enough
-        ? '打开停靠工作台'
-        : '空间不足，点击选择其他打开方式';
     slot.dataset.reason = enough ? '' : 'space';
     const rect = slot.getBoundingClientRect();
     slot.style.setProperty('--csw-dock-inset', `${Math.max(0, 48 - rect.top)}px`);
@@ -233,12 +216,12 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
         right: rect.right,
         bottom: rect.bottom,
         anchor: {
-          left: returnExpanded ? rect.right - requestedWidth : rect.right - 44,
-          top: returnExpanded ? Math.max(rect.top, 48) : rect.top + 52,
+          left: returnExpanded ? rect.right - requestedWidth : rect.right,
+          top: Math.max(rect.top, 48),
           right: rect.right,
-          bottom: returnExpanded ? rect.bottom : rect.top + 96,
-          width: returnExpanded ? requestedWidth : 44,
-          height: returnExpanded ? rect.bottom - Math.max(rect.top, 48) : 44,
+          bottom: returnExpanded ? rect.bottom : Math.max(rect.top, 48),
+          width: returnExpanded ? requestedWidth : 0,
+          height: returnExpanded ? rect.bottom - Math.max(rect.top, 48) : 0,
         },
       },
     });
@@ -249,17 +232,32 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
     fingerprint = key;
     onChange(value);
   }
+  function placeRoot() {
+    if (!attachedRoot) return;
+    const parent = dockExpanded && slot ? slot : document.body;
+    if (attachedRoot.parentElement !== parent) {
+      attachedRoot.dataset.dockMoved = 'true';
+      parent.append(attachedRoot);
+    }
+    if (dockExpanded && slot) attachedRoot.dataset.dockMounted = 'true';
+    else delete attachedRoot.dataset.dockMounted;
+  }
   return {
     update,
     attachRoot(root) {
       attachedRoot = root;
-      if (slot && root) {
-        if (root.parentElement !== slot) {
-          root.dataset.dockMoved = 'true';
-          slot.append(root);
-        }
-        root.dataset.dockMounted = 'true';
-      }
+      placeRoot();
+    },
+    showOptions(anchor) {
+      const menu = slot?.querySelector('.csw-dock-menu');
+      if (!menu || menu.hidden || !anchor) return;
+      menu.style.position = 'fixed';
+      menu.style.right = 'auto';
+      menu.style.width = '230px';
+      menu.style.left = `${Math.max(12, Math.min(innerWidth - 242, anchor.right - 230))}px`;
+      menu.style.top = `${Math.max(12, Math.min(innerHeight - 170, anchor.bottom + 8))}px`;
+      menu.style.zIndex = '2147483647';
+      menu.open = !menu.open;
     },
     reopen() {
       blocked = false;
@@ -271,6 +269,7 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       window.removeEventListener('resize', schedule);
       document.removeEventListener('focusin', schedule);
       document.removeEventListener('pointerdown', closeMenu);
+      window.removeEventListener('keydown', escapeMenu, true);
       cancelAnimationFrame(frame);
       removeSlot();
     },
