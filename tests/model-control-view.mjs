@@ -981,6 +981,27 @@ test('three materials follow Codex colors while pure black stays fixed in every 
         .evaluate((n) => getComputedStyle(n).fontSize),
       '17px',
     );
+    const mutations = await page.evaluate(() => {
+      const repeated = {
+        expanded: true,
+        effectiveMaterial: 'native-glass',
+        nativeBackdrop: false,
+        appearance: { material: 'matte', fontOffset: 4, hostTheme: null },
+      };
+      window.dispatchEvent(new CustomEvent('model-control-native', { detail: repeated }));
+      const observer = new MutationObserver(() => {});
+      observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
+      for (let i = 0; i < 30; i++)
+        window.dispatchEvent(
+          new CustomEvent('model-control-native', {
+            detail: { ...repeated, animating: true, unfold: i / 30, width: 200 + i },
+          }),
+        );
+      const count = observer.takeRecords().length;
+      observer.disconnect();
+      return count;
+    });
+    assert.equal(mutations, 0, 'Geometry frames must not rewrite unchanged palette variables');
     await nativeEvent(page, { appearance: { hostTheme: null } });
     assert.equal(
       await page.locator('body').getAttribute('data-theme'),
@@ -1027,6 +1048,22 @@ test('native pointer entry is immediate, overrides DOM leave and respects suppre
   await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
   await page.clock.runFor(250);
   assert.equal(await page.locator('#panel').isVisible(), true);
+  for (let i = 0; i < 8; i++) {
+    await pointer({ inside: false, buttons: 0, hoverSuppressed: false });
+    await page.clock.runFor(180);
+    await pointer({ inside: true, buttons: 0, hoverSuppressed: false });
+    await page.clock.runFor(50);
+    assert.equal(await page.locator('#panel').isVisible(), true);
+  }
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.nativeMessages
+        .filter((m) => m.action === 'expand' || m.action === 'collapse')
+        .map((m) => m.action),
+    ),
+    ['expand'],
+    'Repeated short boundary exits must not restart the animation',
+  );
   await page.keyboard.press('Escape');
   await pointer({ inside: true, buttons: 0, hoverSuppressed: true });
   assert.equal(await page.locator('#panel').isHidden(), true);

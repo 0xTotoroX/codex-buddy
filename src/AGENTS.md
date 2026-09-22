@@ -17,8 +17,8 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [native_backdrop.rs](native_backdrop.rs)：NSWindow/NSPanel 共用的原生磨砂、液态 Regular/Clear、圆角/可选贴边凹角及刘海两翼裁切与网页承载；控制条复用同一形状遮罩；根据宿主 theme 设置自有窗口 NSAppearance，不写系统偏好，不持有业务或窗口生命周期。
 
 - [model_control.rs](model_control.rs)：独立控制条服务、串行操作、版本化局部偏好及窗口租约，防止跨聊天迟到结果与并发覆盖。
-- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标边界与冻结区域、按内容调高、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
-- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、凹角命中、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
+- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标精确点击边界、稳定悬停区域及8pt退出容错与冻结区域、按内容调高、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、掉帧按实际时间推进、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
+- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
 
 
 - [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源。

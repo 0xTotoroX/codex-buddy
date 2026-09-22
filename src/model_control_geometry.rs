@@ -1,5 +1,5 @@
 // [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
-// [OUTPUT]: 贴合物理边缘的内容高度布局、凹角命中、多屏选择与可反向连续开合进度。
+// [OUTPUT]: 贴合物理边缘的内容高度布局、精确点击/稳定悬停命中、多屏选择与可反向连续开合进度。
 // [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
@@ -26,7 +26,8 @@ impl Unfold {
             return;
         }
         let omega = std::f64::consts::TAU / 0.42;
-        let dt = seconds.clamp(0., 0.032);
+        // The analytic spring is stable for a whole delayed frame; never discard elapsed time.
+        let dt = seconds.max(0.);
         let distance = self.value - target;
         let c = self.velocity + omega * distance;
         let decay = (-omega * dt).exp();
@@ -134,6 +135,58 @@ pub struct Screen {
     pub notch_width: f64,
     pub notch_height: f64,
     pub notch_x: f64,
+}
+
+// Hover uses stable state bounds, while clicks retain the exact animated contour.
+// Keeping the wake region in the open region prevents end-cap points from ejecting themselves.
+#[derive(Clone, Copy)]
+pub struct HoverArea {
+    wake: Rect,
+    hold: Rect,
+    excluded: Rect,
+    margin: f64,
+}
+impl HoverArea {
+    pub fn contains(self, x: f64, y: f64) -> bool {
+        let padded = |r: Rect| {
+            Rect {
+                x: r.x - self.margin,
+                y: r.y - self.margin,
+                width: r.width + self.margin * 2.,
+                height: r.height + self.margin * 2.,
+            }
+            .contains(x, y)
+        };
+        !self.excluded.contains(x, y) && (padded(self.wake) || padded(self.hold))
+    }
+}
+pub fn hover_area(
+    screen: &Screen,
+    edge: Edge,
+    position: f64,
+    expanded: bool,
+    height: f64,
+) -> HoverArea {
+    let wake = layout(screen, edge, position, false);
+    HoverArea {
+        wake,
+        hold: if expanded {
+            layout_height(screen, edge, position, true, height)
+        } else {
+            wake
+        },
+        excluded: if edge == Edge::Top && screen.notch_width > 0. {
+            Rect {
+                x: screen.notch_x,
+                y: screen.frame.y + screen.frame.height - screen.notch_height,
+                width: screen.notch_width,
+                height: screen.notch_height,
+            }
+        } else {
+            Rect::default()
+        },
+        margin: if expanded { 8. } else { 0. },
+    }
 }
 
 pub fn fraction(value: f64) -> f64 {
@@ -306,6 +359,86 @@ mod tests {
         assert_eq!(motion.value, 1.);
         assert!(!motion.active(true));
     }
+    #[test]
+    fn delayed_frames_preserve_elapsed_motion_time() {
+        let mut regular = Unfold::default();
+        for _ in 0..20 {
+            regular.step(true, 0.016, false);
+        }
+        let mut delayed = Unfold::default();
+        for dt in [0.016, 0.064, 0.16, 0.08] {
+            delayed.step(true, dt, false);
+        }
+        assert!((regular.value - delayed.value).abs() < 1e-10);
+        assert!((regular.velocity - delayed.velocity).abs() < 1e-10);
+        // A reversal keeps the same velocity and obeys the same wall-clock time.
+        regular.step(false, 0.16, false);
+        for _ in 0..10 {
+            delayed.step(false, 0.016, false);
+        }
+        assert!((regular.value - delayed.value).abs() < 1e-10);
+        delayed.step(true, 2., false);
+        assert_eq!(delayed.value, 1.);
+        assert!(!delayed.active(true));
+    }
+
+    #[test]
+    fn opening_retains_every_wake_point_including_screen_end_caps() {
+        let s = screen("main", 0., 0., 1440., 900.);
+        for edge in [Edge::Left, Edge::Right, Edge::Top] {
+            for position in [0., 0.1, 0.5, 0.9, 1.] {
+                let closed = hover_area(&s, edge, position, false, 274.);
+                let open = hover_area(&s, edge, position, true, 274.);
+                let wake = layout(&s, edge, position, false);
+                for xi in 0..wake.width as usize {
+                    for yi in 0..wake.height as usize {
+                        let (x, y) = (wake.x + xi as f64 + 0.25, wake.y + yi as f64 + 0.25);
+                        assert!(closed.contains(x, y));
+                        assert!(open.contains(x, y), "{edge:?} {position} {x} {y}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn hover_exit_tolerance_and_frozen_area_do_not_expand_click_targets() {
+        let s = screen("main", 0., 0., 1440., 900.);
+        let open = hover_area(&s, Edge::Right, 0.5, true, 274.);
+        let bounds = layout(&s, Edge::Right, 0.5, true);
+        let y = bounds.y + bounds.height / 2.;
+        // Small hand jitter cannot leave the hold or frozen suppression area.
+        for dx in [-7., -3., 0., 3.] {
+            assert!(open.contains(bounds.x + dx, y));
+        }
+        assert!(!open.contains(bounds.x - 9., y));
+        assert!(
+            !(SurfaceRegion {
+                rect: bounds,
+                edge: Edge::Right
+            })
+            .contains(bounds.x - 3., y)
+        );
+        let closed = hover_area(&s, Edge::Right, 0.5, false, 274.);
+        assert!(!closed.contains(bounds.x, y));
+        assert!(open.contains(bounds.x, y)); // Frozen until the pointer actually exits.
+    }
+
+    #[test]
+    fn notch_hover_keeps_both_flanks_and_excludes_hardware() {
+        let mut s = screen("notch", 0., 0., 1512., 982.);
+        s.notch_width = 180.;
+        s.notch_height = 32.;
+        s.notch_x = 666.;
+        s.usable.height -= 32.;
+        for expanded in [false, true] {
+            let area = hover_area(&s, Edge::Top, 0.5, expanded, 274.);
+            assert!(area.contains(661., 965.));
+            assert!(area.contains(851., 965.));
+            assert!(!area.contains(756., 965.));
+        }
+    }
+
     #[test]
     fn unfold_keeps_the_screen_edge_attached() {
         let display = screen("main", 0., 0., 1440., 900.);

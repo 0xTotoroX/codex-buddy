@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 非激活 NSPanel、原生鼠标边界事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
+// [OUTPUT]: macOS 14+ 非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -282,7 +282,7 @@ struct Surface {
     backdrop: crate::native_backdrop::Backdrop,
     content_height: f64,
     pointer_state: Option<Value>,
-    hover_suppressed: Vec<SurfaceRegion>,
+    hover_suppressed: Option<geometry::HoverArea>,
     _parent: NativeParent,
     panel: Retained<ControlPanel>,
     prefs: Preferences,
@@ -488,35 +488,16 @@ impl Surface {
         Ok(())
     }
 
-    fn hover_regions(&self) -> Vec<SurfaceRegion> {
-        let frame = rect(self.panel.frame());
-        let allowed = self._parent.0.ivars().allowed.get();
-        let mut regions = vec![SurfaceRegion {
-            edge: self.prefs.edge,
-            rect: Rect {
-                x: frame.x + allowed.x,
-                y: frame.y + allowed.y,
-                ..allowed
-            },
-        }];
-        // Keep the original notch flank connected to the expanded content below it.
-        if let Some(screen) = &self.screen
-            && self.expanded
-            && self.prefs.edge == Edge::Top
-            && screen.notch_width > 0.
-        {
-            regions.push(SurfaceRegion {
-                edge: Edge::Top,
-                rect: Rect {
-                    x: screen.notch_x - geometry::NOTCH_FLANK,
-                    y: frame.y + frame.height
-                        - geometry::content_offset(screen, self.prefs.edge, true),
-                    width: geometry::NOTCH_FLANK,
-                    height: geometry::content_offset(screen, self.prefs.edge, true),
-                },
-            });
-        }
-        regions
+    fn hover_area(&self) -> Option<geometry::HoverArea> {
+        self.screen.as_ref().map(|screen| {
+            geometry::hover_area(
+                screen,
+                self.prefs.edge,
+                self.prefs.position,
+                self.expanded,
+                self.content_height,
+            )
+        })
     }
 
     fn mouse_passthrough(&mut self) {
@@ -546,19 +527,16 @@ impl Surface {
         if self.panel.ignoresMouseEvents() != ignored {
             self.panel.setIgnoresMouseEvents(ignored);
         }
-        if !self
+        if self
             .hover_suppressed
-            .iter()
-            .any(|r| r.contains(point.x, point.y))
+            .is_some_and(|area| !area.contains(point.x, point.y))
         {
-            self.hover_suppressed.clear();
+            self.hover_suppressed = None;
         }
-        let inside = !excluded
-            && self
-                .hover_regions()
-                .iter()
-                .any(|r| r.contains(point.x, point.y));
-        let detail = json!({"inside": inside, "buttons": buttons, "option": NSEvent::modifierFlags_class().contains(NSEventModifierFlags::Option), "hoverSuppressed": !self.hover_suppressed.is_empty()});
+        let inside = self
+            .hover_area()
+            .is_some_and(|area| area.contains(point.x, point.y));
+        let detail = json!({"inside": inside, "buttons": buttons, "option": NSEvent::modifierFlags_class().contains(NSEventModifierFlags::Option), "hoverSuppressed": self.hover_suppressed.is_some()});
         if self.pointer_state.as_ref() != Some(&detail) {
             self.pointer_state = Some(detail.clone());
             let _ = self.webview.evaluate_script(&format!(
@@ -622,7 +600,7 @@ impl Surface {
             "expand" => self.expand(value["keyboard"] == true, mtm)?,
             "focus" => self.expand(true, mtm)?,
             "collapse" => {
-                self.hover_suppressed = self.hover_regions();
+                self.hover_suppressed = self.hover_area();
                 self.release_keyboard();
                 if !self.unfold.active(self.expanded) {
                     self.motion_tick = Instant::now();
@@ -763,7 +741,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         backdrop,
         content_height: 274.,
         pointer_state: None,
-        hover_suppressed: Vec::new(),
+        hover_suppressed: None,
         _parent: parent,
         panel,
         prefs: Preferences::default(),

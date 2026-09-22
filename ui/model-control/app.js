@@ -1,6 +1,6 @@
 /*
  * [INPUT]: #token/#lease、/api/model-control/* 投影、原生几何/开合进度与鼠标边界事件。
- * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；固定纯黑及三材质宿主配色、屏幕/位置设置。
+ * [OUTPUT]: 常驻轮廓外壳、紧凑模型矩阵、版本保护写入、开合/非动画期内容高度 IPC；固定纯黑及按需更新的三材质宿主配色、屏幕/位置设置。
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
@@ -134,10 +134,21 @@ function scheduleCollapse() {
   }, 450);
 }
 let lastHostTheme = null;
+let appearanceSignature = '';
 function applyAppearance(detail) {
   const host = detail.appearance?.hostTheme;
   if (host?.theme === 'light' || host?.theme === 'dark') lastHostTheme = host;
   const material = detail.effectiveMaterial || document.body.dataset.material || 'black';
+  const signature = JSON.stringify([
+    material,
+    lastHostTheme,
+    detail.nativeDark,
+    detail.nativeBackdrop === true,
+    detail.liquidVariant || 'regular',
+    detail.appearance?.fontOffset,
+  ]);
+  if (signature === appearanceSignature) return;
+  appearanceSignature = signature;
   const colors = material === 'black' ? null : lastHostTheme?.colors;
   document.body.dataset.material = material;
   document.body.dataset.theme = material === 'black' ? 'dark' : lastHostTheme?.theme || 'dark';
