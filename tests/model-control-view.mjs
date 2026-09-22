@@ -365,7 +365,7 @@ test('authenticated passive polling preserves focus, search, hover, scroll and m
   await page.keyboard.press('Escape');
   await page.locator('[data-key="p1"]').hover();
   await page.waitForTimeout(1350);
-  assert.match(await page.locator('#preview').innerText(), /Alpha.*high.*Standard/);
+  assert.match(await page.locator('#preview').innerText(), /Alpha.*High.*Standard/);
   assert.equal(
     await page.locator('[data-key="p1"]').evaluate((node) => node.matches(':hover')),
     true,
@@ -386,7 +386,7 @@ test('frozen apply, double-click guard, actual-only result and explicit same-tar
   });
   await modelButton(page, 'alpha', 'low').click();
   await page.waitForTimeout(100);
-  assert.match(await page.locator('#actual').innerText(), /high/);
+  assert.match(await page.locator('#actual').innerText(), /High/);
   assert.equal(await modelButton(page, 'alpha', 'high').isDisabled(), true);
   assert.equal(await page.locator('#save').isDisabled(), true);
   assert.equal(applies(f).length, 1);
@@ -398,11 +398,11 @@ test('frozen apply, double-click guard, actual-only result and explicit same-tar
   });
   release();
   f.delayApply = null;
-  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Low'));
   assert.equal(await page.locator('#undo').isVisible(), true);
   assert.equal(applies(f).length, 1, 'No automatic rollback');
   await page.locator('#undo').click();
-  await poll(page, () => document.querySelector('#actual').textContent.includes('high'));
+  await poll(page, () => document.querySelector('#actual').textContent.includes('High'));
   assert.equal(applies(f).length, 2);
   assert.equal(applies(f)[1].payload.expectedRevision, 'source-1-applied');
   await modelButton(page, 'alpha', 'low').click();
@@ -420,13 +420,13 @@ test('partial and failed applies show service actual state without optimistic or
   f.applyResult = 'partial';
   await menu(page, '应用预设 快速');
   await poll(page, () => document.querySelector('#notice').textContent.includes('部分'));
-  assert.match(await page.locator('#actual').innerText(), /Gamma.*low.*Standard/);
+  assert.match(await page.locator('#actual').innerText(), /Gamma.*Low.*Standard/);
   assert.equal(applies(f).length, 1);
   await shot(page, 'partial-result');
   f.applyResult = 'failed';
   await modelButton(page, 'alpha', 'high').click();
   await poll(page, () => document.querySelector('#notice').textContent.includes('未成功'));
-  assert.match(await page.locator('#actual').innerText(), /Gamma.*low.*Standard/);
+  assert.match(await page.locator('#actual').innerText(), /Gamma.*Low.*Standard/);
   assert.equal(applies(f).length, 2);
   f.failApply = true;
   await modelButton(page, 'alpha', 'high').click();
@@ -493,7 +493,7 @@ test('preferences conflict refreshes once without overwrite; save only frozen co
   await page.locator('#preset-name').fill('确认配置');
   f.data.snapshot.current = selection('alpha', 'low');
   f.data.snapshot.revision = 'source-new';
-  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Low'));
   assert.equal(await page.locator('#editor-submit').isDisabled(), true);
   assert.equal(await page.locator('#preset-name').inputValue(), '确认配置');
   assert.equal(
@@ -822,10 +822,10 @@ test('missing credentials fail closed; delayed state cannot overwrite an apply r
   await page.waitForTimeout(1350);
   assert.ok(f.requests.length > count);
   await modelButton(page, 'alpha', 'low').click();
-  await poll(page, () => document.querySelector('#actual').textContent.includes('low'));
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Low'));
   release();
   await page.waitForTimeout(150);
-  assert.match(await page.locator('#actual').innerText(), /low/);
+  assert.match(await page.locator('#actual').innerText(), /Low/);
   assert.equal(applies(f).length, 1);
   await cleanup(ctx);
 });
@@ -1082,6 +1082,7 @@ test('native pointer entry is immediate, overrides DOM leave and respects suppre
 
 test('no pins shows all models directly; compact content sizes and wide matrices never turn into cards', async () => {
   const initial = fixture();
+  initial.snapshot.models[0].reasoning = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   initial.preferences.pinned = [];
   const ctx = await setup({ initial });
   const { page } = ctx;
@@ -1093,6 +1094,46 @@ test('no pins shows all models directly; compact content sizes and wide matrices
   assert.equal(await page.locator('body').getAttribute('data-layout'), 'matrix');
   assert.ok(await page.locator('#model-scroll').evaluate((n) => n.scrollWidth > n.clientWidth));
   assert.equal(await page.locator('#matrix-head').isVisible(), true);
+  await cleanup(ctx);
+});
+
+test('all six reasoning levels including Ultra fit and retain model-specific selection', async () => {
+  const initial = fixture();
+  initial.snapshot.models[0].label = 'alpha';
+  initial.snapshot.models[0].reasoning = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+  initial.snapshot.models[2].reasoning = [...initial.snapshot.models[0].reasoning];
+  initial.preferences.pinned = ['alpha', 'beta', 'gamma'];
+  const ctx = await setup({ initial });
+  const { page, f } = ctx;
+  assert.deepEqual(await page.locator('#matrix-head > div > span').allTextContents(), [
+    'Low',
+    'Medium',
+    'High',
+    'Xhigh',
+    'Max',
+    'Ultra',
+  ]);
+  assert.equal(await page.locator('[data-key="alpha"] strong').innerText(), 'Alpha');
+  const ultra = modelButton(page, 'alpha', 'ultra');
+  const bounds = await page.locator('#model-scroll').boundingBox();
+  const cell = await ultra.boundingBox();
+  assert.ok(
+    cell.x >= bounds.x && cell.x + cell.width <= bounds.x + bounds.width + 1,
+    `Ultra must be fully visible: ${JSON.stringify({ bounds, cell })}`,
+  );
+  await page.screenshot({ path: resolve(output, 'all-reasoning-levels.png') });
+  await ultra.click();
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Ultra'));
+  assert.deepEqual(f.data.snapshot.current, selection('alpha', 'ultra'));
+  assert.equal(await ultra.getAttribute('aria-pressed'), 'true');
+  assert.equal(await modelButton(page, 'beta', 'ultra').isDisabled(), true);
+  await modelButton(page, 'gamma', 'ultra').click();
+  await poll(page, () => document.querySelector('#actual').textContent.includes('Gamma'));
+  assert.deepEqual(f.data.snapshot.current, selection('gamma', 'ultra'));
+  assert.equal(await ultra.getAttribute('aria-pressed'), 'false');
+  await nativeEvent(page, { appearance: { fontOffset: 11 } });
+  const large = await modelButton(page, 'gamma', 'ultra').boundingBox();
+  assert.ok(large.x + large.width <= bounds.x + bounds.width + 1);
   await cleanup(ctx);
 });
 

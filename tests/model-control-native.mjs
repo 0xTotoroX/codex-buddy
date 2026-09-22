@@ -43,7 +43,12 @@ const snapshot = {
   generating: false,
   current: { model: 'fixture-a', reasoning: 'high', speed: 'standard' },
   models: [
-    { id: 'fixture-a', label: 'Fixture Alpha', reasoning: ['low', 'medium', 'high'], fast: true },
+    {
+      id: 'fixture-a',
+      label: 'Fixture Alpha',
+      reasoning: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'],
+      fast: true,
+    },
     { id: 'fixture-b', label: 'Fixture Beta', reasoning: ['medium', 'high'], fast: false },
   ],
 };
@@ -199,6 +204,11 @@ function probePage() {
           path: location.pathname,
           viewport: [innerWidth, innerHeight],
           searchRect: document.getElementById('menu-button')?.getBoundingClientRect().toJSON(),
+          matrixRect: document.getElementById('model-scroll')?.getBoundingClientRect().toJSON(),
+          ultraRect: document
+            .querySelector('[data-model="fixture-a"][data-reasoning="ultra"]')
+            ?.getBoundingClientRect()
+            .toJSON(),
         }),
       });
       for (const command of await response.json()) {
@@ -457,6 +467,10 @@ try {
       ? 'real native hover expands without stealing focus'
       : 'synthetic native pointer message expands without stealing focus',
   );
+  assert.ok(telemetry.ultraRect && telemetry.ultraRect.width > 0);
+  assert.ok(telemetry.ultraRect.left >= telemetry.matrixRect.left);
+  assert.ok(telemetry.ultraRect.right <= telemetry.matrixRect.right + 1);
+  check('six reasoning levels including Ultra are fully visible in the native WebView');
   await capture('expanded');
   const stableBounds = windowInfo().kCGWindowBounds;
   await command('window.deferNative = true');

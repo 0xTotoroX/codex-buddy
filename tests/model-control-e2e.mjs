@@ -342,6 +342,24 @@ try {
   assert.equal(await page.locator('[role="menu"]').count(), 0);
   record('embedded adapter switches modern same-root model view, slider and Fast through Rust/CDP');
 
+  await page.evaluate(() => {
+    for (const model of host.records)
+      model.supportedReasoningEfforts = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
+    capability('full-reasoning-levels');
+  });
+  for (const model of ['alpha', 'beta']) {
+    const state = await api('state');
+    const selection = { model, reasoning: 'ultra', speed: 'standard' };
+    const result = await api('apply', command(state.snapshot, selection));
+    assert.equal(result.result.status, 'success', result.result.message);
+    assert.deepEqual(result.snapshot.current, selection);
+    assert.deepEqual((await api('refresh', {})).snapshot.current, selection);
+    assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), selection);
+  }
+  record(
+    'Ultra follows the selected model through authenticated Rust/CDP apply and official readback',
+  );
+
   assert.equal(await decoy.evaluate(() => typeof window.__codexBuddyModelControl), 'undefined');
   assert.equal(await decoy.evaluate(() => host.triggerEvents), 0);
   assert.deepEqual(await page.evaluate(() => host.unexpected), []);

@@ -4,7 +4,7 @@
  * [POS]: 独立 ES module 页面；不访问官方宿主、CDP 或模型发送接口。
  * [PROTOCOL]: 请求携带 Bearer 与 X-Model-Control-Lease；窗口几何和公开地图由父任务维护。
  */
-import { icons, text, button, reconcile, describe, validate, moved } from './view.js';
+import { icons, text, button, reconcile, describe, validate, moved, displayLabel } from './view.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.hash.slice(1));
@@ -579,16 +579,26 @@ function manualSelection(model, reasoning) {
 
 function updateLayout() {
   if (nativeState.animating) return;
-  const font =
-    parseFloat(
-      getComputedStyle(document.querySelector('.model-label strong') || $('panel')).fontSize,
-    ) || 13;
   const width = Math.min(280, Math.max(100, widthDraft ?? prefs().modelColumnWidth));
-  const needed = Math.max(42, ...columns.map((value) => value.length * font * 0.56 + 12));
+  // Measure the actual heading text, not the larger model-name font. Six current
+  // efforts must fit the default panel; enlarged names must not push Ultra away.
+  const range = document.createRange();
+  const headings = [...$('matrix-head').querySelectorAll('div > span')];
+  const widths = headings.map((node) => {
+    range.selectNodeContents(node);
+    return Math.max(36, Math.ceil(range.getBoundingClientRect().width) + 8);
+  });
   const style = document.documentElement.style;
   style.setProperty('--name-width', `${width}px`);
   style.setProperty('--columns', String(Math.max(1, columns.length)));
-  style.setProperty('--matrix-width', `${width + 8 + columns.length * needed}px`);
+  style.setProperty(
+    '--reasoning-tracks',
+    widths.map((value) => `minmax(${value}px, 1fr)`).join(' ') || '1fr',
+  );
+  style.setProperty(
+    '--matrix-width',
+    `${width + 8 + widths.reduce((sum, value) => sum + value, 0) + Math.max(0, widths.length - 1) * 4}px`,
+  );
   $('resize').setAttribute('aria-valuenow', String(Math.round(width)));
   document.body.dataset.layout = 'matrix';
   queueSize();
@@ -759,8 +769,8 @@ function renderModels() {
     const values = document.createElement('div');
     for (const value of columns) {
       const span = document.createElement('span');
-      span.textContent = value;
-      span.title = value;
+      span.textContent = displayLabel(value);
+      span.title = displayLabel(value);
       values.append(span);
     }
     $('matrix-head').replaceChildren(label, values);
@@ -790,8 +800,8 @@ function createModelRow() {
 }
 function updateModelRow(row, model) {
   const label = row.querySelector('strong');
-  text(label, model.label);
-  label.title = model.label;
+  text(label, displayLabel(model.label));
+  label.title = displayLabel(model.label);
   const pinned = prefs().pinned.includes(model.id);
   const current = snapshot()?.current?.model === model.id;
   text(
@@ -799,8 +809,8 @@ function updateModelRow(row, model) {
     current ? (pinned ? '当前' : '当前 · 未固定') : pinned ? '已固定' : '',
   );
   const more = row.querySelector('button');
-  more.setAttribute('aria-label', `模型 ${model.label} 菜单`);
-  more.title = `模型 ${model.label} 菜单`;
+  more.setAttribute('aria-label', `模型 ${displayLabel(model.label)} 菜单`);
+  more.title = `模型 ${displayLabel(model.label)} 菜单`;
   more.disabled = busy;
   row.querySelector('.model-name').draggable = pinned && !busy;
   const reasoning = columns;
@@ -809,7 +819,7 @@ function updateModelRow(row, model) {
     reasoning,
     (value) => value,
     (value) => {
-      const choice = button(value, () => {
+      const choice = button(displayLabel(value), () => {
         const live = models().find((item) => item.id === row.dataset.key);
         if (live) apply(() => manualSelection(live, choice.dataset.key));
       });
@@ -820,8 +830,10 @@ function updateModelRow(row, model) {
       const downgrade = snapshot()?.current?.speed === 'fast' && !model.fast;
       text(choice, supported ? '●' : '—');
       choice.disabled = !supported || !canApply();
-      const title = `${model.label} · ${value} · ${manualSelection(model, value).speed === 'fast' ? 'Fast' : 'Standard'}${downgrade ? '（不支持 Fast，将使用 Standard）' : ''}`;
-      choice.title = supported ? title : `${model.label} 不支持 ${value}`;
+      const title = `${displayLabel(model.label)} · ${displayLabel(value)} · ${manualSelection(model, value).speed === 'fast' ? 'Fast' : 'Standard'}${downgrade ? '（不支持 Fast，将使用 Standard）' : ''}`;
+      choice.title = supported
+        ? title
+        : `${displayLabel(model.label)} 不支持 ${displayLabel(value)}`;
       choice.setAttribute('aria-label', choice.title);
       choice.setAttribute(
         'aria-pressed',
@@ -971,7 +983,7 @@ async function openPlacement() {
 function openModelMenu(id, opener) {
   const model = models().find((item) => item.id === id);
   if (!model) return;
-  openMenu(model.label, opener);
+  openMenu(displayLabel(model.label), opener);
   const index = prefs().pinned.indexOf(id);
   menuAction(
     index < 0 ? '固定模型' : '取消固定',
@@ -1035,7 +1047,7 @@ function openEditor(kind, preset) {
   $('editor').hidden = false;
   $('preset-name').value =
     preset?.name ||
-    `${models().find((model) => model.id === snapshot().current.model)?.label || snapshot().current.model} ${snapshot().current.reasoning}`;
+    `${displayLabel(models().find((model) => model.id === snapshot().current.model)?.label || snapshot().current.model)} ${displayLabel(snapshot().current.reasoning)}`;
   text($('editor-description'), describe(editor.selection, models()));
   $('preset-name').focus();
   $('preset-name').select();

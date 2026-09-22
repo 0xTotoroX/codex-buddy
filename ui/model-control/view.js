@@ -1,6 +1,6 @@
 /*
  * [INPUT]: /model-control/icons.js 映射到公共 ui/panel/icons/index.js与服务投影数据。
- * [OUTPUT]: 无构建依赖的图标、验证和保留节点身份的列表协调。
+ * [OUTPUT]: 无构建依赖的图标、首字母大写显示（不改变协议值）、验证和保留节点身份的列表协调。
  * [POS]: 模型控制 UI 的纯视图辅助；许可由父项目统一收集。
  * [PROTOCOL]: 与共享图标路径保持一致；地图由主任务维护。
  */
@@ -41,10 +41,16 @@ export function reconcile(parent, items, keyOf, create, update) {
   for (const node of existing.values()) node.remove();
 }
 
+// Labels are presentation only: API/model identifiers keep their original spelling.
+export function displayLabel(value) {
+  const label = String(value ?? '');
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export function describe(selection, models = []) {
   if (!selection) return '尚未读取';
   const label = models.find((model) => model.id === selection.model)?.label || selection.model;
-  return `${label} · ${selection.reasoning} · ${selection.speed === 'fast' ? 'Fast' : 'Standard'}`;
+  return `${displayLabel(label)} · ${displayLabel(selection.reasoning)} · ${selection.speed === 'fast' ? 'Fast' : 'Standard'}`;
 }
 
 export function validate(selection, models) {

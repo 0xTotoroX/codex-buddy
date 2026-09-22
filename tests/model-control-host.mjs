@@ -51,6 +51,53 @@ async function check(name, test, options) {
 }
 try {
   await check(
+    'Ultra round trips bind the correct model across all supported levels',
+    async (page) => {
+      await page.evaluate(() => {
+        host.records[0].supportedReasoningEfforts = [
+          'low',
+          'medium',
+          'high',
+          'xhigh',
+          'max',
+          'ultra',
+        ];
+        host.records.push({
+          model: 'gamma',
+          displayName: 'Gamma',
+          supportedReasoningEfforts: [{ reasoningEffort: 'high' }, { reasoningEffort: 'ultra' }],
+          serviceTiers: ['standard'],
+        });
+        capability('ultra-capabilities');
+      });
+      const initial = await snapshot(page, true);
+      assert.deepEqual(initial.models.find((m) => m.id === 'alpha').reasoning, [
+        'low',
+        'medium',
+        'high',
+        'xhigh',
+        'max',
+        'ultra',
+      ]);
+      for (const model of ['alpha', 'gamma', 'alpha']) {
+        const desired = { model, reasoning: 'ultra', speed: 'standard' };
+        const result = await apply(page, desired);
+        assert.equal(result.status, 'success', result.message);
+        assert.deepEqual(result.snapshot.current, desired);
+        assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), desired);
+        assert.deepEqual((await snapshot(page, true)).current, desired);
+      }
+      const before = await page.evaluate(() => host.changes.length);
+      assert.equal(
+        (await apply(page, { model: 'beta', reasoning: 'ultra', speed: 'standard' })).status,
+        'failed',
+      );
+      assert.equal(await page.evaluate(() => host.changes.length), before);
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+    },
+    { modern: true, defaultRecommendation: true, openPlaceholder: true },
+  );
+  await check(
     'modern same-popup model view, canonical reasoning slider and Fast checkbox round trip',
     async (page) => {
       assert.equal((await snapshot(page, true)).status, 'ready');

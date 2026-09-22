@@ -261,7 +261,7 @@ input {
 .matrix-head > div,
 .choices {
   display: grid;
-  grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr));
+  grid-template-columns: var(--reasoning-tracks, repeat(var(--columns, 3), minmax(0, 1fr)));
   gap: 4px;
   align-items: center;
 }
