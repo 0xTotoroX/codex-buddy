@@ -1546,34 +1546,98 @@ const cases = [
     },
   ],
   [
-    'collapsed rail keeps one primary action and secondary placement commands',
+    'collapsed rail opens normally and offers explicit alternatives only when space is insufficient',
     async (page, baseline) => {
       await mode(page, true);
-      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.getByRole('button', { name: '收起工作台', exact: true }).click();
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
       const rail = page.locator(slotSelector);
+      const entry = rail.getByRole('button', { name: '打开停靠工作台', exact: true });
       assert.equal(await rail.locator(':scope > button:visible').count(), 1);
+      assert.equal(await rail.locator('summary:visible').count(), 0);
+      await entry.click();
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      await page.setViewportSize({ width: 880, height: 960 });
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'space',
+      );
+      await entry.click();
+      assert.equal(await rail.getByRole('group', { name: '展开工作台' }).isVisible(), true);
+      assert.match(await rail.locator('.csw-dock-reason').innerText(), /聊天区域太窄/);
       assert.equal(
-        await rail.getByRole('button', { name: '打开停靠工作台', exact: true }).isVisible(),
+        await rail.getByRole('button', { name: '移到独立窗口', exact: true }).isVisible(),
         true,
       );
-      await rail.locator('.csw-dock-menu > summary').click();
       assert.equal(
-        await rail.getByRole('button', { name: '弹出到桌面', exact: true }).isVisible(),
-        true,
+        await page.evaluate(() => window.workbenchFixture.unexpected.includes('/panel/detach')),
+        false,
       );
-      await page.locator('#fixture-host-content .app-bar').click();
+      await page.keyboard.press('Escape');
       assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
-      await rail.locator('.csw-dock-menu > summary').click();
-      await rail.getByRole('button', { name: '内嵌浮动', exact: true }).click();
-      await settle(page);
+      await entry.click();
+      await entry.click();
+      assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+      await entry.click();
+      await page.evaluate(() => document.documentElement.classList.add('dark'));
+      await page.screenshot({ path: resolve(output, 'space-open-options.png') });
+      await rail.getByRole('button', { name: '在聊天内展开', exact: true }).click();
+      await page.locator('.csw-workbench').waitFor({ state: 'visible' });
       assert.equal(await page.locator(slotSelector).count(), 0);
-      assert.equal(await page.locator('.csw-workbench').count(), 0);
-      await box(page, '.csw-fab');
+      assert.equal(await page.evaluate(() => window.__companionFloatingPanel.state.open), true);
+      await page.setViewportSize(wide);
+      await settle(page);
       await hostUnchanged(page, baseline);
+    },
+  ],
+  [
+    'dock fits available chat width without counting the file panel or overwriting saved width',
+    async (page) => {
+      await mode(page, true);
+      for (let i = 0; i < 8; i++)
+        await page.getByRole('separator', { name: '调整工作台宽度' }).press('ArrowLeft');
+      await settle(page);
+      await page.evaluate(() => {
+        const panel = document.createElement('section');
+        panel.id = 'fixture-file-panel';
+        panel.style.cssText = 'flex:0 0 550px;order:2;height:100%;background:#333';
+        panel.textContent = '文件预览';
+        document.querySelector('#fixture-dock-row').append(panel);
+      });
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'space',
+      );
+      const entry = page.getByRole('button', { name: '打开停靠工作台', exact: true });
+      await entry.click();
+      assert.equal(await page.locator('.csw-dock-reason').isVisible(), true);
+      await page
+        .locator('#fixture-file-panel')
+        .evaluate((node) => (node.style.flexBasis = '325px'));
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'closed',
+      );
+      assert.equal(await page.locator('.csw-dock-reason').isVisible(), false);
+      await entry.click();
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      near(
+        (await box(page, '#fixture-host-content')).width,
+        560,
+        'chat retains minimum readable width',
+      );
+      near((await box(page, slotSelector)).width, 340, 'dock uses actual remaining width');
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
+        460,
+      );
+      assert.equal(await page.locator('.csw-workbench-source').isVisible(), false);
+      await page.locator('#fixture-file-panel').evaluate((node) => node.remove());
+      await settle(page);
+      near(
+        (await box(page, slotSelector)).width,
+        460,
+        'saved width returns when file panel closes',
+      );
     },
   ],
   [

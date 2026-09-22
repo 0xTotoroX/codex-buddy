@@ -33,7 +33,7 @@ Inside Codex, click the face to expand or collapse the workbench. Double-click i
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
 
-Both panels share the same chat source, shown at the top of the workbench. The follow/lock menu is temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
+Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
 ## Installation and use
 
@@ -56,11 +56,13 @@ After installation, open **CodexBuddy** from Applications. Node.js and Rust are 
 
 Open settings from the capsule. Choose your existing Codex login or enter your model API settings, save, and test the connection. Using an existing login requires a working local Codex CLI installation and login session.
 
+The workbench has five visible states: expanded sidebar or narrow entry, expanded floating workbench or compact capsule inside the chat, and an expanded independent window. Split direction, tabs, and focus only change the contents; insufficient space is a reason for collapsing, not another shape.
+
 ### 3. Use the workbench
 
 - **Navigate an answer:** open the outline and click a heading to jump to the source text.
 - **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
-- **View both panels:** choose a fixed right sidebar or a freely movable embedded workbench in Web settings under chat placement. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, it collapses to a right-edge entry that you can reopen. You can still pop out or return the entire workbench.
+- **View both panels:** choose a fixed right sidebar or a freely movable embedded workbench in Web settings under chat placement. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, the right-edge entry explains why and offers an independent window or a directly expanded floating workbench. Once space returns, click it to reopen the sidebar. You can still pop out or return the entire workbench.
 - **Adjust the window:** use the top controls to move to an independent window or put it back in the chat; the separate minus button collapses the embedded workbench. Then drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; Web settings provide always-on-top and appearance controls.
 
 ### Model quick switch

@@ -55,7 +55,7 @@
 - [popout-preferences.test.mjs](popout-preferences.test.mjs)：位置写入延迟时并发置顶/外观串行推进修订号，真实外部冲突仍拒绝。
 - [workbench-actions.mjs](workbench-actions.mjs)：端到端检查通过设置、标题/标签双击或 Esc 选择内容，替代旧展开页标签。
 
-workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹出时公共表情与明确收回入口，以及紧凑双击的出发状态。
+workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹出时公共表情与明确收回入口，以及紧凑双击的出发状态。窄入口覆盖空间不足的可见解释、明确替代展开与取消；侧栏宽度排除文件侧栏并保持保存偏好，来源文字与关联菜单均隐藏。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 

@@ -66,7 +66,7 @@ export function syncWorkbench() {
       () => {
         emitSignal('windowToggle', undefined);
       },
-      () => setWorkbench(false),
+      () => setWorkbench(false, { expanded: true }),
       () => rememberWorkbenchReading(shellState.panel),
     );
   dock.update({

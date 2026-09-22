@@ -94,7 +94,8 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
   document.addEventListener('focusin', schedule);
   const closeMenu = (event) => {
     const menu = slot?.querySelector('.csw-dock-menu');
-    if (menu && !menu.contains(event.target)) menu.removeAttribute('open');
+    if (menu && !menu.contains(event.target) && !event.target.closest('.csw-dock-entry'))
+      menu.removeAttribute('open');
   };
   document.addEventListener('pointerdown', closeMenu);
 
@@ -142,11 +143,13 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       entry.style.cssText =
         'position:absolute;top:56px;right:4px;width:36px;height:36px;border:0;border-radius:10px;background:color-mix(in srgb,currentColor 8%,transparent);color:inherit;cursor:pointer;font-size:22px;';
       entry.onclick = () => {
-        if (!options.detached) onOpen();
+        if (options.detached) return;
+        if (slot.dataset.reason === 'space') menu.open = !menu.open;
+        else onOpen();
       };
       const menu = document.createElement('details');
       menu.className = 'csw-dock-menu';
-      menu.innerHTML = `<summary aria-label="工作台位置" title="工作台位置">${iconSvg('more')}</summary><div><button data-dock-popout>弹出到桌面</button><button data-dock-floating>内嵌浮动</button></div>`;
+      menu.innerHTML = `<summary hidden>展开工作台</summary><div role="group" aria-label="展开工作台"><p role="status" class="csw-dock-reason"></p><button data-dock-popout>移到独立窗口</button><button data-dock-floating>在聊天内展开</button></div>`;
       menu.querySelector('[data-dock-popout]').addEventListener('click', () => {
         menu.open = false;
         onPopout();
@@ -155,10 +158,13 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
         menu.open = false;
         onExit();
       });
-      menu.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape') {
+      menu.addEventListener('toggle', () => {
+        entry.setAttribute('aria-expanded', String(menu.open));
+      });
+      slot.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && menu.open) {
           menu.open = false;
-          menu.querySelector('summary').focus();
+          entry.focus();
           event.stopPropagation();
         }
       });
@@ -170,11 +176,14 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
       if (host.dialog) observer.observe(host.dialog);
     }
     const bounds = host.row.getBoundingClientRect();
-    const requestedWidth = host.dialog
-      ? Math.min(options.width, Math.max(300, bounds.width - 560))
-      : options.width;
+    // 只计算聊天与自有占位可分配的宽度，不把文件/浏览器侧栏算进来。
+    const availableWidth = Math.min(
+      bounds.width,
+      host.content.getBoundingClientRect().width + slot.getBoundingClientRect().width,
+    );
+    const requestedWidth = Math.min(options.width, Math.max(300, availableWidth - 560));
     const enough =
-      bounds.width >= 560 + requestedWidth && bounds.bottom - Math.max(bounds.top, 48) >= 426;
+      availableWidth >= 560 + requestedWidth && bounds.bottom - Math.max(bounds.top, 48) >= 426;
     // 收起后即使空间恢复也保持收起，由用户主动重新打开。
     if (options.open && !options.detached && !enough) blocked = true;
     if (!options.open) blocked = false;
@@ -185,17 +194,21 @@ export function createDock(onChange, onOpen, onPopout, onExit, beforeMove = () =
     const entry = slot.firstElementChild;
     const menu = slot.querySelector('.csw-dock-menu');
     entry.style.display = expanded ? 'none' : 'grid';
-    menu.hidden = expanded || options.detached;
+    menu.hidden = expanded || options.detached || enough;
     if (menu.hidden) menu.open = false;
     entry.disabled = options.detached;
     const popout = /** @type {HTMLButtonElement} */ (menu.querySelector('[data-dock-popout]'));
     popout.disabled = !options.popoutSupported;
-    popout.title = options.popoutSupported ? '弹出到桌面' : '当前系统不支持桌面浮窗';
+    popout.title = options.popoutSupported ? '移到独立窗口' : '当前系统不支持独立窗口';
+    menu.querySelector('.csw-dock-reason').textContent =
+      availableWidth < 560 + requestedWidth
+        ? '聊天区域太窄。收起右侧面板或加宽聊天后，可重新打开侧栏。'
+        : '聊天区域太矮。增高窗口后，可重新打开侧栏。';
     entry.title = options.detached
       ? '浮窗已弹出，请在浮窗中收回'
       : enough
         ? '打开停靠工作台'
-        : '空间不足，请放大窗口，或从胶囊弹出到桌面';
+        : '空间不足，点击选择其他打开方式';
     slot.dataset.reason = enough ? '' : 'space';
     const rect = slot.getBoundingClientRect();
     slot.style.setProperty('--csw-dock-inset', `${Math.max(0, 48 - rect.top)}px`);

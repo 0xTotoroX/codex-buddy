@@ -204,6 +204,7 @@ export function chatBindingCases({
         assert.equal((await snapshot(page)).prompts[0].label, 'A');
         assert.equal(await page.getByRole('button', { name: '聊天关联', exact: true }).count(), 0);
         assert.equal(await page.locator('.csw-association-menu').isHidden(), true);
+        assert.equal(await page.locator('.csw-workbench-source').isHidden(), true);
         assert.match(await page.locator('.csw-workbench-source').innerText(), /已锁定/);
         await page
           .locator('.csw-workbench')

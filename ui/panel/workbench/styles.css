@@ -447,6 +447,9 @@
 .csw-dock-menu[hidden] {
   display: none;
 }
+.csw-dock-menu summary[hidden] {
+  display: none;
+}
 .csw-dock-menu summary {
   display: grid;
   place-items: center;
@@ -462,12 +465,13 @@
 .csw-dock-menu > div {
   position: absolute;
   right: 0;
-  top: 32px;
-  width: 148px;
+  top: 0;
+  width: min(230px, calc(100vw - 24px));
   padding: 6px;
   border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
   border-radius: 10px;
-  background: light-dark(#fafafa, #292929);
+  background: var(--color-background-surface-primary, Canvas);
+  color: var(--color-text-primary, CanvasText);
   box-shadow: 0 4px 14px #0002;
 }
 .csw-dock-menu button {
@@ -508,4 +512,13 @@
 
 .csw-layout-menu[hidden] {
   display: none;
+}
+
+.csw-workbench-source[hidden] {
+  display: none;
+}
+.csw-dock-reason {
+  margin: 4px 8px 6px;
+  opacity: 0.7;
+  line-height: 1.6;
 }
