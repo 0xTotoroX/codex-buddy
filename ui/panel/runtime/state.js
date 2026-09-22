@@ -205,7 +205,7 @@ function createShellState(preferences) {
     remoteSource: /** @type {import("../../contracts").PanelSnapshot|null} */ (null),
     remoteFingerprint: '',
     nativeSizeChanging: false,
-    pinnedOnTop: false,
+    pinnedOnTop: true,
     detachPending: false,
     detachedRecoveryTimer: 0,
     handoffAnimation: null,

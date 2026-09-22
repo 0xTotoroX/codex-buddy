@@ -145,7 +145,7 @@ pub struct Position {
     pub y: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Preferences {
     pub revision: u64,
@@ -155,6 +155,19 @@ pub struct Preferences {
     pub always_on_top: bool,
     pub position: Option<Position>,
     pub ui: Ui,
+}
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            revision: 0,
+            web_revision: 0,
+            detached: false,
+            return_open: None,
+            always_on_top: true,
+            position: None,
+            ui: Ui::default(),
+        }
+    }
 }
 impl Preferences {
     pub fn read(paths: &Paths) -> Self {
@@ -1067,6 +1080,22 @@ mod tests {
         assert_eq!(changed.ui.liquid_variant, "clear");
         assert_eq!(changed.return_open, Some(false));
         assert_eq!(Preferences::read(&app.paths).return_open, Some(false));
+    }
+
+    #[test]
+    fn window_pin_defaults_on_and_preserves_explicit_opt_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        assert!(Preferences::read(&paths).always_on_top);
+        std::fs::write(paths.root.join("panel.json"), "{}").unwrap();
+        assert!(Preferences::read(&paths).always_on_top);
+        let mut prefs = Preferences::read(&paths);
+        prefs.always_on_top = false;
+        prefs.save(&paths).unwrap();
+        assert!(!Preferences::read(&paths).always_on_top);
+        prefs.always_on_top = true;
+        prefs.save(&paths).unwrap();
+        assert!(Preferences::read(&paths).always_on_top);
     }
 
     #[test]

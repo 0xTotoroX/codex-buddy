@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共享大纲与 Stepwise 视图、当前聊天身份、工作台布局偏好。
- * [OUTPUT]: 唯一展开外壳、居中共享表情、来源及布局位置菜单、双面板编排和明确收起/收回及外部网页设置入口；保留无公开入口的旧设置模板。
+ * [OUTPUT]: 唯一展开外壳、居中共享表情、来源及布局位置菜单、双面板编排和表情单击收放/双击窗口往返、桌面置顶及外部网页设置入口；保留无公开入口的旧设置模板。
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -67,7 +67,6 @@ function layoutMenu() {
     <button data-layout-action="merge">合并为标签</button><button data-layout-action="split">拆回分栏</button><button data-layout-action="swap">交换位置</button><button data-layout-action="reset">恢复默认布局</button></div>
     ${IS_POPOUT ? '' : `<button data-placement="dock" aria-pressed="${shellState.layoutMode === 'workbench'}">固定在聊天右侧</button><button data-placement="floating" aria-pressed="${shellState.layoutMode !== 'workbench'}">在聊天内自由移动</button>`}
     ${IS_POPOUT ? '' : '<div hidden>'}
-    ${IS_POPOUT ? `<button data-action="pin" aria-pressed="${shellState.pinnedOnTop}">${iconSvg('pin')}窗口置顶</button>` : ''}
     <button data-action="theme" title="${themeLabel()}">${themeIcon()}${themeLabel()}</button>${IS_POPOUT ? '' : '</div>'}
   </div></details>`;
 }
@@ -250,8 +249,14 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   updateAssociation(panel.querySelector('.csw-workbench-head'), source);
   const face = panel.querySelector('.csw-workbench-face');
   face.dataset.expression = resolveFabExpression();
+  const windowGesture = IS_POPOUT || runtimeState.settings?.popoutSupported === true;
+  face.title = IS_POPOUT
+    ? '双击放回聊天；Alt+Enter 同样可用；拖动移动窗口'
+    : `单击收起${windowGesture ? '；双击弹出；Alt+Enter 同样可用' : ''}`;
+  if (windowGesture) face.setAttribute('aria-keyshortcuts', 'Alt+Enter');
+  else face.removeAttribute('aria-keyshortcuts');
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}<button class="csw-icon" data-workbench-settings aria-label="设置" title="在浏览器中打开设置">${iconSvg('settings')}</button>`;
+  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span><button class="csw-icon" data-workbench-settings aria-label="设置" title="在浏览器中打开设置">${iconSvg('settings')}</button>`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
     paneContent.set(controls, controlsHtml);

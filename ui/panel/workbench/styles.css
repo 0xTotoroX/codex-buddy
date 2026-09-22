@@ -67,7 +67,7 @@
   flex: 0 0 calc(var(--csw-default-chip-height) + 8px);
   height: calc(var(--csw-default-chip-height) + 8px);
   min-height: 0;
-  padding: 4px 6px;
+  padding: 4px 12px;
 }
 .csw-workbench-source {
   grid-column: 1;
@@ -91,6 +91,15 @@
 .csw-workbench .csw-icon {
   width: 28px;
   height: 28px;
+}
+/* Header glyphs share the shell; hover must not add a second rounded surface. */
+.csw-workbench-controls > .csw-icon,
+.csw-workbench-controls > .csw-icon:hover {
+  background: transparent;
+  box-shadow: none;
+}
+.csw-workbench-controls > .csw-icon[aria-pressed='true'] {
+  color: var(--csw-text);
 }
 .csw-workbench-panes {
   display: grid;
@@ -374,8 +383,21 @@
 .csw-workbench .csw-workbench-face {
   grid-column: 2;
   grid-row: 1;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  outline: none;
   width: var(--csw-default-chip-width);
   height: var(--csw-default-chip-height);
+}
+/* Keyboard focus marks the eyes with a short line, never a second capsule shell. */
+.csw-workbench-face:focus-visible::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 16px;
+  height: 1px;
+  background: color-mix(in srgb, var(--csw-text) 35%, transparent);
 }
 .csw-workbench-face .csw-status-stage {
   transform: none;

@@ -580,6 +580,19 @@ function onGlassClick(event) {
 }
 
 function onKeyDown(event) {
+  if (
+    event.altKey &&
+    event.key === 'Enter' &&
+    event.target instanceof Element &&
+    event.target.closest('.csw-fab,.csw-head-face') &&
+    (IS_POPOUT || runtimeState.settings?.popoutSupported === true)
+  ) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    cancelFaceClick();
+    emitSignal('windowToggle', undefined);
+    return;
+  }
   if (shellState.layoutMode === 'workbench' && shellState.dockStatus !== 'unsupported') {
     if (
       event.key === 'Escape' &&

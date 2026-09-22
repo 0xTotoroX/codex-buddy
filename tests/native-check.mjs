@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
  * [OUTPUT]: target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
- * [POS]: 原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
+ * [POS]: --header-only 免鼠标权限验证三材质透明头部和实际置顶层级；原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
  * 设置验收使用公共头部入口与实际设置区可见性，不依赖旧 activeTab。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -17,7 +17,8 @@ if (process.platform !== 'darwin')
   throw Error('Native backdrop acceptance requires macOS and Screen Recording permission.');
 const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
-const workbenchOnly = process.argv.includes('--workbench-only');
+const headerOnly = process.argv.includes('--header-only');
+const workbenchOnly = headerOnly || process.argv.includes('--workbench-only');
 const genieOnly = process.argv.includes('--genie-only');
 const chipAnchor = genieOnly && process.argv.includes('--chip-anchor');
 const crossScreen = genieOnly && process.argv.includes('--cross-screen');
@@ -29,7 +30,9 @@ const output =
   root +
   '/target/reports/' +
   (workbenchOnly
-    ? 'native-workbench'
+    ? headerOnly
+      ? 'native-header'
+      : 'native-workbench'
     : genieOnly
       ? crossScreen
         ? reverseScreens
@@ -193,6 +196,19 @@ function probePage() {
                 },
               ]),
             ),
+            pin: workbench.querySelector('[data-action=pin]')?.getAttribute('aria-pressed'),
+            headerSurfaces: [
+              '.csw-workbench-face',
+              '[data-workbench-settings]',
+              '[data-action=pin]',
+            ].map((selector) => {
+              const style = getComputedStyle(workbench.querySelector(selector));
+              return {
+                background: style.backgroundColor,
+                shadow: style.boxShadow,
+                border: style.borderTopWidth,
+              };
+            }),
             settings: measure(workbench.querySelector('.csw-workbench-settings')),
             settingsButton: measure(workbench.querySelector('[data-workbench-settings]')),
             settingsLabel: workbench
@@ -237,6 +253,7 @@ function probePage() {
           select.value = cmd.action;
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
+        if (cmd.kind === 'pin') document.querySelector('[data-action=pin]')?.click();
         if (cmd.kind === 'retained-settings') {
           document.querySelector('[data-legacy-settings]')?.click();
         }
@@ -327,6 +344,7 @@ const server = createServer(async (req, res) => {
   }
   if (req.url === '/api/panel/preferences') {
     if (data.ui) ui = state.preferences.ui = data.ui;
+    if (typeof data.alwaysOnTop === 'boolean') state.preferences.alwaysOnTop = data.alwaysOnTop;
     state.preferences.revision = (state.preferences.revision || 0) + 1;
     res.end(JSON.stringify({ revision: state.preferences.revision }));
     return;
@@ -482,7 +500,30 @@ try {
         Math.abs(telemetry.rect.height - 540) < 1,
       'native workbench not ready',
     );
-    const workbenchChecks = [];
+    const level = () =>
+      windows().sort(
+        (a, b) =>
+          b.kCGWindowBounds.Width * b.kCGWindowBounds.Height -
+          a.kCGWindowBounds.Width * a.kCGWindowBounds.Height,
+      )[0]?.kCGWindowLayer;
+    const pinnedLevel = level();
+    if (!(pinnedLevel > 0) || telemetry.workbench.pin !== 'true')
+      throw Error('Default pin did not reach the native window');
+    await command({ kind: 'pin' });
+    await waitFor(
+      () => telemetry.workbench.pin === 'false' && level() === 0,
+      'Unpin did not lower the native window',
+    );
+    if (state.preferences.alwaysOnTop !== false) throw Error('Unpin preference not saved');
+    await command({ kind: 'pin' });
+    await waitFor(
+      () => telemetry.workbench.pin === 'true' && level() === pinnedLevel,
+      'Pin did not restore the native window level',
+    );
+    if (state.preferences.alwaysOnTop !== true) throw Error('Pin preference not saved');
+    const workbenchChecks = [
+      { pin: { defaultLevel: pinnedLevel, unpinnedLevel: 0, restored: true } },
+    ];
     for (const material of ['matte', 'frosted', 'native-glass']) {
       await command({ kind: 'material', value: material });
       const effective =
@@ -499,6 +540,19 @@ try {
         'native workbench material mapping',
       );
       const initial = assertLayout();
+      if (headerOnly) {
+        if (
+          initial.headerSurfaces.some(
+            (style) =>
+              style.background !== 'rgba(0, 0, 0, 0)' ||
+              style.shadow !== 'none' ||
+              style.border !== '0px',
+          )
+        )
+          throw Error('Native header renders an extra button surface');
+        workbenchChecks.push({ material, effective, headerSurfaces: initial.headerSurfaces });
+        continue;
+      }
       const nextScroll = Math.min(
         60,
         initial.panes.next.body.scrollHeight - initial.panes.next.body.clientHeight,
@@ -638,7 +692,7 @@ try {
       JSON.stringify(
         {
           artifact,
-          scope: 'workbench-only',
+          scope: headerOnly ? 'header-only' : 'workbench-only',
           workbenchChecks,
           telemetry,
           log,

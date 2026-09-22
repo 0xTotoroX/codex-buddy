@@ -15,7 +15,7 @@
 
 CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, generate follow-up questions, and keep your tools inside the conversation or in a desktop window.
 
-The gear in the workbench header opens settings in your browser without replacing the outline or suggestions.
+Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. The gear opens settings in your browser. Desktop windows stay on top by default; use the pin beside the gear to turn this off or on. Your choice is saved.
 
 ## Features
 
@@ -31,7 +31,7 @@ The gear in the workbench header opens settings in your browser without replacin
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face and return control.
+Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face for returning to the chat.
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
 
@@ -58,14 +58,14 @@ After installation, open **CodexBuddy** from Applications. Node.js and Rust are 
 
 Open settings from the capsule. Choose your existing Codex login or enter your model API settings, save, and test the connection. Using an existing login requires a working local Codex CLI installation and login session.
 
-The workbench has three main forms: a compact capsule, an expanded in-chat workbench, and an independent window. Inside the chat it can dock on the right or float freely. Collapsing or running out of room returns it to the capsule and releases all sidebar space; a click restores the preferred position. Split direction, tabs, and focus only change the contents. Top controls and refresh buttons appear when their header is hovered or receives keyboard focus, and remain visible on touch devices.
+The workbench has three main forms: a compact capsule, an expanded in-chat workbench, and an independent window. Inside the chat it can dock on the right or float freely. Collapsing or running out of room returns it to the capsule and releases all sidebar space; a click restores the preferred position. Split direction, tabs, and focus only change the contents. Top controls and refresh buttons appear when the pointer is inside the workbench or a control receives keyboard focus, and remain visible on touch devices.
 
 ### 3. Use the workbench
 
 - **Navigate an answer:** open the outline and click a heading to jump to the source text.
 - **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
 - **View both panels:** in Web settings, use the capsule’s “点击胶囊后展开为” (expand capsule as) option to choose “右侧嵌入工作台” (right sidebar) or “聊天内浮动工作台” (floating inside the chat). Both stay inside the host; the floating option is not an independent desktop window. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, the capsule explains why and offers an independent window or a directly expanded floating workbench. Once space returns, click it to reopen the sidebar. You can still pop out or return the entire workbench.
-- **Adjust the window:** use the top controls to move to an independent window or put it back in the chat; the separate minus button collapses the embedded workbench. Then drag the header to move, and drag a lower corner to resize. Change appearance in settings. The desktop workbench stays expanded; Web settings provide always-on-top and appearance controls.
+- **Adjust the window:** click the face to expand or collapse inside the chat, and double-click (or press Alt+Enter on the face) to pop out or return. Drag the header to move and a lower corner to resize. Desktop windows stay expanded and on top by default; the pin toggles always-on-top. The gear opens Web settings for appearance and other options.
 
 ### Model quick switch
 

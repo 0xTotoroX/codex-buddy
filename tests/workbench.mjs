@@ -274,7 +274,7 @@ async function createPopout(host, preserveSnapshot = false) {
         height: 720,
       },
       webRevision: 0,
-      alwaysOnTop: false,
+      alwaysOnTop: true,
     },
   }));
   if (!preserveSnapshot) {
@@ -301,7 +301,7 @@ async function createPopout(host, preserveSnapshot = false) {
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`${hostUrl}/popout`);
   await page.evaluate((settings) => {
-    window.popoutFixture = { saves: [], unexpected: [], settingsOpens: 0 };
+    window.popoutFixture = { saves: [], pins: [], unexpected: [], settingsOpens: 0 };
     window.__companionHostRequest = (raw) => {
       const { id, path } = JSON.parse(raw);
       if (path === '/settings/open') window.popoutFixture.settingsOpens++;
@@ -315,6 +315,7 @@ async function createPopout(host, preserveSnapshot = false) {
     };
     window.__companionPopout = {
       save: (ui) => window.popoutFixture.saves.push(structuredClone(ui)),
+      pin: async (value) => window.popoutFixture.pins.push(value),
       size: async () => {},
       native: () => {},
       request: async (path) => {
@@ -446,8 +447,8 @@ const cases = [
           const color = getComputedStyle(probe).color;
           probe.remove();
           return {
-            width: getComputedStyle(n).outlineWidth,
-            color: getComputedStyle(n).outlineColor,
+            width: getComputedStyle(n, '::after').height,
+            color: getComputedStyle(n, '::after').backgroundColor,
             expected: color,
           };
         });
@@ -575,7 +576,7 @@ const cases = [
       assert.equal(await page.locator('.csw-layout-menu').isVisible(), false);
       assert.equal(await page.locator('.csw-pane-menu:visible').count(), 0);
       assert.equal(await page.locator('.csw-workbench-pane > header > button:visible').count(), 2);
-      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 3);
+      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 1);
       assert.equal(
         await page.locator('[data-action=detach]').getAttribute('aria-label'),
         '移到独立窗口',
@@ -669,7 +670,7 @@ const cases = [
       );
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-placement=dock]').evaluate((node) => node.click());
-      await page.locator('[data-workbench-close]').click();
+      await page.locator('.csw-workbench-face').press('Enter');
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
@@ -732,7 +733,31 @@ const cases = [
           const face = page.locator('.csw-workbench-face');
           assert.equal(await face.count(), 1);
           assert.equal(await face.isVisible(), true);
-          assert.equal(await page.locator('[data-action="detach"]').isVisible(), true);
+          assert.equal(await page.locator('[data-action="detach"]').isVisible(), false);
+          await face.hover();
+          const chrome = await face.evaluate((node) => {
+            const style = getComputedStyle(node);
+            return {
+              background: style.backgroundColor,
+              border: style.borderTopWidth,
+              shadow: style.boxShadow,
+              outline: style.outlineStyle,
+            };
+          });
+          assert.deepEqual(chrome, {
+            background: 'rgba(0, 0, 0, 0)',
+            border: '0px',
+            shadow: 'none',
+            outline: 'none',
+          });
+          await face.click();
+          await settle(page);
+          assert.equal(
+            await page.evaluate(() => window.__companionFloatingPanel.state.open),
+            true,
+            'desktop single click stays expanded',
+          );
+          await page.waitForTimeout(550);
           await face.dblclick();
           assert.equal(await page.locator('.csw-workbench').count(), 1);
         }
@@ -744,8 +769,25 @@ const cases = [
       );
       assert.equal(await page.locator('[data-workbench-close]').count(), 0);
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 9);
+      const pin = page.locator('[data-action="pin"]');
+      assert.equal(await pin.count(), 1);
+      assert.equal(await pin.getAttribute('aria-pressed'), 'true');
+      await pin.click();
+      assert.equal(await pin.getAttribute('aria-pressed'), 'false');
+      await pin.click();
+      assert.equal(await pin.getAttribute('aria-pressed'), 'true');
+      assert.deepEqual(await page.evaluate(() => window.popoutFixture.pins), [false, true]);
+      const gear = page.locator('[data-workbench-settings]');
+      await gear.hover();
+      assert.deepEqual(
+        await gear.evaluate((node) => ({
+          background: getComputedStyle(node).backgroundColor,
+          shadow: getComputedStyle(node).boxShadow,
+        })),
+        { background: 'rgba(0, 0, 0, 0)', shadow: 'none' },
+      );
       await page.screenshot({ path: resolve(output, 'unified-shell-focus.png') });
-      await page.locator('[data-action="detach"]').click();
+      await page.locator('.csw-workbench-face').press('Alt+Enter');
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 10);
       assert.deepEqual(errors, []);
       await page.close();
@@ -1175,7 +1217,7 @@ const cases = [
         node.scrollTop = 120;
         window.workbenchFixture.outlineBody = node;
       });
-      await page.getByRole('button', { name: '收起工作台', exact: true }).click();
+      await page.locator('.csw-workbench-face').press('Enter');
       await page.locator('.csw-fab').press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
@@ -1363,7 +1405,7 @@ const cases = [
       );
       assert.deepEqual(errors, []);
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-      await page.locator('[data-workbench-close]').click();
+      await page.locator('.csw-workbench-face').press('Enter');
       const closed = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       assert.equal(closed.dockOpen, false, 'explicit close updates intent');
       await page.setViewportSize({ width: 1500, height: 960 });
@@ -1864,7 +1906,7 @@ const cases = [
     'collapsed capsule frees the sidebar and offers explicit alternatives only when space is insufficient',
     async (page, baseline) => {
       await mode(page, true);
-      await page.getByRole('button', { name: '收起工作台', exact: true }).click();
+      await page.locator('.csw-workbench-face').press('Enter');
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
@@ -1984,7 +2026,7 @@ const cases = [
       assert.equal(await page.locator('.csw-workbench').count(), 1);
       assert.equal(await page.locator(slotSelector).count(), 0);
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-      await page.getByRole('button', { name: '收起工作台', exact: true }).click();
+      await page.locator('.csw-workbench-face').press('Enter');
       await page.locator('.csw-fab').waitFor({ state: 'visible' });
       await box(page, '.csw-fab');
     },

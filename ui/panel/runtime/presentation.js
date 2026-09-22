@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点。
+ * [OUTPUT]: 共享关联及双面板阅读投影、关联命令和身份校验；阅读状态按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -551,7 +551,7 @@ function panelDisconnected(message) {
   emitSignal('render', undefined);
 }
 
-function panelWindowControls({ includePin = true } = {}) {
+function panelWindowControls({ includePin = true, includeToggle = true } = {}) {
   const unsupported = !IS_POPOUT && runtimeState.settings?.popoutSupported !== true;
   const label = IS_POPOUT
     ? '放回聊天'
@@ -566,6 +566,7 @@ function panelWindowControls({ includePin = true } = {}) {
     IS_POPOUT && includePin
       ? `<button class="csw-icon csw-desktop-pin" type="button" data-action="pin" aria-pressed="${shellState.pinnedOnTop}" title="${pinTitle}" aria-label="${pinTitle}">${iconSvg('pin')}</button>`
       : '';
+  if (!includeToggle) return pin;
   return `${pin}<button class="csw-icon" type="button" data-action="detach" title="${label}" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
 }
 
@@ -600,15 +601,22 @@ function bindPanelWindowControls() {
   shellState.panel
     .querySelector('[data-action="detach"]')
     ?.addEventListener('click', () => void togglePanelWindow());
-  shellState.panel.querySelector('[data-action="pin"]')?.addEventListener('click', async () => {
-    try {
-      await POPOUT.pin(!shellState.pinnedOnTop);
-      shellState.pinnedOnTop = !shellState.pinnedOnTop;
-      emitSignal('render', undefined);
-    } catch (error) {
-      POPOUT.notice(error.message);
-    }
-  });
+  shellState.panel
+    .querySelector('[data-action="pin"]')
+    ?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const pinned = !shellState.pinnedOnTop;
+      button.disabled = true;
+      try {
+        await POPOUT.pin(pinned);
+        shellState.pinnedOnTop = pinned;
+        emitSignal('render', undefined);
+      } catch (error) {
+        POPOUT.notice(error.message);
+      } finally {
+        button.disabled = false;
+      }
+    });
   if (IS_POPOUT) POPOUT.save(panelPreferences());
 }
 
