@@ -99,6 +99,8 @@ After installation, open **CodexBuddy** from Applications. Node.js and Rust are 
 
 Open settings from the capsule. Choose your existing Codex login or enter your model API settings, then test the connection. Text fields save when focus leaves them; selections save automatically. The Save button remains available for immediate saving. Using an existing login requires a working local Codex CLI installation and login session.
 
+For Zhipu BigModel, select **Chat Completions** and use `https://open.bigmodel.cn/api/paas/v4` with your API key and model name. `glm-4.5-air`, `glm-4.7`, `glm-4.6v`, and `glm-4.1v-thinking-flashx` have passed the fixed-example connection test, including suggestion-format validation. Buddy adapts requests to the official endpoint while retaining direction and output validation; model access and quota still depend on your account. The connection test generates suggestions from a fixed example, not your chat.
+
 The workbench has three main forms: a compact capsule, an expanded in-chat workbench, and an independent window. Inside the chat it can dock on the right or float freely. Collapsing or running out of room returns it to the capsule and releases all sidebar space; a click restores the preferred position. Split direction, tabs, and focus only change the contents. Top controls and refresh buttons appear when the pointer is inside the workbench or a control receives keyboard focus, and remain visible on touch devices.
 
 ### 3. Use the workbench

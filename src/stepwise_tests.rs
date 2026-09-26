@@ -62,6 +62,9 @@ async fn generate(State(state): State<Shared>, Json(body): Json<Value>) -> Json<
         if state.mode == "unknown" {
             values[0]["directionId"] = json!("invented");
         }
+        if state.mode == "missing" {
+            values[0].as_object_mut().unwrap().remove("directionId");
+        }
         if state.mode == "duplicate" && values.len() > 1 {
             values[0]["directionId"] = values[1]["directionId"].clone();
         }
@@ -166,12 +169,19 @@ async fn smart_failures_and_no_candidates_never_fall_back_or_generate() {
 }
 
 #[tokio::test]
-async fn unknown_and_duplicate_direction_ids_are_rejected() {
-    for mode in ["unknown", "duplicate"] {
+async fn missing_unknown_and_duplicate_direction_ids_are_rejected() {
+    for mode in ["missing", "unknown", "duplicate"] {
         let (mut model, _, task) = setup(mode).await;
         model.options.direction_source = DirectionSource::Manual;
         model.options.selected_directions = vec!["advance".into(), "gaps".into()];
-        assert!(model.generate_exchange(&exchange()).await.is_err());
+        let error = model
+            .generate_exchange(&exchange())
+            .await
+            .unwrap_err()
+            .to_string();
+        if mode == "missing" {
+            assert!(error.contains("缺少方向编号"));
+        }
         task.abort();
     }
 }
