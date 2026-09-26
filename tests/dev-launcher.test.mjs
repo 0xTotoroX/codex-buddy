@@ -1,11 +1,11 @@
 /*
  * [INPUT]: 临时源码路径、进程锁与启动器脚本生成函数。
- * [OUTPUT]: 开发入口唤起/重连/失败边界、失效进程与 shell 转义回归；可选合成原生窗口焦点验收。
+ * [OUTPUT]: 开发入口唤起/重连/失败边界、早期错误透传、其他会话保护与 shell 转义回归；可选合成原生窗口焦点验收。
  * [POS]: 独立 Node 验收，不连接宿主或启动实际开发后台。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { test } from 'node:test';
-import { existsSync, copyFileSync } from 'node:fs';
+import { existsSync, copyFileSync, cpSync, symlinkSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -139,6 +139,48 @@ test('a failed terminal startup is reported without waiting for the full readine
     revealDevelopment(root, { checkStartupError: true }),
     /没有找到可调试的真实 Codex/,
   );
+});
+
+test('early supervisor failures reach the launcher without removing another session', async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-early-failure-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  cpSync(new URL('../scripts', import.meta.url), join(root, 'scripts'), { recursive: true });
+  symlinkSync(new URL('../node_modules', import.meta.url), join(root, 'node_modules'));
+  const data = join(root, 'target/dev');
+  mkdirSync(data, { recursive: true });
+  const session = JSON.stringify({ token: 'existing-session', runtime: join(data, 'real') });
+  writeFileSync(join(data, 'session.json'), session);
+  for (const record of ['{', JSON.stringify({ pid: process.pid, root })]) {
+    writeFileSync(join(data, 'owner.json'), record);
+    const result = spawnSync(process.execPath, [join(root, 'scripts/dev.mjs'), '--no-open'], {
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    assert.equal(result.status, 1, result.stderr);
+    const failure = JSON.parse(readFileSync(join(data, 'launcher-error.json')));
+    assert.match(failure.message, /占用记录无法读取|已有开发会话/);
+    assert.match(result.stderr, /占用记录无法读取|已有开发会话/);
+    assert.equal(readFileSync(join(data, 'session.json'), 'utf8'), session);
+    assert.equal(readFileSync(join(data, 'owner.json'), 'utf8'), record);
+    if (record === '{')
+      await assert.rejects(revealDevelopment(root, { checkStartupError: true }), /owner.json/);
+  }
+});
+
+test('a concurrent losing startup cannot fail the live winning launcher', async (t) => {
+  const { root } = await developmentFixture(t, (req, res) =>
+    res.end(
+      JSON.stringify(
+        req.url === '/api/state' ? { connection: { status: 'connected' } } : { ok: true },
+      ),
+    ),
+  );
+  writeFileSync(join(root, 'target/dev/owner.json'), JSON.stringify({ pid: process.pid }));
+  writeFileSync(
+    join(root, 'target/dev/launcher-error.json'),
+    JSON.stringify({ pid: 2147483647, message: '已有开发会话占用' }),
+  );
+  assert.deepEqual(await revealDevelopment(root, { checkStartupError: true }), { ok: true });
 });
 
 test('terminal entry preserves spaces and shell metacharacters without evaluating them', () => {

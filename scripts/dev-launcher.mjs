@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log。
+ * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log，具体启动错误透传且不受并发失败会话干扰。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -80,7 +80,10 @@ export async function startBackgroundDevelopment(directory) {
     if ((code !== 0 || signal) && !existsSync(join(data, 'launcher-error.json')))
       writeFileSync(
         join(data, 'launcher-error.json'),
-        JSON.stringify({ message: '开发进程启动失败，请查看 target/dev/launcher.log。' }),
+        JSON.stringify({
+          message: '开发进程启动失败，请查看 target/dev/launcher.log。',
+          pid: child.pid,
+        }),
         { mode: 0o600 },
       );
   });
@@ -218,7 +221,17 @@ export async function revealDevelopment(
   while (Date.now() < deadline) {
     const failure =
       checkStartupError && readJson(join(directory, 'target/dev/launcher-error.json'));
-    if (failure)
+    // A losing concurrent launcher must not report its error to the winning session.
+    let otherOwner = false;
+    if (failure?.pid) {
+      try {
+        const owner = readJson(join(directory, 'target/dev/owner.json'));
+        otherOwner = owner && owner.pid !== failure.pid && hasDevelopmentOwner(directory);
+      } catch {
+        // Preserve the original startup error if its owner record is unreadable.
+      }
+    }
+    if (failure && !otherOwner)
       throw new Error(failure.message || '开发模式启动失败，请查看 target/dev/launcher.log。');
     const session = readJson(join(directory, 'target/dev/session.json'));
     const data = session?.runtime || join(directory, 'target/dev/real');

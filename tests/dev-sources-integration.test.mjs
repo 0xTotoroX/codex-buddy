@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 完整 dev.mjs、临时双 worktree、模拟编译器/CDP/后台及真实 Vite/Chromium。
- * [OUTPUT]: 固定地址下切换源码、回退、资源更新、前端选择器与清理的进程级验收。
+ * [OUTPUT]: 固定地址下切换源码、回退、资源更新、前端选择器、失效租约恢复与清理的进程级验收。
  * [POS]: 开发调试集成回归；所有端口、进程、配置均为隔离夹具。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -130,6 +130,19 @@ test(
           logs += s;
         });
       };
+      // Leave real leases behind as if a previous supervisor exited without cleanup.
+      const leaseModule = new URL('../scripts/dev-sources.mjs', import.meta.url).href;
+      execFileSync(process.execPath, [
+        '--input-type=module',
+        '-e',
+        `
+        import {claimLease, claimTarget} from ${JSON.stringify(leaseModule)};
+        const root = ${JSON.stringify(main)};
+        claimLease(root + '/target/dev/owner.json', {root});
+        claimTarget({endpoint:${JSON.stringify(endpoint)}, target:{id:'fixture-window'}}, root,
+          ${JSON.stringify(join(base, 'home/Library/Caches/codex-buddy/dev-targets'))});
+      `,
+      ]);
       launch();
       const session = await until(
         () => {

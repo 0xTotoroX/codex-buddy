@@ -1,15 +1,24 @@
 /*
  * [INPUT]: 临时 Git worktrees、进程租约和合成开发交接回调。
- * [OUTPUT]: 来源白名单、互斥占用、并发/失败回退及认证网关行为验收。
+ * [OUTPUT]: 来源白名单、互斥占用、失效租约恢复与孤儿后台保护、并发/失败回退及认证网关行为验收。
  * [POS]: 开发切换契约；不连接官方宿主、不终止真实开发会话。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync, realpathSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  existsSync,
+  realpathSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { once } from 'node:events';
 import {
   worktrees,
   selectSource,
@@ -74,6 +83,129 @@ test('a target lease excludes another worktree, normalizes localhost and never r
   close();
   assert.equal(existsSync(file), true);
 });
+test('leases left by an exited process recover while live and invalid records stay untouched', (t) => {
+  const directory = temporary(t);
+  const file = join(directory, 'owner.json');
+  const module = new URL('../scripts/dev-sources.mjs', import.meta.url).href;
+  execFileSync(process.execPath, [
+    '--input-type=module',
+    '-e',
+    `import {claimLease} from ${JSON.stringify(module)}; claimLease(${JSON.stringify(file)}, {root:${JSON.stringify(directory)}});`,
+  ]);
+  const prior = readFileSync(file, 'utf8');
+  const release = claimLease(file, { root: directory });
+  assert.notEqual(readFileSync(file, 'utf8'), prior);
+  assert.equal(existsSync(file + '.recovery'), false);
+  assert.throws(() => claimLease(file), /已有开发会话/);
+  release();
+  for (const record of ['{', '{}', '{"pid":-1}', '{"pid":"2147483647"}']) {
+    writeFileSync(file, record);
+    assert.throws(() => claimLease(file), /未自动清理/);
+    assert.equal(readFileSync(file, 'utf8'), record);
+    assert.equal(existsSync(file + '.recovery'), false);
+  }
+});
+
+test('recovery refuses uncertain process status and an interrupted recovery guard', (t) => {
+  const file = join(temporary(t), 'owner.json');
+  const prior = JSON.stringify({ pid: 2147483647 });
+  writeFileSync(file, prior);
+  const kill = t.mock.method(process, 'kill', () => {
+    throw Object.assign(new Error('denied'), { code: 'EPERM' });
+  });
+  assert.throws(() => claimLease(file), /无法确认/);
+  assert.equal(readFileSync(file, 'utf8'), prior);
+  kill.mock.restore();
+  writeFileSync(file + '.recovery', 'interrupted');
+  assert.throws(() => claimLease(file), /恢复被中断/);
+  assert.equal(readFileSync(file, 'utf8'), prior);
+  assert.equal(readFileSync(file + '.recovery', 'utf8'), 'interrupted');
+});
+
+test('stale target recovery protects a live backend in a handoff source before session publication', (t) => {
+  const directory = temporary(t),
+    root = join(directory, 'main'),
+    other = join(directory, 'other');
+  mkdirSync(root);
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' });
+  git('init', '-b', 'main');
+  git('config', 'user.name', 'Fixture');
+  git('config', 'user.email', 'fixture@example.invalid');
+  writeFileSync(join(root, '.gitignore'), 'target/');
+  git('add', '.');
+  git('commit', '-m', 'fixture');
+  git('worktree', 'add', '-b', 'other', other);
+  mkdirSync(join(other, 'target/dev/real'), { recursive: true });
+  writeFileSync(
+    join(other, 'target/dev/owner.json'),
+    JSON.stringify({ pid: 2147483647, controller: root }),
+  );
+  const runtime = join(other, 'target/dev/real/runtime.json');
+  writeFileSync(runtime, JSON.stringify({ pid: process.pid }));
+  const file = join(directory, 'target.json');
+  const prior = JSON.stringify({ pid: 2147483647, root });
+  writeFileSync(file, prior);
+  assert.throws(() => claimLease(file, { root }), /后台仍在运行/);
+  assert.equal(readFileSync(file, 'utf8'), prior);
+  writeFileSync(runtime, JSON.stringify({ pid: 2147483647 }));
+  claimLease(file, { root })();
+  assert.equal(existsSync(file), false);
+});
+
+test(
+  'simultaneous recovery has one owner and cannot remove the winning lease',
+  { timeout: 10000 },
+  async (t) => {
+    const file = join(temporary(t), 'owner.json');
+    writeFileSync(file, JSON.stringify({ pid: 2147483647 }));
+    const module = new URL('../scripts/dev-sources.mjs', import.meta.url).href;
+    const children = Array.from({ length: 8 }, () =>
+      spawn(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `
+    import {claimLease} from ${JSON.stringify(module)};
+    let release;
+    process.on('message', (message) => {
+      if (message === 'go') {
+        try { release = claimLease(${JSON.stringify(file)}); process.send({won:true,pid:process.pid}); }
+        catch (error) { process.send({won:false,message:error.message}); }
+      } else { release?.(); process.exit(0); }
+    });
+    process.send('ready');
+  `,
+        ],
+        { stdio: ['ignore', 'ignore', 'pipe', 'ipc'] },
+      ),
+    );
+    t.after(async () => {
+      await Promise.all(
+        children.map(async (child) => {
+          if (child.exitCode !== null || child.signalCode !== null) return;
+          const exited = once(child, 'exit');
+          child.kill();
+          await exited;
+        }),
+      );
+    });
+    await Promise.all(children.map((child) => once(child, 'message')));
+    const outcomes = children.map((child) => once(child, 'message'));
+    for (const child of children) child.send('go');
+    const winners = (await Promise.all(outcomes))
+      .map(([result]) => result)
+      .filter((result) => result.won);
+    assert.equal(winners.length, 1);
+    assert.equal(JSON.parse(readFileSync(file)).pid, winners[0].pid);
+    const exits = children.map((child) => once(child, 'exit'));
+    for (const child of children) child.send('stop');
+    await Promise.all(exits);
+    assert.equal(existsSync(file), false);
+    assert.equal(existsSync(file + '.recovery'), false);
+  },
+);
+
 test('source switching is serialized and prepares before disconnecting, persists only on success', async () => {
   const events = [];
   let finish;

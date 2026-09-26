@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Git worktree 清单、私有进程记录与开发服务交接回调。
- * [OUTPUT]: 可选源码清单、独占租约、串行且可回退的来源切换。
+ * [OUTPUT]: 可选源码清单、可安全恢复失效记录的独占租约、串行且可回退的来源切换。
  * [POS]: dev.mjs 的跨 worktree 协调层；不操作宿主或终止其他进程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -82,6 +82,70 @@ export function readRecord(path) {
     throw error;
   }
 }
+function leaseRecord(path) {
+  try {
+    return readRecord(path);
+  } catch (error) {
+    throw new Error(`开发占用记录无法读取，未自动清理：${path}`, { cause: error });
+  }
+}
+function processAlive(record, path) {
+  if (!Number.isSafeInteger(record?.pid) || record.pid <= 0)
+    throw new Error(`开发进程记录无效，未自动清理：${path}`);
+  try {
+    process.kill(record.pid, 0);
+    return true;
+  } catch (error) {
+    if (error.code === 'ESRCH') return false;
+    throw new Error(`无法确认开发进程是否已退出，未自动清理：${path}`, { cause: error });
+  }
+}
+function assertLeaseStopped(prior, path) {
+  if (processAlive(prior, path))
+    throw new Error(
+      `已有开发会话占用 ${prior.root || '此目标'}。请在原 Dev 设置中切换来源，不要重复注入。`,
+    );
+  if (!prior.root) return;
+  const directory = join(prior.root, 'target/dev');
+  const session = leaseRecord(join(directory, 'session.json'));
+  const directories = new Set([join(directory, 'real'), session?.runtime].filter(Boolean));
+  // A source lease precedes backend startup; session.json is only updated after handoff.
+  for (const source of worktrees(prior.controller || prior.root)) {
+    const owner = leaseRecord(join(source.path, 'target/dev/owner.json'));
+    if (owner?.pid === prior.pid) directories.add(join(source.path, 'target/dev/real'));
+  }
+  for (const data of directories) {
+    const runtimePath = join(data, 'runtime.json');
+    const runtime = leaseRecord(runtimePath);
+    if (runtime && processAlive(runtime, runtimePath))
+      throw new Error(
+        `开发监督进程已退出，但后台仍在运行（PID ${runtime.pid}）。请先正常关闭该后台再启动；未清理占用记录：${path}`,
+      );
+  }
+}
+function recoverLease(path, record) {
+  const guard = `${path}.recovery`;
+  try {
+    writeFileSync(guard, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    throw new Error(`占用记录正在恢复或上次恢复被中断，请稍后重试；仍失败时核对恢复记录：${guard}`);
+  }
+  try {
+    const prior = leaseRecord(path);
+    if (prior) {
+      assertLeaseStopped(prior, path);
+      unlinkSync(path);
+    }
+    // A normal claimant may win after unlink. Never retry deletion in that case.
+    writeFileSync(path, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if (error.code === 'EEXIST') throw new Error('另一个开发会话已取得占用，请重新打开入口。');
+    throw error;
+  } finally {
+    unlinkSync(guard);
+  }
+}
 export function claimLease(path, metadata = {}) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const record = { ...metadata, pid: process.pid, nonce: randomUUID() };
@@ -89,19 +153,9 @@ export function claimLease(path, metadata = {}) {
     writeFileSync(path, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;
-    const prior = readRecord(path);
-    let alive = true;
-    try {
-      process.kill(prior?.pid, 0);
-    } catch (e) {
-      if (e.code === 'ESRCH') alive = false;
-    }
-    // Never unlink/reclaim a contender's lock during acquisition: stale recovery is explicit.
-    throw new Error(
-      alive
-        ? `已有开发会话占用 ${prior?.root || '此目标'}。请在原 Dev 设置中切换来源，不要重复注入。`
-        : `开发会话已退出但占用记录未清理。核对后删除记录再启动：${path}`,
-    );
+    const prior = leaseRecord(path);
+    if (prior) assertLeaseStopped(prior, path);
+    recoverLease(path, record);
   }
   return () => {
     if (readRecord(path)?.nonce === record.nonce) unlinkSync(path);

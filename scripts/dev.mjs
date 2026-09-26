@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Git worktrees、Rust/Node、来源选择器与独立开发数据目录。
- * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，再恢复旧会话，启动错误传回 App。
+ * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，安全恢复失效租约，含占用检查在内的启动错误传回 App。
  * [POS]: 持久开发编排与设置入口；持有目标租约并串行交接 worktree，管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -64,7 +64,7 @@ const source = resolve(
   process.env.CODEX_BUDDY_HOME || join(homedir(), 'Library/Application Support/codex-buddy'),
 );
 const lock = join(controllerDirectory, 'owner.json');
-const releaseController = claimLease(lock, { root: controllerRoot });
+let releaseController;
 const journal = join(controllerDirectory, 'paused-installation.json');
 let directory, data, binary, snapshot, options, env;
 let releaseSource = () => {},
@@ -95,7 +95,6 @@ function context(path) {
 function useContext(value) {
   ({ root, directory, data, binary, snapshot, options, env } = value);
 }
-useContext(context(root));
 const children = new Set();
 const watchers = [];
 let service,
@@ -115,7 +114,7 @@ const token = randomUUID();
 let nativeFingerprint, switcher, settingsUrl, switchTask;
 let buildError = '';
 let sourceEpoch = randomUUID();
-const injectedSettings = readFileSync(join(controllerRoot, 'ui/settings/dev-sources.js'), 'utf8');
+let injectedSettings;
 const nativeInputs = (root) => [
   ...filesUnder(root, 'src'),
   ...filesUnder(root, 'ui/model-control'),
@@ -499,15 +498,23 @@ async function cleanup() {
       console.error(error.message);
     }
   }
-  rmSync(join(directory, 'session.json'), { force: true });
-  rmSync(join(controllerDirectory, 'session.json'), { force: true });
+  for (const path of new Set([directory, controllerDirectory].filter(Boolean))) {
+    const session = join(path, 'session.json');
+    try {
+      if (readRecord(session)?.token === token) rmSync(session, { force: true });
+    } catch (error) {
+      console.error(`无法清理开发会话记录：${error.message}`);
+    }
+  }
   releaseSource();
   releaseTarget();
-  releaseController();
+  releaseController?.();
 }
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => cleanup().then(() => process.exit(0)));
 try {
+  releaseController = claimLease(lock, { root: controllerRoot });
+  injectedSettings = readFileSync(join(controllerRoot, 'ui/settings/dev-sources.js'), 'utf8');
   const remembered = args.source
     ? resolve(args.source)
     : readRecord(preference)?.path || controllerRoot;
@@ -598,12 +605,17 @@ try {
   }
   startWatchers();
 } catch (error) {
-  writeFileSync(
-    join(controllerDirectory, 'launcher-error.json'),
-    JSON.stringify({ message: error.message }),
-    { mode: 0o600 },
-  );
   console.error(error.message);
+  try {
+    mkdirSync(controllerDirectory, { recursive: true, mode: 0o700 });
+    writeFileSync(
+      join(controllerDirectory, 'launcher-error.json'),
+      JSON.stringify({ message: error.message, pid: process.pid }),
+      { mode: 0o600 },
+    );
+  } catch (failure) {
+    console.error(`无法保存启动错误：${failure.message}`);
+  }
   await cleanup();
   process.exitCode = 1;
 }
