@@ -11,7 +11,9 @@ const host = document.createElement('section');
 host.id = 'buddy-dev-sources';
 const view = host.attachShadow({ mode: 'open' });
 view.innerHTML = `<style>
-:host{display:block;max-width:1060px;margin:20px auto 0;padding:0 24px;font:13px/1.6 system-ui;color:var(--buddy-text,CanvasText)}
+:host{display:block;max-width:1120px;margin:20px auto 0!important;padding:0 40px!important;font:13px/1.6 system-ui;color:var(--buddy-text,CanvasText)}
+@media(max-width:850px){:host{padding:0 23px!important}}
+@media(max-width:650px){:host{padding:0 18px!important}}
 details{border:1px solid var(--buddy-border,GrayText);border-radius:12px;background:var(--buddy-surface,Canvas);padding:12px 16px}
 summary{cursor:pointer}p{margin:8px 0;overflow-wrap:anywhere;color:var(--buddy-muted,GrayText)}
 form{display:flex;align-items:center;gap:10px;flex-wrap:wrap}select,button{font:inherit;color:inherit;background:var(--buddy-subtle,Canvas);border:1px solid var(--buddy-border,GrayText);border-radius:7px;padding:6px 10px;max-width:100%}

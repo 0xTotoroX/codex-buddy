@@ -241,6 +241,17 @@ test(
       await page.getByRole('switch').first().waitFor();
       await page.getByRole('heading', { name: '模型快切', exact: true }).waitFor();
       assert.deepEqual(errors, [], 'complete settings page must render without React errors');
+      const alignment = await page.evaluate(() => ({
+        source: document
+          .querySelector('#buddy-dev-sources')
+          .shadowRoot.querySelector('details')
+          .getBoundingClientRect().left,
+        settings: document.querySelector('#root header').getBoundingClientRect().left,
+      }));
+      assert.ok(
+        Math.abs(alignment.source - alignment.settings) <= 1,
+        'source and settings share the same content edge',
+      );
       await page.locator('summary').click();
       await page.getByLabel('调试 worktree').selectOption(main);
       await page.getByRole('button', { name: '切换来源' }).click();
