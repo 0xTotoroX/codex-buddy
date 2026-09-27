@@ -2071,7 +2071,7 @@ const cases = [
     },
   ],
   [
-    'unsupported host falls back to visible capsule without a dock slot',
+    'unsupported host preserves sidebar preference until an explicit placement choice',
     async (page, baseline) => {
       await page
         .locator('.workspace')
@@ -2086,13 +2086,75 @@ const cases = [
       await box(page, '.csw-fab');
       await hostUnchanged(page, baseline);
       await page.locator('.csw-fab').click();
+      await page.waitForTimeout(150);
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
+        'workbench',
+        'opening an unavailable sidebar must not overwrite placement',
+      );
+      assert.equal(await page.locator('.csw-workbench').count(), 0);
+      assert.match(await page.locator('.csw-dock-reason').innerText(), /暂不支持侧栏/);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+      await page.locator('.csw-fab').press('Enter');
+      await page.getByRole('button', { name: '在聊天内展开', exact: true }).click();
       await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
       assert.equal(await page.locator('.csw-workbench').count(), 1);
       assert.equal(await page.locator(slotSelector).count(), 0);
+      assert.equal(await page.locator('.csw-dock-menu').count(), 0);
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
+        'capsule',
+      );
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('.csw-workbench-face').press('Enter');
       await page.locator('.csw-fab').waitFor({ state: 'visible' });
       await box(page, '.csw-fab');
+    },
+  ],
+  [
+    'sidebar preference survives unsupported host recovery and runtime reload',
+    async (page) => {
+      await mode(page, true);
+      await page
+        .locator('.workspace')
+        .evaluate((node) => node.classList.remove('app-shell-main-content-frame'));
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
+      );
+      for (let i = 0; i < 3; i++) {
+        await page.locator('.csw-fab').press('Enter');
+        assert.equal(await page.locator('.csw-workbench').count(), 0);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.state.layoutMode),
+          'workbench',
+        );
+      }
+      const saved = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
+      assert.equal(saved.dockOpen, true);
+      await page.evaluate(() => window.__companionFloatingPanel.destroy());
+      assert.equal(await page.locator('.csw-dock-menu').count(), 0);
+      await page.evaluate(bundle);
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.runtimeActive);
+      await page.evaluate(
+        (ui) => window.__companionFloatingPanel.syncPanelPreferences(ui, 1, false),
+        saved,
+      );
+      await page.waitForFunction(
+        () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
+      );
+      assert.equal(await page.locator('.csw-workbench').count(), 0);
+      await page
+        .locator('.workspace')
+        .evaluate((node) => node.classList.add('app-shell-main-content-frame'));
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      await layout(page);
+      assert.equal(await page.locator('.csw-dock-menu').count(), 1);
+      assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
+        'workbench',
+      );
     },
   ],
   [

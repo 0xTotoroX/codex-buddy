@@ -13,15 +13,18 @@ test('popout serializes position pin and appearance without hiding external conf
   const timers = new Map();
   let sequence = 0,
     revision = 1,
-    releasePosition;
+    releasePosition,
+    releaseAnchor;
   const writes = [],
     messages = [];
   const ui = { material: 'solid', width: 600 };
   const notice = { textContent: '' };
+  const dockWrites = [];
   const window = {
     __companionFloatingPanel: {
       state: { runtimeActive: true },
       panelPreferences: () => ui,
+      panelReadingState: () => null,
       receivePanelState: async () => {},
     },
     ipc: { postMessage: (value) => messages.push(JSON.parse(value)) },
@@ -59,6 +62,20 @@ test('popout serializes position pin and appearance without hiding external conf
           ok: true,
           json: async () => ({ preferences: { revision, webRevision: 0, ui }, ready: true }),
         };
+      if (url.endsWith('/anchor')) {
+        await new Promise((resolve) => {
+          releaseAnchor = resolve;
+        });
+        return { ok: true, json: async () => ({ anchor: null }) };
+      }
+      if (url.endsWith('/dock')) {
+        dockWrites.push(body);
+        const conflict = body.expectedRevision !== revision;
+        return {
+          ok: !conflict,
+          json: async () => (conflict ? { message: '外观已在其他窗口更新，请重试' } : {}),
+        };
+      }
       if (!url.endsWith('/preferences')) return { ok: true, json: async () => ({}) };
       writes.push(body);
       if (body.position)
@@ -95,4 +112,26 @@ test('popout serializes position pin and appearance without hiding external conf
   await tick();
   assert.match(notice.textContent, /其他窗口更新/);
   assert.equal(revision, 5);
+  await fire(400); // Read the external edit before starting the return.
+  ui.width = 680;
+  api.save(ui); // This debounce has not fired; dock must retain the final UI.
+  const returning = api.dock();
+  await tick();
+  revision++; // Settings change while anchor/return animation is in flight.
+  releaseAnchor();
+  await returning;
+  assert.equal(dockWrites[0].expectedRevision, 5, 'return uses the snapshot revision');
+  assert.equal(dockWrites[0].ui.width, 680, 'last debounced edit is not lost');
+  assert.equal(messages.at(-1).kind, 'cancel-return');
+  assert.equal(
+    messages.some((m) => m.kind === 'close'),
+    false,
+  );
+  await fire(400); // A conflict resumes projection polling.
+  const retry = api.dock();
+  await tick();
+  releaseAnchor();
+  await retry;
+  assert.equal(dockWrites[1].expectedRevision, 6);
+  assert.equal(messages.at(-1).kind, 'close');
 });

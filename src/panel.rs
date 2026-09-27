@@ -1,6 +1,6 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
 // [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
-// [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化。
+// [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化，收回偏好按版本校验并保存。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -497,9 +497,19 @@ impl App {
             if panel.docking {
                 bail!("窗口正在收回");
             }
+            if input.ui.is_some() && input.expected_revision != Some(panel.prefs.revision) {
+                bail!("外观已在其他窗口更新，请重试");
+            }
             if let Some(ui) = &input.ui {
                 ui.validate()?;
-                panel.prefs.ui = ui.clone();
+                if panel.prefs.ui != *ui {
+                    let mut next = panel.prefs.clone();
+                    next.ui = ui.clone();
+                    next.ui.open = true;
+                    next.revision += 1;
+                    next.save(&self.paths)?;
+                    panel.prefs = next;
+                }
             }
             panel.docking = true;
             panel.ready
@@ -513,6 +523,7 @@ impl App {
         }
         let mut prefs = panel.prefs.clone();
         prefs.detached = false;
+        prefs.revision += 1;
         prefs.ui.open = prefs.return_open.unwrap_or(true);
         prefs.save(&self.paths)?;
         panel.prefs = prefs;
@@ -778,6 +789,61 @@ mod tests {
         let panel = app.panel.lock().await;
         assert!(panel.ready && panel.presented && !panel.lease.is_empty());
         assert!(panel.prefs.detached && !panel.docking);
+    }
+
+    #[tokio::test]
+    async fn stale_dock_cannot_overwrite_new_sidebar_preferences() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let app = App::new(paths, crate::config::Config::default(), None, true);
+        {
+            let mut panel = app.panel.lock().await;
+            panel.popout_supported = true;
+            panel.test_window = true;
+        }
+        app.detach_panel(Some(Ui::default())).await.unwrap();
+        let lease = app.panel.lock().await.lease.clone();
+        let mut input = panel_input(lease);
+        app.ready_panel(&input).await.unwrap();
+        let _ = app.presented_panel(&input).await;
+        let old = app.appearance().await;
+        let saved = app
+            .save_appearance(json!({
+                "expectedRevision":old.revision, "ui":{"layoutMode":"workbench"}
+            }))
+            .await
+            .unwrap();
+        input.ui = Some(old.ui);
+        for revision in [None, Some(old.revision)] {
+            input.expected_revision = revision;
+            assert!(
+                app.dock_panel(&input)
+                    .await
+                    .unwrap_err()
+                    .to_string()
+                    .contains("其他窗口更新")
+            );
+            assert_eq!(app.appearance().await, saved);
+            let panel = app.panel.lock().await;
+            assert!(panel.ready && panel.presented && !panel.docking);
+            assert_eq!(panel.lease, input.lease);
+        }
+        input.expected_revision = Some(saved.revision);
+        let mut ui = saved.ui.clone();
+        ui.width += 20.;
+        input.ui = Some(ui.clone());
+        assert!(
+            app.dock_panel(&input)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("内嵌面板尚未恢复")
+        );
+        let actual = app.appearance().await;
+        assert_eq!(actual.ui, ui);
+        assert_eq!(actual.revision, saved.revision + 1);
+        assert!(actual.detached);
+        assert_eq!(Preferences::read(&app.paths), actual);
     }
 
     #[test]

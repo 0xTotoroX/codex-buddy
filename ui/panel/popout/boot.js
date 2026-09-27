@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 带令牌和租约的启动链接、本机 panel API 与 Wry IPC。
- * [OUTPUT]: 宿主主题随背景 IPC 同步； 窗口交接和原生通信；位置、置顶、外观写入共用串行队列与修订号，保留外部并发冲突保护。
+ * [OUTPUT]: 宿主主题随背景 IPC 同步； 窗口交接和原生通信；位置、置顶、外观写入共用串行队列与修订号，收回偏好携带动画前捕获的修订号，保留外部并发冲突保护。
  * [POS]: 系统窗口页面引导层，复用共享胶囊而不采集聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -198,11 +198,13 @@
       await saving;
       const panel = window.__companionFloatingPanel;
       const ui = panel?.panelPreferences();
+      const expectedRevision = revision;
       const presentation = panel?.panelReadingState();
       const { anchor } = await request('anchor');
       if (cancelReturning || !(await travelHome(anchor))) return;
       await request('dock', {
         ui,
+        expectedRevision,
         presentation,
       });
       stopped = true;

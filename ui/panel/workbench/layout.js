@@ -42,7 +42,8 @@ export function openWorkbench() {
   shellState.dockOpen = true;
   dock?.reopen();
   emitSignal('render', undefined);
-  if (shellState.dockStatus === 'space') dock?.showOptions(shellState.fab?.getBoundingClientRect());
+  if (['space', 'unsupported'].includes(shellState.dockStatus))
+    dock?.showOptions(shellState.fab?.getBoundingClientRect());
   saveWorkbench();
 }
 export function closeWorkbench() {

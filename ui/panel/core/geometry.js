@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊状态、DOM 尺寸、滚动容器与原生窗口偏好。
- * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换；保留胶囊位置与原生尺寸同步，停靠开合交由通知协调。
+ * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换；保留胶囊位置与原生尺寸同步，停靠开合始终交由通知协调，临时不可用不改变位置偏好。
  * [POS]: 交互与视图共用的空间计算层。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -563,17 +563,10 @@ function startMorph(expanded, focusTarget = '') {
 function setOpen(expanded, focusTarget = '') {
   if (!isCurrentRuntime()) return;
   resetEyePointer();
-  if (
-    !IS_POPOUT &&
-    shellState.layoutMode === 'workbench' &&
-    shellState.dockStatus !== 'unsupported'
-  ) {
+  if (!IS_POPOUT && shellState.layoutMode === 'workbench') {
     emitSignal('workbenchToggle', Boolean(expanded));
     return;
   }
-  // 停靠不可用时，显式展开紧凑入口改用浮动工作台，不再反复尝试占位。
-  if (expanded && shellState.layoutMode === 'workbench' && shellState.dockStatus === 'unsupported')
-    shellState.layoutMode = 'capsule';
   const target = IS_POPOUT || Boolean(expanded);
   if (target === shellState.open) return;
   clearCompletionBeam();
