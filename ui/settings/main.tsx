@@ -121,6 +121,7 @@ function App() {
       setTargetId(view.connection.targetId || '');
     }
   }, [view?.connection.endpoint, view?.connection.targetId, connectionEdited]);
+  const loadingError = error || (!saved && failure ? message : '');
   async function run(name: string, action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(name);
@@ -189,12 +190,12 @@ function App() {
             </h1>
           </div>
           <ModelControlSettings live={live} />
-          {error && (
+          {loadingError && (
             <div
               className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"
               role="alert"
             >
-              {error}
+              {loadingError}
             </div>
           )}
           <div className="min-w-0">
@@ -207,8 +208,16 @@ function App() {
               />
               {!form || !saved ? (
                 <Card className="flex items-center gap-3 text-xs text-muted-foreground p-9">
-                  <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={22} />
-                  <span>{live ? '正在读取设置…' : '等待本地服务…'}</span>
+                  {!loadingError && (
+                    <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={22} />
+                  )}
+                  <span>
+                    {loadingError
+                      ? '设置未能加载，请按上方提示重新打开。'
+                      : live
+                        ? '正在读取设置…'
+                        : '等待本地服务…'}
+                  </span>
                 </Card>
               ) : (
                 <form

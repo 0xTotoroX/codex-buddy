@@ -1,7 +1,7 @@
 /*
  * [INPUT]: Vite、React 插件与 CODEX_BUDDY_DEV_API 本机地址。
  * [OUTPUT]: 支持冷启动后正常退出的开发服务器配置及 target/web 构建输出。
- * [POS]: 设置页构建配置，产物由 Rust 内嵌。
+ * [POS]: 设置页构建配置，产物由 Rust 内嵌；依赖缓存隔离到本工作树 target，React 去重。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
@@ -27,10 +27,14 @@ if (
 export default defineConfig({
   root: fileURLToPath(new URL('.', import.meta.url)),
   plugins: [react(), tailwindcss()],
+  cacheDir: fileURLToPath(new URL('../../target/vite-settings', import.meta.url)),
   // Resolve optimized imports before shutdown; speculative transforms otherwise
   // wait for crawl completion while the dependency optimizer is being cancelled.
   optimizeDeps: { holdUntilCrawlEnd: false },
-  resolve: { alias: { '@': fileURLToPath(new URL('.', import.meta.url)) } },
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+    alias: { '@': fileURLToPath(new URL('.', import.meta.url)) },
+  },
   server: {
     host: '127.0.0.1',
     proxy: {

@@ -1,6 +1,6 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
 // [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
-// [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文；独立模型控制 API、页面与窗口租约共用鉴权。
+// [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文；认证状态携带 Dev 设置地址供旧入口跳转；独立模型控制 API、页面与窗口租约共用鉴权。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -220,7 +220,7 @@ async fn state(State(service): State<Service>) -> impl IntoResponse {
 }
 
 fn public_view(view: crate::state::View) -> Value {
-    json!({"version":view.version,"connection":view.connection,"model":view.model,"updatedAt":view.updated_at,
+    json!({"settingsUrl":crate::assets::settings_url(),"version":view.version,"connection":view.connection,"model":view.model,"updatedAt":view.updated_at,
         "desktop":view.desktop,"configurationRevision":view.configuration_revision,
         "panelPreferences":view.panel_preferences,"panelTheme":view.panel_theme,"panelFontBase":view.panel_font_base})
 }

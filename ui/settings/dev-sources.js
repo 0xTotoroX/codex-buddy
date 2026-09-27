@@ -28,12 +28,15 @@ let active = '',
   pending = false,
   polling = false;
 async function api(body) {
+  if (!token) throw new Error('缺少连接凭据，请从工作台齿轮或 npm run dev:settings 重新打开。');
   const response = await fetch('/api/dev/sources', {
     method: body === undefined ? 'GET' : 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const result = await response.json();
+  if (response.status === 401)
+    throw new Error('连接凭据已过期，请从工作台齿轮或 npm run dev:settings 重新打开。');
+  const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.message || '开发来源暂时不可用');
   return result;
 }
@@ -77,6 +80,9 @@ async function refresh() {
   try {
     render(await api());
   } catch (error) {
+    summary.textContent = '开发来源 · 无法连接';
+    view.querySelector('details').open = true;
+    select.disabled = button.disabled = true;
     state.textContent = error.message;
   } finally {
     polling = false;

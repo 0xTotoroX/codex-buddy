@@ -7,7 +7,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 成员清单：
 
 - [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，首次后台执行带 --restart-running 的开发流程，日志写入 launcher.log；按开发配置（首次回退日常配置）的策略准备无连接宿主；重复打开按 session 中所选来源唤起工作台，dev:settings 打开固定开发设置地址；失联重连原目标，失败显式提示，并发启动的失败记录不干扰已取得占用的会话；--stop 校验进程身份后正常退出后台会话。Applet 启动期间显示 Dock 图标，经 AppKit 协作交接焦点后退出；连接成功后的前台切换失败仅发系统通知，通知异常不升级为弹窗；不更新日常安装，复用 launcher 的图标生成。
-- [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退，独立模型控制资源变化随原生后台重建；持有宿主目标与所选 worktree 租约，固定设置服务地址，先编译后交接来源、失败回退，切换 Vite/监听/后台而不重启宿主；启动前先发现可调试宿主；显式 --restart-running 时先构建当前 CLI，再通过 host-only 模式准备宿主，仅在接管安装版后启用退出恢复，含占用获取和初始化在内的失败原因与进程 ID 写入私有 launcher-error.json，退出只清理本次会话记录；Ctrl+C 清理自身进程并恢复安装版连接。
+- [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退，独立模型控制资源变化随原生后台重建；持有宿主目标与所选 worktree 租约，先绑定统一设置服务地址再传给开发后台齿轮，每个来源独立 Vite 缓存并去重 React；先编译后交接来源、失败回退，切换 Vite/监听/后台而不重启宿主；启动前先发现可调试宿主；显式 --restart-running 时先构建当前 CLI，再通过 host-only 模式准备宿主，仅在接管安装版后启用退出恢复，含占用获取和初始化在内的失败原因与进程 ID 写入私有 launcher-error.json，退出只清理本次会话记录；Ctrl+C 清理自身进程并恢复安装版连接。
 - [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 MIT 许可的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
 - [material-preview.swift](material-preview.swift)：14 种 NSVisualEffectView 材质的原生并排对照；独立背景窗口提供重复图案，统一切换外观、焦点状态与背景，支持真实桌面采样；标题栏固定不透明底色并跟随预览明暗。
 - [dev-host.mjs](dev-host.mjs)：选择真实窗口与宿主启动配置（开发优先、首次继承日常），仅无宿主且显式授权自动准备时调用共享启动器，指定目标或歧义不触发重开；首次复制独立开发配置，暂停并恢复安装版连接；新目标已发现且旧目标不可用时将旧恢复记录保留为带唯一后缀的归档，不将安装版改连新聊天；API 错误保留后端原因；不创建浏览器或修改官方应用。

@@ -1,13 +1,14 @@
 /*
  * [INPUT]: 启动令牌、React 与本机认证 API/SSE。
  * [OUTPUT]: 公开数据类型、request 与 useCompanion 状态订阅。
- * [POS]: 网页通信层，启动令牌移入当前标签页存储。
+ * [POS]: 网页通信层，启动令牌移入当前标签页存储；认证状态中的 Dev 地址将普通设置入口导向监督进程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import { useEffect, useState } from 'react';
 import type { AppearanceSettings } from '../contracts';
 export interface View {
+  settingsUrl?: string | null;
   version: string;
   connection: {
     status: 'disconnected' | 'connecting' | 'connected' | 'incompatible';
@@ -71,7 +72,7 @@ export function useCompanion() {
   const [error, setError] = useState('');
   useEffect(() => {
     if (!token) {
-      setError('请运行 codex-buddy start，从启动链接打开面板。');
+      setError('缺少连接凭据，请从工作台齿轮重新打开设置；Dev 也可运行 npm run dev:settings。');
       return;
     }
     const controller = new AbortController();
@@ -86,7 +87,9 @@ export function useCompanion() {
           });
           if (response.status === 401) {
             setLive(false);
-            setError('连接凭据已过期，请运行 codex-buddy start 重新打开。');
+            setError(
+              '连接凭据已过期，请从工作台齿轮重新打开设置；Dev 也可运行 npm run dev:settings。',
+            );
             return;
           }
           if (!response.ok || !response.body) throw new Error('服务连接暂时中断');
@@ -110,7 +113,14 @@ export function useCompanion() {
                   .filter((line) => line.startsWith('data:'))
                   .map((line) => line.slice(5).trimStart())
                   .join('\n');
-                if (data) setView(JSON.parse(data) as View);
+                if (data) {
+                  const next = JSON.parse(data) as View;
+                  if (next.settingsUrl && new URL(next.settingsUrl).origin !== location.origin) {
+                    location.replace(next.settingsUrl);
+                    return;
+                  }
+                  setView(next);
+                }
               }
             }
           } finally {

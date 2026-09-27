@@ -1,7 +1,7 @@
 /*
  * [INPUT]: Git worktrees、Rust/Node、来源选择器与独立开发数据目录。
  * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，安全恢复失效租约，含占用检查在内的启动错误传回 App。
- * [POS]: 持久开发编排与设置入口；持有目标租约并串行交接 worktree，管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
+ * [POS]: 持久开发编排与统一设置入口；先绑定稳定地址供后台齿轮打开，各来源隔离 Vite 缓存；持有目标租约并串行交接 worktree，管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import {
@@ -80,6 +80,9 @@ function context(path) {
     CARGO_TARGET_DIR: join(path, 'target'),
     CODEX_BUDDY_HOME: data,
     CODEX_BUDDY_DEV_ASSETS: snapshot,
+    ...(settingsUrl
+      ? { CODEX_BUDDY_DEV_SETTINGS: `${settingsUrl}/#token=${encodeURIComponent(token)}` }
+      : {}),
   };
   delete env.CODEX_BUDDY_PANEL_TEST;
   return {
@@ -287,6 +290,8 @@ function stopWatchers() {
 async function startSettings() {
   vite = await createServer({
     configFile: join(root, 'ui/settings/vite.config.ts'),
+    cacheDir: join(directory, 'vite'),
+    resolve: { dedupe: ['react', 'react-dom'] },
     plugins: [
       {
         name: 'buddy-dev-source',
@@ -570,10 +575,6 @@ try {
       }
     },
   });
-  await buildDevPanel(root, snapshot);
-  if (!existsSync(join(root, 'target/web/index.html'))) await execute('npm', ['run', 'build:web']);
-  await rebuildNative();
-  if (closing) throw new Error('开发模式退出中');
   process.env.CODEX_BUDDY_DEV_API = gateway.origin;
   httpServer = createHttpServer((request, response) => {
     if (request.url === '/__buddy_dev.js') {
@@ -592,6 +593,11 @@ try {
     httpServer.listen(0, '127.0.0.1', resolve);
   });
   const url = (settingsUrl = `http://127.0.0.1:${httpServer.address().port}`);
+  env.CODEX_BUDDY_DEV_SETTINGS = `${settingsUrl}/#token=${encodeURIComponent(token)}`;
+  await buildDevPanel(root, snapshot);
+  if (!existsSync(join(root, 'target/web/index.html'))) await execute('npm', ['run', 'build:web']);
+  await rebuildNative();
+  if (closing) throw new Error('开发模式退出中');
   saveSession();
   if (args.source) writeFileSync(preference, JSON.stringify({ path: root }), { mode: 0o600 });
   console.log(
