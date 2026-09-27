@@ -13,10 +13,15 @@ const root = resolve(import.meta.dirname, '..');
 export async function buildPanel(projectRoot = root, development = false) {
   const result = await build({
     absWorkingDir: projectRoot,
+    nodePaths: [resolve(root, 'node_modules')],
     entryPoints: ['ui/panel/runtime/lifecycle.js'],
     loader: { '.css': 'text' },
+    jsx: 'automatic',
     bundle: true,
-    define: { CODEX_BUDDY_DEVELOPMENT: String(development) },
+    define: {
+      CODEX_BUDDY_DEVELOPMENT: String(development),
+      'process.env.NODE_ENV': '"production"',
+    },
     format: 'iife',
     target: 'safari17',
     write: false,

@@ -130,6 +130,8 @@ function blinkHandoff() {
 
 function applyWorkbenchPreferences(ui) {
   shellState.layoutMode = ui.layoutMode === 'workbench' ? 'workbench' : 'capsule';
+  shellState.feature =
+    ui.feature === 'outline' || ui.feature === 'board' ? ui.feature : 'workbench';
   shellState.dockWidth = clamp(Number(ui.dockWidth) || 340, 300, 460);
   shellState.splitRatio = clamp(Number(ui.splitRatio) || 0.45, 0.2, 0.8);
   shellState.dockLayout = normalizeWorkbenchLayout(ui.dockLayout, shellState.splitRatio);
@@ -206,6 +208,7 @@ function readingState(viewToken) {
   return {
     viewToken,
     contentToken: readingContentToken(shellState.activeTab),
+    taskView: { ...shellState.taskView },
     activeTab: shellState.activeTab,
     scrollTop: readWorkbenchScroll(body),
     promptPreviewIndex: Number(shellState.promptPreviewIndex) || 0,
@@ -230,7 +233,7 @@ function readingState(viewToken) {
 
 function panelReadingState() {
   const viewToken = IS_POPOUT ? shellState.remoteSource?.viewToken : exportPanelState()?.viewToken;
-  return viewToken ? readingState(viewToken) : null;
+  return viewToken || shellState.feature === 'board' ? readingState(viewToken || '') : null;
 }
 
 function validReadingState(value, viewToken) {
@@ -246,7 +249,18 @@ function validReadingState(value, viewToken) {
 }
 
 function applyReadingSelection(value, viewToken) {
-  if (!validReadingState(value, viewToken)) return false;
+  let restoredTasks = false;
+  if (
+    value?.taskView &&
+    typeof value.taskView.search === 'string' &&
+    ['board', 'archive', 'attention'].includes(value.taskView.tab) &&
+    ['todo', 'doing', 'waiting', 'done'].includes(value.taskView.stage)
+  ) {
+    shellState.featureCleanup?.();
+    Object.assign(shellState.taskView, value.taskView);
+    restoredTasks = true;
+  }
+  if (!validReadingState(value, viewToken)) return restoredTasks;
   shellState.activeTab = normalizeActiveTab(value.activeTab);
   shellState.restoringWorkbench = Boolean(value.panes);
   shellState.promptPreviewIndex = clamp(
@@ -598,7 +612,7 @@ function panelWindowControls({ includePin = true, includeToggle = true } = {}) {
   return `${pin}<button class="csw-icon" type="button" data-action="detach" title="${label}" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
 }
 
-async function togglePanelWindow() {
+async function togglePanelWindow(options = {}) {
   if (IS_POPOUT && shellState.detachPending) {
     POPOUT.cancelDock?.();
     return;
@@ -608,7 +622,7 @@ async function togglePanelWindow() {
   shellState.detachPending = true;
   emitSignal('render', undefined);
   try {
-    if (IS_POPOUT) await POPOUT.dock();
+    if (IS_POPOUT) await POPOUT.dock(options);
     else {
       const result = await bridgeCall('/panel/detach', { ui: panelPreferences() });
       if (result.error) throw new Error(result.error);

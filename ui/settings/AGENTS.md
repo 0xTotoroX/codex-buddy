@@ -22,3 +22,6 @@ main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责�
 - [components/ui/AGENTS.md](components/ui/AGENTS.md)：本地 shadcn/ui 基础组件，页面功能通过 props 组合；保留上游 MIT 许可。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+- [task-settings.tsx](task-settings.tsx)：任务看板和 Apple 同步独立开关、授权、同账户三列表创建、显式绑定及仅失效列表的确认修复；不修改模型快切与胶囊偏好。
+- [board.html](board.html)：独立任务看板 HTML 入口；Vite 多入口构建输出 board.html 和共享资源，页面业务位于 ../board。

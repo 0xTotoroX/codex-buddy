@@ -548,3 +548,40 @@
     transition: none;
   }
 }
+
+.csw-feature-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px 8px;
+  flex: none;
+  border-bottom: 1px solid var(--csw-border);
+}
+.csw-feature-controls label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: var(--csw-muted);
+}
+.csw-feature-controls select {
+  max-width: 112px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 4px;
+}
+.csw-board-mount {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.csw-board-mount[hidden] {
+  display: none;
+}
+.csw-workbench[data-feature='outline'] [data-pane-focus] {
+  cursor: default;
+}

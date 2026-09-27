@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
- * [OUTPUT]: target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
+ * [OUTPUT]: --features-only 验证真实 Wry 的大纲/看板切换与响应式任务视图；target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
  * [POS]: --header-only 免鼠标权限验证三材质透明头部和实际置顶层级；原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
  * 设置验收使用公共头部入口与实际设置区可见性，不依赖旧 activeTab。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -17,8 +17,9 @@ if (process.platform !== 'darwin')
   throw Error('Native backdrop acceptance requires macOS and Screen Recording permission.');
 const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
+const featuresOnly = process.argv.includes('--features-only');
 const headerOnly = process.argv.includes('--header-only');
-const workbenchOnly = headerOnly || process.argv.includes('--workbench-only');
+const workbenchOnly = featuresOnly || headerOnly || process.argv.includes('--workbench-only');
 const genieOnly = process.argv.includes('--genie-only');
 const chipAnchor = genieOnly && process.argv.includes('--chip-anchor');
 const crossScreen = genieOnly && process.argv.includes('--cross-screen');
@@ -29,23 +30,25 @@ const dir = mkdtempSync(join(tmpdir(), 'buddy-native-'));
 const output =
   root +
   '/target/reports/' +
-  (workbenchOnly
-    ? headerOnly
-      ? 'native-header'
-      : 'native-workbench'
-    : genieOnly
-      ? crossScreen
-        ? reverseScreens
-          ? 'native-genie-cross-reverse'
-          : 'native-genie-cross'
-        : chipAnchor
-          ? 'native-genie-chip'
-          : 'native-genie'
-      : motionOnly
-        ? 'native-motion'
-        : appearanceOnly
-          ? 'native-appearance'
-          : 'native');
+  (featuresOnly
+    ? 'native-features'
+    : workbenchOnly
+      ? headerOnly
+        ? 'native-header'
+        : 'native-workbench'
+      : genieOnly
+        ? crossScreen
+          ? reverseScreens
+            ? 'native-genie-cross-reverse'
+            : 'native-genie-cross'
+          : chipAnchor
+            ? 'native-genie-chip'
+            : 'native-genie'
+        : motionOnly
+          ? 'native-motion'
+          : appearanceOnly
+            ? 'native-appearance'
+            : 'native');
 mkdirSync(output, { recursive: true });
 rmSync(join(output, 'report.json'), { force: true });
 const helper = join(dir, 'native-probe');
@@ -123,6 +126,35 @@ if (workbenchOnly) {
     labelText: `合成大纲条目 ${i + 1}`,
   }));
 }
+const taskState = {
+  store: {
+    revision: 1,
+    boardEnabled: true,
+    syncEnabled: false,
+    bindings: { todo: '', doing: '', waiting: '' },
+    inflight: null,
+    tasks: [
+      {
+        id: 'native-pilot',
+        fields: {
+          title: '原生试点任务',
+          notes: '',
+          due: null,
+          priority: 0,
+          column: 'todo',
+          completed: false,
+        },
+        archived: false,
+        deleteRequested: false,
+        remote: null,
+        remoteMissing: false,
+        conflict: null,
+      },
+    ],
+  },
+  status: '同步已暂停',
+  error: null,
+};
 const events = [];
 const requests = [];
 const script = await buildPanel();
@@ -175,6 +207,17 @@ function probePage() {
           viewport: [innerWidth, innerHeight],
           activeTab: current?.activeTab,
           commandId: window.probeCommandId,
+          feature: workbench?.dataset.feature,
+          board: (() => {
+            const board = workbench?.querySelector('.csw-board-mount')?.shadowRoot;
+            return board
+              ? {
+                  text: board.textContent,
+                  narrow: !!board.querySelector('[aria-label="任务阶段"]'),
+                  search: board.querySelector('input[type="search"]')?.value,
+                }
+              : null;
+          })(),
           workbench: workbench && {
             composition: workbench.dataset.composition,
             layoutMode: current?.layoutMode,
@@ -240,6 +283,18 @@ function probePage() {
         }),
       });
       for (const cmd of await response.json()) {
+        if (cmd.kind === 'feature') {
+          const select = document.querySelector('[aria-label="显示功能"]');
+          select.value = cmd.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        if (cmd.kind === 'board-stage') {
+          const select = document
+            .querySelector('.csw-board-mount')
+            .shadowRoot.querySelector('select[aria-label="移动 原生试点任务"]');
+          select.value = 'doing';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
         if (cmd.kind === 'workbench-layout')
           document
             .querySelector(`[data-layout-mode="${cmd.value}"], [data-layout-action="${cmd.value}"]`)
@@ -336,6 +391,19 @@ const server = createServer(async (req, res) => {
     telemetry = data;
     events.push(data);
     res.end(JSON.stringify(commands.splice(0)));
+    return;
+  }
+  if (req.url === '/api/tasks/state' || req.url === '/api/tasks/command') {
+    if (req.url.endsWith('command')) {
+      if (data.op !== 'update' || data.revision !== taskState.store.revision) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ message: 'Unexpected native pilot command' }));
+        return;
+      }
+      taskState.store.tasks[0].fields = data.fields;
+      taskState.store.revision++;
+    }
+    res.end(JSON.stringify(taskState));
     return;
   }
   if (req.url === '/api/panel/request') {
@@ -438,7 +506,59 @@ try {
     () => telemetry?.active && telemetry?.sourceTheme && telemetry?.rect?.width > 300,
     'no native panel',
   );
-  if (workbenchOnly) {
+  if (featuresOnly) {
+    let commandId = 0;
+    const command = async (value) => {
+      commands.push({ ...value, id: ++commandId });
+      await waitFor(() => telemetry?.commandId === commandId, 'feature command not acknowledged');
+    };
+    await command({ kind: 'feature', value: 'outline' });
+    await waitFor(
+      () =>
+        telemetry.feature === 'outline' &&
+        telemetry.workbench.panes.outline.visible &&
+        !telemetry.workbench.panes.next.visible,
+      'outline view missing',
+    );
+    const outline = telemetry.workbench.panes.outline;
+    await command({ kind: 'feature', value: 'board' });
+    await waitFor(() => telemetry.board?.text.includes('原生试点任务'), 'native board missing');
+    await command({ kind: 'board-stage' });
+    await waitFor(
+      () => taskState.store.tasks[0].fields.column === 'doing',
+      'native task command missing',
+    );
+    const sizes = [];
+    for (const width of [940, 424]) {
+      await command({ kind: 'viewport', width, height: 624 });
+      await waitFor(
+        () => telemetry.viewport[0] === width && telemetry.board?.narrow === width < 680,
+        'native board responsive layout',
+      );
+      const native = windows().find((w) => Math.abs(w.kCGWindowBounds.Width - width) <= 1);
+      if (!native) throw Error('Native window and board viewport differ');
+      sizes.push({
+        viewport: telemetry.viewport,
+        native: native.kCGWindowBounds,
+        narrow: telemetry.board.narrow,
+      });
+    }
+    await command({ kind: 'feature', value: 'outline' });
+    await waitFor(
+      () => telemetry.feature === 'outline' && telemetry.workbench.panes.outline.visible,
+      'outline return missing',
+    );
+    if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
+    writeFileSync(
+      join(output, 'report.json'),
+      JSON.stringify(
+        { artifact, scope: 'features-only', outline, sizes, taskState, telemetry },
+        null,
+        2,
+      ),
+    );
+    rmSync(join(output, 'failure.json'), { force: true });
+  } else if (workbenchOnly) {
     let commandId = 0;
     const command = async (value) => {
       commands.push({ ...value, id: ++commandId });

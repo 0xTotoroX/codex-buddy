@@ -320,6 +320,7 @@ impl App {
         fields.extend(json!({
             "hostRestartPolicy": config.host_restart_policy,
             "popoutSupported": self.panel.lock().await.popout_supported,
+            "taskBoardEnabled": self.tasks.board_enabled().await,
             "provider": model.provider, "model": model.name,
             "baseUrl": model.base_url, "available": info.available, "reason": info.reason,
             "apiKeyConfigured": model.has_key() || model.provider == "codex" && info.available,

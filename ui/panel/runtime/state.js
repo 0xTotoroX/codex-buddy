@@ -249,6 +249,8 @@ function createShellState(preferences) {
     activeTab: 'next',
     layoutMode: /** @type {'capsule'|'workbench'} */ ('capsule'),
     dockWidth: 340,
+    feature: /** @type {'workbench'|'outline'|'board'} */ ('workbench'),
+    taskView: { search: '', stage: 'todo', tab: 'board' },
     splitRatio: 0.45,
     dockLayout: normalizeWorkbenchLayout(null),
     popoutLayout: normalizeWorkbenchLayout(null),
@@ -334,7 +336,12 @@ function outlineEnabled(settings = runtimeState.settings) {
 }
 
 function runtimeEnabled(settings = runtimeState.settings) {
-  return IS_POPOUT || stepwiseEnabled(settings) || outlineEnabled(settings);
+  return (
+    IS_POPOUT ||
+    settings?.taskBoardEnabled === true ||
+    stepwiseEnabled(settings) ||
+    outlineEnabled(settings)
+  );
 }
 
 function enabledViewOrder() {

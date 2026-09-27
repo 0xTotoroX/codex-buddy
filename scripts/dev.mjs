@@ -250,7 +250,13 @@ async function flush() {
 }
 function changed(path) {
   if (path.endsWith('.md') || path.endsWith('.log')) return;
-  if (path === 'ui/tokens.css' || path.startsWith('ui/panel/') || path.startsWith('ui/bridge/'))
+  if (
+    path === 'ui/tokens.css' ||
+    path.startsWith('ui/panel/') ||
+    path.startsWith('ui/bridge/') ||
+    path.startsWith('ui/board/') ||
+    path === 'ui/settings/api.ts'
+  )
     pendingPanel = true;
   if (
     path.startsWith('src/') ||

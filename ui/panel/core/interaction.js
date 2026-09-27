@@ -580,6 +580,11 @@ function onGlassClick(event) {
 }
 
 function onKeyDown(event) {
+  // Shadow DOM retargets inputs to the mount; let the board own its keyboard.
+  if (
+    event.composedPath().some((node) => node instanceof Element && node.matches('.csw-board-mount'))
+  )
+    return;
   if (
     event.altKey &&
     event.key === 'Enter' &&

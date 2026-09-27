@@ -1,5 +1,5 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
-// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
+// [OUTPUT]: serve、认证任务 API、HTTP/SSE API、设置页、看板和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
 // [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文；独立模型控制 API、页面与窗口租约共用鉴权。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -92,6 +92,7 @@ pub async fn serve(
     };
     let router = router(state);
     let watcher = app.clone().supervise();
+    let task_watcher = app.tasks.start();
     tracing::info!(port, "CodexBuddy 本地服务启动");
     let shutdown_app = app.clone();
     let result = axum::serve(listener, router)
@@ -101,6 +102,8 @@ pub async fn serve(
         })
         .await;
     watcher.abort();
+    task_watcher.abort();
+    app.tasks.stop().await;
     app.disconnect().await;
     if let Ok(current) = Runtime::read(&paths)
         && current.token == runtime.token
@@ -118,6 +121,8 @@ async fn termination() {
 
 fn router(service: Service) -> Router {
     let api = Router::new()
+        .route("/tasks/state", get(tasks_state))
+        .route("/tasks/command", post(tasks_command))
         .route("/state", get(state))
         .route(
             "/development",
@@ -732,4 +737,20 @@ async fn save_appearance(
 }
 async fn close_panel(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_panel().await?))
+}
+
+async fn tasks_state(State(service): State<Service>) -> Json<Value> {
+    Json(service.app.tasks.state().await)
+}
+async fn tasks_command(
+    State(service): State<Service>,
+    Json(command): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let modules_changed = command["op"] == "modules";
+    let result = service.app.tasks.command(command).await?;
+    if modules_changed {
+        let settings = service.app.settings().await;
+        service.app.sync_desktop_settings(&settings).await;
+    }
+    Ok(Json(result))
 }

@@ -20,6 +20,8 @@ test('panel boundaries and fixtures pass every checkJs diagnostic', () => {
     allowJs: true,
     checkJs: true,
     noEmit: true,
+    jsx: ts.JsxEmit.ReactJSX,
+    esModuleInterop: true,
     target: ts.ScriptTarget.ESNext,
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,

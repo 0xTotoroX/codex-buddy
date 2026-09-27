@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { showRetainedSettings } from './workbench-actions.mjs';
+import { featureSurfaceCases } from './feature-surfaces.mjs';
 import { chatBindingCases } from './workbench-binding.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -325,6 +326,12 @@ async function createPopout(host, preserveSnapshot = false) {
       notice: (message) => window.popoutFixture.unexpected.push(message),
     };
   }, fixtureSettings);
+  await page.exposeFunction('pilotTaskRequest', (path, body) =>
+    host.evaluate(({ path, body }) => window.pilotTasks(path, body), { path, body }),
+  );
+  await page.evaluate(() => {
+    window.__companionPopout.taskRequest = (path, body) => window.pilotTaskRequest(path, body);
+  });
   await page.evaluate(bundle);
   await page.addStyleTag({
     content: readFileSync(resolve(root, 'ui/panel/popout/native.css'), 'utf8'),
@@ -392,6 +399,7 @@ async function chooseLayout(page, action) {
 }
 
 const cases = [
+  ...featureSurfaceCases({ mode, createPopout, settle, output, bundle }),
   [
     'slim capsule restores either saved in-chat placement with neutral keyboard focus',
     async (page) => {

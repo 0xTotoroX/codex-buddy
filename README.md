@@ -26,6 +26,8 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 | Docked workbench | Show the outline and suggestions together without covering the chat; use automatic, vertical, or horizontal layouts, drag panels, group tabs, or focus one panel; remember docked and desktop layouts separately |
 | Desktop window | On macOS 15+, pop out and return to the embedded panel, move and resize the window, or keep it on top |
 | Model quick switch | Use a separate screen-edge control to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
+| Task board | Independent resizable four-column window, drag-and-drop, task editing and local archive |
+| Apple Reminders sync | Optional two-way sync with three selected lists in the same iCloud account; explicit conflict and recovery handling |
 | Reading and appearance | Choose materials, font size, and summary visibility, with saved preferences |
 | Your choice of model | Use an existing Codex login or connect your own model API |
 
@@ -46,6 +48,20 @@ Inside Codex, click the face to expand or collapse the workbench. Double-click i
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
+
+## Task board and Apple Reminders
+
+Open **任务看板与提醒事项** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.
+
+To sync, grant macOS access, choose or create three writable lists in one iCloud account, confirm the account, save the bindings, then enable sync. “To do”, “Doing” and “Waiting” map to those lists; completed reminders share one Done view. Only selected lists are read. Existing valid list bindings stay locked. If a list becomes unavailable, pause sync and explicitly repair only the failed bindings; original tasks and recovery records are retained. iCloud/device delivery is handled by Apple; Buddy catches up when running on the Mac.
+
+Titles, notes, due dates, priorities, list moves and completion are synchronized. Dates do not automatically create notification alarms. Native sections, tags, attachments and precise Apple ordering are not synchronized. Recurring reminders are shown read-only; edit them in Reminders. Archiving only hides the local card. Permanent deletion explicitly affects both sides. Missing remote items keep local recovery records; conflicting fields require a choice, and uncertain creates are not automatically repeated.
+
+Task content stays local and is never sent to a model. An internal **CodexBuddy Reminders** helper owns the system permission. Native helper input changes can require renewed authorization; UI-only rebuilds reuse the verified helper; production signing and cross-device delivery require separate release acceptance.
+
+### Feature and placement pilot
+
+In the expanded workbench, choose Outline or Board with the feature selector, then choose sidebar, page overlay, or desktop window. The existing two-pane workbench remains the default. The pilot has one active feature container, not independent simultaneous placements. Narrow boards show stage tabs; wide windows show columns. Reminder sync is independent of placement.
 
 ## Operations and state transitions
 

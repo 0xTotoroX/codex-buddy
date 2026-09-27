@@ -27,3 +27,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
 内嵌液态：build-panel 在正式与开发构建中追加 ui/panel/glass/lab.js，且只在非弹出页面启动；dev-panel 的只读测量记录实际渲染路径和阶段，不记录画面或错误文本。SVG 无第三方渲染依赖；third-party-notices 继续收集现用依赖及 shadcn/ui、OpenAI apps-sdk-ui 图标的许可。
+
+任务看板由现有 Vite 多入口和 RustEmbed 随程序分发。verify 运行 board.mjs；提醒事项原生辅助 App 按需由程序在自身数据目录创建，不要求安装额外 CLI 或模型服务。
+
+胶囊 bundle 包含独立任务 React 视图；build-panel 使用现有 React 自动 JSX 转换和隔离样式文本。dev-panel 将 ui/board（含内嵌 CSS）及任务客户端计入逻辑指纹，dev 监听并重建；通用 panel CSS 仍原位更新。

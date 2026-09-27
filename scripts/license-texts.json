@@ -259,6 +259,10 @@
         {
           "name": "objc2-web-kit",
           "version": "0.3.2"
+        },
+        {
+          "name": "objc2-event-kit",
+          "version": "0.3.2"
         }
       ],
       "files": [

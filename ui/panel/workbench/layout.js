@@ -90,6 +90,7 @@ export function attachWorkbenchRoot() {
   if (!IS_POPOUT) dock?.attachRoot(shellState.root);
 }
 export function stopWorkbench() {
+  shellState.featureCleanup?.();
   shellState.workbenchLayoutCleanup?.();
   shellState.workbenchLayoutCleanup = null;
   shellState.panel?.querySelector('.csw-workbench')?.remove();

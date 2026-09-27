@@ -23,3 +23,5 @@ state 从独立宿主存储恢复聊天关联元数据；presentation 投影来�
 双面板阅读投影依据当前实际 workbench DOM，不再由旧 layoutMode 决定；胶囊偏好弹出后同样接续两面板阅读，返回仍恢复出发形态。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+state 的 feature 仅决定活动视图，runtimeEnabled 依据真实功能开关；taskView 保存任务搜索/阶段/页签，与聊天 token 无关。presentation 独立接续 taskView，大纲仍检查原阅读 token。windowToggle 的可选 expand 只用于显式选择返回承载形式，旧手势保持原行为。

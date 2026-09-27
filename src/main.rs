@@ -1,4 +1,4 @@
-// [INPUT]: CLI 参数以及 config/lifecycle/server/panel_window/model_control 模块。
+// [INPUT]: CLI 参数以及 config/lifecycle/server/panel_window/model_control/tasks 模块。
 // [OUTPUT]: codex-buddy 命令分发与进程入口；launch --host-only 供开发入口仅准备宿主。
 // [POS]: 独立可执行文件入口，区分后台和窗口子进程。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -21,6 +21,7 @@ mod settings;
 mod state;
 #[cfg(test)]
 mod stepwise_tests;
+mod tasks;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -37,6 +38,20 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(hide = true)]
+    RemindersWorker {
+        #[arg(long)]
+        lease: String,
+        #[arg(long)]
+        runtime_token: String,
+    },
+    #[command(hide = true)]
+    BoardWindow {
+        #[arg(long)]
+        lease: String,
+    },
+    #[command(about = "打开独立任务看板")]
+    Board,
     #[command(about = "将胶囊弹出到桌面，复用后台与当前连接")]
     Popout,
     #[command(about = "打开独立模型控制条，保留工作台和宿主当前任务")]
@@ -122,6 +137,18 @@ async fn main() -> Result<()> {
         no_open: false,
         allow_fixture: false,
     }) {
+        Commands::RemindersWorker {
+            lease,
+            runtime_token,
+        } => tasks::native::run(&paths, &lease, &runtime_token),
+        Commands::BoardWindow { lease } => tasks::window::run(&paths, &lease),
+        Commands::Board => {
+            lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;
+            lifecycle::Runtime::read(&paths)?
+                .request("tasks/command", Some(serde_json::json!({"op":"open"})))
+                .await?;
+            Ok(())
+        }
         Commands::ModelControlWindow { lease } => model_control_window::run(&paths, &lease),
         Commands::ModelControl => {
             lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;

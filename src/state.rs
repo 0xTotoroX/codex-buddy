@@ -1,6 +1,6 @@
 // [INPUT]: CDP Client、Config、Model 与胶囊状态摘要。
 // [OUTPUT]: App、View、连接与无正文胶囊状态；退出信号取消模型请求，开发模式锁定启动窗口。
-// [POS]: 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
+// [POS]: 持有独立 tasks 服务； 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -61,6 +61,7 @@ struct Desired {
 }
 
 pub struct App {
+    pub tasks: Arc<crate::tasks::Service>,
     pub views: watch::Sender<View>,
     pub shutdown: Notify,
     pub closing: watch::Sender<bool>,
@@ -114,6 +115,7 @@ impl App {
             panel_font_base: 13.,
         });
         Arc::new(Self {
+            tasks: crate::tasks::Service::load(&paths),
             views,
             shutdown: Notify::new(),
             closing: watch::channel(false).0,

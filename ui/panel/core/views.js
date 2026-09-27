@@ -348,6 +348,7 @@ function renderFloat(options = {}) {
   const tone = statusToneForView(expression);
   const paneCue = activePaneCue();
   const viewTabs = enabledViewOrder().map(viewTabHtml).join('');
+  shellState.featureCleanup?.();
   shellState.panel.innerHTML = `
       <div class="csw-head">
         <div class="csw-head-side csw-head-left">

@@ -77,15 +77,17 @@ export async function buildDevPanel(root, output) {
   const inputs = [
     ...filesUnder(root, 'ui/panel'),
     ...filesUnder(root, 'ui/bridge'),
+    ...filesUnder(root, 'ui/board'),
+    'ui/settings/api.ts',
     'ui/tokens.css',
   ];
   const code = fingerprint(
     root,
-    inputs.filter((file) => !file.endsWith('.css')),
+    inputs.filter((file) => !file.endsWith('.css') || file.startsWith('ui/board/')),
   );
   const styles = fingerprint(
     root,
-    inputs.filter((file) => file.endsWith('.css')),
+    inputs.filter((file) => file.endsWith('.css') && !file.startsWith('ui/board/')),
   );
   const html = readFileSync(join(root, 'ui/panel/popout/index.html'), 'utf8');
   const boot = readFileSync(join(root, 'ui/panel/popout/boot.js'), 'utf8');

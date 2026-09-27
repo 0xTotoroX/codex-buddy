@@ -54,6 +54,8 @@ import { setOpen } from '../core/geometry.js';
 import { installAssociation, updateAssociation } from './association.js';
 import { installArrangement } from './arrangement.js';
 
+import { installFeatureControls, updateFeatureControls } from './features.js';
+
 const arrangements = new WeakMap();
 const paneContent = new WeakMap();
 const layoutKey = IS_POPOUT ? 'popoutLayout' : 'dockLayout';
@@ -161,6 +163,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section><button hidden data-legacy-settings aria-label="旧版内置设置"></button>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
     </div>`;
+    installFeatureControls(panel.querySelector('.csw-workbench'));
     installAssociation(panel.querySelector('.csw-workbench-head'));
     panel.querySelector('.csw-workbench-face').addEventListener('click', onWorkbenchFaceClick);
     for (const pane of registry) {
@@ -368,6 +371,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       writeWorkbenchScroll(preview, restored.previewTop);
     }
   }
+  updateFeatureControls(root);
   alignOutlineNestedText();
   updateSplit();
   applyMaterial({ animate: false });
@@ -428,7 +432,7 @@ function updateSplit() {
     if (focused instanceof HTMLElement && panes.contains(focused))
       focused.focus({ preventScroll: true });
   }
-  const focused = arrangement?.focused;
+  const focused = shellState.feature === 'outline' ? 'outline' : arrangement?.focused;
   const tabs = preference.group === 'tabs' && !focused;
   const single = Boolean(focused) || tabs;
   tabbar.hidden = !tabs;

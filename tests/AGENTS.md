@@ -75,3 +75,8 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 设置页端到端回归覆盖大纲在桌面/窄屏的跳转、当前项跟随、键盘与深链接，以及内嵌 Codex 主题写入入口移除。
 
 主题回归覆盖宿主与系统明暗相反时的浮窗和模型快切、纯黑固定配色及其他三材质的收起/展开/选中/悬停/焦点配色；Web 设置保持浏览器主题。
+
+- [board.mjs](board.mjs)：隔离任务服务的认证、创建编辑、键盘阶段选择、拖拽、归档、重启恢复、修订冲突和明确删除；渲染浅色/深色/窄窗口证据到 target/reports/board，绝不授权或写入真实提醒事项。
+
+- [feature-surfaces.mjs](feature-surfaces.mjs)：由 workbench.mjs 执行的功能/容器试点，验证状态接续、任务唯一性、独立开关、轮询回收、Shadow DOM 键盘及宿主断连后任务编辑；使用合成任务，不访问 EventKit。
+- native-check.mjs 的 --features-only 在真实 Wry/AppKit 窗口中验证大纲/看板选择、任务更新及宽窄布局，报告位于 target/reports/native-features；不连接用户聊天或提醒事项。

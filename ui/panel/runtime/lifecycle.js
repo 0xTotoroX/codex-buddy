@@ -361,6 +361,7 @@ function stopRuntime() {
   outlineState.outlineFingerprint = '';
   outlineState.outlineStatus = 'idle';
   outlineState.outlineError = '';
+  shellState.featureCleanup?.();
   shellState.root?.remove();
   shellState.root = null;
   shellState.fab = null;
@@ -422,6 +423,7 @@ function activateRuntime() {
 }
 
 function destroy() {
+  shellState.featureCleanup?.();
   clearTimeout(shellState.detachedRecoveryTimer);
   if (!IS_POPOUT) sessionStorage.removeItem(DETACHED_KEY);
   runtimeState.destroyed = true;
@@ -517,7 +519,7 @@ function install() {
     onSignal('generationControl', ({ mode, busy }) => updateGenerationModeControl(mode, busy)),
     onSignal('verify', () => scan()),
     onSignal('theme', () => syncTheme()),
-    onSignal('windowToggle', () => void togglePanelWindow()),
+    onSignal('windowToggle', (options) => void togglePanelWindow(options)),
     onSignal('workbenchToggle', (expanded) => (expanded ? openWorkbench() : closeWorkbench())),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
