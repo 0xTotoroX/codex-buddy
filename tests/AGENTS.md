@@ -24,7 +24,7 @@
 
 - [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、完整/限长上下文切换、失焦/选择自动保存、串行在途编辑、失败重试/冲突保护、快捷词及三种方向配置/位置排序/自定义积木/Jev 同意与密钥编辑、无效草稿及在途失败不阻止停用/撤回同意、页面重载恢复；合成本机 API，不退出真实宿主。
 
-- [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发 App 后台启动/日志/进程存续/正常退出及身份保护、启动策略参数传递、重复唤起、原目标重连、失败边界、失效记录交由监督进程恢复、早期具体错误透传、其他会话保护及 shell 转义；设置 CODEX_BUDDY_NATIVE_LAUNCHER_TEST=1 显式验收合成原生窗口的 Dock 策略与焦点交接，不在普通回归中抢焦点。
+- [dev-launcher.test.mjs](dev-launcher.test.mjs)：开发 App 后台启动/日志/进程存续/正常退出及身份保护、启动策略参数传递、重复唤起、原目标重连、失败边界、失效记录交由监督进程恢复、早期具体错误透传、其他会话保护及 shell 转义；执行 AppleScript 夹具覆盖前台拒绝、超时、异常及通知不可用时正常返回，真实启动失败仍弹错误；设置 CODEX_BUDDY_NATIVE_LAUNCHER_TEST=1 显式验收合成原生窗口的 Dock 策略与焦点交接，不在普通回归中抢焦点。
 
 - [bridge-requests.test.mjs](bridge-requests.test.mjs)：弹出请求失联后的超时释放、重试与迟到响应隔离，保留模型请求的长超时。
 

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log，具体启动错误透传且不受并发失败会话干扰。
+ * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App，前台切换失败仅发通知；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log，具体启动错误透传且不受并发失败会话干扰。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -130,27 +130,36 @@ on openWorkbench()
     activate
     set outcome to do shell script ${appleQuote(launch)}
     if outcome is "host" then
+      set workbenchLocation to "ChatGPT"
       set targets to current application's NSRunningApplication's runningApplicationsWithBundleIdentifier:"com.openai.codex"
       if (targets's |count|()) is not 1 then error "找不到唯一的 Codex 应用，未切换到其他程序。"
       set targetApp to targets's firstObject()
     else
+      set workbenchLocation to "CodexBuddy 工作台"
       set targetApp to current application's NSRunningApplication's runningApplicationWithProcessIdentifier:(outcome as integer)
     end if
     if targetApp is missing value then error "工作台已退出，请重新打开。"
-    set launcherApp to current application's NSRunningApplication's currentApplication()
-    set nativeApp to current application's NSApplication's sharedApplication()
-    targetApp's unhide()
-    nativeApp's yieldActivationToApplication:targetApp
-    set accepted to targetApp's activateFromApplication:launcherApp options:1
-    if not accepted then error "系统未允许切换到工作台，请再试一次。"
-    repeat 40 times
-      if (targetApp's isActive()) as boolean then return
-      delay 0.05
-    end repeat
-    error "工作台已连接，但未能切到前台，请再试一次。"
   on error messageText
     activate
     display alert "CodexBuddy Dev" message messageText buttons {"好"} default button "好"
+    return
+  end try
+  try
+    set launcherApp to current application's NSRunningApplication's currentApplication()
+    set nativeApp to current application's NSApplication's sharedApplication()
+    targetApp's unhide()
+    if (targetApp's isActive()) as boolean then return
+    nativeApp's yieldActivationToApplication:targetApp
+    set accepted to targetApp's activateFromApplication:launcherApp options:1
+    if accepted then
+      repeat 40 times
+        if (targetApp's isActive()) as boolean then return
+        delay 0.05
+      end repeat
+    end if
+  end try
+  try
+    display notification ("工作台已就绪，请手动切换到 " & workbenchLocation & " 继续使用。") with title "CodexBuddy Dev"
   end try
 end openWorkbench`;
 }

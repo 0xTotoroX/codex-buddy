@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 临时源码路径、进程锁与启动器脚本生成函数。
- * [OUTPUT]: 开发入口唤起/重连/失败边界、早期错误透传、其他会话保护与 shell 转义回归；可选合成原生窗口焦点验收。
+ * [OUTPUT]: 开发入口唤起/重连/失败边界、早期错误透传、非阻塞前台失败通知、其他会话保护与 shell 转义回归；可选合成原生窗口焦点验收。
  * [POS]: 独立 Node 验收，不连接宿主或启动实际开发后台。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -317,6 +317,97 @@ test('stop refuses an owner record pointing at an unrelated process', async (t) 
   writeFileSync(join(root, 'target/dev/owner.json'), JSON.stringify({ pid: process.pid }));
   await assert.rejects(stopBackgroundDevelopment(root), /未结束其他进程/);
 });
+
+test(
+  'foreground failures notify without blocking, while startup failures still alert',
+  { skip: process.platform !== 'darwin' },
+  () => {
+    const original = launcherSource('/usr/bin/true');
+    // Compile the actual notification command, then replace only OS effects for deterministic execution.
+    const root = mkdtempSync(join(tmpdir(), 'buddy-focus-notice-'));
+    try {
+      const compiled = spawnSync('/usr/bin/osacompile', ['-o', join(root, 'launcher.scpt'), '-'], {
+        input: original,
+        encoding: 'utf8',
+      });
+      assert.equal(compiled.status, 0, compiled.stderr);
+      for (const [
+        name,
+        active,
+        accepted,
+        activationError,
+        notificationError,
+        startupError,
+        expected,
+      ] of [
+        ['already active', true, true, false, false, false, [0, 0, 1]],
+        ['activation refused', false, false, false, false, false, [0, 1, 1]],
+        ['activation timeout', false, true, false, false, false, [0, 1, 1]],
+        ['activation API error', false, true, true, false, false, [0, 1, 1]],
+        ['notification unavailable', false, false, false, true, false, [0, 1, 1]],
+        ['startup failed', false, false, false, false, true, [1, 0, 2]],
+      ]) {
+        const fixture = `
+property alertCount : 0
+property noticeCount : 0
+property activationCount : 0
+script targetFixture
+  on unhide()
+  end unhide
+  on isActive()
+    return ${active}
+  end isActive
+  on activateFromApplication:sender options:flags
+    if ${activationError} then error "synthetic activation failure"
+    return ${accepted}
+  end activateFromApplication:options:
+end script
+script nativeFixture
+  on yieldActivationToApplication:targetApp
+  end yieldActivationToApplication:
+end script
+`;
+        const script = original
+          .replace(
+            'on run\n  my openWorkbench()\nend run',
+            `${fixture}\non run\n  my openWorkbench()\n  return {alertCount, noticeCount, activationCount}\nend run`,
+          )
+          .replace(
+            /set outcome to do shell script .*\n/,
+            `if ${startupError} then error "synthetic startup failure"\n    set outcome to "host"\n`,
+          )
+          .replace(
+            /set targets to .*\n.*\n.*set targetApp to targets's firstObject\(\)/,
+            'set targetApp to targetFixture',
+          )
+          .replace(
+            /set launcherApp to current application's .*\n/,
+            'set launcherApp to missing value\n',
+          )
+          .replace(
+            /set nativeApp to current application's .*\n/,
+            'set nativeApp to nativeFixture\n',
+          )
+          .replaceAll('\n    activate\n', '\n    set activationCount to activationCount + 1\n')
+          .replace(/display alert .*\n/, 'set alertCount to alertCount + 1\n')
+          .replace(
+            /display notification .*\n/,
+            `set noticeCount to noticeCount + 1\n    if ${notificationError} then error "synthetic notification failure"\n`,
+          )
+          .replace('delay 0.05', '-- no wall-clock wait in the fixture');
+        const result = spawnSync('/usr/bin/osascript', ['-'], {
+          input: script,
+          encoding: 'utf8',
+          timeout: 5000,
+        });
+        assert.equal(result.status, 0, `${name}: ${result.stderr}`);
+        assert.deepEqual(result.stdout.trim().split(', ').map(Number), expected, name);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 // Explicit opt-in: this check briefly takes foreground focus using only synthetic windows.
 test(
