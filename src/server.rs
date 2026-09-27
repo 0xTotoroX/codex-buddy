@@ -123,6 +123,7 @@ async fn termination() {
 fn router(service: Service) -> Router {
     let api = Router::new()
         .route("/features", post(features))
+        .route("/surfaces", post(surfaces))
         .route("/tasks/state", get(tasks_state))
         .route("/tasks/command", post(tasks_command))
         .route("/state", get(state))
@@ -158,7 +159,8 @@ fn router(service: Service) -> Router {
         .route("/model-control/open", post(model_control_open))
         .route("/model-control/close", post(model_control_close))
         .route("/model-control/window", get(model_control_window))
-        .route("/model-control/displays", get(model_control_displays))
+        .route("/model-control/displays", get(surface_displays))
+        .route("/surfaces/displays", get(surface_displays))
         .route("/shutdown", post(shutdown))
         .route_layer(middleware::from_fn_with_state(service.clone(), authorize));
     Router::new()
@@ -453,8 +455,8 @@ async fn model_control_open(State(service): State<Service>) -> Result<Json<Value
 async fn model_control_close(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_model_control().await?))
 }
-async fn model_control_displays() -> Result<Json<Value>, ApiError> {
-    Ok(Json(crate::model_control_window::display_options()?))
+async fn surface_displays() -> Result<Json<Value>, ApiError> {
+    Ok(Json(crate::edge_window::display_options()?))
 }
 async fn model_control_window(
     State(service): State<Service>,
@@ -487,41 +489,11 @@ async fn asset(Path(path): Path<String>) -> Response {
             return ([(header::CONTENT_TYPE, kind)], body).into_response();
         }
     }
-    match path.as_str() {
-        "model-control" => {
-            return panel_asset(
-                "text/html; charset=utf-8",
-                include_str!("../ui/model-control/index.html"),
-            );
-        }
-        "model-control/app.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/model-control/app.js"),
-            );
-        }
-        "model-control/icons.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/panel/icons/index.js"),
-            );
-        }
-        "model-control/tokens.css" => {
-            return panel_asset("text/css; charset=utf-8", include_str!("../ui/tokens.css"));
-        }
-        "model-control/view.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/model-control/view.js"),
-            );
-        }
-        "model-control/styles.css" => {
-            return panel_asset(
-                "text/css; charset=utf-8",
-                include_str!("../ui/model-control/styles.css"),
-            );
-        }
-        _ => {}
+    if path == "model-control" {
+        return panel_asset(
+            "text/html; charset=utf-8",
+            "<!doctype html><meta charset=utf-8><script>location.replace('/'+location.hash)</script><a href=/>打开设置</a>",
+        );
     }
     if path == "panel" {
         return panel_asset(
@@ -655,7 +627,9 @@ mod tests {
                         .header("host", "127.0.0.1:47831")
                         .header("authorization", "Bearer test-token")
                         .header("content-type", "application/json")
-                        .body(Body::from(r#"{"revision":1,"patch":{"edge":"left"}}"#))
+                        .body(Body::from(
+                            r#"{"revision":1,"patch":{"pinned":["fixture"]}}"#,
+                        ))
                         .unwrap(),
                 )
                 .await
@@ -793,6 +767,12 @@ async fn tasks_command(
     Ok(Json(result))
 }
 
+async fn surfaces(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.surface_request(input).await?))
+}
 async fn features(
     State(service): State<Service>,
     Json(input): Json<Value>,

@@ -11,6 +11,7 @@ export type Reading = {
   left?: number;
   selected?: number;
   board?: BoardView;
+  modelSearch?: string;
 };
 export type Entry = {
   id: FeatureId;
@@ -23,5 +24,12 @@ export type Entry = {
   view: Reading;
   pending: { placement: Placement; owner: string; ready: boolean } | null;
 };
-export type FeatureState = { features: Entry[] };
+export type FeatureState = {
+  features: Entry[];
+  appearance?: {
+    theme?: string | null;
+    fontSize?: number;
+    themes: Record<string, import('./surface').SurfaceTheme>;
+  };
+};
 export type Request = <T = FeatureState>(input: Record<string, unknown>) => Promise<T>;

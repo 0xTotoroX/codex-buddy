@@ -17,7 +17,7 @@ use tao::{
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoopBuilder},
     platform::{
-        macos::{ActivationPolicy, EventLoopExtMacOS},
+        macos::{ActivationPolicy, EventLoopExtMacOS, WindowExtMacOS},
         run_return::EventLoopExtRunReturn,
     },
     window::WindowBuilder,
@@ -45,6 +45,7 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
             }
         ))
         .with_resizable(true)
+        .with_transparent(true)
         .with_visible(false)
         .with_inner_size(LogicalSize::new(size[0], size[1]))
         .with_min_inner_size(LogicalSize::new(320, 280))
@@ -52,6 +53,11 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
     let page = format!("http://127.0.0.1:{}/feature.html", runtime.port);
     let allowed = page.clone();
     let webview = WebViewBuilder::new()
+        .with_transparent(true)
+        .with_initialization_script(format!(
+            "window.__buddyNativeSurface=true;window.__buddyNativeGlass={};",
+            crate::native_backdrop::glass_available()
+        ))
         .with_url(format!(
             "{page}?feature={feature}&lease={lease}#token={}",
             runtime.token
@@ -61,6 +67,8 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
         })
         .with_new_window_req_handler(|_, _| wry::NewWindowResponse::Deny)
         .build(&window)?;
+    let native = unsafe { &*(window.ns_window() as *const objc2_app_kit::NSWindow) };
+    let backdrop = crate::native_backdrop::Backdrop::new(native);
     let proxy = events.create_proxy();
     let lease = lease.to_owned();
     let feature = feature.to_owned();
@@ -96,10 +104,13 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
     let mut reveal = 0;
     let mut sized = false;
     let mut resized = None;
+    let mut appearance = Value::Null;
     events.run_return(|event, _, control| {
         *control = ControlFlow::WaitUntil(Instant::now() + Duration::from_millis(250));
         match event {
             Event::UserEvent(state) => {
+                appearance = state["appearance"].clone();
+                update_backdrop(&window, &backdrop, &appearance);
                 if !sized
                     && let Ok(size) = serde_json::from_value::<[u32; 2]>(state["size"].clone())
                 {
@@ -127,7 +138,11 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 ..
-            } => resized = Some(Instant::now()),
+            } => {
+                backdrop.resize_viewport(native, true);
+                update_backdrop(&window, &backdrop, &appearance);
+                resized = Some(Instant::now());
+            }
             Event::MainEventsCleared
                 if resized.is_some_and(|at| at.elapsed() > Duration::from_millis(500)) =>
             {
@@ -143,4 +158,14 @@ pub fn run(paths: &Paths, feature: &str, lease: &str) -> Result<()> {
     });
     live.store(false, Ordering::Relaxed);
     Ok(())
+}
+
+fn update_backdrop(
+    window: &tao::window::Window,
+    backdrop: &crate::native_backdrop::Backdrop,
+    appearance: &Value,
+) {
+    let size = window.inner_size().to_logical::<f64>(window.scale_factor());
+    let native = unsafe { &*(window.ns_window() as *const objc2_app_kit::NSWindow) };
+    backdrop.update(native,&json!({"theme":if appearance["surface"]["theme"]=="black" {json!("dark")} else {appearance["theme"].clone()},"material":appearance["surface"]["theme"],"liquidVariant":appearance["surface"]["liquidVariant"],"x":0,"y":0,"width":size.width,"height":size.height,"radius":0}));
 }

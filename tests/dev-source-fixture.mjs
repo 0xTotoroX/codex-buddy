@@ -84,6 +84,23 @@ if (['cargo', 'npm'].includes(basename(process.argv[1]))) {
       );
       return;
     }
+    if (req.url === '/api/surfaces') {
+      res.end(
+        JSON.stringify({
+          revision: 1,
+          preferences: {
+            themes: Object.fromEntries(
+              ['sidebar', 'overlay', 'desktop', 'edge'].map((p) => [
+                p,
+                { theme: 'matte', liquidVariant: 'regular' },
+              ]),
+            ),
+            edge: { edge: 'right', position: 0.5, screen: '', keepOpen: false },
+          },
+        }),
+      );
+      return;
+    }
     if (req.url === '/api/features') {
       res.end(JSON.stringify({ features: [] }));
       return;
@@ -98,7 +115,7 @@ if (['cargo', 'npm'].includes(basename(process.argv[1]))) {
       );
       return;
     }
-    if (req.url === '/api/model-control/displays') {
+    if (['/api/model-control/displays', '/api/surfaces/displays'].includes(req.url)) {
       res.end(JSON.stringify({ screens: [], nativeGlassAvailable: false }));
       return;
     }

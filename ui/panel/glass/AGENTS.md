@@ -6,6 +6,7 @@
 
 - `lab.js`：appearance/stop 生命周期、几何更新、减少透明度与共享 liquidVariant 同步；清理旧比较偏好，退出清理节点、监听器与帧任务。
 - `lens.js`：自有凸面曲线与 Snell 折射位移，折射率 3，厚度随边缘尺度变化，不使用 RGB 分离。
+- `svg.d.ts`：既有 SVG 渲染器供 TypeScript 功能视图使用的类型边界，无运行代码。
 - `svg.js`：refresh(variant) 使用同一张透镜贴图；Regular 4px 模糊、Clear 保持 B 版 0.3px，饱和度均为 100%；仅尺寸或圆角变化时重建贴图。
 - `lab.css`：Regular 浅色 28%/深色 24% 底色；Clear 保持 B 版 6% 底色；共用内反光、轻外阴影与指针高光，不提供失焦染色分支。
 

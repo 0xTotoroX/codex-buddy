@@ -1,6 +1,7 @@
 /* [INPUT]: Authenticated native page and lease. [OUTPUT]: One feature window.
  * [POS]: Native entry, no business runtime. [PROTOCOL]: Keep features/AGENTS.md in sync. */
 import { request as http } from '../settings/api';
+import { startEdge } from './edge';
 import { mountFeature } from './mount';
 import type { FeatureState, Request } from './types';
 // api.ts consumes the token fragment but preserves feature/lease query parameters here.
@@ -39,5 +40,12 @@ async function refresh() {
     running = false;
   }
 }
-void refresh();
-setInterval(() => void refresh().catch(() => {}), 600);
+if (
+  params.get('surface') === 'edge' ||
+  new URLSearchParams(location.search).get('surface') === 'edge'
+)
+  startEdge(request);
+else {
+  void refresh();
+  setInterval(() => void refresh().catch(() => {}), 600);
+}

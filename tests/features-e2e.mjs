@@ -227,6 +227,39 @@ try {
       record(`${id} native view automatically readies and returns to sidebar`);
     }
   }
+  if (native) {
+    for (const id of ['board', 'outline', 'next', 'model']) {
+      await api('features', { op: 'move', id, placement: 'edge' });
+      await wait(async () => {
+        const e = await entry(id);
+        return e?.placement === 'edge' && !e.pending;
+      }, `${id} edge ready`);
+    }
+    assert.equal((await entry('board')).view.board.editor.draft.title, '仍未保存的草稿');
+    await api('model-control/close', {});
+    assert.equal((await entry('model')).open, false);
+    const boardOwner = (await entry('board')).owner;
+    assert.equal((await entry('board')).open, true);
+    assert.equal(
+      (await api('features', { op: 'read', id: 'board', owner: boardOwner })).store.tasks.length,
+      1,
+    );
+    await api('features', { op: 'move', id: 'board', placement: 'overlay' });
+    await wait(async () => {
+      const e = await entry('board');
+      return e.placement === 'overlay' && !e.pending;
+    }, 'board returns from edge');
+    await board.getByRole('button', { name: '继续编辑草稿' }).click();
+    assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '仍未保存的草稿');
+    await board.getByRole('button', { name: '保留草稿并返回' }).click();
+    await assert.rejects(() =>
+      api('features', { op: 'save', id: 'board', owner: boardOwner, view: {} }),
+    );
+    assert.deepEqual((await api('tasks/state')).store, before.store);
+    record(
+      'all four features share edge, disabling model preserves board, edge round trip retains draft and rejects stale owner',
+    );
+  }
   await page.screenshot({ path: join(output, 'independent-surfaces.png') });
   await api('disconnect', {});
   const current = await entry('board');

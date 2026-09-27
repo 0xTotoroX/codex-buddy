@@ -2,6 +2,7 @@
  * [OUTPUT]: Independent feature surfaces and one shared sidebar slot.
  * [POS]: Host presentation lifecycle; business authority stays in runtime.
  * [PROTOCOL]: Keep workbench/AGENTS.md in sync. */
+import { surfaceStyle } from '../../features/surface';
 import { mountFeature } from '../../features/mount';
 import { titles } from '../../features/types';
 import { createDock } from '../host/dock.js';
@@ -202,6 +203,10 @@ function render(state) {
     }
   if (!sidebarIds.includes(selected)) selected = sidebarIds[0] || '';
   const tabs = sidebar.querySelector('nav');
+  Object.assign(
+    tabs.style,
+    surfaceStyle({ ...state.appearance, surface: state.appearance?.themes.sidebar }),
+  );
   if (tabs.dataset.key !== sidebarIds.join(':') + selected) {
     tabs.replaceChildren();
     tabs.dataset.key = sidebarIds.join(':') + selected;

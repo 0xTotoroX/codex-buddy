@@ -61,6 +61,7 @@ struct Desired {
 }
 
 pub struct App {
+    pub(crate) surfaces: Mutex<crate::surfaces::Surfaces>,
     pub(crate) features: Mutex<crate::features::Features>,
     pub(crate) feature_operation: Mutex<()>,
     pub tasks: Arc<crate::tasks::Service>,
@@ -117,6 +118,7 @@ impl App {
             panel_font_base: 13.,
         });
         Arc::new(Self {
+            surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
             features: Mutex::new(crate::features::Features::load(&paths)),
             feature_operation: Mutex::new(()),
             tasks: crate::tasks::Service::load(&paths),
@@ -162,7 +164,6 @@ impl App {
                 interval.tick().await;
                 self.supervise_features().await;
                 self.supervise_panel().await;
-                self.supervise_model_control().await;
                 let prefs = self.appearance().await;
                 self.views.send_if_modified(|view| {
                     if view.panel_preferences == prefs {
@@ -174,7 +175,8 @@ impl App {
                 let session = self.session.read().await.clone();
                 if session.is_some() {
                     let guard = self.transition.lock().await;
-                    if self.refresh().await.is_err() {
+                    if let Err(error) = self.refresh().await {
+                        tracing::debug!(error = %error, "宿主状态刷新失败");
                         self.clear_connection("disconnected", "Codex 连接中断，正在重连…")
                             .await;
                     }
@@ -184,7 +186,8 @@ impl App {
                     if attempts % 4 == 1 && self.desired.read().await.enabled {
                         let _guard = self.transition.lock().await;
                         let desired = self.desired.read().await.clone();
-                        if self.establish(&desired).await.is_err() {
+                        if let Err(error) = self.establish(&desired).await {
+                            tracing::debug!(error = %error, "宿主连接建立失败");
                             self.update_connection(
                                 "disconnected",
                                 "未发现可连接的 Codex。请通过调试启动入口打开，或指定本机端口。",
@@ -249,6 +252,11 @@ impl App {
             client: client.clone(),
         };
         *self.session.write().await = Some(session);
+        if let Err(error) = client.install_desktop(Arc::downgrade(self)).await {
+            self.clear_connection("disconnected", "桌面浮窗安装失败，正在等待重连…")
+                .await;
+            return Err(error);
+        }
         self.views.send_modify(|view| {
             view.connection = Connection {
                 status: "connected".into(),
@@ -260,11 +268,6 @@ impl App {
             view.desktop = DesktopStatus::default();
             view.updated_at = now();
         });
-        if let Err(error) = client.install_desktop(Arc::downgrade(self)).await {
-            self.clear_connection("disconnected", "桌面浮窗安装失败，正在等待重连…")
-                .await;
-            return Err(error);
-        }
         Ok(())
     }
 

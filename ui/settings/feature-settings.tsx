@@ -52,7 +52,9 @@ export function FeatureSettings({
               <option value="desktop" disabled={!desktopSupported}>
                 桌面窗口
               </option>
-              {id === 'model' && <option value="edge">贴边控制条</option>}
+              <option value="edge" disabled={!desktopSupported}>
+                贴边 / 刘海
+              </option>
             </select>
             <button
               className="rounded border px-3 py-1 text-sm"

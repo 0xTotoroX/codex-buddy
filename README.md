@@ -63,7 +63,7 @@ Task content stays local and is never sent to a model. An internal **CodexBuddy 
 
 ### Feature display locations
 
-Use **Independent open** in the workbench, or **Feature display location** in Web settings, to place the outline, task board, next-step suggestions and model switcher separately in a sidebar, an in-page overlay or a resizable desktop window. Sidebar features share tabs; model switching also supports its original screen-edge control. Each feature has one active view. The CodexBuddy menu reopens or focuses it.
+Use **Independent open** in the workbench, or **Feature display location** in Web settings, to place the outline, task board, next-step suggestions and model switcher separately in a sidebar, an in-page overlay, a resizable desktop window or an edge/notch panel. Sidebar and edge views each share a tabbed container. **Presentation** settings independently save black, matte, frosted or liquid (Regular/Clear) themes for each form. Each feature has one active view. The CodexBuddy menu reopens or focuses it.
 
 Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
 
@@ -135,11 +135,11 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 
 ### Model quick switch
 
-Open the control from settings or run `codex-buddy model-control`. Its default shell stays pure black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The capsule, workbench, desktop window, and the three optional model-control materials follow Codex colors in every state. The pure-black model-control palette stays fixed. Web settings continue to follow the browser theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
+Enable the model feature in settings or run `codex-buddy model-control`. It initially opens in the shared edge form and subsequently uses its saved placement. Search, pinned models, reasoning, speed and presets are available in every form; next-step generation settings remain independent.
 
-The control stays on the selected display across desktop Spaces and full-screen apps, even when Codex loses focus or is hidden. If Codex disconnects, the control remains visible but model actions require a valid target. Closing the control or stopping the Buddy service removes it. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
+The edge/notch form now hosts all four features. Use **Presentation** settings for its theme, display, edge, position and keep-open preference. Hover to expand, leave for roughly half a second to collapse, or press `⌘⇧M` to toggle. Editing and business operations suppress automatic collapse; collapsing or switching tabs preserves drafts. The panel stays on its selected display across Spaces and full-screen apps regardless of Codex focus. Stopping Buddy closes it.
 
-Models and reasoning efforts share a matrix. Open search from the menu or with `⌘F`. Hovering does not steal keyboard focus; search, editing, and keyboard interaction can request it. `⌘⇧M` toggles the panel, and the menu lets you keep it open or close the control.
+Legacy model visual preferences migrate once to `surfaces.json`; model pins and presets remain in `model-control.json`.
 
 Available models and efforts come from the host. The first selection reads and applies the configuration in one operation, without a separate refresh, then verifies the actual result. You can adjust subsequent configuration while an answer is being generated, provided the official controls allow it. Switching stops if the controls are disabled, the target is ambiguous, or capabilities have not loaded. If the official model list has not yet been observed after connecting, the control waits; there is no need to restart a working host just to load the list.
 
@@ -163,7 +163,7 @@ Built with **Rust, JavaScript / TypeScript, and React**.
 src/               Backend, CLI, and native windows
 ui/panel/          Capsule, next-step suggestions, and outlines
 ui/settings/       Settings web app
-ui/model-control/  Independent model control and official-menu adapter
+ui/model-control/  Official model-menu business adapter
 ui/bridge/         Host communication
 tests/            Automated tests
 scripts/           Development, build, and installation tools

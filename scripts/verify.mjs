@@ -89,7 +89,7 @@ async function verify() {
   run('npm', ['run', 'check']);
   run(process.execPath, ['tests/workbench.mjs']);
   run(process.execPath, ['tests/model-control-host.mjs']);
-  run(process.execPath, ['tests/model-control-view.mjs']);
+  run(process.execPath, ['tests/feature-views.mjs']);
   run('cargo', ['fmt', '--check']);
   const artifact = prepareTestBinary();
   run('cargo', ['test', '--locked']);

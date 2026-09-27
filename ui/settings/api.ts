@@ -37,7 +37,12 @@ function readToken() {
   const incoming = params.get('token');
   if (incoming) {
     sessionStorage.setItem('companion-token', incoming);
-    history.replaceState(null, '', location.pathname + location.search);
+    params.delete('token');
+    history.replaceState(
+      null,
+      '',
+      location.pathname + location.search + (params.size ? `#${params}` : ''),
+    );
   }
   return incoming || sessionStorage.getItem('companion-token') || '';
 }

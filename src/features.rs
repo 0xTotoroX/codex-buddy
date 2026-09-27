@@ -51,10 +51,26 @@ pub struct Features {
 }
 impl Features {
     pub fn load(paths: &Paths) -> Self {
-        let prefs: BTreeMap<String, Preference> = std::fs::read(paths.root.join("features.json"))
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
+        let mut prefs: BTreeMap<String, Preference> =
+            std::fs::read(paths.root.join("features.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .unwrap_or_default();
+        if !prefs.contains_key("model")
+            && std::fs::read(paths.root.join("model-control.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                .is_some_and(|v| v["enabled"] == true)
+        {
+            prefs.insert(
+                "model".into(),
+                Preference {
+                    placement: "edge".into(),
+                    open: true,
+                    ..Default::default()
+                },
+            );
+        }
         Self {
             entries: IDS
                 .into_iter()
@@ -104,8 +120,8 @@ impl Features {
         Ok(())
     }
 }
-fn valid_placement(id: &str, p: &str) -> bool {
-    ["sidebar", "overlay", "desktop"].contains(&p) || id == "model" && p == "edge"
+fn valid_placement(_id: &str, p: &str) -> bool {
+    crate::surfaces::PLACEMENTS.contains(&p)
 }
 fn spawn(paths: &Paths, id: &str, owner: &str) -> Result<Child> {
     Command::new(std::env::current_exe()?)
@@ -120,28 +136,25 @@ fn spawn(paths: &Paths, id: &str, owner: &str) -> Result<Child> {
 }
 impl App {
     pub async fn feature_state(&self) -> Value {
-        self.features.lock().await.snapshot()
+        let mut state = self.features.lock().await.snapshot();
+        let view = self.view();
+        state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"themes":self.surfaces.lock().await.preferences.themes});
+        state
     }
-    pub async fn feature_model_embedded(&self) -> bool {
-        self.features
-            .lock()
-            .await
-            .entries
-            .get("model")
-            .is_some_and(|e| {
-                !(e.pref.placement == "edge" && (e.pref.open || e.pending.is_some())
-                    || e.pending
-                        .as_ref()
-                        .is_some_and(|p| p.placement == "edge" && p.source_ready))
-            })
+    pub async fn edge_features_active(&self) -> bool {
+        self.features.lock().await.entries.values().any(|e| {
+            e.pref.open && e.pref.placement == "edge"
+                || e.pending.as_ref().is_some_and(|p| p.placement == "edge")
+        })
     }
-    pub async fn feature_edge_writable(&self) -> bool {
-        self.features
-            .lock()
-            .await
-            .entries
-            .get("model")
-            .is_none_or(|e| e.pref.placement == "edge" && e.pref.open && e.pending.is_none())
+    pub async fn close_feature(&self, id: &str) -> Result<()> {
+        let _operation = self.feature_operation.lock().await;
+        let mut f = self.features.lock().await;
+        if let Some(e) = f.entries.get_mut(id) {
+            e.pref.open = false;
+            e.pending = None;
+        }
+        f.save(&self.paths)
     }
     pub async fn features_active(&self) -> bool {
         !self.features.lock().await.entries.is_empty()
@@ -164,9 +177,10 @@ impl App {
                 || e.pending
                     .as_ref()
                     .is_some_and(|p| p.owner == owner && p.placement == "desktop");
-            return Ok(
-                json!({"valid":valid,"active":e.owner==owner,"pid":e.child.as_ref().map(|c|c.id()),"reveal":e.reveal,"size":e.pref.size}),
-            );
+            let mut result = json!({"valid":valid,"active":e.owner==owner,"pid":e.child.as_ref().map(|c|c.id()),"reveal":e.reveal,"size":e.pref.size});
+            drop(f);
+            result["appearance"] = self.surface_appearance("desktop").await;
+            return Ok(result);
         }
         if op == "read" {
             let f = self.features.lock().await;
@@ -175,6 +189,12 @@ impl App {
                 e.owner == owner || e.pending.as_ref().is_some_and(|p| p.owner == owner),
                 "功能归属已变化"
             );
+            let placement = e
+                .pending
+                .as_ref()
+                .filter(|p| p.owner == owner)
+                .map(|p| p.placement.clone())
+                .unwrap_or_else(|| e.pref.placement.clone());
             drop(f);
             let mut result = match id {
                 "board" => Ok(self.tasks.state().await),
@@ -203,9 +223,7 @@ impl App {
                     Ok(json!({"snapshot":snapshot}))
                 }
             }?;
-            let view = self.view();
-            result["appearance"] =
-                json!({"theme":view.panel_theme,"fontSize":view.panel_font_base});
+            result["appearance"] = self.surface_appearance(&placement).await;
             return Ok(result);
         }
         // Moving and writing share a gate. State polling remains available during business operations.
@@ -228,11 +246,15 @@ impl App {
                 .entries
                 .get(id)
                 .map(|e| e.pref.placement.clone());
-            let placement = input["placement"].as_str().unwrap_or(
-                saved
-                    .as_deref()
-                    .unwrap_or(if id == "board" { "desktop" } else { "sidebar" }),
-            );
+            let placement = input["placement"]
+                .as_str()
+                .unwrap_or(saved.as_deref().unwrap_or(if id == "model" {
+                    "edge"
+                } else if id == "board" {
+                    "desktop"
+                } else {
+                    "sidebar"
+                }));
             ensure!(valid_placement(id, placement), "该功能不支持此位置");
             if placement == "desktop" {
                 ensure!(crate::panel::popout_supported(), "当前系统不支持桌面窗口");
@@ -272,11 +294,11 @@ impl App {
             }
             if e.pref.open && (op == "reveal" || placement == e.pref.placement) {
                 e.reveal += 1;
-                let edge = id == "model" && e.pref.placement == "edge";
+                let edge = e.pref.placement == "edge";
                 let result = f.snapshot();
                 drop(f);
                 if edge {
-                    self.open_model_control_edge().await?;
+                    self.surfaces.lock().await.open(&self.paths, true)?;
                 }
                 return Ok(result);
             }
@@ -297,14 +319,21 @@ impl App {
                 placement: placement.into(),
                 owner: lease,
                 started: Instant::now(),
-                source_ready: !e.pref.open || owner == e.owner || e.pref.placement == "edge",
+                source_ready: !e.pref.open || owner == e.owner,
             });
-            let edge_ready = placement == "edge" && e.pending.as_ref().unwrap().source_ready;
-            let next_owner = e.pending.as_ref().unwrap().owner.clone();
             let result = f.snapshot();
             drop(f);
-            if edge_ready {
-                return self.finish_feature(id, &next_owner).await;
+            if placement == "edge"
+                && let Err(error) = self.surfaces.lock().await.open(&self.paths, true)
+            {
+                self.features
+                    .lock()
+                    .await
+                    .entries
+                    .get_mut(id)
+                    .unwrap()
+                    .pending = None;
+                return Err(error);
             }
             return Ok(result);
         }
@@ -317,13 +346,8 @@ impl App {
             ensure!(view.to_string().len() < 128 * 1024, "阅读状态过大");
             e.view = view.clone();
             p.source_ready = true;
-            let edge = p.placement == "edge";
-            let next_owner = p.owner.clone();
             let result = f.snapshot();
             drop(f);
-            if edge {
-                return self.finish_feature(id, &next_owner).await;
-            }
             return Ok(result);
         }
         if op == "ready" {
@@ -406,26 +430,6 @@ impl App {
         }
     }
     async fn finish_feature(&self, id: &str, owner: &str) -> Result<Value> {
-        let edge = {
-            let f = self.features.lock().await;
-            let p = f
-                .entries
-                .get(id)
-                .and_then(|e| e.pending.as_ref())
-                .context("交接已取消")?;
-            ensure!(p.owner == owner && p.source_ready, "交接尚未就绪或已过期");
-            p.placement == "edge"
-        };
-        if edge && let Err(error) = self.open_model_control_edge().await {
-            self.features
-                .lock()
-                .await
-                .entries
-                .get_mut(id)
-                .unwrap()
-                .pending = None;
-            return Err(error);
-        }
         let mut f = self.features.lock().await;
         let e = f.entries.get_mut(id).context("功能已关闭")?;
         let p = e.pending.as_ref().context("交接已取消")?;
@@ -476,8 +480,19 @@ impl App {
                 e.child = spawn(&self.paths, id, &e.owner).ok();
             }
         }
+        drop(f);
+        let active = self.edge_features_active().await;
+        let mut surfaces = self.surfaces.lock().await;
+        if active {
+            if let Err(error) = surfaces.open(&self.paths, false) {
+                tracing::warn!(%error,"无法恢复贴边窗口");
+            }
+        } else {
+            surfaces.stop();
+        }
     }
     pub async fn stop_features(&self) {
+        self.surfaces.lock().await.stop();
         for e in self.features.lock().await.entries.values_mut() {
             if let Some(mut c) = e.child.take() {
                 let _ = c.kill();
@@ -674,7 +689,7 @@ mod tests {
     async fn placement_validation_and_feature_scopes_do_not_enable_business() {
         let (_dir, app) = app().await;
         for (id, placement) in [
-            ("outline", "edge"),
+            ("outline", "invalid"),
             ("unknown", "sidebar"),
             ("board", "sidebar"),
             ("model", "sidebar"),

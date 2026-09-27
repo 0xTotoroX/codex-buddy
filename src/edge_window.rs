@@ -1,9 +1,9 @@
-// [INPUT]: Paths/Runtime、独立 model-control HTTP/IPC、AppKit/Wry/Tao。
+// [INPUT]: Paths/Runtime、独立 edge HTTP/IPC、AppKit/Wry/Tao。
 // [OUTPUT]: macOS 14+ 稳定视口与原生整树轮廓、首帧就绪门控的非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
-#[path = "model_control_geometry.rs"]
+#[path = "edge_geometry.rs"]
 mod geometry;
 
 use crate::{config::Paths, lifecycle::Runtime};
@@ -68,7 +68,7 @@ impl HitRegion {
 
 define_class!(
     #[unsafe(super = NSView)]
-    #[name = "CodexBuddyModelControlView"]
+    #[name = "CodexBuddyEdgeView"]
     #[thread_kind = MainThreadOnly]
     #[ivars = HitRegion]
     struct ControlView;
@@ -85,7 +85,7 @@ define_class!(
 define_class!(
     // 创建真实 NSPanel 子类；从不更改 Tao/NSWindow 的 Objective-C isa。
     #[unsafe(super = NSPanel)]
-    #[name = "CodexBuddyModelControlPanel"]
+    #[name = "CodexBuddyEdgePanel"]
     #[thread_kind = MainThreadOnly]
     #[ivars = KeyboardGate]
     struct ControlPanel;
@@ -237,21 +237,20 @@ impl Backend {
         let (sender, mut receiver) = tokio::sync::mpsc::unbounded_channel::<Patch>();
         let stopped = Arc::new(AtomicBool::new(false));
         let stop = stopped.clone();
-        std::thread::Builder::new().name("model-control-lease".into()).spawn(move || {
+        std::thread::Builder::new().name("edge-lease".into()).spawn(move || {
             let result = (|| -> Result<()> {
                 let executor = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
                 executor.block_on(async {
                     let client = reqwest::Client::builder().no_proxy()
                         .redirect(reqwest::redirect::Policy::none()).timeout(Duration::from_secs(2)).build()?;
-                    let base = format!("http://127.0.0.1:{}/api/model-control", runtime.port);
+                    let base = format!("http://127.0.0.1:{}/api/surfaces", runtime.port);
                     let mut interval = tokio::time::interval(Duration::from_secs(1));
                     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                     let mut revision = 0;
                     while !stop.load(Ordering::Relaxed) {
                         tokio::select! {
                             _ = interval.tick() => {
-                                let value: Value = client.get(format!("{base}/window"))
-                                    .query(&[("lease", &lease)]).bearer_auth(&runtime.token)
+                                let value: Value = client.post(&base).json(&json!({"op":"window","lease":lease})).bearer_auth(&runtime.token)
                                     .send().await?.error_for_status()?.json().await?;
                                 if value["valid"] != true { break; }
                                 if proxy.send_event(Message::Snapshot { value, revision }).is_err() { break; }
@@ -265,8 +264,8 @@ impl Backend {
                                     }
                                     patch.revision = next.revision;
                                 }
-                                let response = client.post(format!("{base}/preferences"))
-                                    .bearer_auth(&runtime.token).json(&json!({"patch": patch.value})).send().await;
+                                let response = client.post(&base)
+                                    .bearer_auth(&runtime.token).json(&json!({"op":"save","lease":lease,"edge": patch.value})).send().await;
                                 revision = patch.revision;
                                 if response.and_then(|r| r.error_for_status()).is_err() {
                                     let _ = proxy.send_event(Message::PreferenceError);
@@ -277,9 +276,9 @@ impl Backend {
                     Ok(())
                 })
             })();
-            if result.is_err() { tracing::debug!("model-control backend unavailable"); }
+            if result.is_err() { tracing::debug!("edge backend unavailable"); }
             let _ = proxy.send_event(Message::BackendGone);
-        }).context("无法启动模型控窗租约线程")?;
+        }).context("无法启动贴边容器租约线程")?;
         Ok(Self { sender, stopped })
     }
 }
@@ -403,7 +402,7 @@ impl Surface {
             "notchX": notch.x, "notchY": if notch.height > 0. { size.height - notch.y - notch.height } else { 0. },
             "contentOffsetY": offset, "contentHeight": (size.height - offset).max(0.),
             "shortcutAvailable": self.shortcut_error.is_none(), "shortcutError": self.shortcut_error,
-            "preferenceError": if self.preference_error { Some("无法保存模型控窗偏好，请稍后重试") } else { None },
+            "preferenceError": if self.preference_error { Some("无法保存贴边容器偏好，请稍后重试") } else { None },
             "appearance": {"material": self.appearance.material, "liquidVariant": self.appearance.liquid_variant, "fontOffset": self.appearance.font_offset, "hostTheme":self.appearance.host_theme},
             "nativeDark": self.panel.effectiveAppearance().bestMatchFromAppearancesWithNames(
                 &NSArray::from_slice(&[unsafe {NSAppearanceNameDarkAqua}, unsafe {NSAppearanceNameAqua}])
@@ -424,7 +423,7 @@ impl Surface {
         }
         self.last_detail = Some(detail.clone());
         let _ = self.webview.evaluate_script(&format!(
-            "window.dispatchEvent(new CustomEvent('model-control-native',{{detail:{detail}}}));"
+            "window.dispatchEvent(new CustomEvent('edge-native',{{detail:{detail}}}));"
         ));
     }
 
@@ -583,7 +582,7 @@ impl Surface {
         if self.pointer_state.as_ref() != Some(&detail) {
             self.pointer_state = Some(detail.clone());
             let _ = self.webview.evaluate_script(&format!(
-                "window.dispatchEvent(new CustomEvent('model-control-pointer',{{detail:{detail}}}));"
+                "window.dispatchEvent(new CustomEvent('edge-pointer',{{detail:{detail}}}));"
             ));
         }
     }
@@ -736,7 +735,9 @@ impl Surface {
         }
         self.appearance = appearance;
         let reveal = value["reveal"].as_u64().unwrap_or(0);
-        let requested = self.reveal.is_some_and(|previous| previous != reveal);
+        let requested = self
+            .reveal
+            .map_or(reveal > 0, |previous| previous != reveal);
         self.reveal = Some(reveal);
         if revision >= self.revision {
             let prefs = Preferences::read(&value["preferences"]);
@@ -758,7 +759,7 @@ impl Surface {
 }
 
 pub fn run(paths: &Paths, lease: &str) -> Result<()> {
-    let mtm = MainThreadMarker::new().context("模型控窗必须在主线程启动")?;
+    let mtm = MainThreadMarker::new().context("贴边容器必须在主线程启动")?;
     let runtime = Runtime::read(paths)?;
     let mut event_loop = EventLoopBuilder::<Message>::with_user_event().build();
     event_loop.set_activation_policy(ActivationPolicy::Accessory);
@@ -770,11 +771,15 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
     };
     panel.setContentView(Some(&view));
     let parent = NativeParent(view);
-    let page = format!("http://127.0.0.1:{}/model-control", runtime.port);
+    let page = format!("http://127.0.0.1:{}/feature.html", runtime.port);
     let mut url = reqwest::Url::parse(&page)?;
     let fragment = reqwest::Url::parse_with_params(
         "http://localhost/",
-        &[("token", runtime.token.as_str()), ("lease", lease)],
+        &[
+            ("token", runtime.token.as_str()),
+            ("lease", lease),
+            ("surface", "edge"),
+        ],
     )?;
     url.set_fragment(fragment.query());
     let allowed = page;
@@ -782,6 +787,10 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
     let webview = WebViewBuilder::new()
         .with_url(url.as_str())
         .with_transparent(true)
+        .with_initialization_script(format!(
+            "window.__buddyNativeSurface=true;window.__buddyNativeGlass={};",
+            crate::native_backdrop::glass_available()
+        ))
         .with_focused(false)
         .with_accept_first_mouse(true)
         .with_navigation_handler(move |url| {
@@ -810,7 +819,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
     let mut surface = Surface {
         webview,
         backdrop,
-        content_height: 274.,
+        content_height: 600.,
         pointer_state: None,
         hover_suppressed: None,
         _parent: parent,

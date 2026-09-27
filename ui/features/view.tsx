@@ -7,6 +7,8 @@ import { Board } from '../board/app';
 import type { TaskRequest } from '../board/api';
 import type { PanelSnapshot, CommandResult, PanelCommand } from '../contracts';
 import { ModelView, type ModelState } from './model';
+import { surfaceStyle, type Appearance } from './surface';
+import { createSvgGlass } from '../panel/glass/svg.js';
 import { titles, type Entry, type Request, type Reading } from './types';
 export function FeatureView({
   entry,
@@ -31,7 +33,7 @@ export function FeatureView({
   const [projection, setProjection] = useState<PanelSnapshot | null>(null),
     [model, setModel] = useState<ModelState | null>(null);
   const [connected, setConnected] = useState(true);
-  const [appearance, setAppearance] = useState<{ theme?: string; fontSize?: number }>({});
+  const [appearance, setAppearance] = useState<Appearance>({});
   const active = entry.owner === owner && entry.open && !entry.pending;
   const locked = !active || busy;
   const call = useCallback(
@@ -64,12 +66,12 @@ export function FeatureView({
         const value = await call<
           {
             snapshot?: PanelSnapshot;
-            appearance?: { theme?: string; fontSize?: number };
+            appearance?: Appearance;
           } & ModelState
         >('read');
         if (stopped) return;
         setConnected(true);
-        if (value.appearance?.theme) setAppearance(value.appearance);
+        if (value.appearance) setAppearance(value.appearance);
         if (entry.id === 'model') setModel(value);
         else if (entry.id !== 'board' && value.snapshot) {
           const token = `${value.snapshot.viewToken}:${entry.id === 'outline' ? value.snapshot.outlineToken : value.snapshot.promptToken}`;
@@ -213,35 +215,49 @@ export function FeatureView({
         ? projection?.settings.enabled
         : true;
   const disabled = locked || !connected || !enabled || projection?.association?.available === false;
-  const colors = projection?.colors;
-  const style = {
-    colorScheme: (projection?.theme || appearance.theme) === 'dark' ? 'dark' : 'light',
-    ...((projection?.theme || appearance.theme) === 'dark'
-      ? {
-          '--paper': '#232420',
-          '--board-bg': '#1c1d1a',
-          '--surface': '#252720',
-          '--ink': '#e8e8e1',
-          '--muted': '#a3a59a',
-          '--line': '#3b3d34',
-        }
-      : {
-          '--paper': '#faf9f6',
-          '--board-bg': '#f6f5f2',
-          '--surface': '#fffefb',
-          '--ink': '#2c2e2b',
-          '--muted': '#777b73',
-          '--line': '#e7e6df',
-        }),
-    fontSize: projection?.hostTypography?.baseItemFontSize
-      ? `${projection.hostTypography.baseItemFontSize}px`
-      : appearance.fontSize
-        ? `${appearance.fontSize}px`
-        : undefined,
-    ...(colors ? { '--paper': colors['surface-opaque'], '--ink': colors.text } : {}),
-  } as React.CSSProperties;
+  const native = !!window.__buddyNativeSurface;
+  const surface = useRef<HTMLDivElement>(null);
+  const material = appearance.surface?.theme;
+  const variant = appearance.surface?.liquidVariant;
+  useEffect(() => {
+    if (native || material !== 'native-glass' || !surface.current) return;
+    let glass: { refresh: (variant?: string) => void; destroy: () => void } | undefined;
+    try {
+      glass = createSvgGlass(surface.current);
+    } catch {
+      return;
+    }
+    const refresh = () => glass?.refresh(variant);
+    refresh();
+    const resize = new ResizeObserver(refresh);
+    resize.observe(surface.current);
+    return () => {
+      resize.disconnect();
+      glass?.destroy();
+    };
+  }, [native, material, variant]);
+  const style = surfaceStyle(
+    {
+      ...appearance,
+      theme: projection?.theme || appearance.theme,
+      fontSize: projection?.hostTypography?.baseItemFontSize || appearance.fontSize,
+    },
+    native,
+  );
   return (
-    <section className="feature-view" data-feature={entry.id} style={style}>
+    <section
+      className="feature-view"
+      data-feature={entry.id}
+      data-busy={busy}
+      data-material={material || 'matte'}
+      style={{ ...style, background: 'transparent', backdropFilter: undefined }}
+    >
+      <div
+        className="feature-material"
+        ref={surface}
+        style={{ background: style.background, backdropFilter: style.backdropFilter }}
+        aria-hidden="true"
+      />
       <header className="feature-head">
         <strong>{titles[entry.id]}</strong>
         <select
@@ -255,7 +271,7 @@ export function FeatureView({
           <option value="desktop" disabled={entry.desktopSupported === false}>
             桌面窗口
           </option>
-          {entry.id === 'model' && <option value="edge">贴边控制条</option>}
+          <option value="edge">贴边 / 刘海</option>
         </select>
         <button
           aria-label={`关闭${titles[entry.id]}`}
@@ -284,6 +300,7 @@ export function FeatureView({
           model ? (
             <ModelView
               state={model}
+              reading={reading.current}
               busy={locked || !connected}
               action={(data, action) =>
                 operation(async () => {

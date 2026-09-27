@@ -1,6 +1,6 @@
 // [INPUT]: Wry 所属 NSWindow、原生背景几何与共享材质偏好。
 // [OUTPUT]: 根据宿主 theme 设置自有 NSWindow 外观； 哑光关闭背景、HUDWindow 磨砂及 macOS 26+ Regular/Clear 液态。
-// [POS]: panel_window 与 model_control_window 共用的 AppKit 背景层。
+// [POS]: panel_window、feature_window 与 edge_window 共用的 AppKit 背景层。
 // [PROTOCOL]: 共享材质保持窗口无关；控制条在根视图统一裁切背景与网页，更新内容边缘和刘海两翼，工作台仍用圆角矩形。
 
 use objc2::{MainThreadMarker, MainThreadOnly, rc::Retained, runtime::AnyClass};

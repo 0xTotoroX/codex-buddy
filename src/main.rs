@@ -7,13 +7,13 @@ mod assets;
 mod cdp;
 mod config;
 mod directions;
+mod edge_window;
 mod feature_window;
 mod features;
 mod jev;
 mod lifecycle;
 mod model;
 mod model_control;
-mod model_control_window;
 mod native_backdrop;
 mod panel;
 mod panel_window;
@@ -23,6 +23,7 @@ mod settings;
 mod state;
 #[cfg(test)]
 mod stepwise_tests;
+mod surfaces;
 mod tasks;
 
 use anyhow::Result;
@@ -63,10 +64,10 @@ enum Commands {
     Board,
     #[command(about = "将胶囊弹出到桌面，复用后台与当前连接")]
     Popout,
-    #[command(about = "打开独立模型控制条，保留工作台和宿主当前任务")]
+    #[command(about = "在保存的呈现形式中打开模型快切，保留宿主当前任务")]
     ModelControl,
     #[command(hide = true)]
-    ModelControlWindow {
+    EdgeWindow {
         #[arg(long)]
         lease: String,
     },
@@ -159,7 +160,7 @@ async fn main() -> Result<()> {
                 .await?;
             Ok(())
         }
-        Commands::ModelControlWindow { lease } => model_control_window::run(&paths, &lease),
+        Commands::EdgeWindow { lease } => edge_window::run(&paths, &lease),
         Commands::ModelControl => {
             lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;
             lifecycle::Runtime::read(&paths)?

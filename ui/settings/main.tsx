@@ -33,6 +33,7 @@ import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
 import { SettingsOutline } from './settings-outline';
 import { TaskSettings } from './task-settings';
+import { SurfaceSettings } from './surface-settings';
 import { ModelControlSettings } from './model-control-settings';
 import { DirectionSettings } from './direction-settings';
 import { useSettingsForm } from './use-settings-form';
@@ -192,6 +193,7 @@ function App() {
           </div>
           <ModelControlSettings live={live} />
           <TaskSettings />
+          <SurfaceSettings live={live} desktopSupported={saved?.popoutSupported === true} />
           {loadingError && (
             <div
               className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"

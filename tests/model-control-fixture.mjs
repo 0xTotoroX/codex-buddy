@@ -264,7 +264,8 @@ export function installModelControlFixture({ records, options = {} }) {
                   state.changes.push({ id, ...config });
                   render();
                 };
-                if (state.delay) setTimeout(commit, state.delay);
+                if (state.holdCommit) state.pendingCommit = commit;
+                else if (state.delay) setTimeout(commit, state.delay);
                 else commit();
                 if (state.onSelect) state.onSelect(section, pane);
               });
