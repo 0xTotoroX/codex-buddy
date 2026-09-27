@@ -6,7 +6,7 @@
  */
 import { foregroundSurface } from './surfaces.js';
 const SLOT = 'data-codex-buddy-dock';
-const OWN_UI = `[${SLOT}],[data-companion-stepwise-root]`;
+const OWN_UI = `[${SLOT}],[data-companion-stepwise-root],[data-codex-buddy-features-root]`;
 const visible = (node) =>
   node && node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility === 'visible';
 

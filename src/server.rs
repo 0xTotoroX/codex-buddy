@@ -103,6 +103,7 @@ pub async fn serve(
         .await;
     watcher.abort();
     task_watcher.abort();
+    app.stop_features().await;
     app.tasks.stop().await;
     app.disconnect().await;
     if let Ok(current) = Runtime::read(&paths)
@@ -121,6 +122,7 @@ async fn termination() {
 
 fn router(service: Service) -> Router {
     let api = Router::new()
+        .route("/features", post(features))
         .route("/tasks/state", get(tasks_state))
         .route("/tasks/command", post(tasks_command))
         .route("/state", get(state))
@@ -405,14 +407,36 @@ async fn model_control_refresh(State(service): State<Service>) -> Result<Json<Va
 }
 async fn model_control_apply(
     State(service): State<Service>,
+    headers: HeaderMap,
     Json(command): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
+    let _guard = service
+        .app
+        .feature_operation
+        .try_lock()
+        .map_err(|_| ApiError::from(anyhow::anyhow!("已有功能操作正在进行")))?;
+    if let Some(lease) = headers.get("x-model-control-lease") {
+        service
+            .app
+            .validate_model_edge(lease.to_str().unwrap_or(""))
+            .await?;
+    }
     Ok(Json(service.app.model_control_apply(command).await?))
 }
 async fn model_control_preferences(
     State(service): State<Service>,
+    headers: HeaderMap,
     Json(patch): Json<Value>,
 ) -> Response {
+    let _guard = service.app.feature_operation.lock().await;
+    if let Some(lease) = headers.get("x-model-control-lease")
+        && let Err(error) = service
+            .app
+            .validate_model_edge(lease.to_str().unwrap_or(""))
+            .await
+    {
+        return ApiError::from(error).into_response();
+    }
     match service.app.model_control_preferences(patch).await {
         Ok(value) => Json(value).into_response(),
         Err(error) if error.to_string() == "model_control_conflict" => (
@@ -746,6 +770,20 @@ async fn tasks_command(
     State(service): State<Service>,
     Json(command): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
+    let window_guard = if command["op"] == "open" {
+        Some(service.app.feature_operation.lock().await)
+    } else {
+        None
+    };
+    if command["op"] == "open" && service.app.feature_managed("board").await {
+        drop(window_guard);
+        return Ok(Json(
+            service
+                .app
+                .feature_request(json!({"op":"reveal","id":"board"}))
+                .await?,
+        ));
+    }
     let modules_changed = command["op"] == "modules";
     let result = service.app.tasks.command(command).await?;
     if modules_changed {
@@ -753,4 +791,11 @@ async fn tasks_command(
         service.app.sync_desktop_settings(&settings).await;
     }
     Ok(Json(result))
+}
+
+async fn features(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.feature_request(input).await?))
 }

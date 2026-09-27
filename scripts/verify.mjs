@@ -97,6 +97,7 @@ async function verify() {
   const env = { ...process.env, CODEX_BUDDY_TEST_BINARY: artifact.binary };
   run(process.execPath, ['tests/model-control-e2e.mjs'], env);
   run(process.execPath, ['tests/board.mjs'], env);
+  run(process.execPath, ['tests/features-e2e.mjs'], env);
   run(process.execPath, ['tests/e2e.mjs'], env);
   run(process.execPath, ['tests/lifecycle-test.mjs'], env);
   if (process.argv.includes('--native')) run(process.execPath, ['tests/native-check.mjs'], env);

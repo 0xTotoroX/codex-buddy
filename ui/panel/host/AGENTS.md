@@ -15,3 +15,5 @@
 context 负责跟随/锁定策略、稳定聊天身份验证和唯一来源重绑；锁定失联不回退其他来源。操作输入框前验证聊天身份；输入框在消息区旁边时，只扩展到包含唯一聊天的最近容器。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+dock/surfaces/context 排除 data-codex-buddy-features-root 自有 UI，防止将浮层、编辑框或布局变化识别为宿主聊天。

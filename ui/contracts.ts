@@ -33,6 +33,7 @@ export interface EditableSettings {
 }
 export interface Settings extends EditableSettings {
   taskBoardEnabled?: boolean;
+  modelControlEnabled?: boolean;
   popoutSupported: boolean;
   apiKeyConfigured: boolean;
   storedApiKey: boolean;

@@ -61,6 +61,8 @@ struct Desired {
 }
 
 pub struct App {
+    pub(crate) features: Mutex<crate::features::Features>,
+    pub(crate) feature_operation: Mutex<()>,
     pub tasks: Arc<crate::tasks::Service>,
     pub views: watch::Sender<View>,
     pub shutdown: Notify,
@@ -115,6 +117,8 @@ impl App {
             panel_font_base: 13.,
         });
         Arc::new(Self {
+            features: Mutex::new(crate::features::Features::load(&paths)),
+            feature_operation: Mutex::new(()),
             tasks: crate::tasks::Service::load(&paths),
             views,
             shutdown: Notify::new(),
@@ -156,6 +160,7 @@ impl App {
             let mut attempts = 0;
             loop {
                 interval.tick().await;
+                self.supervise_features().await;
                 self.supervise_panel().await;
                 self.supervise_model_control().await;
                 let prefs = self.appearance().await;

@@ -11,3 +11,5 @@ requests 请求桥供共享胶囊调用后台白名单操作；不再独立识�
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
 任务试点仅放行 /tasks/state 与 /tasks/command；后端确认活动 CDP 客户端，并由 tasks::view_command 拒绝授权、绑定、模块开关和窗口管理等设置操作。
+
+白名单 /features 仅访问固定功能操作；Rust 再校验当前 CDP 连接、owner 与具体业务命令，宿主不取得 HTTP bearer。

@@ -80,3 +80,5 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 
 - [feature-surfaces.mjs](feature-surfaces.mjs)：由 workbench.mjs 执行的功能/容器试点，验证状态接续、任务唯一性、独立开关、轮询回收、Shadow DOM 键盘及宿主断连后任务编辑；使用合成任务，不访问 EventKit。
 - native-check.mjs 的 --features-only 在真实 Wry/AppKit 窗口中验证大纲/看板选择、任务更新及宽窄布局，报告位于 target/reports/native-features；不连接用户聊天或提醒事项。
+
+`independent-features.mjs`：四功能共享侧栏/浮层、十轮交接、草稿、模型回读与无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的独立位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、单进程唤起及往返。

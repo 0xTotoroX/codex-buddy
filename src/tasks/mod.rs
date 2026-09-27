@@ -535,6 +535,24 @@ impl Service {
         };
         Ok(())
     }
+    pub async fn window_open(&self) -> bool {
+        self.inner
+            .lock()
+            .await
+            .window
+            .as_mut()
+            .is_some_and(|child| child.try_wait().ok().flatten().is_none())
+    }
+
+    pub async fn close_window(&self) {
+        let mut inner = self.inner.lock().await;
+        inner.lease.clear();
+        if let Some(mut child) = inner.window.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
     pub async fn stop(&self) {
         self.desired.store(false, Ordering::SeqCst);
         bridge::stop(&self.paths);

@@ -16,3 +16,5 @@ EventKit 没有跨设备 compare-and-swap：写前回读缩小竞争窗口，但
 [PROTOCOL]: 结构或契约变化时同步本文与父级地图。
 
 view_command 是宿主内嵌看板的任务操作白名单，拒绝权限、列表映射、模块及原生窗口管理；board_enabled 只投影开关，视图位置不会更改同步开关。
+
+close_window 只回收旧独立看板窗口，由新功能 ready 调用；任务存储、同步工作线程与开关保持独立。

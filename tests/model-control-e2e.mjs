@@ -131,6 +131,15 @@ try {
   const { targetInfo } = await cdp.send('Target.getTargetInfo');
   await cdp.detach();
   const targetId = targetInfo.targetId;
+  // Exercise the enabled service without a native control bar adding passive polls.
+  writeFileSync(
+    join(directory, 'features.json'),
+    JSON.stringify({ model: { placement: 'sidebar', open: false, size: [840, 620] } }),
+    { mode: 0o600 },
+  );
+  writeFileSync(join(directory, 'model-control.json'), JSON.stringify({ enabled: true }), {
+    mode: 0o600,
+  });
   writeFileSync(
     join(directory, 'config.json'),
     JSON.stringify({
@@ -194,6 +203,7 @@ try {
   const fast = { model: 'alpha', reasoning: 'high', speed: 'fast' };
   const beta = { model: 'beta', reasoning: 'high', speed: 'standard' };
   await page.waitForFunction(() => typeof window.__codexBuddyModelControl?.snapshot === 'function');
+  await page.waitForFunction(() => window.__companionFloatingPanel?.state.settingsLoaded === true);
   await waitFor(
     async () => (await request('state')).body.connection?.targetId === targetId,
     'Backend did not use the configured target',
@@ -211,10 +221,11 @@ try {
   );
 
   const missing = await api('state');
-  assert.equal(missing.snapshot.status, 'waiting');
+  assert.equal(missing.snapshot.status, 'waiting', JSON.stringify(missing.snapshot));
   assert.deepEqual(missing.snapshot.models, []);
   await page.evaluate(() => capability('backend-observed'));
   const passive = await api('state');
+  assert.ok(passive.snapshot.target, JSON.stringify(passive.snapshot));
   assert.equal(passive.snapshot.target.id, 'chat-a');
   assert.equal(passive.snapshot.status, 'waiting');
   assert.equal(passive.snapshot.current, null);

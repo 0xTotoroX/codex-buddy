@@ -13,3 +13,5 @@
 - [styles.css](styles.css)：独立页面的响应式多列、原生字体、米白与墨色的极简明暗主题及高对比、焦点和减少动态效果。
 
 [PROTOCOL]: 文件或职责变化时同步本文与父级地图。
+
+BoardView 增加原任务快照、revision、草稿字段及暂停编辑状态；Editor 的“保留草稿并返回”允许迁移前退出模态层。locked 在交接时禁用真实输入（包括可逃逸祖先 inert 的 modal）；移动不保存任务，expectedTask 仍校验原快照。

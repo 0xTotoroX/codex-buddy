@@ -338,6 +338,7 @@ function outlineEnabled(settings = runtimeState.settings) {
 function runtimeEnabled(settings = runtimeState.settings) {
   return (
     IS_POPOUT ||
+    settings?.modelControlEnabled === true ||
     settings?.taskBoardEnabled === true ||
     stepwiseEnabled(settings) ||
     outlineEnabled(settings)

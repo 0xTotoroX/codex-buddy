@@ -255,6 +255,7 @@ function changed(path) {
     path.startsWith('ui/panel/') ||
     path.startsWith('ui/bridge/') ||
     path.startsWith('ui/board/') ||
+    path.startsWith('ui/features/') ||
     path === 'ui/settings/api.ts'
   )
     pendingPanel = true;

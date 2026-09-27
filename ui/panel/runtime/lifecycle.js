@@ -4,6 +4,7 @@
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { startFeatureHost, stopFeatureHost } from '../workbench/feature-host.js';
 import { panelAppearance } from '../core/panel-appearance.js';
 
 import {
@@ -272,7 +273,12 @@ function installObserver() {
   runtimeState.observer = new MutationObserver((mutations) => {
     if (!isCurrentRuntime(generation)) return;
     const relevant = mutations.some((mutation) => {
-      if (shellState.root?.contains(mutation.target)) return false;
+      if (
+        shellState.root?.contains(mutation.target) ||
+        (mutation.target instanceof Element &&
+          mutation.target.closest('[data-codex-buddy-features-root]'))
+      )
+        return false;
       return mutation.addedNodes.length || mutation.type === 'characterData';
     });
     if (relevant) scheduleScan();
@@ -286,6 +292,7 @@ function installObserver() {
 }
 
 function stopRuntime() {
+  stopFeatureHost();
   stopWorkbench();
   cancelFaceClick();
   window.dispatchEvent(
@@ -405,6 +412,7 @@ function activateRuntime() {
     renderFloat();
     return true;
   }
+  startFeatureHost();
   installContextTracking();
   if (!runtimeState.observer && !installObserver()) {
     const domReadyHandler = () => {

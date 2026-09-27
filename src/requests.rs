@@ -86,11 +86,14 @@ pub(crate) async fn dispatch(
     request: &Request,
 ) -> Result<Value> {
     match request.path.as_str() {
-        "/tasks/state" | "/tasks/command" => {
+        "/features" | "/tasks/state" | "/tasks/command" => {
             let client = client.context("只能从关联的 Codex 使用内嵌看板")?;
             let current = app.desktop_client().await.context("Codex 已断开")?;
             if !Arc::ptr_eq(client, &current) {
                 bail!("Codex 连接已变化");
+            }
+            if request.path == "/features" {
+                return app.feature_request(request.payload.clone()).await;
             }
             if request.path == "/tasks/state" {
                 return Ok(app.tasks.state().await);

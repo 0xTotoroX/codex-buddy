@@ -257,11 +257,27 @@ impl App {
         Ok(control.envelope(snapshot))
     }
 
+    pub async fn validate_model_edge(&self, lease: &str) -> Result<()> {
+        anyhow::ensure!(
+            self.feature_edge_writable().await,
+            "模型功能已移到其他位置或正在交接"
+        );
+        let control = self.model_control.lock().await;
+        anyhow::ensure!(
+            !lease.is_empty() && control.lease == lease && control.preferences.enabled,
+            "模型窗口归属已失效"
+        );
+        Ok(())
+    }
     pub async fn model_control_apply(&self, command: Value) -> Result<Value> {
         let operation = self.model_control.lock().await.operation.clone();
         let _guard = operation
             .try_lock()
             .map_err(|_| anyhow::anyhow!("已有模型操作正在进行"))?;
+        anyhow::ensure!(
+            self.model_control.lock().await.preferences.enabled,
+            "模型快切已停用"
+        );
         let selection: Selection =
             serde_json::from_value(command["selection"].clone()).context("请选择完整模型配置")?;
         selection.validate()?;
@@ -314,6 +330,8 @@ impl App {
     }
 
     pub async fn model_control_preferences(&self, request: Value) -> Result<Value> {
+        let operation = self.model_control.lock().await.operation.clone();
+        let _guard = operation.lock().await;
         let mut control = self.model_control.lock().await;
         if let Some(revision) = request.get("revision") {
             if revision.as_u64() != Some(control.revision) {
@@ -337,6 +355,21 @@ impl App {
     }
 
     pub async fn open_model_control(&self) -> Result<Value> {
+        if self.feature_model_embedded().await {
+            {
+                let mut control = self.model_control.lock().await;
+                control.preferences.enabled = true;
+                control.save(&self.paths)?;
+                control.revision += 1;
+            }
+            return self
+                .feature_request(json!({"op":"reveal","id":"model"}))
+                .await;
+        }
+        self.open_model_control_edge().await
+    }
+
+    pub async fn open_model_control_edge(&self) -> Result<Value> {
         let mut control = self.model_control.lock().await;
         let previous = control.preferences.enabled;
         control.preferences.enabled = true;
@@ -355,6 +388,8 @@ impl App {
     }
 
     pub async fn close_model_control(&self) -> Result<Value> {
+        let operation = self.model_control.lock().await.operation.clone();
+        let _guard = operation.lock().await;
         let mut control = self.model_control.lock().await;
         let previous = control.preferences.enabled;
         control.preferences.enabled = false;
@@ -395,8 +430,10 @@ impl App {
         };
         let ui = self.appearance().await.ui;
         let appearance = json!({"material":ui.material,"liquidVariant":ui.liquid_variant,"fontOffset":ui.font_offset,"hostTheme":host["appearance"]});
+        let embedded = self.feature_model_embedded().await;
         let mut control = self.model_control.lock().await;
-        let valid = !lease.is_empty()
+        let valid = !embedded
+            && !lease.is_empty()
             && control.lease == lease
             && control.preferences.enabled
             && control.alive();
@@ -404,7 +441,16 @@ impl App {
     }
 
     pub async fn supervise_model_control(&self) {
+        let embedded = self.feature_model_embedded().await;
         let mut control = self.model_control.lock().await;
+        if embedded {
+            control.lease.clear();
+            if let Some(mut child) = control.child.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+            }
+            return;
+        }
         if control.preferences.enabled
             && !control.alive()
             && control

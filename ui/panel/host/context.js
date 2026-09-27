@@ -593,6 +593,7 @@ function ignoredComposerContainer(node, targetRoot = null) {
     [
       `[${ROOT_ATTR}="true"]`,
       '[data-codex-buddy-dock]',
+      '[data-codex-buddy-features-root]',
       'nav',
       "[role='dialog']",
       "[aria-modal='true']",

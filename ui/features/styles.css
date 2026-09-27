@@ -1,0 +1,139 @@
+/* [INPUT]: Shared feature and board DOM. [OUTPUT]: Quiet responsive surfaces.
+ * [POS]: Shadow-isolated presentation. [PROTOCOL]: Keep features/AGENTS.md in sync. */
+:host {
+  --paper: #faf9f6;
+  --ink: #343630;
+  display: block;
+  min-width: 0;
+  height: 100%;
+  color: var(--ink);
+  color-scheme: light dark;
+  font:
+    13px -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+* {
+  box-sizing: border-box;
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button,
+select {
+  background: transparent;
+  border: 1px solid #8884;
+  border-radius: 5px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+button:disabled,
+select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+button[aria-pressed='true'] {
+  background: #8882;
+  border-color: #8888;
+}
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #777;
+  outline-offset: 2px;
+}
+.feature-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  overflow: hidden;
+  border-radius: 8px;
+}
+.feature-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid #8883;
+  flex: none;
+}
+.feature-head strong {
+  flex: 1;
+  white-space: nowrap;
+}
+.feature-head select {
+  max-width: 120px;
+}
+.feature-body {
+  min-height: 0;
+  overflow: auto;
+  flex: 1;
+  padding: 12px;
+}
+.feature-view[data-feature='board'] > .feature-body {
+  padding: 0;
+}
+.feature-view > p {
+  padding: 0 12px;
+}
+.feature-source {
+  font-size: 11px;
+  opacity: 0.6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+.outline-item {
+  display: block;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  line-height: 1.6;
+  margin: 4px 0;
+}
+.outline-item:hover {
+  background: #8881;
+}
+.prompt-card,
+.model-row {
+  padding: 12px 0;
+  border-bottom: 1px solid #8883;
+}
+.prompt-card p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.model-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.feature-model > input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #8884;
+  background: transparent;
+  border-radius: 5px;
+}
+@media (prefers-color-scheme: dark) {
+  :host {
+    --paper: #232420;
+    --ink: #dfdfd8;
+  }
+}
+
+:host([hidden]) {
+  display: none !important;
+}

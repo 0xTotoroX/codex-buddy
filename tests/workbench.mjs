@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { showRetainedSettings } from './workbench-actions.mjs';
+import { independentFeatureCases } from './independent-features.mjs';
 import { featureSurfaceCases } from './feature-surfaces.mjs';
 import { chatBindingCases } from './workbench-binding.mjs';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -86,7 +87,8 @@ async function setup(page) {
       const { id, path, payload } = JSON.parse(raw);
       fixture.requests.push({ path, payload });
       let reply;
-      if (path === '/settings/open') reply = { status: 'ok' };
+      if (path === '/features' && payload.op === 'state') reply = { features: [] };
+      else if (path === '/settings/open') reply = { status: 'ok' };
       else if (path === '/stepwise/settings') reply = { settings: fixture.settings };
       else if (path === '/stepwise/generate' && fixture.deferred) {
         fixture.deferred.push({ id, payload });
@@ -400,6 +402,7 @@ async function chooseLayout(page, action) {
 
 const cases = [
   ...featureSurfaceCases({ mode, createPopout, settle, output, bundle }),
+  ...independentFeatureCases({ mode, syncSettings }),
   [
     'slim capsule restores either saved in-chat placement with neutral keyboard focus',
     async (page) => {

@@ -2,6 +2,7 @@
  * [OUTPUT]: Pilot feature selector and container-independent board mount.
  * [POS]: Presentation composition; no task mutations or chat parsing.
  * [PROTOCOL]: Keep workbench/AGENTS.md in sync. */
+import { revealFeature } from './feature-host.js';
 import { mountBoard } from '../../board/embed';
 import { IS_POPOUT, POPOUT } from '../runtime/constants.js';
 import { shellState, runtimeState, bridgeCall } from '../runtime/state.js';
@@ -25,6 +26,18 @@ export function installFeatureControls(root) {
   toolbar.className = 'csw-feature-controls';
   toolbar.innerHTML = `<label>功能 <select aria-label="显示功能">${featureViews.map((f) => `<option value="${f.id}">${f.title}</option>`).join('')}</select></label><label>显示于 <select aria-label="功能显示位置"><option value="sidebar">侧栏</option><option value="overlay">页面浮层</option><option value="desktop">桌面窗口</option></select></label>`;
   root.querySelector('.csw-workbench-head').after(toolbar);
+  if (!IS_POPOUT) {
+    const launch = document.createElement('select');
+    launch.setAttribute('aria-label', '独立打开功能');
+    launch.innerHTML =
+      '<option value="">独立打开…</option><option value="outline">大纲</option><option value="board">看板</option><option value="next">下一步</option><option value="model">模型快切</option>';
+    launch.onchange = () => {
+      const id = launch.value;
+      launch.value = '';
+      if (id) void revealFeature(id).catch((e) => alert(String(e)));
+    };
+    toolbar.append(launch);
+  }
   /** @type {HTMLSelectElement} */ (
     toolbar.querySelector('select[aria-label="显示功能"]')
   ).onchange = (event) => {

@@ -279,6 +279,8 @@ pub struct Input {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub editor: Option<Value>,
     pub search: String,
     pub tab: String,
     pub stage: String,
@@ -318,7 +320,11 @@ pub struct PaneReadingState {
 impl ReadingState {
     fn validate(&self) -> Result<()> {
         if let Some(view) = &self.task_view
-            && (view.search.len() > 4000
+            && (view
+                .editor
+                .as_ref()
+                .is_some_and(|v| v.to_string().len() > 128 * 1024)
+                || view.search.len() > 4000
                 || !["board", "archive", "attention"].contains(&view.tab.as_str())
                 || !["todo", "doing", "waiting", "done"].contains(&view.stage.as_str()))
         {
@@ -383,6 +389,9 @@ impl App {
     }
 
     pub async fn detach_panel(&self, ui: Option<Ui>) -> Result<()> {
+        if self.features_active().await {
+            bail!("请在独立功能标题旁选择桌面窗口");
+        }
         let activate = ui.is_some();
         let mut panel = self.panel.lock().await;
         require_popout(panel.popout_supported)?;
@@ -589,13 +598,17 @@ impl App {
                 bail!("浮窗尚未就绪");
             }
         }
+        self.execute_panel_command(&input.command).await
+    }
+
+    pub(crate) async fn execute_panel_command(&self, command: &Value) -> Result<Value> {
         let client = self.desktop_client().await.context("Codex 连接已断开")?;
         let result = client.evaluate(format!(
-            "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", input.command
+            "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", command
         )).await?;
         if result["ok"] == true
             && ["fill", "quick-fill", "outline-jump", "outline-anchor"]
-                .contains(&input.command["kind"].as_str().unwrap_or_default())
+                .contains(&command["kind"].as_str().unwrap_or_default())
         {
             let _ = client.request("Page.bringToFront", json!({})).await;
         }

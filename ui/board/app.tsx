@@ -4,20 +4,35 @@
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, RefreshCw, LayoutDashboard, Archive, AlertCircle } from 'lucide-react';
-import { columns, useTasks, type Task, type TaskRequest } from './api';
+import { columns, useTasks, type Task, type Fields, type TaskRequest } from './api';
 import { Column, TaskCard } from './card';
 import { Editor } from './editor';
-export type BoardView = { search: string; stage: string; tab: string };
+export type BoardEditor = {
+  task: Task | null;
+  revision: number;
+  draft?: Fields;
+  suspended?: boolean;
+};
+export type BoardView = {
+  search: string;
+  stage: string;
+  tab: string;
+  gridLeft?: number;
+  editor?: BoardEditor | null;
+};
 export function Board({
   request,
   embedded = false,
+  locked = false,
   view,
 }: {
   request: TaskRequest;
   embedded?: boolean;
+  locked?: boolean;
   view?: BoardView;
 }) {
-  const { state, error, busy, command } = useTasks(true, request);
+  const { state, error, busy: taskBusy, command } = useTasks(true, request);
+  const busy = taskBusy || locked;
   const element = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
   const [stage, setStage] = useState(view?.stage ?? 'todo');
@@ -29,11 +44,11 @@ export function Board({
     return () => observer.disconnect();
   }, [!!state]);
   const [tab, setTab] = useState(view?.tab ?? 'board');
-  const [editor, setEditor] = useState<{ task: Task | null; revision: number } | null>(null);
+  const [editor, setEditor] = useState<BoardEditor | null>(view?.editor ?? null);
   const [search, setSearch] = useState(view?.search ?? '');
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab });
-  }, [view, search, stage, tab]);
+    if (view) Object.assign(view, { search, stage, tab, editor });
+  }, [view, search, stage, tab, editor]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(
@@ -43,6 +58,10 @@ export function Board({
     window.addEventListener('board-size', resize);
     return () => window.removeEventListener('board-size', resize);
   }, [request]);
+  useEffect(() => {
+    const grid = element.current?.querySelector<HTMLElement>('.board-grid');
+    if (grid && !narrow) grid.scrollLeft = view?.gridLeft || 0;
+  }, [narrow, tab, state?.store.tasks.length, view]);
   const move = useCallback(
     (id: string, column: string, before?: string) => {
       const task = state?.store.tasks.find((t) => t.id === id);
@@ -93,7 +112,15 @@ export function Board({
     />
   );
   return (
-    <div ref={element} className={`board-app ${embedded ? 'embedded' : ''}`}>
+    <div
+      ref={element}
+      onScrollCapture={(e) => {
+        const node = e.target as HTMLElement;
+        if (view && node.classList.contains('board-grid') && node.scrollWidth > node.clientWidth)
+          view.gridLeft = node.scrollLeft;
+      }}
+      className={`board-app ${embedded ? 'embedded' : ''}`}
+    >
       <header className="board-header">
         <div className="heading">
           <div>
@@ -102,6 +129,9 @@ export function Board({
           </div>
         </div>
         <div className="header-actions">
+          {editor?.suspended && (
+            <button onClick={() => setEditor({ ...editor, suspended: false })}>继续编辑草稿</button>
+          )}
           <button
             disabled={busy || !state.store.syncEnabled}
             onClick={() => void command({ op: 'sync' })}
@@ -214,10 +244,16 @@ export function Board({
           </div>
         )}
       </main>
-      {editor && (
+      {editor && !editor.suspended && (
         <Editor
           key={`${editor.task?.id ?? 'new'}-${editor.revision}`}
           task={editor.task}
+          draft={editor.draft}
+          onDraft={(draft) => {
+            editor.draft = draft;
+            if (view) view.editor = editor;
+          }}
+          suspend={() => setEditor({ ...editor, suspended: true })}
           busy={busy}
           error={error}
           close={() => setEditor(null)}

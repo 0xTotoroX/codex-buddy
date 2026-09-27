@@ -14,6 +14,7 @@ fn main() {
     for path in [
         "ui/panel",
         "ui/board",
+        "ui/features",
         "ui/model-control",
         "ui/tokens.css",
         "ui/bridge/requests.js",

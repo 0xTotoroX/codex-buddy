@@ -7,6 +7,8 @@ mod assets;
 mod cdp;
 mod config;
 mod directions;
+mod feature_window;
+mod features;
 mod jev;
 mod lifecycle;
 mod model;
@@ -38,6 +40,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(hide = true)]
+    FeatureWindow {
+        #[arg(long)]
+        feature: String,
+        #[arg(long)]
+        lease: String,
+    },
     #[command(hide = true)]
     RemindersWorker {
         #[arg(long)]
@@ -141,6 +150,7 @@ async fn main() -> Result<()> {
             lease,
             runtime_token,
         } => tasks::native::run(&paths, &lease, &runtime_token),
+        Commands::FeatureWindow { feature, lease } => feature_window::run(&paths, &feature, &lease),
         Commands::BoardWindow { lease } => tasks::window::run(&paths, &lease),
         Commands::Board => {
             lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;

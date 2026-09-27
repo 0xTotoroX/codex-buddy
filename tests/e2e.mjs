@@ -932,7 +932,13 @@ try {
     );
     record('设置大纲桌面/窄屏跳转、滚动跟随、键盘与深链接；Codex 主题写入入口移除');
 
-    assert.equal(await page.locator('option[value="desktop"]').isDisabled(), false);
+    assert.equal(
+      await page
+        .getByLabel('显示方式', { exact: true })
+        .locator('option[value="desktop"]')
+        .isDisabled(),
+      false,
+    );
     const gatedSettings = await context.newPage();
     await gatedSettings.route('**/api/settings', async (route) => {
       const response = await route.fetch();
@@ -942,7 +948,12 @@ try {
     await gatedSettings.goto(`${base}/#token=${runtime.token}`);
     await gatedSettings.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
     await waitFor(
-      () => gatedSettings.locator('option[value="desktop"]').evaluate((option) => option.disabled),
+      () =>
+        gatedSettings
+          .locator('option[value="desktop"]')
+          .evaluateAll(
+            (options) => options.length === 5 && options.every((option) => option.disabled),
+          ),
       'Unsupported desktop option remained enabled',
     );
     assert.equal(await gatedSettings.locator('option[value="embedded"]').isDisabled(), false);

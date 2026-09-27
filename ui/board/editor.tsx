@@ -4,19 +4,25 @@ import { useEffect, useRef, useState } from 'react';
 import { columns, dueText, emptyFields, type Fields, type Task } from './api';
 export function Editor({
   task,
+  draft,
+  onDraft,
+  suspend,
   busy,
   error,
   close,
   command,
 }: {
   task: Task | null;
+  draft?: Fields;
+  onDraft?: (fields: Fields) => void;
+  suspend?: () => void;
   busy: boolean;
   error: string;
   close: () => void;
   command: (data: Record<string, unknown>) => Promise<unknown>;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [fields, setFields] = useState<Fields>(task?.fields ?? emptyFields());
+  const [fields, setFields] = useState<Fields>(draft ?? task?.fields ?? emptyFields());
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -27,7 +33,11 @@ export function Editor({
     const ok = await command({ id: task?.id, ...(task ? { expectedTask: task } : {}), ...data });
     if (ok) close();
   }
-  const patch = (p: Partial<Fields>) => setFields((f) => ({ ...f, ...p }));
+  const patch = (p: Partial<Fields>) => {
+    const next = { ...fields, ...p };
+    setFields(next);
+    onDraft?.(next);
+  };
   return (
     <dialog
       ref={dialog}
@@ -229,6 +239,11 @@ export function Editor({
         </div>
         <p className="hint">截止时间不会新增通知闹钟。卡片归档只影响本地显示。</p>
         <footer>
+          {suspend && (
+            <button type="button" disabled={busy} onClick={suspend}>
+              保留草稿并返回
+            </button>
+          )}
           {task && (
             <div className="actions">
               <button

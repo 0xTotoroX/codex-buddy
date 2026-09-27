@@ -13,7 +13,9 @@ export function visibleSurface(node) {
 
 export function foregroundSurface() {
   const dialogs = [...document.querySelectorAll('[role="dialog"],dialog[open]')].filter(
-    (node) => !node.closest('[data-companion-stepwise-root]') && visibleSurface(node),
+    (node) =>
+      !node.closest('[data-companion-stepwise-root],[data-codex-buddy-features-root]') &&
+      visibleSurface(node),
   );
   const modal = dialogs.filter(
     (node) => node.getAttribute('aria-modal') === 'true' || node.matches(':modal'),

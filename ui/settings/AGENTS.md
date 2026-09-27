@@ -25,3 +25,5 @@ main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责�
 
 - [task-settings.tsx](task-settings.tsx)：任务看板和 Apple 同步独立开关、授权、同账户三列表创建、显式绑定及仅失效列表的确认修复；不修改模型快切与胶囊偏好。
 - [board.html](board.html)：独立任务看板 HTML 入口；Vite 多入口构建输出 board.html 和共享资源，页面业务位于 ../board。
+
+`feature-settings.tsx` 在外观页列出四功能位置及唤起入口，改变位置不启用业务服务；`feature.html` 是通用功能窗口入口，Vite 与 board/index 一起输出。

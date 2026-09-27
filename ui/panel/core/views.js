@@ -4,6 +4,7 @@
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { independentFeatures } from '../workbench/feature-host.js';
 
 import {
   CHIP_HEIGHT,
@@ -250,6 +251,13 @@ function renderFloat(options = {}) {
     (shellState.viewTransitioning || shellState.morphAnimation)
   ) {
     deferRender();
+    return;
+  }
+  if (independentFeatures()) {
+    installStyle();
+    installFloat();
+    syncTheme();
+    if (shellState.root) shellState.root.style.setProperty('display', 'none', 'important');
     return;
   }
   shellState.activeTab = normalizeActiveTab();

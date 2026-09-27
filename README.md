@@ -59,9 +59,13 @@ Titles, notes, due dates, priorities, list moves and completion are synchronized
 
 Task content stays local and is never sent to a model. An internal **CodexBuddy Reminders** helper owns the system permission. Native helper input changes can require renewed authorization; UI-only rebuilds reuse the verified helper; production signing and cross-device delivery require separate release acceptance.
 
-### Feature and placement pilot
+### Feature display locations
 
-In the expanded workbench, choose Outline or Board with the feature selector, then choose sidebar, page overlay, or desktop window. The existing two-pane workbench remains the default. The pilot has one active feature container, not independent simultaneous placements. Narrow boards show stage tabs; wide windows show columns. Reminder sync is independent of placement.
+Use **Independent open** in the workbench, or **Feature display location** in Web settings, to place the outline, task board, next-step suggestions and model switcher separately in a sidebar, an in-page overlay or a resizable desktop window. Sidebar features share tabs; model switching also supports its original screen-edge control. Each feature has one active view. The CodexBuddy menu reopens or focuses it.
+
+Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
+
+Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 
 ## Operations and state transitions
 

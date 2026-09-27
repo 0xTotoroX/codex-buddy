@@ -46,3 +46,9 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、三方字段合并、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
 
 工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
+
+独立功能呈现：
+- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、内存阅读状态及独立窗口监督；不复制业务服务。
+- [feature_window.rs](feature_window.rs)：自有认证 feature.html 的可缩放 Wry 窗口；按活动 lease 显示、唤起与退出，关闭前经网页保留草稿。
+
+App 持有 Features 和操作门；/features 同时支持认证 HTTP 与当前 CDP 连接白名单。panel 的 execute_panel_command 供旧/新窗口在各自验租约后复用。旧贴边模型 HTTP 写入同时校验 lease/归属；停用与模型操作串行。

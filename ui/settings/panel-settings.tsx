@@ -4,6 +4,7 @@
  * [POS]: 设置页外观、交互与窗口控件；不接收聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { FeatureSettings } from './feature-settings';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
 import { NativeSelect } from './components/ui/native-select';
@@ -352,6 +353,7 @@ export function PanelSettings({
           )}
         </details>
       </fieldset>
+      <FeatureSettings notify={notify} desktopSupported={popoutSupported} />
     </Card>
   );
 }

@@ -26,6 +26,7 @@
   "include": [
     "ui/settings",
     "ui/board",
+    "ui/features",
     "ui/contracts.ts"
   ]
 }
