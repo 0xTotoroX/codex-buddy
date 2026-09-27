@@ -45,11 +45,61 @@ if (['cargo', 'npm'].includes(basename(process.argv[1]))) {
       endpoint: config.cdpEndpoint,
     }) + '\n',
   );
+  const settings = JSON.parse(
+    readFileSync(join(process.env.BUDDY_FIXTURE_DIRECTORY, 'settings.json')),
+  );
+  const view = {
+    settingsUrl: process.env.CODEX_BUDDY_DEV_SETTINGS,
+    version: 'fixture',
+    configurationRevision: 1,
+    connection: {
+      status: 'connected',
+      endpoint: config.cdpEndpoint,
+      targetId: config.targetId,
+      targets: [],
+    },
+    desktop: { hasAnswer: false, headings: 0 },
+    model: { provider: 'api', model: 'fixture', label: 'fixture', available: true, reason: '' },
+  };
   const server = createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/api/events') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream' });
-      res.write(': connected\n\n');
+      res.write(`event: state\ndata: ${JSON.stringify(view)}\n\n`);
+      return;
+    }
+    if (req.url === '/api/tasks/state') {
+      res.end(
+        JSON.stringify({
+          store: {
+            revision: 0,
+            boardEnabled: false,
+            syncEnabled: false,
+            bindings: { todo: '', doing: '', waiting: '' },
+            tasks: [],
+            inflight: null,
+          },
+          status: 'fixture',
+        }),
+      );
+      return;
+    }
+    if (req.url === '/api/features') {
+      res.end(JSON.stringify({ features: [] }));
+      return;
+    }
+    if (req.url === '/api/settings') {
+      res.end(JSON.stringify(settings));
+      return;
+    }
+    if (req.url === '/api/model-control/state') {
+      res.end(
+        JSON.stringify({ revision: 1, preferences: { edge: 'left', position: 0.5, screen: '' } }),
+      );
+      return;
+    }
+    if (req.url === '/api/model-control/displays') {
+      res.end(JSON.stringify({ screens: [], nativeGlassAvailable: false }));
       return;
     }
     if (req.url === '/api/development') {

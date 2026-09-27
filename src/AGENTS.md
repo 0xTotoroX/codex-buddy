@@ -26,18 +26,18 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
 
 
-- [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源。
+- [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源；debug 通过 CODEX_BUDDY_DEV_SETTINGS 接收经验证的本机统一设置地址。
 
 - [cdp.rs](cdp.rs)：宿主连接基础层，被 state.rs 和 requests.rs 使用；目标发现与 Client 请求/事件/注入生命周期，内嵌共享胶囊，开发时检查胶囊归属并更新当前与导航后的脚本，将存活、显示同步和不含正文的状态摘要合并读取。
 - [config.rs](config.rs)：Rust 配置基础层，以 CODEX_BUDDY_HOME 或 codex-buddy 默认目录管理独立数据；Config、HostRestartPolicy（旧配置默认 ask）、Paths、默认参数及私有文件读写。
 - [requests.rs](requests.rs)：renderer 与独立后台的受限操作边界，生成前后校验上下文；按 maxInputChars=0 传递完整最近一问一答，正数预算由 Exchange 优先保留用户问题并标记截断，生成请求豁免普通设置请求的字节上限；桌面请求分发、建议 items 转换及结果回送。
-- [lifecycle.rs](lifecycle.rs)：CLI 进程管理层，负责复用服务和本地更新回滚；start/stop/status/doctor/launch/update 与 Runtime；launch 优先复用现有进程的调试连接，--restart-running 按 ask/force 策略确认正常退出或强制退出指定原生应用；等待退出后重开，取消/超时不升级或循环重启；--host-only 只输出就绪端点，不启动后台或改写配置，供 Dev 共享启动策略。
+- [lifecycle.rs](lifecycle.rs)：CLI 进程管理层，负责复用服务和本地更新回滚；start/stop/status/doctor/launch/update 与 Runtime；Dev 齿轮与启动入口优先使用监督进程的稳定设置地址；launch 优先复用现有进程的调试连接，--restart-running 按 ask/force 策略确认正常退出或强制退出指定原生应用；等待退出后重开，取消/超时不升级或循环重启；--host-only 只输出就绪端点，不启动后台或改写配置，供 Dev 共享启动策略。
 - [main.rs](main.rs)：独立可执行文件入口，区分后台和窗口子进程；codex-buddy 命令分发与进程入口。
 - [model.rs](model.rs)：模型适配层，统一 CLI 与 API 请求和结构化结果、三种方向来源的共享生成、总超时及有序方向 ID 校验；智谱官方端点按文本/视觉模型适配 JSON 模式、输出上限与思考参数，只解析完整的最终回答包装，其他服务商保留严格 schema；Model、ModelInfo、Suggestion 与生成/测试/模型查询。
 - [panel.rs](panel.rs)：后台系统浮窗管理层，窗口呈现确认后才隐藏内嵌胶囊，宿主恢复失败时保留浮窗；Panel、Preferences、临时 ReadingState 及弹出/收回/受限命令协调，普通建议与快捷词填入成功后唤起宿主；reveal_panel 保留现有呈现方式和实例，提供开发入口的唤起目标；统一检测 macOS 15+ arm64 弹出能力，限制手动/自动恢复及窗口子进程入口；旧玻璃偏好迁移为磨砂，弹出偏好始终展开且忽略宿主收起同步，外观 PATCH（含 liquidVariant）验证与版本控制，Web 修改和宿主回传分开同步，不提供 Codex 主题写入 API。
 - [window_warp.rs](window_warp.rs)：panel_window 的开发版整窗形变后端；私有 ABI 动态加载、独立曲面网格、错误回退和复位，网格身份/四方向顺序测试同文件维护。
 - [panel_window.rs](panel_window.rs)：窗口子进程实现，被 main.rs 调用；系统窗口事件循环、只允许展开尺寸的 WebView IPC、位置恢复、原生 resize 同事务更新玻璃与 WebView、拒绝过期网页尺寸、只读宿主主题对应的窗口外观及 macOS 原生手势；通过共享 native_backdrop 按材质实时切换传统磨砂 NSVisualEffectView HUDWindow/BehindWindow/Active 与系统液态 NSGlassEffectView（始终展开，由 liquidVariant 选择 Regular/Clear），回读实际状态；应用侧圆角父视图限制外溢绘制，液态通过 contentView 承载 WebView，磨砂位于透明 WebView 下方；哑光关闭原生背景，macOS 15–25 的弹出液态回退哑光；弹出进程禁止后台任务暂停以维持浮窗投影和租约。
-- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；开发模式按快照替换胶囊资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
+- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
 - [settings.rs](settings.rs)：分开维护保存版本与生成版本，大纲切换不取消生成；外部读取只返回密钥配置状态；Options、QuickPrompt、方向库/位置/来源与 Jev 同意和独立凭据、Update 及设置读取、校验和保存（maxInputChars 默认 0 表示完整最近一问一答，兼容旧正数上限）；快捷词持久化但不改变生成版本；返回后台检测的只读 popoutSupported。
 - [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
 

@@ -29,6 +29,7 @@ import { wsServer } from 'playwright-core/lib/utilsBundle';
 import { chromium } from 'playwright';
 import { until, stopChild } from '../scripts/dev-runtime.mjs';
 import { readRecord } from '../scripts/dev-sources.mjs';
+import { fixtureSettings } from './fixtures.mjs';
 
 test(
   'Dev switches isolated worktrees without restarting its host or losing the settings address',
@@ -39,6 +40,7 @@ test(
     const main = join(base, 'main'),
       other = join(base, 'Stepwise'),
       bin = join(base, 'bin');
+    writeFileSync(join(base, 'settings.json'), JSON.stringify(fixtureSettings));
     mkdirSync(main);
     mkdirSync(bin);
     mkdirSync(join(base, 'home'));
@@ -220,7 +222,7 @@ test(
         async () => (await (await send('dev/sources')).json()).loaded === true,
         'selected worktree hot update applied',
       );
-      // Mount the actual injected selector on a minimal settings page; API remains the real supervisor.
+      // Render the complete React page together with the injected source selector.
       const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
       browser = await chromium.launch({
         headless: true,
@@ -228,22 +230,25 @@ test(
           process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
       });
       const page = await browser.newPage();
-      await page.route(session.url + '/', async (route) => {
-        const response = await route.fetch();
-        const body = (await response.text()).replace(
-          /<script type="module" src="\/main.tsx"><\/script>/,
-          '',
-        );
-        await route.fulfill({ response, body });
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('console', (message) => {
+        if (message.type() === 'error' && !message.text().startsWith('WebSocket connection to'))
+          errors.push(message.text());
       });
       await page.goto(`${session.url}/#token=${session.token}`);
       await page.getByText(/开发来源 · Stepwise/).waitFor();
+      await page.getByRole('switch').first().waitFor();
+      await page.getByRole('heading', { name: '模型快切', exact: true }).waitFor();
+      assert.deepEqual(errors, [], 'complete settings page must render without React errors');
       await page.locator('summary').click();
       await page.getByLabel('调试 worktree').selectOption(main);
       await page.getByRole('button', { name: '切换来源' }).click();
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
       await page.locator('summary').click();
       await page.getByText(/界面资源已确认/).waitFor();
+      await page.getByRole('switch').first().waitFor();
+      assert.deepEqual(errors, [], 'settings must still render after switching source');
       assert.equal(
         await page.evaluate(
           async () =>
@@ -263,6 +268,17 @@ test(
       );
       mkdirSync(join(project, 'target/reports'), { recursive: true });
       await page.screenshot({ path: join(project, 'target/reports/dev-source-selector.png') });
+      const unauthenticated = await browser.newPage();
+      await unauthenticated.goto(session.url);
+      await unauthenticated.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
+      await unauthenticated.getByRole('alert').filter({ hasText: '缺少连接凭据' }).waitFor();
+      assert.equal(await unauthenticated.getByText('等待本地服务…', { exact: true }).count(), 0);
+      await unauthenticated.close();
+      const expired = await browser.newPage();
+      await expired.goto(`${session.url}/#token=expired`);
+      await expired.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
+      await expired.getByRole('alert').filter({ hasText: '连接凭据已过期' }).waitFor();
+      await expired.close();
       const events = readFileSync(join(base, 'events.jsonl'), 'utf8')
         .trim()
         .split('\n')

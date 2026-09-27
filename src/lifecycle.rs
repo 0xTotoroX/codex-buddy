@@ -1,6 +1,6 @@
 // [INPUT]: Paths、私有 runtime 信息、系统进程与本地产物。
 // [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；host-only 仅准备宿主并输出端点，不启后台或写配置；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
-// [POS]: CLI 进程管理层，负责复用服务和本地更新回滚。
+// [POS]: CLI 进程管理层，负责复用服务和本地更新回滚；Dev 设置入口优先使用监督进程地址。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::config::{self, Paths, VERSION, write_private};
@@ -28,7 +28,8 @@ impl Runtime {
         serde_json::from_slice(&std::fs::read(paths.runtime())?).context("运行信息无效")
     }
     pub fn url(&self) -> String {
-        format!("http://127.0.0.1:{}/#token={}", self.port, self.token)
+        crate::assets::settings_url()
+            .unwrap_or_else(|| format!("http://127.0.0.1:{}/#token={}", self.port, self.token))
     }
     pub async fn request(&self, path: &str, body: Option<Value>) -> Result<Value> {
         let client = config::local_client();
