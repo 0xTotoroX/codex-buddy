@@ -47,7 +47,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               revision: 1,
               boardEnabled: true,
               syncEnabled: false,
-              bindings: { todo: '', doing: '', waiting: '' },
+              bindings: { calendarId: '' },
               tasks: [task],
               inflight: null,
             },

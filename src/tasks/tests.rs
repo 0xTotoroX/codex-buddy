@@ -313,9 +313,8 @@ async fn resolving_remote_conflict_preserves_uncontested_local_edits() {
 #[test]
 fn repairing_missing_lists_preserves_valid_bindings_and_recovery_records() {
     let bindings = Bindings {
-        todo: "deleted".into(),
-        doing: "doing".into(),
-        waiting: "waiting".into(),
+        calendar_id: "deleted".into(),
+        ..Default::default()
     };
     let calendars: Vec<Calendar> = ["new", "doing", "waiting", "other"]
         .into_iter()
@@ -328,15 +327,15 @@ fn repairing_missing_lists_preserves_valid_bindings_and_recovery_records() {
         })
         .collect();
     let replacement = Bindings {
-        todo: "new".into(),
+        calendar_id: "new".into(),
         ..bindings.clone()
     };
     assert!(bindings.validate_repair(&replacement, &calendars).is_ok());
     assert!(
-        bindings
+        replacement
             .validate_repair(
                 &Bindings {
-                    doing: "other".into(),
+                    calendar_id: "other".into(),
                     ..replacement.clone()
                 },
                 &calendars
@@ -429,4 +428,140 @@ async fn embedded_view_cannot_authorize_or_change_sync_configuration() {
     }
     assert!(!service.board_enabled().await);
     assert_eq!(service.state().await["store"]["syncEnabled"], false);
+}
+
+#[test]
+fn stages_archive_and_legacy_metadata_never_produce_remote_writes() {
+    let mut store = Store::default();
+    let snapshot = Snapshot {
+        reminders: vec![remote("one", "task")],
+        ..Default::default()
+    };
+    reconcile(&mut store, &snapshot);
+    let task = &mut store.tasks[0];
+    task.fields.column = "doing".into();
+    task.fields.priority = 1;
+    task.archived = true;
+    assert!(task.sync_intent().is_none());
+    let mut changed = snapshot.clone();
+    changed.reminders[0].fields.priority = 9;
+    changed.reminders[0].fields.column = "todo".into();
+    changed.reminders[0].fields.completed = true;
+    for _ in 0..3 {
+        reconcile(&mut store, &changed);
+    }
+    let task = &mut store.tasks[0];
+    assert_eq!(task.fields.column, "doing");
+    assert_eq!(task.fields.priority, 1);
+    assert!(task.archived && task.fields.completed && task.conflict.is_none());
+    assert!(task.sync_intent().is_none());
+    task.fields.notes = "local edit".into();
+    assert_eq!(task.sync_intent().unwrap().action, "update");
+    task.fields.accept_synced(&changed.reminders[0].fields);
+    assert_eq!(task.fields.column, "doing");
+    assert_eq!(task.fields.priority, 1);
+}
+
+#[tokio::test]
+async fn legacy_migration_pauses_sync_preserves_identity_and_never_replays_delete() {
+    for action in ["create", "update", "delete"] {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        let mut old = Store {
+            schema: 1,
+            sync_enabled: true,
+            board_enabled: true,
+            ..Default::default()
+        };
+        reconcile(
+            &mut old,
+            &Snapshot {
+                reminders: vec![remote("old", "keep")],
+                ..Default::default()
+            },
+        );
+        old.tasks[0].fields.column = "waiting".into();
+        old.tasks[0].delete_requested = action == "delete";
+        old.bindings.todo = "original-todo".into();
+        old.inflight = Some(Intent {
+            task_id: old.tasks[0].id.clone(),
+            action: action.into(),
+            expected: old.tasks[0].remote.clone(),
+            desired: old.tasks[0].fields.clone(),
+        });
+        let bytes = serde_json::to_vec(&old).unwrap();
+        std::fs::write(paths.root.join("tasks.json"), &bytes).unwrap();
+        let service = Service::load(&paths);
+        let inner = service.inner.lock().await;
+        assert_eq!(inner.store.schema, 2);
+        assert!(!inner.store.sync_enabled && !service.desired.load(Ordering::SeqCst));
+        assert_eq!(inner.store.tasks[0].id, old.tasks[0].id);
+        assert_eq!(inner.store.tasks[0].remote, old.tasks[0].remote);
+        assert_eq!(inner.store.tasks[0].fields.column, "waiting");
+        assert!(!inner.store.tasks[0].delete_requested);
+        assert_eq!(inner.store.inflight.is_some(), action != "delete");
+        assert_eq!(inner.store.tasks[0].archived, action == "delete");
+        assert!(inner.store.bindings.calendar_id.is_empty());
+        assert_eq!(inner.store.bindings.todo, "original-todo");
+        assert_eq!(
+            std::fs::read(paths.root.join("tasks-v1.json")).unwrap(),
+            bytes
+        );
+    }
+}
+
+#[test]
+fn uncertain_update_checks_only_shared_fields_and_preserves_local_stage() {
+    let mut store = Store::default();
+    let snapshot = Snapshot {
+        reminders: vec![remote("one", "task")],
+        ..Default::default()
+    };
+    reconcile(&mut store, &snapshot);
+    store.tasks[0].fields.column = "doing".into();
+    store.tasks[0].fields.notes = "sent".into();
+    store.inflight = store.tasks[0].sync_intent();
+    let mut received = snapshot;
+    received.reminders[0].fields.notes = "sent".into();
+    received.reminders[0].fields.priority = 9;
+    recover_inflight(&mut store, &received);
+    reconcile(&mut store, &received);
+    assert!(store.inflight.is_none());
+    assert_eq!(store.tasks[0].fields.column, "doing");
+    assert_eq!(store.tasks[0].fields.priority, 0);
+    assert!(store.tasks[0].sync_intent().is_none());
+}
+
+#[tokio::test]
+async fn archive_keeps_remote_identity_and_delete_is_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = Paths::new(Some(dir.path().into())).unwrap();
+    let service = Service::load(&paths);
+    let id = {
+        let mut inner = service.inner.lock().await;
+        inner.store.board_enabled = true;
+        reconcile(
+            &mut inner.store,
+            &Snapshot {
+                reminders: vec![remote("one", "task")],
+                ..Default::default()
+            },
+        );
+        inner.store.tasks[0].id.clone()
+    };
+    service
+        .command(json!({"op":"archive","revision":1,"id":id,"archived":true}))
+        .await
+        .unwrap();
+    assert!(
+        service
+            .command(json!({"op":"delete","revision":2,"id":id,"confirmBoth":true}))
+            .await
+            .is_err()
+    );
+    let inner = service.inner.lock().await;
+    assert_eq!(inner.store.tasks.len(), 1);
+    assert!(inner.store.tasks[0].archived && !inner.store.tasks[0].fields.completed);
+    assert!(inner.store.tasks[0].remote.is_some());
+    assert!(inner.store.tasks[0].sync_intent().is_none());
 }

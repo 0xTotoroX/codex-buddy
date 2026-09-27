@@ -130,13 +130,29 @@ try {
   await page.screenshot({ path: join(report, 'light.png'), fullPage: true });
   await page.emulateMedia({ colorScheme: 'dark' });
   await page.screenshot({ path: join(report, 'dark.png'), fullPage: true });
-  await page.setViewportSize({ width: 680, height: 600 });
+  assert.equal(await page.locator('.board-column').count(), 3);
+  assert.equal(
+    await page
+      .getByRole('region', { name: '待办', exact: true })
+      .getByRole('button', { name: '等待设计反馈', exact: true })
+      .count(),
+    1,
+  );
+  await page.setViewportSize({ width: 360, height: 600 });
+  await page.getByRole('navigation', { name: '任务阶段' }).waitFor();
+  assert.deepEqual(await page.locator('.stage-tabs button').allTextContents(), [
+    '看板',
+    '处理中',
+    '归档',
+  ]);
+  assert.equal(await page.locator('.board-column').count(), 1);
+  await page.screenshot({ path: join(report, 'narrow.png'), fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.getByRole('button', { name: '等待设计反馈', exact: true }).click();
   await page.getByRole('button', { name: '归档', exact: true }).last().click();
   await page.locator('dialog').waitFor({ state: 'detached' });
   await page
-    .getByRole('navigation', { name: '任务视图' })
+    .getByRole('navigation', { name: '任务阶段' })
     .getByRole('button', { name: '归档', exact: true })
     .click();
   await page.getByRole('button', { name: '等待设计反馈', exact: true }).waitFor();
@@ -154,11 +170,34 @@ try {
   assert.equal((await api('tasks/state')).store.syncEnabled, false);
   await command({ op: 'modules', boardEnabled: true });
   await page.goto(`http://127.0.0.1:${runtime.port}/board.html#token=${runtime.token}`);
-  await page.getByRole('button', { name: '整理下一次发布', exact: true }).click();
-  page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: '永久删除两端', exact: true }).click();
-  await page.waitForFunction(() => !document.querySelector('dialog'));
-  assert.equal((await api('tasks/state')).store.tasks.length, 3);
+  await page
+    .getByRole('navigation', { name: '任务阶段' })
+    .getByRole('button', { name: '归档', exact: true })
+    .click();
+  await page.getByRole('button', { name: '完成本地数据持久化', exact: true }).waitFor();
+  await page.getByRole('button', { name: '等待设计反馈', exact: true }).click();
+  await page.getByRole('button', { name: '取消归档', exact: true }).click();
+  await page.locator('dialog').waitFor({ state: 'detached' });
+  await page
+    .getByRole('navigation', { name: '任务阶段' })
+    .getByRole('button', { name: '看板', exact: true })
+    .click();
+  await page.getByRole('button', { name: '等待设计反馈', exact: true }).waitFor();
+  state = await api('tasks/state');
+  assert.equal(state.store.tasks.length, 4);
+  const legacy = state.store.tasks.find((t) => t.fields.title === '等待设计反馈');
+  assert.equal(legacy.fields.column, 'waiting');
+  assert.equal(legacy.fields.due.day, 1);
+  assert.equal(legacy.archived, false);
+  await page.getByRole('button', { name: '等待设计反馈', exact: true }).click();
+  await page.getByLabel('备注', { exact: true }).fill('保留原截止日期');
+  await page.getByRole('button', { name: '保存任务', exact: true }).click();
+  await page.locator('dialog').waitFor({ state: 'detached' });
+  assert.deepEqual(
+    (await api('tasks/state')).store.tasks.find((t) => t.id === legacy.id).fields.due,
+    legacy.fields.due,
+  );
+  await assert.rejects(() => command({ op: 'delete', id: legacy.id, confirmBoth: true }), /未知/);
   assert.deepEqual(failures, []);
   writeFileSync(
     join(report, 'result.json'),
@@ -174,7 +213,8 @@ try {
           'restart persistence',
           'stale revision',
           'module independence',
-          'explicit local delete',
+          'archive restoration and delete rejection',
+          'legacy waiting and metadata preservation',
           'light/dark',
           'narrow viewport',
         ],

@@ -12,10 +12,7 @@ use block2::RcBlock;
 use objc2::{MainThreadMarker, rc::autoreleasepool};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_event_kit::{EKAuthorizationStatus, EKCalendar, EKEntityType, EKEventStore, EKReminder};
-use objc2_foundation::{
-    NSArray, NSCalendar, NSCalendarIdentifierGregorian, NSDate, NSDateComponents, NSError,
-    NSRunLoop, NSString, NSTimeZone, NSURL,
-};
+use objc2_foundation::{NSArray, NSDate, NSError, NSRunLoop, NSString, NSURL};
 use serde_json::{Value, json};
 use std::{
     sync::mpsc,
@@ -63,15 +60,7 @@ fn remote(reminder: &EKReminder, bindings: &Bindings) -> Result<Remote> {
             .context("提醒事项没有列表")?
             .calendarIdentifier()
             .to_string();
-        let column = if calendar == bindings.todo {
-            "todo"
-        } else if calendar == bindings.doing {
-            "doing"
-        } else if calendar == bindings.waiting {
-            "waiting"
-        } else {
-            bail!("提醒事项已移到同步范围外")
-        };
+        ensure!(calendar == bindings.calendar_id, "提醒事项已移到同步范围外");
         let due = reminder.dueDateComponents().map(|d| Due {
             year: d.year() as i32,
             month: d.month() as u32,
@@ -97,7 +86,7 @@ fn remote(reminder: &EKReminder, bindings: &Bindings) -> Result<Remote> {
                 notes: reminder.notes().map(|s| s.to_string()).unwrap_or_default(),
                 due,
                 priority: reminder.priority() as u32,
-                column: column.into(),
+                column: "todo".into(),
                 completed: reminder.isCompleted(),
             },
             recurring: reminder.hasRecurrenceRules(),
@@ -151,6 +140,10 @@ fn write(store: &EKEventStore, bindings: &Bindings, intent: Intent) -> Result<Va
     ensure!(authorized(), "提醒事项权限已撤销");
     bindings.validate(&calendars(store))?;
     intent.desired.validate()?;
+    ensure!(
+        ["create", "update"].contains(&intent.action.as_str()),
+        "不支持的提醒事项写入"
+    );
     // Fetch a fresh object immediately before changing only the editable fields.
     let item = if let Some(expected) = &intent.expected {
         let item = unsafe { store.calendarItemWithIdentifier(&NSString::from_str(&expected.id)) }
@@ -164,7 +157,7 @@ fn write(store: &EKEventStore, bindings: &Bindings, intent: Intent) -> Result<Va
             "重复提醒请在 Apple 提醒事项中编辑，本地只读"
         );
         ensure!(
-            current.fields == expected.fields,
+            current.fields.synced_eq(&expected.fields),
             "远端刚刚发生变化，请重新同步后处理冲突"
         );
         item
@@ -185,12 +178,6 @@ fn write(store: &EKEventStore, bindings: &Bindings, intent: Intent) -> Result<Va
         reminder
     };
     unsafe {
-        if intent.action == "delete" {
-            store
-                .removeReminder_commit_error(&item, true)
-                .map_err(|e| anyhow::anyhow!("删除失败：{e}"))?;
-            return Ok(json!({"deleted":true}));
-        }
         let desired = intent.desired;
         let old = intent.expected.as_ref().map(|r| &r.fields);
         if old.is_none_or(|o| o.title != desired.title) {
@@ -199,46 +186,11 @@ fn write(store: &EKEventStore, bindings: &Bindings, intent: Intent) -> Result<Va
         if old.is_none_or(|o| o.notes != desired.notes) {
             item.setNotes(Some(&NSString::from_str(&desired.notes)));
         }
-        if old.is_none_or(|o| o.priority != desired.priority) {
-            item.setPriority(desired.priority as usize);
-        }
-        if old.is_none_or(|o| o.column != desired.column) {
-            let id = match desired.column.as_str() {
-                "doing" => &bindings.doing,
-                "waiting" => &bindings.waiting,
-                _ => &bindings.todo,
-            };
+        if old.is_none() {
             let calendar = store
-                .calendarWithIdentifier(&NSString::from_str(id))
+                .calendarWithIdentifier(&NSString::from_str(&bindings.calendar_id))
                 .context("目标列表已不可用")?;
             item.setCalendar(Some(&calendar));
-        }
-        if old.is_none_or(|o| o.due != desired.due) {
-            let components = desired
-                .due
-                .as_ref()
-                .map(|d| -> Result<_> {
-                    let components = NSDateComponents::new();
-                    components.setCalendar(
-                        NSCalendar::calendarWithIdentifier(NSCalendarIdentifierGregorian)
-                            .as_deref(),
-                    );
-                    components.setYear(d.year as isize);
-                    components.setMonth(d.month as isize);
-                    components.setDay(d.day as isize);
-                    if let (Some(h), Some(m)) = (d.hour, d.minute) {
-                        components.setHour(h as isize);
-                        components.setMinute(m as isize);
-                    }
-                    if let Some(zone) = &d.time_zone {
-                        let zone = NSTimeZone::timeZoneWithName(&NSString::from_str(zone))
-                            .context("时区无效")?;
-                        components.setTimeZone(Some(&zone));
-                    }
-                    Ok(components)
-                })
-                .transpose()?;
-            item.setDueDateComponents(components.as_deref());
         }
         if old.is_none_or(|o| o.completed != desired.completed) {
             item.setCompleted(desired.completed);
@@ -284,7 +236,7 @@ fn handle(store: &EKEventStore, request: &Value) -> Result<Value> {
             let source = unsafe { store.sourceWithIdentifier(&NSString::from_str(source_id)) }
                 .context("账户不存在")?;
             let mut ids = Vec::new();
-            for title in ["Buddy · 待办", "Buddy · 进行中", "Buddy · 等待"] {
+            for title in ["CodexBuddy"] {
                 let existing: Vec<_> = calendars(store)
                     .into_iter()
                     .filter(|c| c.source == source_id && c.title == title)
@@ -306,9 +258,7 @@ fn handle(store: &EKEventStore, request: &Value) -> Result<Value> {
                     ids.push(calendar.calendarIdentifier().to_string());
                 }
             }
-            Ok(
-                json!({"calendars":calendars(store),"bindings":{"todo":ids[0],"doing":ids[1],"waiting":ids[2]}}),
-            )
+            Ok(json!({"calendars":calendars(store),"bindings":{"calendarId":ids[0]}}))
         }
         "snapshot" => Ok(serde_json::to_value(snapshot(
             store,

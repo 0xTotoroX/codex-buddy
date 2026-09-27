@@ -1,7 +1,7 @@
 /* [INPUT]: Task editing snapshot and command handler. [OUTPUT]: Modal task editor and recovery choices.
- * [POS]: Explicit destructive actions and conflict review. [PROTOCOL]: Keep board/AGENTS.md in sync. */
+ * [POS]: Minimal task editor with local archive and conditional conflict review. [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
-import { columns, dueText, emptyFields, type Fields, type Task } from './api';
+import { columns, emptyFields, type Fields, type Task } from './api';
 export function Editor({
   task,
   draft,
@@ -159,7 +159,7 @@ export function Editor({
             阶段
             <select
               disabled={frozen || busy}
-              value={fields.completed ? 'done' : fields.column}
+              value={fields.completed ? 'done' : fields.column === 'doing' ? 'doing' : 'todo'}
               onChange={(e) =>
                 patch(
                   e.target.value === 'done'
@@ -170,74 +170,12 @@ export function Editor({
             >
               {columns.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.title}
+                  {c.id === 'done' ? '完成' : c.title}
                 </option>
               ))}
             </select>
           </label>
-          <label>
-            优先级
-            <select
-              disabled={frozen || busy}
-              value={
-                fields.priority === 0 ? 0 : fields.priority <= 4 ? 1 : fields.priority === 5 ? 5 : 9
-              }
-              onChange={(e) => patch({ priority: Number(e.target.value) })}
-            >
-              <option value={0}>无</option>
-              <option value={1}>高</option>
-              <option value={5}>中</option>
-              <option value={9}>低</option>
-            </select>
-          </label>
         </div>
-        <div className="form-row">
-          <label>
-            截止日期
-            <input
-              type="date"
-              disabled={frozen || busy}
-              value={dueText(fields.due).slice(0, 10)}
-              onChange={(e) => {
-                if (!e.target.value) patch({ due: null });
-                else {
-                  const [year, month, day] = e.target.value.split('-').map(Number);
-                  patch({
-                    due: {
-                      year,
-                      month,
-                      day,
-                      hour: fields.due?.hour ?? null,
-                      minute: fields.due?.minute ?? null,
-                      timeZone: fields.due?.timeZone ?? null,
-                    },
-                  });
-                }
-              }}
-            />
-          </label>
-          <label>
-            时间（可选）
-            <input
-              type="time"
-              disabled={!fields.due || frozen || busy}
-              value={fields.due?.hour == null ? '' : dueText(fields.due).slice(11)}
-              onChange={(e) => {
-                if (fields.due) {
-                  const [hour, minute] = e.target.value.split(':').map(Number);
-                  patch({
-                    due: {
-                      ...fields.due,
-                      hour: e.target.value ? hour : null,
-                      minute: e.target.value ? minute : null,
-                    },
-                  });
-                }
-              }}
-            />
-          </label>
-        </div>
-        <p className="hint">截止时间不会新增通知闹钟。卡片归档只影响本地显示。</p>
         <footer>
           {suspend && (
             <button type="button" disabled={busy} onClick={suspend}>
@@ -252,17 +190,6 @@ export function Editor({
                 onClick={() => void action({ op: 'archive', archived: !task.archived })}
               >
                 {task.archived ? '取消归档' : '归档'}
-              </button>
-              <button
-                className="danger"
-                type="button"
-                disabled={busy || frozen}
-                onClick={() => {
-                  if (confirm('永久删除此任务及关联的 Apple 提醒事项？此操作无法撤销。'))
-                    void action({ op: 'delete', confirmBoth: true });
-                }}
-              >
-                永久删除两端
               </button>
             </div>
           )}

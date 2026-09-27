@@ -76,9 +76,11 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 
 主题回归覆盖宿主与系统明暗相反时的浮窗和模型快切、纯黑固定配色及其他三材质的收起/展开/选中/悬停/焦点配色；Web 设置保持浏览器主题。
 
-- [board.mjs](board.mjs)：隔离任务服务的认证、创建编辑、键盘阶段选择、拖拽、归档、重启恢复、修订冲突和明确删除；渲染浅色/深色/窄窗口证据到 target/reports/board，绝不授权或写入真实提醒事项。
+- [board.mjs](board.mjs)：隔离任务服务的认证、创建编辑、键盘阶段选择、拖拽、归档、重启恢复、修订冲突和删除接口拒绝；渲染浅色/深色/窄窗口证据到 target/reports/board，绝不授权或写入真实提醒事项。
 
 - [feature-surfaces.mjs](feature-surfaces.mjs)：由 workbench.mjs 执行的功能/容器试点，验证状态接续、任务唯一性、独立开关、轮询回收、Shadow DOM 键盘及宿主断连后任务编辑；使用合成任务，不访问 EventKit。
 - native-check.mjs 的 --features-only 在真实 Wry/AppKit 窗口中验证大纲/看板选择、任务更新及宽窄布局，报告位于 target/reports/native-features；不连接用户聊天或提醒事项。
 
 `independent-features.mjs`：四功能共享侧栏/浮层、十轮交接、草稿、模型回读与无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的独立位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、单进程唤起及往返。
+
+看板简化验收：board.mjs 覆盖宽三列、窄三标签、旧 waiting/日期保留、完成与归档汇总、取消归档及删除接口拒绝；feature-surfaces 保持搜索与草稿跨容器接续。

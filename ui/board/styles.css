@@ -169,7 +169,7 @@ h1 {
 }
 .board-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
   overflow: auto;
   min-height: calc(100vh - 235px);
@@ -518,4 +518,21 @@ h1 {
 }
 .embedded .board-grid {
   min-height: 220px;
+}
+
+/* Compact containers expose a single layer of task groups. */
+.board-grid.narrow .board-column > h2 {
+  display: none;
+}
+.stage-tabs {
+  display: flex;
+}
+.stage-tabs button {
+  flex: 1;
+}
+.board-toolbar input {
+  width: 100%;
+}
+.card-meta:empty {
+  display: none;
 }

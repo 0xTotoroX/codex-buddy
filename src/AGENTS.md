@@ -43,7 +43,7 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
-- [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、三方字段合并、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
+- [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、单列表三共享字段合并与旧数据安全升级、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
 
 工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
 

@@ -37,6 +37,15 @@ impl Default for Fields {
     }
 }
 impl Fields {
+    pub fn synced_eq(&self, other: &Self) -> bool {
+        self.title == other.title && self.notes == other.notes && self.completed == other.completed
+    }
+    pub fn accept_synced(&mut self, remote: &Self) {
+        self.title = remote.title.clone();
+        self.notes = remote.notes.clone();
+        self.completed = remote.completed;
+    }
+
     pub fn validate(&self) -> anyhow::Result<()> {
         anyhow::ensure!(
             !self.title.trim().is_empty() && self.title.len() <= 4096,
@@ -101,6 +110,31 @@ pub struct Task {
     pub remote_missing: bool,
     pub conflict: Option<Conflict>,
 }
+impl Task {
+    pub fn sync_intent(&self) -> Option<Intent> {
+        if self.remote_missing
+            || self.conflict.is_some()
+            || self
+                .remote
+                .as_ref()
+                .is_some_and(|r| r.recurring || r.fields.synced_eq(&self.fields))
+            || (self.remote.is_none() && self.archived)
+        {
+            return None;
+        }
+        Some(Intent {
+            task_id: self.id.clone(),
+            action: if self.remote.is_some() {
+                "update"
+            } else {
+                "create"
+            }
+            .into(),
+            expected: self.remote.clone(),
+            desired: self.fields.clone(),
+        })
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Calendar {
@@ -119,35 +153,27 @@ pub struct Snapshot {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Bindings {
+    #[serde(default)]
+    pub calendar_id: String,
+    // Legacy list IDs are retained for recovery, never used as active bindings.
+    #[serde(default)]
     pub todo: String,
+    #[serde(default)]
     pub doing: String,
+    #[serde(default)]
     pub waiting: String,
 }
 impl Bindings {
-    pub fn ids(&self) -> [&str; 3] {
-        [&self.todo, &self.doing, &self.waiting]
+    pub fn ids(&self) -> [&str; 1] {
+        [&self.calendar_id]
     }
     pub fn validate(&self, calendars: &[Calendar]) -> anyhow::Result<()> {
-        let ids = self.ids();
+        anyhow::ensure!(!self.calendar_id.is_empty(), "请选择一个提醒事项列表");
         anyhow::ensure!(
-            ids.iter().all(|id| !id.is_empty())
-                && ids[0] != ids[1]
-                && ids[1] != ids[2]
-                && ids[0] != ids[2],
-            "请选择三个不同的提醒事项列表"
-        );
-        let selected = ids
-            .iter()
-            .map(|id| {
-                calendars
-                    .iter()
-                    .find(|c| c.id == *id && c.writable)
-                    .ok_or_else(|| anyhow::anyhow!("列表不存在或不可写，请重新授权并检查列表"))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        anyhow::ensure!(
-            selected.iter().all(|c| c.source == selected[0].source),
-            "三个列表必须属于同一个账户"
+            calendars
+                .iter()
+                .any(|c| c.id == self.calendar_id && c.writable),
+            "列表不存在或不可写，请重新授权并检查列表"
         );
         Ok(())
     }
@@ -157,16 +183,20 @@ impl Bindings {
         calendars: &[Calendar],
     ) -> anyhow::Result<()> {
         replacement.validate(calendars)?;
-        anyhow::ensure!(self != replacement, "请选择替代失效列表");
-        for (old, new) in self.ids().into_iter().zip(replacement.ids()) {
-            anyhow::ensure!(
-                old == new || !calendars.iter().any(|c| c.id == old && c.writable),
-                "只能修复缺失或不可写的列表，正常列表绑定保持不变"
-            );
-        }
+        anyhow::ensure!(
+            self.calendar_id != replacement.calendar_id,
+            "请选择替代失效列表"
+        );
+        anyhow::ensure!(
+            !calendars
+                .iter()
+                .any(|c| c.id == self.calendar_id && c.writable),
+            "只能修复缺失或不可写的列表"
+        );
         Ok(())
     }
 }
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Intent {
@@ -192,7 +222,7 @@ pub struct Store {
 impl Default for Store {
     fn default() -> Self {
         Self {
-            schema: 1,
+            schema: 2,
             revision: 1,
             board_enabled: false,
             sync_enabled: false,
@@ -219,9 +249,6 @@ pub fn merge(base: &Fields, local: &Fields, remote: &Fields) -> (Fields, Vec<Str
     }
     field!(title);
     field!(notes);
-    field!(due);
-    field!(priority);
-    field!(column);
     field!(completed);
     (merged, conflicts)
 }
@@ -248,7 +275,7 @@ pub fn reconcile(store: &mut Store, snapshot: &Snapshot) {
         let remote = matches[0];
         task.remote_missing = false;
         let (fields, mut conflicts) = merge(&base.fields, &task.fields, &remote.fields);
-        if task.delete_requested && remote.fields != base.fields {
+        if task.delete_requested && !remote.fields.synced_eq(&base.fields) {
             conflicts.push("delete".into());
         }
         task.fields = fields;
@@ -325,7 +352,7 @@ pub fn recover_inflight(next: &mut Store, snapshot: &Snapshot) {
             }
             next.inflight = None;
         } else if candidates.len() == 1
-            && (intent.action == "create" || candidates[0].fields == intent.desired)
+            && (intent.action == "create" || candidates[0].fields.synced_eq(&intent.desired))
         {
             if let Some(task) = next.tasks.iter_mut().find(|t| t.id == intent.task_id) {
                 let mut baseline = candidates[0].clone();

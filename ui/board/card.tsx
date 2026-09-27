@@ -6,8 +6,8 @@ import {
   dropTargetForElements,
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
-import { Check, GripVertical, Flag, AlertCircle } from 'lucide-react';
-import { columns, dueText, type Task } from './api';
+import { Check, GripVertical, AlertCircle } from 'lucide-react';
+import { columns, taskGroup, type Task } from './api';
 export function TaskCard({
   task,
   disabled,
@@ -26,6 +26,7 @@ export function TaskCard({
   const [over, setOver] = useState(false);
   const readonly =
     disabled ||
+    task.archived ||
     task.remoteMissing ||
     !!task.conflict ||
     !!task.remote?.recurring ||
@@ -73,13 +74,6 @@ export function TaskCard({
       </div>
       {task.fields.notes && <p className="card-note">{task.fields.notes}</p>}
       <div className="card-meta">
-        {task.fields.due && <time>{dueText(task.fields.due)}</time>}
-        {task.fields.priority > 0 && (
-          <span>
-            <Flag size={12} />
-            {task.fields.priority <= 4 ? '高' : task.fields.priority === 5 ? '中' : '低'}
-          </span>
-        )}
         {(task.conflict || task.remoteMissing) && (
           <span className="attention">
             <AlertCircle size={12} />
@@ -87,19 +81,19 @@ export function TaskCard({
           </span>
         )}
         {task.remote?.recurring && <span>重复 · 只读</span>}
-        {task.deleteRequested && <span>等待两端删除</span>}
+        {task.archived && <span>已归档</span>}
       </div>
       <label className="card-move">
         <span className="sr-only">移动 {task.fields.title}</span>
         <select
           aria-label={`移动 ${task.fields.title}`}
           disabled={readonly}
-          value={task.fields.completed ? 'done' : task.fields.column}
+          value={taskGroup(task)}
           onChange={(e) => move(e.target.value)}
         >
           {columns.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.title}
+              {c.id === 'done' ? '完成' : c.title}
             </option>
           ))}
         </select>

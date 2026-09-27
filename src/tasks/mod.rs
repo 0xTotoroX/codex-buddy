@@ -40,8 +40,35 @@ impl Service {
         let loaded = match std::fs::read(paths.root.join("tasks.json")) {
             Ok(bytes) => serde_json::from_slice::<Store>(&bytes)
                 .context("任务文件损坏，已停止写入以保留原数据")
-                .and_then(|s| {
-                    ensure!(s.schema == 1, "任务数据版本不受支持");
+                .and_then(|mut s| {
+                    ensure!([1, 2].contains(&s.schema), "任务数据版本不受支持");
+                    if s.schema == 1 {
+                        // Keep an application-managed recovery copy before the first v2 save.
+                        let backup = paths.root.join("tasks-v1.json");
+                        if !backup.exists() {
+                            write_private(&backup, &bytes)?;
+                        }
+                        s.schema = 2;
+                        s.sync_enabled = false;
+                        s.bindings.calendar_id.clear();
+                        for task in &mut s.tasks {
+                            if task.delete_requested {
+                                task.archived = true;
+                            }
+                            task.delete_requested = false;
+                            if let Some(conflict) = &mut task.conflict {
+                                conflict.fields.retain(|f| {
+                                    ["title", "notes", "completed"].contains(&f.as_str())
+                                });
+                                if conflict.fields.is_empty() {
+                                    task.conflict = None;
+                                }
+                            }
+                        }
+                        if s.inflight.as_ref().is_some_and(|i| i.action == "delete") {
+                            s.inflight = None;
+                        }
+                    }
                     Ok(s)
                 }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Store::default()),
@@ -92,7 +119,6 @@ impl Service {
                 "create",
                 "update",
                 "archive",
-                "delete",
                 "resolve",
                 "restore",
                 "keepLocal",
@@ -211,11 +237,14 @@ impl Service {
                 ensure!(
                     next.inflight
                         .as_ref()
-                        .is_none_or(|i| op == "repairBindings" && i.action != "create"),
+                        .is_none_or(|i| next.bindings.calendar_id.is_empty()
+                            || (op == "repairBindings" && i.action != "create")),
                     "请先核对此前未确认的创建操作"
                 );
                 ensure!(
-                    op == "repairBindings" || !next.tasks.iter().any(|t| t.remote.is_some()),
+                    op == "repairBindings"
+                        || next.bindings.calendar_id.is_empty()
+                        || !next.tasks.iter().any(|t| t.remote.is_some()),
                     "已有同步关联时不能替换列表，以免重复导入或误移任务"
                 );
                 let bindings: Bindings = serde_json::from_value(command["bindings"].clone())?;
@@ -236,7 +265,7 @@ impl Service {
                     });
                     let new_source = calendars
                         .iter()
-                        .find(|c| c.id == bindings.todo)
+                        .find(|c| c.id == bindings.calendar_id)
                         .map(|c| c.source.as_str());
                     ensure!(
                         old_source.is_some() && old_source == new_source,
@@ -251,9 +280,10 @@ impl Service {
                 );
                 next.binding_source = calendars
                     .iter()
-                    .find(|c| c.id == bindings.todo)
+                    .find(|c| c.id == bindings.calendar_id)
                     .map(|c| c.source.clone());
-                next.bindings = bindings;
+                // Retain old mappings as recovery metadata after selecting the single list.
+                next.bindings.calendar_id = bindings.calendar_id;
             }
             "create" => {
                 ensure!(next.board_enabled, "看板已停用");
@@ -289,7 +319,7 @@ impl Service {
                 }
                 next.tasks = tasks;
             }
-            "update" | "archive" | "delete" | "resolve" | "restore" | "keepLocal" => {
+            "update" | "archive" | "resolve" | "restore" | "keepLocal" => {
                 ensure!(next.board_enabled, "看板已停用");
                 let id = command["id"].as_str().context("缺少任务 ID")?;
                 ensure!(
@@ -309,35 +339,25 @@ impl Service {
                 }
                 match op {
                     "update" => {
-                        ensure!(
-                            !task.remote.as_ref().is_some_and(|r| r.recurring),
-                            "重复提醒请在 Apple 提醒事项中编辑"
-                        );
-                        ensure!(
-                            task.conflict.is_none()
-                                && !task.remote_missing
-                                && !task.delete_requested,
-                            "请先处理任务冲突或恢复记录"
-                        );
                         let fields: Fields = serde_json::from_value(command["fields"].clone())?;
                         fields.validate()?;
+                        if !fields.synced_eq(&task.fields) {
+                            ensure!(
+                                !task.remote.as_ref().is_some_and(|r| r.recurring),
+                                "重复提醒请在 Apple 提醒事项中编辑"
+                            );
+                            ensure!(
+                                task.conflict.is_none() && !task.remote_missing,
+                                "请先处理任务冲突或恢复记录"
+                            );
+                        }
+                        if let Some(archived) = command["archived"].as_bool() {
+                            task.archived = archived;
+                        }
                         task.fields = fields;
                     }
                     "archive" => {
                         task.archived = command["archived"].as_bool().context("缺少归档状态")?;
-                    }
-                    "delete" => {
-                        ensure!(command["confirmBoth"] == true, "请确认永久删除两端任务");
-                        ensure!(
-                            task.conflict.is_none()
-                                && !task.remote_missing
-                                && !task.remote.as_ref().is_some_and(|r| r.recurring),
-                            "请先处理冲突；重复或身份不明的提醒不允许删除"
-                        );
-                        task.delete_requested = true;
-                        if task.remote.is_none() {
-                            next.tasks.retain(|t| t.id != id);
-                        }
                     }
                     "resolve" => {
                         let conflict = task.conflict.take().context("当前任务没有冲突")?;
@@ -472,35 +492,8 @@ impl Service {
             let Some(task) = inner.store.tasks.iter().find(|t| t.id == id).cloned() else {
                 continue;
             };
-            if task.remote_missing
-                || task.conflict.is_some()
-                || task.remote.as_ref().is_some_and(|r| r.recurring)
-            {
+            let Some(intent) = task.sync_intent() else {
                 continue;
-            }
-            if task.remote.is_none() && task.archived {
-                continue;
-            }
-            if task
-                .remote
-                .as_ref()
-                .is_some_and(|r| r.fields == task.fields)
-                && !task.delete_requested
-            {
-                continue;
-            }
-            let intent = Intent {
-                task_id: id.clone(),
-                action: if task.delete_requested {
-                    "delete"
-                } else if task.remote.is_none() {
-                    "create"
-                } else {
-                    "update"
-                }
-                .into(),
-                expected: task.remote.clone(),
-                desired: task.fields.clone(),
             };
             let mut next = inner.store.clone();
             next.inflight = Some(intent.clone());
@@ -512,14 +505,10 @@ impl Service {
             .await?;
             let mut next = inner.store.clone();
             next.inflight = None;
-            if response["deleted"] == true {
-                next.tasks.retain(|t| t.id != id);
-            } else {
-                let remote: Remote = serde_json::from_value(response["remote"].clone())?;
-                let task = next.tasks.iter_mut().find(|t| t.id == id).unwrap();
-                task.fields = remote.fields.clone();
-                task.remote = Some(remote);
-            }
+            let remote: Remote = serde_json::from_value(response["remote"].clone())?;
+            let task = next.tasks.iter_mut().find(|t| t.id == id).unwrap();
+            task.fields.accept_synced(&remote.fields);
+            task.remote = Some(remote);
             self.save(inner, next)?;
         }
         let conflicts = inner

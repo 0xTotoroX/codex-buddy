@@ -32,7 +32,7 @@ export type Task = {
   remoteMissing: boolean;
   conflict: { fields: string[]; remote: Remote } | null;
 };
-export type Bindings = { todo: string; doing: string; waiting: string };
+export type Bindings = { calendarId: string; todo?: string; doing?: string; waiting?: string };
 export type Calendar = {
   id: string;
   title: string;
@@ -53,11 +53,17 @@ export type TaskState = {
   error?: string | null;
 };
 export const columns = [
-  { id: 'todo', title: '待办' },
-  { id: 'doing', title: '进行中' },
-  { id: 'waiting', title: '等待' },
-  { id: 'done', title: '已完成' },
+  { id: 'todo', title: '待办', tab: '看板' },
+  { id: 'doing', title: '进行中', tab: '处理中' },
+  { id: 'done', title: '完成 / 归档', tab: '归档' },
 ];
+export function taskGroup(task: Task) {
+  return task.archived || task.fields.completed
+    ? 'done'
+    : task.fields.column === 'doing'
+      ? 'doing'
+      : 'todo';
+}
 export const emptyFields = (): Fields => ({
   title: '',
   notes: '',

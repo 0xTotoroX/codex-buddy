@@ -30,7 +30,7 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
               revision: 1,
               boardEnabled: true,
               syncEnabled: false,
-              bindings: { todo: '', doing: '', waiting: '' },
+              bindings: { calendarId: '' },
               tasks: [task],
               inflight: null,
             },
@@ -78,7 +78,7 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         await board.getByLabel('移动 试点任务', { exact: true }).selectOption('doing');
         await board
           .getByRole('navigation', { name: '任务阶段' })
-          .getByRole('button', { name: '进行中', exact: true })
+          .getByRole('button', { name: '处理中', exact: true })
           .click();
         await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
         await board.getByPlaceholder('搜索任务…').fill('试点');
