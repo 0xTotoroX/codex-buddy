@@ -6,8 +6,9 @@
  */
 import { build } from 'esbuild';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, writeFileSync, renameSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync, renameSync, existsSync } from 'node:fs';
+import { join, relative, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { buildPanel } from './build-panel.mjs';
 
 const hash = (text) => createHash('sha256').update(text).digest('hex');
@@ -73,6 +74,11 @@ function measurePanel() {
 }
 
 export async function buildDevPanel(root, output) {
+  const builder = join(root, 'scripts/dev-panel.mjs');
+  if (resolve(root) !== resolve(import.meta.dirname, '..') && existsSync(builder)) {
+    const source = await import(pathToFileURL(builder).href);
+    return source.buildDevPanel(root, output);
+  }
   const probe = `(${measurePanel.toString()})()`;
   const inputs = [
     ...filesUnder(root, 'ui/panel'),

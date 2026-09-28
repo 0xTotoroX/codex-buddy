@@ -27,3 +27,5 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
 内嵌液态：build-panel 在正式与开发构建中追加 ui/panel/glass/lab.js，且只在非弹出页面启动；dev-panel 的只读测量记录实际渲染路径和阶段，不记录画面或错误文本。SVG 无第三方渲染依赖；third-party-notices 继续收集现用依赖及 shadcn/ui、OpenAI apps-sdk-ui 图标的许可。
+
+Dev 控制器使用所选源码的 dev-panel 构建器，监听看板和通用功能视图；不能以控制器自身较旧的资源指纹确认新分支。构建脚本自身更新后须正常重启 Dev 监督进程。
