@@ -326,6 +326,7 @@ export function ModelView({
           </span>
         )}
         <button
+          data-refresh="model"
           aria-label="刷新可用模型"
           title="刷新可用模型"
           disabled={busy || !prefs.enabled}

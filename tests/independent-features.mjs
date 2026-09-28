@@ -214,6 +214,24 @@ export function independentFeatureCases({ mode, syncSettings }) {
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
+        const refresh = outline.getByRole('button', { name: '刷新大纲', exact: true });
+        const waitRefresh = (opacity) =>
+          page.waitForFunction((opacity) => {
+            const root = document.querySelector('[data-codex-buddy-features-root]');
+            const button = root?.shadowRoot?.querySelector('[data-refresh="outline"]');
+            return button && getComputedStyle(button).opacity === opacity;
+          }, opacity);
+        await page.mouse.move(10, 10);
+        await waitRefresh('0');
+        await page.locator('.csw-workbench-head').hover();
+        await waitRefresh('1');
+        await page.mouse.move(10, 10);
+        await waitRefresh('0');
+        await page.keyboard.press('Tab');
+        await refresh.focus();
+        await waitRefresh('1');
+        await refresh.evaluate((node) => node.blur());
+        await waitRefresh('0');
         await page.getByRole('tab', { name: '大纲', exact: true }).dblclick();
         assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
         await page.keyboard.press('Escape');
@@ -396,6 +414,21 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await openFeature('next');
         const next = page.locator('[data-feature="next"]');
         await next.getByRole('button', { name: '重新生成建议', exact: true }).waitFor();
+        await page.mouse.move(10, 10);
+        const waitNextRefresh = (opacity) =>
+          page.waitForFunction(
+            (opacity) =>
+              [...document.querySelectorAll('[data-codex-buddy-features-root]')].some((root) => {
+                const button = root.shadowRoot?.querySelector('[data-refresh="next"]');
+                return button && getComputedStyle(button).opacity === opacity;
+              }),
+            opacity,
+          );
+        await waitNextRefresh('0');
+        await page.locator('.csw-workbench-head').hover();
+        await waitNextRefresh('1');
+        await page.mouse.move(10, 10);
+        await waitNextRefresh('0');
         await page.evaluate(() => {
           window.workbenchFixture.nextProjection = {
             prompts: [

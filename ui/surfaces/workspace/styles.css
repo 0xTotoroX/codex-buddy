@@ -604,3 +604,12 @@
 .csw-feature-panes .csw-feature-content {
   overflow: hidden;
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .csw-workbench {
+    --feature-refresh-opacity: 0;
+  }
+  .csw-workbench:hover {
+    --feature-refresh-opacity: 1;
+  }
+}

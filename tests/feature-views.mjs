@@ -272,6 +272,33 @@ try {
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
+  const waitModelRefresh = (opacity) =>
+    page.waitForFunction((opacity) => {
+      const hosts = [...document.querySelectorAll('.edge-view, .csw-feature-content > div')];
+      return hosts.some((host) => {
+        const button = host.shadowRoot?.querySelector('[data-refresh="model"]');
+        return button && getComputedStyle(button).opacity === opacity;
+      });
+    }, opacity);
+  await page.mouse.move(499, 699);
+  await waitModelRefresh('0');
+  await page.locator('#edge-panel > header').hover();
+  await waitModelRefresh('1');
+  await page.mouse.move(499, 699);
+  await waitModelRefresh('0');
+  await page.keyboard.press('Tab');
+  await view.getByRole('button', { name: '刷新可用模型' }).focus();
+  await waitModelRefresh('1');
+  await view.getByRole('button', { name: '刷新可用模型' }).evaluate((node) => node.blur());
+  await waitModelRefresh('0');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(
+    await view
+      .getByRole('button', { name: '刷新可用模型' })
+      .evaluate((node) => getComputedStyle(node).transitionDuration),
+    '0s',
+  );
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
   await view.getByRole('button', { name: /其他模型/ }).waitFor();
   assert.equal(
     await view.locator('.model-row').count(),
@@ -352,6 +379,12 @@ try {
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
   await view.getByLabel('模型名称列宽').waitFor();
+  await page.mouse.move(1, 1);
+  await waitModelRefresh('0');
+  await page.locator('.csw-workbench-head').hover();
+  await waitModelRefresh('1');
+  await page.mouse.move(1, 1);
+  await waitModelRefresh('0');
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
     await view.getByRole('button', { name: /其他模型/ }).getAttribute('aria-expanded'),

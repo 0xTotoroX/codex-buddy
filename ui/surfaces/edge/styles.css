@@ -64,3 +64,12 @@ body {
 .edge-view[hidden] {
   display: none;
 }
+
+@media (hover: hover) and (pointer: fine) {
+  #edge-panel {
+    --feature-refresh-opacity: 0;
+  }
+  #edge-panel:hover {
+    --feature-refresh-opacity: 1;
+  }
+}
