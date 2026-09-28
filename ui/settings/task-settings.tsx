@@ -46,7 +46,7 @@ export function TaskSettings() {
         onChange={(boardEnabled) => void command({ op: 'modules', boardEnabled })}
         onOpen={() => void command({ op: 'open' })}
       />
-      <details className="group">
+      <details id="board-groups" className="group">
         <summary className="cursor-pointer text-[15px] group-open:mb-4">看板分组</summary>
         <div className="space-y-3">
           {(state?.store.columns ?? defaultColumns).map((column) => (

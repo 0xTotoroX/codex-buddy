@@ -269,6 +269,7 @@ function createShellState(preferences) {
       preferences.hostTypography
     ),
     fontOffset: preferences.fontOffset,
+    fontSizes: /** @type {import("../../shared/features").FontSizes} */ ({}),
     material: preferences.material,
     liquidVariant: preferences.liquidVariant,
     labelOnly: storage.get(LABEL_ONLY_KEY) === 'true',

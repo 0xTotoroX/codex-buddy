@@ -111,6 +111,7 @@ export function SurfaceSettings({
             return (
               <details
                 key={placement}
+                id={`theme-${placement}`}
                 open={placement === primary || placement === 'edge'}
                 className="settings-details"
               >
@@ -155,7 +156,7 @@ export function SurfaceSettings({
         </div>
       </section>
       <PanelSettings value={appearance} fontBase={fontBase} />
-      <details className="settings-section">
+      <details id="edge-position" className="settings-section">
         <summary className="cursor-pointer text-sm">贴边 / 刘海位置</summary>
         <div className="mt-3 space-y-3">
           <label className="settings-field text-sm">
@@ -207,6 +208,7 @@ export function SurfaceSettings({
           <label className="settings-field text-sm">
             <span className="whitespace-nowrap">保持展开</span>
             <input
+              id="edge-keep-open"
               aria-label="贴边保持展开"
               type="checkbox"
               disabled={disabled}

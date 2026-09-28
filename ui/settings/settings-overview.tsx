@@ -1,11 +1,17 @@
 /* [INPUT]: 已保存的功能、承载、任务和模型配置，以及当前连接与外观状态。
- * [OUTPUT]: 按承载和功能组织的只读总览，展示任务分组数量和模型配置，不包含操作控件。
+ * [OUTPUT]: 按承载和功能组织的只读总览，展示任务分组数量和模型配置，属性链接定位设置项，不直接修改配置。
  * [POS]: 设置展示层；仅在总览可见时读取现有服务，不创建新配置。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useState, type ReactNode } from 'react';
 import { request, type Settings, type View } from './api';
 import type { SurfaceState } from './surface-settings';
-import { titles, type FeatureId, type FeatureState, type Placement } from '../shared/features';
+import {
+  titles,
+  featureFontSize,
+  type FeatureId,
+  type FeatureState,
+  type Placement,
+} from '../shared/features';
 import { columns, taskGroup, type TaskState } from '../features/board/api';
 import type { ModelState } from '../features/model/view';
 import { resolveFeatureLayout } from '../surfaces/workspace/layout';
@@ -36,11 +42,17 @@ function themeLabel(value?: SurfaceTheme) {
     return value.liquidVariant === 'clear' ? '液态 · 通透' : '液态 · 标准';
   return { black: '纯黑', matte: '哑光', frosted: '磨砂' }[value.theme];
 }
-function Metric({ label, children }: { label: string; children: ReactNode }) {
+function Metric({ label, children, href }: { label: string; children: ReactNode; href: string }) {
   return (
     <div>
-      <dt>{label}</dt>
-      <dd>{children}</dd>
+      <dt>
+        <a href={href} tabIndex={-1}>
+          {label}
+        </a>
+      </dt>
+      <dd>
+        <a href={href}>{children}</a>
+      </dd>
     </div>
   );
 }
@@ -143,7 +155,7 @@ export function SettingsOverview({
         .filter((id) => location(id) === placement)
         .map((id) => (
           <li key={id}>
-            <span>{titles[id]}</span>
+            <a href={`#settings-${id === 'model' ? 'model-control' : id}`}>{titles[id]}</a>
             {!enabled[id] && <span className="overview-muted">已停用</span>}
           </li>
         ))}
@@ -156,20 +168,42 @@ export function SettingsOverview({
         <div className="overview-hero">
           <div className="overview-identity">
             <h2>主界面</h2>
-            <strong>{placements[primary]}</strong>
+            <strong>
+              <a href="#settings-surfaces/main-placement">{placements[primary]}</a>
+            </strong>
             {featureList(primary)}
           </div>
           <dl className="overview-metrics">
-            <Metric label="主题">{themeLabel(surfaces.preferences.themes[primary])}</Metric>
-            <Metric label="布局">{layoutLabel}</Metric>
-            <Metric label="字号">
-              {ui
-                ? `${Math.max(10, Math.min(24, ui.fontOffset + (view?.panelFontBase ?? 13))).toFixed(1)} px`
-                : '未读取'}
+            <Metric label="主题" href={`#settings-surfaces/theme-${primary}`}>
+              {themeLabel(surfaces.preferences.themes[primary])}
             </Metric>
-            {primary === 'sidebar' && ui && <Metric label="宽度">{ui.dockWidth} px</Metric>}
+            <Metric label="布局" href="#settings-surfaces/main-layout">
+              {layoutLabel}
+            </Metric>
+            <div>
+              <dt>
+                <a href="#settings-surfaces/settings-fonts">字号</a>
+              </dt>
+              <dd className="overview-fonts">
+                {(Object.keys(titles) as FeatureId[]).map((id) => (
+                  <a key={id} href={`#settings-surfaces/font-${id}`}>
+                    {titles[id]}{' '}
+                    {ui
+                      ? `${featureFontSize(id, ui.fontSizes, ui.fontOffset ? ui.fontOffset + (view?.panelFontBase ?? 13) : undefined).toFixed(1)} px`
+                      : '未读取'}
+                  </a>
+                ))}
+              </dd>
+            </div>
+            {primary === 'sidebar' && ui && (
+              <Metric label="宽度" href="#settings-surfaces/dock-width">
+                {ui.dockWidth} px
+              </Metric>
+            )}
             {primary === 'desktop' && view && (
-              <Metric label="置顶">{view.panelPreferences.alwaysOnTop ? '开启' : '关闭'}</Metric>
+              <Metric label="置顶" href="#settings-surfaces/window-pinning">
+                {view.panelPreferences.alwaysOnTop ? '开启' : '关闭'}
+              </Metric>
             )}
           </dl>
         </div>
@@ -179,13 +213,15 @@ export function SettingsOverview({
             {featureList('edge')}
           </div>
           <dl className="overview-metrics">
-            <Metric label="主题">{themeLabel(surfaces.preferences.themes.edge)}</Metric>
-            <Metric label="位置">
+            <Metric label="主题" href="#settings-surfaces/theme-edge">
+              {themeLabel(surfaces.preferences.themes.edge)}
+            </Metric>
+            <Metric label="位置" href="#settings-surfaces/edge-position">
               {{ right: '右侧', left: '左侧', top: '顶部' }[surfaces.preferences.edge.edge] ||
                 surfaces.preferences.edge.edge}{' '}
               · {Math.round(surfaces.preferences.edge.position * 100)}%
             </Metric>
-            <Metric label="展开">
+            <Metric label="展开" href="#settings-surfaces/edge-keep-open">
               {surfaces.preferences.edge.keepOpen ? '保持展开' : '鼠标靠近时展开'}
             </Metric>
           </dl>
@@ -195,7 +231,9 @@ export function SettingsOverview({
         <div className="overview-hero">
           <div className="overview-identity">
             <h2>下一步</h2>
-            <strong>{settings.model || '未配置模型'}</strong>
+            <strong>
+              <a href="#settings-model">{settings.model || '未配置模型'}</a>
+            </strong>
             <p className="overview-muted">
               {!settings.enabled
                 ? '已停用'
@@ -205,13 +243,13 @@ export function SettingsOverview({
             </p>
           </div>
           <dl className="overview-metrics">
-            <Metric label="生成">
+            <Metric label="生成" href="#settings-next/generation-mode">
               {settings.generationMode === 'manual' ? '手动刷新' : '自动生成'}
             </Metric>
-            <Metric label="显示">
+            <Metric label="显示" href="#settings-next/suggestion-labels">
               {ui ? (ui.labelOnly ? '仅标题' : '标题 + 摘要') : '未读取'}
             </Metric>
-            <Metric label="点击">
+            <Metric label="点击" href="#settings-next/suggestion-click">
               {ui
                 ? { fill: '仅填入', direct: '直接发送', hybrid: '单击填入 · 双击发送' }[
                     ui.promptClickMode
@@ -221,24 +259,32 @@ export function SettingsOverview({
           </dl>
         </div>
         <dl className="overview-footer">
-          <Metric label="方向">
+          <Metric label="方向" href="#settings-next/settings-directions">
             {{ auto: '自动探索', manual: '自选方向', smart: '智能挑选' }[settings.directionSource]}
           </Metric>
-          <Metric label="数量">最多 {settings.maxItems} 条</Metric>
+          <Metric label="数量" href="#settings-next/max-items">
+            最多 {settings.maxItems} 条
+          </Metric>
         </dl>
       </section>
       <section className="overview-surface overview-board" aria-label="看板配置">
         <header className="overview-section-head">
-          <h2>看板</h2>
+          <h2>
+            <a href="#settings-board">看板</a>
+          </h2>
           <span className="overview-muted">
             {!enabled.board && '已停用 · '}
-            {tasks.store.syncEnabled ? 'Apple 提醒事项同步' : '本地保存'}
+            <a href="#settings-board/reminders-enabled">
+              {tasks.store.syncEnabled ? 'Apple 提醒事项同步' : '本地保存'}
+            </a>
           </span>
         </header>
         <dl className="overview-board-columns">
           {boardColumns.map((column) => (
             <div key={column.id}>
-              <dt>{column.title}</dt>
+              <dt>
+                <a href="#settings-board/board-groups">{column.title}</a>
+              </dt>
               <dd>
                 {tasks.store.tasks.filter((task) => taskGroup(task) === column.id).length}
                 <span>项</span>
@@ -249,13 +295,17 @@ export function SettingsOverview({
       </section>
       <section className="overview-surface overview-model" aria-label="模型快切配置">
         <header className="overview-section-head">
-          <h2>模型快切</h2>
+          <h2>
+            <a href="#settings-model-control">模型快切</a>
+          </h2>
           {!enabled.model && <span className="overview-muted">已停用</span>}
         </header>
         <div className="overview-model-content">
           <div className="overview-model-current">
             <h3>当前模型</h3>
-            <strong>{modelName || '未读取'}</strong>
+            <strong>
+              <a href="#settings-model-control">{modelName || '未读取'}</a>
+            </strong>
             {current && (
               <p className="overview-muted">
                 {[
@@ -275,7 +325,9 @@ export function SettingsOverview({
             {favorites.length ? (
               <ul>
                 {favorites.map((id) => (
-                  <li key={id}>{modelLabel(id)}</li>
+                  <li key={id}>
+                    <a href="#settings-model-control">{modelLabel(id)}</a>
+                  </li>
                 ))}
               </ul>
             ) : (
@@ -289,7 +341,7 @@ export function SettingsOverview({
             <ul>
               {models.preferences.presets.map((preset) => (
                 <li key={preset.id}>
-                  <span>{preset.name}</span>
+                  <a href="#settings-model-control">{preset.name}</a>
                   <span className="overview-muted">{modelLabel(preset.selection.model)}</span>
                 </li>
               ))}

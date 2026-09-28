@@ -61,10 +61,10 @@ async function checkSettingsNavigation(page, context, base, runtime) {
   await overview.getByRole('region', { name: '下一步配置', exact: true }).waitFor();
   assert.equal(
     await overview
-      .locator('button,input,select,textarea,a,[role="switch"],[contenteditable="true"]')
+      .locator('button,input,select,textarea,[role="switch"],[contenteditable="true"]')
       .count(),
     0,
-    'overview is display only',
+    'overview links navigate without configuration controls',
   );
   const savedSettings = await page.evaluate(async () =>
     (
@@ -433,12 +433,25 @@ try {
       .getByRole('region', { name: '模型快切配置', exact: true })
       .getByRole('heading', { name: '常用模型', exact: true })
       .waitFor();
-    const overviewFont = await page
-      .locator('.settings-overview .overview-metrics > div')
-      .filter({ has: page.getByText('字号', { exact: true }) })
-      .locator('dd')
-      .innerText();
-    assert.match(overviewFont, /^\d+\.\d px$/);
+    const fontLinks = page.locator('.overview-fonts a');
+    assert.equal(await fontLinks.count(), 4);
+    for (const link of await fontLinks.all()) assert.match(await link.innerText(), /\d+\.\d px$/);
+    // Deep links reveal collapsed controls and preserve browser back navigation.
+    const summary = page.locator('.settings-overview');
+    for (const [href, target] of [
+      ['#settings-surfaces/font-board', 'font-board'],
+      ['#settings-surfaces/main-layout', 'main-layout'],
+      ['#settings-surfaces/theme-edge', 'theme-edge'],
+      ['#settings-surfaces/edge-keep-open', 'edge-keep-open'],
+      ['#settings-next/suggestion-click', 'suggestion-click'],
+      ['#settings-board/board-groups', 'board-groups'],
+    ]) {
+      await summary.locator(`a[href="${href}"]`).first().click();
+      await page.waitForFunction((id) => document.activeElement?.id === id, target);
+      assert.equal(await page.locator(`#${target}`).isVisible(), true);
+      await page.goBack();
+      await page.locator('.settings-overview').waitFor({ state: 'visible' });
+    }
 
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.screenshot({ path: join(output, 'settings-overview-dark.png'), fullPage: true });
@@ -1151,13 +1164,13 @@ try {
     });
     assert.notEqual(staleAppearance.status, 200);
     await page.getByRole('link', { name: '显示与布局', exact: true }).click();
-    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).fill('16');
-    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).blur();
+    await page.getByLabel('大纲字号（px）', { exact: true }).fill('16');
+    await page.getByLabel('大纲字号（px）', { exact: true }).blur();
     await waitFor(
       async () =>
         await desktop.evaluate(() => {
           const s = window.__companionFloatingPanel.state;
-          return Math.round(s.hostTypography.baseItemFontSize + s.fontOffset) === 16;
+          return s.fontSizes.outline === 16;
         }),
       'Web font size did not match panel pixels',
     );

@@ -151,10 +151,8 @@ function applyPanelPreferences(ui) {
   // 保留浮窗请求尺寸；内嵌只在布局时收敛，避免收回后丢失大窗口偏好。
   shellState.width = clampPanelWidth(ui.width, Infinity);
   shellState.height = clampPanelHeight(ui.height, Infinity);
-  shellState.fontOffset = clampFontOffset(
-    ui.fontOffset,
-    shellState.hostTypography.baseItemFontSize,
-  );
+  shellState.fontOffset = clampFontOffset(ui.fontOffset);
+  shellState.fontSizes = ui.fontSizes || {};
   shellState.material = normalizeMaterial(ui.material);
   shellState.liquidVariant = ui.liquidVariant === 'clear' ? 'clear' : 'regular';
   shellState.labelOnly = ui.labelOnly === true;

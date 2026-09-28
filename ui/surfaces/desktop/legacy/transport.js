@@ -24,6 +24,7 @@ function panelPreferences() {
     material: shellState.material,
     liquidVariant: shellState.liquidVariant,
     fontOffset: shellState.fontOffset,
+    fontSizes: { ...shellState.fontSizes },
     labelOnly: shellState.labelOnly,
     promptClickMode: shellState.promptClickMode,
     viewOrder: shellState.viewOrder.slice(),

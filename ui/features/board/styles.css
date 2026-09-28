@@ -88,7 +88,7 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   line-height: 1.5;
 }
 .board-app.embedded {
@@ -176,14 +176,14 @@ h1 {
 .board-app .group-title {
   border: 0;
   background: transparent;
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   font-weight: 600;
   text-align: left;
   padding: 4px 0;
   overflow-wrap: anywhere;
 }
 .column-heading small {
-  font-size: 14px;
+  font-size: max(14px, calc(var(--board-font-size, 15px) - 1px));
   color: var(--muted);
 }
 .column-cards {
@@ -274,7 +274,7 @@ h1 {
   padding: 0;
   text-align: left;
   overflow-wrap: anywhere;
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   line-height: 1.5;
   font-weight: 400;
 }
@@ -283,7 +283,7 @@ h1 {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 8px;
-  font-size: 14px;
+  font-size: max(14px, calc(var(--board-font-size, 15px) - 1px));
   color: var(--muted);
 }
 .card-meta span {
@@ -298,7 +298,7 @@ h1 {
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
 }
 .board-app .add-task:hover {
   background: var(--hover, color-mix(in srgb, var(--ink) 5%, transparent));
@@ -316,7 +316,7 @@ h1 {
 .board-app textarea,
 .board-app select,
 .board-app .quick-add button {
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   border-radius: 10px;
 }
 .stage-tabs {
@@ -329,7 +329,7 @@ h1 {
 .board-app .stage-tabs button {
   flex: none;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   padding: 6px 8px;
   border: 0;
   border-radius: 10px;
@@ -363,7 +363,7 @@ h1 {
   border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, var(--danger) 5%, var(--surface));
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
 }
 .error,
 .attention,
@@ -380,7 +380,7 @@ h1 {
   color: var(--ink);
 }
 .recovery h3 {
-  font-size: 15px;
+  font-size: var(--board-font-size, 15px);
   margin: 0;
 }
 .conflict-values {

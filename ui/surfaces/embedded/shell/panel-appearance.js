@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { featureFontSize } from '../../../shared/features';
 import { iconSvg } from '../../../shared/icons/index.js';
 import {
   DEVELOPMENT,
@@ -87,12 +88,9 @@ function clampFontSize(value) {
   return Math.round(clamp(parsed, MIN_FONT, MAX_FONT) * 10) / 10;
 }
 
-function clampFontOffset(value, baseItemFontSize = DEFAULT_FONT) {
+function clampFontOffset(value) {
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return 0;
-  const parsedBase = Number(baseItemFontSize);
-  const base = Number.isFinite(parsedBase) ? parsedBase : DEFAULT_FONT;
-  return roundPixel(clamp(parsed, MIN_FONT - base, MAX_FONT - base));
+  return Number.isFinite(parsed) ? roundPixel(clamp(parsed, -14, 14)) : 0;
 }
 
 function readFontOffset() {
@@ -153,6 +151,17 @@ function applyTypographyVariables() {
     String(shellState.hostTypography.labelWeight),
   );
   setPixelVariable(shellState.root, '--csw-item-font', effectiveFontSize());
+  for (const id of /** @type {const} */ (['outline', 'next'])) {
+    setPixelVariable(
+      shellState.root,
+      `--csw-${id}-font`,
+      featureFontSize(
+        id,
+        shellState.fontSizes,
+        shellState.fontOffset ? effectiveFontSize() : undefined,
+      ),
+    );
+  }
   setPixelVariable(shellState.root, '--csw-chrome-font', shellState.hostTypography.chromeFontSize);
   setPixelVariable(shellState.root, '--csw-icon-font', shellState.hostTypography.iconFontSize);
 }
@@ -172,7 +181,7 @@ function writeFontSize(value) {
   const parsed = Number(value);
   const requested = clampFontSize(Number.isFinite(parsed) ? parsed : effectiveFontSize());
   const baseItemFontSize = shellState.hostTypography.baseItemFontSize;
-  shellState.fontOffset = clampFontOffset(requested - baseItemFontSize, baseItemFontSize);
+  shellState.fontOffset = clampFontOffset(requested - baseItemFontSize);
   persistFontPreference();
   applyTypographyVariables();
 }

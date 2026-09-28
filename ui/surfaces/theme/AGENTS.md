@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
-- `appearance.ts`：各形式的主题语义色与原材质配方，供隔离功能视图消费；纯黑保持 #000。
+- `appearance.ts`：各形式的主题语义色、内容字号契约与原材质配方，供隔离功能视图消费；纯黑保持 #000。
 - `tokens.css`：胶囊语义颜色、材质参数与外壳变量，基础尺寸来自 ui/shared/tokens.css。
 - `materials.css`：哑光、CSS 磨砂和原生材质透明前景；原生液态不重复叠加网页阴影。
 - [glass/AGENTS.md](glass/AGENTS.md)：正式/开发构建共用的自有 SVG 凸面透镜与 Regular/Clear 变体。

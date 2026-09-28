@@ -122,7 +122,7 @@ export function FeatureSettings({
   return (
     <section className="settings-section">
       <h2>主界面</h2>
-      <div className="settings-choice" role="group" aria-label="主界面形式">
+      <div id="main-placement" className="settings-choice" role="group" aria-label="主界面形式">
         {(['sidebar', 'overlay', 'desktop'] as const).map((p) => (
           <button
             type="button"

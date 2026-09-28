@@ -47,7 +47,7 @@
 }
 .model-matrix {
   position: relative;
-  min-width: calc(var(--name-width) + 8px + var(--columns) * 48px);
+  min-width: calc(var(--name-width) + 8px + var(--columns) * max(48px, 4.5em));
 }
 .model-column-resize {
   position: absolute;
@@ -82,12 +82,12 @@
   grid-template-columns: var(--name-width) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-width: calc(var(--name-width) + var(--columns) * 40px);
+  min-width: calc(var(--name-width) + 8px + var(--columns) * max(48px, 4.5em));
 }
 .model-matrix-head {
   min-height: 28px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: inherit;
 }
 .model-matrix-head > div,
 .model-choices {
@@ -115,7 +115,7 @@
 }
 .model-choices button {
   padding: 4px 2px;
-  font-size: 10px;
+  font-size: inherit;
   color: var(--muted);
 }
 .model-choices button[aria-pressed='true'],

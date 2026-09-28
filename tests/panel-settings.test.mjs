@@ -79,15 +79,15 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
-    const font = page.getByLabel('大纲与下一步字号（px）', { exact: true });
+    const font = page.getByLabel('大纲字号（px）', { exact: true });
     assert.equal(await font.inputValue(), '23.1');
-    assert.equal(await font.getAttribute('step'), '0.1');
+    assert.equal(await font.getAttribute('step'), '1');
     const width = page.getByLabel('侧栏宽度（px）', { exact: true });
     await width.fill('400');
     await width.press('Tab');
     await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '400');
-    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).fill('16.34');
-    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).press('Tab');
+    await page.getByLabel('大纲字号（px）', { exact: true }).fill('16.34');
+    await page.getByLabel('大纲字号（px）', { exact: true }).press('Tab');
     await page.waitForFunction(() =>
       [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
     );
@@ -102,8 +102,40 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       () => document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true',
     );
     assert.equal(prefs.ui.dockWidth, 400);
-    assert.ok(Math.abs(prefs.ui.fontOffset - 3.3) < 0.0001);
+    assert.equal(prefs.ui.fontSizes.outline, 16.3);
+    assert.equal(prefs.ui.fontOffset, 10.130000000000003);
     assert.equal(await font.inputValue(), '16.3');
+    await font.press('ArrowUp');
+    assert.equal(await font.inputValue(), '17.3');
+    await font.press('ArrowDown');
+    assert.equal(await font.inputValue(), '16.3');
+    await font.blur();
+    await page.getByRole('button', { name: '增大大纲字号（px）', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '17.3');
+    await page.getByRole('button', { name: '减小大纲字号（px）', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16.3');
+    for (const [label, size] of [
+      ['下一步', 18.5],
+      ['看板', 17.2],
+      ['模型快切', 16.1],
+    ]) {
+      const input = page.getByLabel(`${label}字号（px）`, { exact: true });
+      await input.fill(String(size));
+      await input.blur();
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll('fieldset')].every((f) => !f.disabled),
+      );
+    }
+    assert.deepEqual(prefs.ui.fontSizes, { outline: 16.3, next: 18.5, board: 17.2, model: 16.1 });
+    await page.getByRole('button', { name: '重置全部字号' }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
+    assert.deepEqual(prefs.ui.fontSizes, { outline: 16, next: 16, board: 15, model: 14 });
+    assert.equal(prefs.ui.fontOffset, 0);
+    await font.fill('18.9');
+    await page.getByRole('button', { name: '重置全部字号' }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
+    assert.equal(prefs.ui.fontSizes.outline, 16);
+
     assert.equal(prefs.ui.labelOnly, true);
     assert.equal(prefs.ui.promptClickMode, 'hybrid');
     assert.equal(prefs.alwaysOnTop, true);

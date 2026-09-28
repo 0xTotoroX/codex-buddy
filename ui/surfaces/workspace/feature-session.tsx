@@ -1,13 +1,13 @@
 /* [INPUT]: Owner lease, business projection, request function and optional surface header slot.
- * [OUTPUT]: Business content with guarded actions and draft/reading handoff; the surface owns chrome.
+ * [OUTPUT]: Business content with per-feature fonts, guarded actions and draft/reading handoff; the surface owns chrome.
  * [POS]: Shared by native windows and host Shadow DOM surfaces; no host parsing.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { readWorkbenchScroll, writeWorkbenchScroll } from './reading.js';
 import { FeatureContent, contentToken, type FeatureData } from '../../features/content';
 import type { PanelSnapshot } from '../../shared/contracts';
 import { surfaceStyle, type Appearance } from '../theme/appearance';
-import { type Entry, type Request, type Reading } from '../../shared/features';
+import { featureFontSize, type Entry, type Request, type Reading } from '../../shared/features';
 export function FeatureView({
   entry,
   owner,
@@ -210,17 +210,26 @@ export function FeatureView({
     ...appearance,
     theme: projection?.theme || appearance.theme,
     colors: projection?.colors || appearance.colors,
-    fontSize:
-      projection?.display?.fontSize ??
-      projection?.hostTypography?.baseItemFontSize ??
-      appearance.fontSize,
+    fontSize: featureFontSize(
+      entry.id,
+      appearance.fontSizes,
+      appearance.fontSizes ? appearance.legacyFontSize : projection?.display?.fontSize,
+    ),
   });
   return (
     <section
       className="feature-view"
       data-feature={entry.id}
       data-busy={busy}
-      style={{ ...style, background: 'transparent', backdropFilter: undefined }}
+      style={
+        {
+          ...style,
+          '--board-font-size': style.fontSize,
+          '--csw-item-font': style.fontSize,
+          background: 'transparent',
+          backdropFilter: undefined,
+        } as CSSProperties
+      }
     >
       {entry.pending && <p role="status">正在移到新位置…</p>}
       {error && <p role="alert">{error}</p>}

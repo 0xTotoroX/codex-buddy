@@ -458,3 +458,55 @@
     gap: 24px;
   }
 }
+
+.settings-overview a {
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.settings-overview a:hover {
+  color: var(--buddy-text);
+  background: var(--buddy-subtle);
+}
+.settings-overview a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.overview-fonts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.font-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.font-stepper input {
+  appearance: textfield;
+}
+.font-stepper input::-webkit-inner-spin-button,
+.font-stepper input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+.font-stepper button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.font-stepper button:hover {
+  background: var(--buddy-subtle);
+}
+.font-stepper button:focus-visible {
+  outline: 2px solid var(--buddy-focus);
+  outline-offset: 2px;
+}
+
+.settings-font-heading h2 {
+  margin: 0;
+}

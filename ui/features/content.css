@@ -5,6 +5,13 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+[data-view-body='outline'] {
+  --csw-item-font: var(--csw-outline-font);
+}
+[data-view-body='next'] {
+  --csw-item-font: var(--csw-next-font);
+}
+
 .csw-mouth-stage[data-mouth-stage='next'] {
   height: auto;
   min-height: 100%;

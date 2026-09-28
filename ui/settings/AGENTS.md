@@ -7,14 +7,14 @@
 成员清单：
 
 - [main.tsx](main.tsx)：页面入口、服务状态、分类容器及大纲开关；组合各设置模块，不持有任务或模型业务。
-- [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，分类可见时读取现有 API，不提供修改、测试或打开功能的控件。
-- [settings-outline.tsx](settings-outline.tsx)：总览为首次打开的默认分类，分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；旧深链接等待异步表单就绪再定位；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
+- [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
+- [settings-outline.tsx](settings-outline.tsx)：总览为首次打开的默认分类，分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
 - [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步开关、生成方式、生成模型、常用提示词与高级生成限制；模型读取/连接测试仅由显式操作触发。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
 - [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；导出 SettingsEditor 供展示模块组合。
-- [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示/点击行为、大纲与下一步字号（0.1px）/侧栏宽度/桌面置顶逐项保存。不再编辑旧 dockLayout/popoutLayout、位置或主题。
+- [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示/点击行为、四功能独立内容字号（步进 1px，手填保留一位小数）及全部字号重置、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
 - [surface-settings.tsx](surface-settings.tsx)：组合形式设置，管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
 - [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关与打开操作，不持有位置或主题。

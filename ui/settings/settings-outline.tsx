@@ -1,5 +1,5 @@
 /* [INPUT]: URL 锚点、当前设置分类与 Dev 注入入口。
- * [OUTPUT]: 单页分类导航、旧锚点兼容、各分类阅读位置及最后访问分类。
+ * [OUTPUT]: 单页分类导航、属性定位与折叠展开、旧锚点兼容、各分类阅读位置及最后访问分类。
  * [POS]: 设置导航；隐藏而不卸载内容，保留编辑草稿。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -26,7 +26,7 @@ const aliases: Record<string, SettingsPage> = {
   'settings-startup': 'connection',
 };
 function fromHash(): SettingsPage | null {
-  const hash = location.hash.slice(1);
+  const hash = location.hash.slice(1).split('/')[0];
   if (aliases[hash]) return aliases[hash];
   const key = hash.replace(/^settings-/, '');
   return key in pageTitles ? (key as SettingsPage) : null;
@@ -68,23 +68,31 @@ export function useSettingsPage(ready: boolean) {
     sessionStorage.setItem('buddy-settings-page', page);
     window.scrollTo({ top: positions.current.get(page) || 0, behavior: 'instant' });
     if (!ready) return;
-    const target = hash.slice(1);
-    if (
-      [
-        'settings-model',
-        'settings-directions',
-        'settings-quick-prompts',
-        'settings-limits',
-        'settings-startup',
-      ].includes(target) &&
-      aliases[target] === page
-    ) {
+    const [section, field] = hash.slice(1).split('/');
+    const target = field || (aliases[section] === page ? section : '');
+    if (!target) return;
+    const focusTarget = () => {
       const node = document.getElementById(target);
-      if (node) {
-        if (node instanceof HTMLDetailsElement) node.open = true;
-        node.scrollIntoView({ behavior: 'instant' });
+      if (!node) return false;
+      for (let parent: HTMLElement | null = node; parent; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
       }
-    }
+      if (!node.hasAttribute('tabindex') && !node.matches('input,select,button,a'))
+        node.tabIndex = -1;
+      node.focus({ preventScroll: true });
+      node.scrollIntoView({ behavior: 'instant', block: 'center' });
+      return true;
+    };
+    if (focusTarget()) return;
+    const observer = new MutationObserver(() => {
+      if (focusTarget()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timer = setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
   }, [page, hash, ready]);
   useLayoutEffect(() => {
     let attachedHost: HTMLElement | null = null;

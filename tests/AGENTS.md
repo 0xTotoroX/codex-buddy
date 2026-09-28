@@ -16,7 +16,7 @@
 
 
 - [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、引用身份隔离、新旧菜单/内联/隐藏视图、菜单打开占位文字/速度可访问标签/高级视图返回、推理滑块、锁定选项、重复失败清理与完整回读、单次菜单事务、生成期间调整与官方禁用、迟到/部分失败及清理的合成宿主回归。
-- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删、大纲/建议字号同步且不放大标签、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
+- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删、四功能独立字号同步且不放大标签、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
 - [model-control-e2e.mjs](model-control-e2e.mjs)：真实 Rust HTTP/CDP 到合成官方菜单的链路、鉴权、完整回读、旧目标拒绝及设置页四形式主题隔离/持久化及贴边位置保存及私有末次诊断验收。
 - [edge-native.mjs](edge-native.mjs)：共享 NSPanel 的稳定视口、原生轮廓/材质、scene-ready 首帧、焦点、悬停、定位、租约退出；合成后端，不操作官方宿主；默认不截图，只有明确需要截图时才传 --screenshots，截图失败后本轮不再重试。
@@ -36,11 +36,11 @@
 
 - [workbench.mjs](workbench.mjs)：工作台浏览器行为验收；自动/双轴布局、交换/重置、连续缩放及生成中切换不增加请求、独立持久化和嵌套滚动接续；真实占位、前景聊天迁移及输入目标、非模态注释浮层的编辑/删除与鼠标往返不改变停靠、模态让位与阅读恢复、两栏独立渲染、键盘调整、空间不足、功能开关、宿主重绘和销毁恢复。连续流程以延迟的合成响应验证聊天切换、过期结果、生成次数及双端阅读交接，不调用模型；`WORKBENCH_CASE` 可按名称片段只运行相关用例，结果单独写入 `selected-results.json`。
 
-- [panel-settings.test.mjs](panel-settings.test.mjs)：隔离浏览器中的实际 React 设置控件回归，验证工作台偏好逐字段保存、数值范围及胶囊尺寸、主题和功能开关隔离。
+- [panel-settings.test.mjs](panel-settings.test.mjs)：隔离浏览器中的实际 React 设置控件回归，验证工作台偏好逐字段保存、分项字号步进与手填小数、一键重置及旧尺寸、主题和功能开关隔离。
 
 - [embedded-glass.mjs](embedded-glass.mjs)：真实 Chromium 中用固定高对比背景验证正式构建的 SVG 背景像素、实时更新、B 版 Regular/Clear 液态变体与原生变体隔离、清理及正式构建集成；系统合成器允许透明时要求可见像素差，CI 主机启用“减少透明度”时核对不同效果契约，产品回退由 e2e 单独覆盖；独立命令 test:glass，不读取真实聊天。
 
-- [e2e.mjs](e2e.mjs)：端到端测试入口；设置总览覆盖只读、保存值与草稿区分、分类切换后更新、看板分组计数/模型预设长名称及宽窄/明暗布局，验证三种协议下超过旧桥接大小限制的完整中文/emoji 问答与显式限长与完整性标记；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
+- [e2e.mjs](e2e.mjs)：端到端测试入口；设置总览覆盖只读、保存值与草稿区分、分类切换后更新、看板分组计数/模型预设长名称、属性链接定位及宽窄/明暗布局，验证三种协议下超过旧桥接大小限制的完整中文/emoji 问答与显式限长与完整性标记；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
 - [popout-checks.mjs](popout-checks.mjs)：端到端测试的弹出窗口子流程；检查快捷词只填入不发送及草稿保护、三材质单入口与双向保存、投影、宿主强调色动态同步及回退、收回、受限操作、隐藏像素、表面偏色、哑光/磨砂的单层圆角浅阴影，以及宿主 reset 有无变化时的公共几何、内边距和字体。
 - [lifecycle-test.mjs](lifecycle-test.mjs)：进程生命周期测试入口，不使用真实聊天数据；验证启动器在不支持浮窗时保留内嵌、其他错误仍提示，以及旧默认目录迁移、安装、服务复用、升级、回滚和模型请求取消；报告写入 target/reports/lifecycle.json。 正式程序冷启动覆盖旧胶囊配置、工作台开合意图与独立宽度/比例。
 - [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--header-only 仅验证三材质透明头部与真实置顶开关层级、偏好保存和退出，写入 native-header，不发送鼠标事件；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×36 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 与宿主主题一致及语义色同步、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；默认走免截图的 appearance-only，只有显式 --screenshots 才运行像素采样；`--appearance-only` 可免截图检查主题、材质能力、通过公共头部进入设置并切换三材质后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。

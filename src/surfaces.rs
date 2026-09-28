@@ -1,5 +1,5 @@
 // [INPUT]: Presentation preferences, native window leases and existing host appearance.
-// [OUTPUT]: Independent per-surface themes and one shared edge/notch container.
+// [OUTPUT]: Independent per-surface themes, current feature fonts and one shared edge/notch container.
 // [POS]: Presentation only; owns no task, model or outline business state.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -237,7 +237,8 @@ impl App {
     pub async fn surface_appearance(&self, placement: &str) -> Value {
         let theme = self.surfaces.lock().await.theme(placement);
         let view = self.view();
-        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"surface":theme})
+        let ui = self.appearance().await.ui;
+        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"fontSizes":ui.font_sizes,"legacyFontSize":(ui.font_offset != 0.).then_some(view.panel_font_base + ui.font_offset),"colors":view.panel_colors,"surface":theme})
     }
     pub async fn surface_request(&self, input: Value) -> Result<Value> {
         let op = input["op"].as_str().unwrap_or("state");

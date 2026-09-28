@@ -87,6 +87,7 @@ try {
     scanBusy: false,
     bridgeStatus: 'ready',
   };
+  let fontSizes = { board: 17.4, model: 16.3 };
   const actions = [];
   const settingsRequests = [];
   const layouts = {};
@@ -149,6 +150,7 @@ try {
         value = {
           ...(p.id === 'board' ? tasks : p.id === 'model' ? model : { snapshot: projection }),
           appearance: {
+            fontSizes,
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
             surface: { theme: surfaceTheme, liquidVariant: 'regular' },
@@ -212,6 +214,7 @@ try {
           activeFeature: 'model',
           mainWindow: { lease: 'main-owner', size: [840, 620] },
           appearance: {
+            fontSizes,
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
             themes: { desktop: { theme: surfaceTheme, liquidVariant: 'regular' } },
@@ -232,6 +235,14 @@ try {
   });
   await page.goto('http://127.0.0.1:47991/feature.html#token=fixture&surface=edge');
   const board = page.locator('[data-feature="board"]');
+  await board.locator('.card-title').first().waitFor();
+  assert.equal(
+    await board
+      .locator('.card-title')
+      .first()
+      .evaluate((n) => getComputedStyle(n).fontSize),
+    '17.4px',
+  );
   surfaceTheme = 'native-glass';
   await board.evaluate(async (node) => {
     const deadline = performance.now() + 5000;
@@ -335,6 +346,13 @@ try {
   await view.getByRole('button', { name: /其他模型/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  assert.equal(
+    await view
+      .locator('.model-name strong')
+      .first()
+      .evaluate((n) => getComputedStyle(n).fontSize),
+    '16.3px',
+  );
   const modelNameBox = await view.locator('.model-name strong').first().boundingBox();
   const disclosureBox = await view.locator('.model-disclosure').boundingBox();
   assert.ok(Math.abs(disclosureBox.x - modelNameBox.x) < 1);
@@ -666,6 +684,7 @@ try {
   record(
     'desktop black theme restores host colors; failed return cancels motion and permits retry',
   );
+  fontSizes = undefined;
   entries.splice(
     0,
     entries.length,
@@ -728,6 +747,22 @@ try {
     '15px',
   );
   record('saved content font updates outline and next labels without resizing the tab chrome');
+  fontSizes = { outline: 18.2, next: 20.5, board: 17.4, model: 16.3 };
+  for (const [id, selector] of [
+    ['outline', '.csw-outline-label'],
+    ['next', '.csw-row-label'],
+  ]) {
+    await page.waitForFunction(
+      ({ id, selector, size }) => {
+        const host = [...document.querySelectorAll('.csw-feature-content > div')].find((n) =>
+          n.shadowRoot?.querySelector(`[data-feature="${id}"]`),
+        );
+        const label = host?.shadowRoot.querySelector(selector);
+        return label && Math.abs(parseFloat(getComputedStyle(label).fontSize) - size) < 0.01;
+      },
+      { id, selector, size: fontSizes[id] },
+    );
+  }
 
   // Build the user's T-shaped layout through the same pointer gestures as the UI.
   entries.push({
@@ -858,7 +893,7 @@ try {
     await page
       .locator('[data-feature="next"] .csw-row-label')
       .evaluate((node) => getComputedStyle(node).fontSize),
-    '23.1px',
+    '20.5px',
   );
   record(
     'edge outline/next refresh follows the active tab in the top row and preserves the content font',

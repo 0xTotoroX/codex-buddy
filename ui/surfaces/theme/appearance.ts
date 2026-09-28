@@ -8,6 +8,8 @@ export type SurfaceTheme = {
 export type Appearance = {
   theme?: string | null;
   fontSize?: number;
+  fontSizes?: import('../../shared/features').FontSizes;
+  legacyFontSize?: number;
   colors?: Record<string, string>;
   surface?: SurfaceTheme;
 };
