@@ -1,9 +1,10 @@
-/* [INPUT]: Task API, native window events and drag/drop components.
+/* [INPUT]: Task API, native window events, drag/drop components and optional surface header slot.
  * [OUTPUT]: Task groups, inline creation/removal and compact tabs or wide columns.
  * [POS]: Task-only application entry; no Codex/model dependencies.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Search, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import {
   columns as defaults,
   emptyFields,
@@ -25,7 +26,9 @@ export function Board({
   embedded = false,
   locked = false,
   view,
+  headerActions,
 }: {
+  headerActions?: HTMLElement;
   request: TaskRequest;
   embedded?: boolean;
   locked?: boolean;
@@ -103,20 +106,18 @@ export function Board({
       before={(id) => move(id, taskGroup(task), task.id)}
     />
   );
-  const boardTools = (
-    <div className="board-tools">
-      <button
-        title="搜索任务"
-        aria-label="搜索任务"
-        aria-expanded={searchOpen}
-        onClick={() => {
-          setSearchOpen(!searchOpen);
-          if (searchOpen) setSearch('');
-        }}
-      >
-        <Search size={15} />
-      </button>
-    </div>
+  const searchButton = (
+    <button
+      title="搜索任务"
+      aria-label="搜索任务"
+      aria-expanded={searchOpen}
+      onClick={() => {
+        setSearchOpen(!searchOpen);
+        if (searchOpen) setSearch('');
+      }}
+    >
+      <Search size={18} />
+    </button>
   );
   const addTask = (column: string) =>
     quickAdd?.column === column ? (
@@ -261,20 +262,23 @@ export function Board({
             );
           })}
         </div>
-        <footer className="board-footer">
-          {searchOpen && (
-            <input
-              className="board-search"
-              autoFocus
-              type="search"
-              aria-label="搜索任务"
-              placeholder="搜索任务…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          )}
-          {boardTools}
-        </footer>
+        {headerActions && createPortal(searchButton, headerActions)}
+        {(searchOpen || !headerActions) && (
+          <footer className="board-footer">
+            {searchOpen && (
+              <input
+                className="board-search"
+                autoFocus
+                type="search"
+                aria-label="搜索任务"
+                placeholder="搜索任务…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            )}
+            {!headerActions && <div className="board-tools">{searchButton}</div>}
+          </footer>
+        )}
       </main>
     </div>
   );

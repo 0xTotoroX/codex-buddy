@@ -402,6 +402,57 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'feature layout clears stale split handles during surface handoff',
+    async (page) => {
+      const { build } = await import('esbuild');
+      const result = await build({
+        stdin: {
+          contents:
+            "import { installFeatureLayout } from './ui/surfaces/workspace/layout.js'; window.installLayoutFixture = installFeatureLayout;",
+          resolveDir: root,
+        },
+        bundle: true,
+        write: false,
+        format: 'iife',
+      });
+      await page.addScriptTag({ content: result.outputFiles[0].text });
+      await page.evaluate(() => {
+        const root = document.createElement('div');
+        document.body.append(root);
+        const layout = window.installLayoutFixture(root, {
+          save: async () => {},
+          error: (error) => {
+            throw error;
+          },
+        });
+        const items = ['outline', 'board'].map((id) => ({
+          id,
+          active: true,
+          node: document.createElement('div'),
+        }));
+        items[0].node.innerHTML =
+          '<section><div role="separator" data-inner-separator></div></section>';
+        const saved = {
+          axis: 'vertical',
+          groups: items.map(({ id }) => ({ ids: [id], active: id, weight: 1 })),
+        };
+        layout.update(items, 'sidebar', saved);
+        if (root.querySelectorAll('.csw-feature-panes > [role="separator"]').length !== 1)
+          throw Error('split missing');
+        if (root.querySelector('[data-inner-separator]').hasAttribute('aria-valuenow'))
+          throw Error('nested feature separator modified');
+        layout.update([], 'desktop', saved);
+        if (root.querySelector('.csw-feature-panes').children.length)
+          throw Error('stale split remains');
+        layout.update(items, 'sidebar', saved);
+        if (root.querySelectorAll('.csw-feature-panes > section').length !== 2)
+          throw Error('split not restored');
+        layout.destroy();
+        root.remove();
+      });
+    },
+  ],
+  [
     'rail launcher replaces capsule and survives navigation without duplicating the workspace',
     async (page) => {
       await mode(page, true);
@@ -641,9 +692,9 @@ const cases = [
         ),
       );
       await page.keyboard.press('Tab');
-      await page.locator('[data-workbench-settings]').focus();
+      await refresh.focus();
       await page.waitForFunction(
-        () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '1',
+        () => getComputedStyle(document.querySelector('[data-refresh="next"]')).opacity === '1',
       );
       await page.locator('#fixture-host-content .app-bar').click();
       await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -712,7 +763,7 @@ const cases = [
       assert.equal(await page.locator('.csw-layout-menu').isVisible(), false);
       assert.equal(await page.locator('.csw-pane-menu:visible').count(), 0);
       assert.equal(await page.locator('.csw-workbench-pane > header > button:visible').count(), 2);
-      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 1);
+      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 0);
       assert.equal(
         await page.locator('[data-action=detach]').getAttribute('aria-label'),
         '移到独立窗口',
@@ -734,9 +785,7 @@ const cases = [
         await settle(page);
         const head = await box(page, '.csw-workbench-head');
         const face = await box(page, '.csw-workbench-face');
-        const controls = await box(page, '.csw-workbench-controls');
         near(face.x + face.width / 2, head.x + head.width / 2, 'face stays on shell center');
-        assert.ok(face.x + face.width <= controls.x, 'actions must not overlap expression');
         for (const icon of await page
           .locator(
             '.csw-workbench-controls > .csw-icon svg, .csw-workbench-pane > header > button svg',
@@ -898,7 +947,7 @@ const cases = [
           assert.equal(await page.locator('.csw-workbench').count(), 1);
         }
       }
-      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 2);
+      assert.equal(await page.locator('.csw-workbench-controls > button:visible').count(), 1);
       assert.equal(
         await page.locator('[data-action=detach]').getAttribute('aria-label'),
         '放回聊天',
@@ -934,7 +983,8 @@ const cases = [
       await pin.click();
       assert.equal(await pin.getAttribute('aria-pressed'), 'true');
       assert.deepEqual(await page.evaluate(() => window.popoutFixture.pins), [false, true]);
-      const gear = page.locator('[data-workbench-settings]');
+      assert.equal(await page.locator('[data-workbench-settings]').count(), 0);
+      const gear = pin;
       await gear.hover();
       assert.deepEqual(
         await gear.evaluate((node) => ({
@@ -1816,7 +1866,7 @@ const cases = [
     },
   ],
   [
-    'settings gear opens external web settings without replacing dock floating or popout content',
+    'workbench surfaces omit settings buttons without replacing content',
     async (host) => {
       await mode(host, true);
       const { page: popout, errors } = await createPopout(host);
@@ -1836,12 +1886,9 @@ const cases = [
           await page.getByRole('button', { name: '旧版内置设置', exact: true }).count(),
           0,
         );
-        const gear = page.getByRole('button', { name: '设置', exact: true });
-        await gear.click();
-        await settle(page);
+        assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
         assert.equal(await page.locator('.csw-workbench-settings').isVisible(), false);
         assert.equal(await page.locator('.csw-workbench-panes').isVisible(), true);
-        assert.equal(await gear.getAttribute('title'), '在浏览器中打开设置');
         assert.equal(
           await page.evaluate(() => window.settingsTestPanes.every((node) => node.isConnected)),
           true,
@@ -1850,9 +1897,6 @@ const cases = [
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences()),
           before,
         );
-        // Keyboard follows the same external route and never opens the legacy overlay.
-        await gear.press('Enter');
-        await settle(page);
         assert.equal(await page.locator('.csw-settings:visible').count(), 0);
         assert.deepEqual(await reading(page), readingBefore);
       }
@@ -1860,9 +1904,9 @@ const cases = [
         await host.evaluate(
           () => window.workbenchFixture.requests.filter((r) => r.path === '/settings/open').length,
         ),
-        4,
+        0,
       );
-      assert.equal(await popout.evaluate(() => window.popoutFixture.settingsOpens), 2);
+      assert.equal(await popout.evaluate(() => window.popoutFixture.settingsOpens), 0);
       assert.deepEqual(errors, []);
     },
   ],

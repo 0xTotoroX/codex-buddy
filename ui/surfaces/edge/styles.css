@@ -51,7 +51,6 @@ body {
 #edge-handle {
   padding: 0;
 }
-#edge-settings,
 .edge-feature-actions button {
   display: grid;
   place-items: center;
@@ -59,7 +58,6 @@ body {
   width: 30px;
   height: 30px;
 }
-#edge-settings svg,
 .edge-feature-actions svg {
   width: 18px;
   height: 18px;
@@ -74,9 +72,6 @@ body {
 .edge-feature-actions button:disabled {
   cursor: default;
   opacity: 0.45;
-}
-#edge-settings:hover {
-  color: var(--muted);
 }
 #edge-error {
   margin: 8px 0;
@@ -103,7 +98,6 @@ body {
   #edge-panel:hover {
     --feature-refresh-opacity: 1;
   }
-  #edge-settings,
   .edge-feature-actions button {
     opacity: var(--feature-refresh-opacity, 0);
     transition: opacity 140ms ease-out;
@@ -111,13 +105,11 @@ body {
   .edge-feature-actions button:disabled {
     opacity: calc(var(--feature-refresh-opacity, 0) * 0.45);
   }
-  #edge-settings:focus-visible,
   .edge-feature-actions button:focus-visible {
     opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  #edge-settings,
   .edge-feature-actions button {
     transition: none;
   }

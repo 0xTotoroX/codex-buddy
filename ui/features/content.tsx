@@ -52,6 +52,7 @@ export function FeatureContent({
   if (id === 'board')
     return (
       <Board
+        headerActions={headerActions}
         locked={locked}
         request={taskRequest}
         embedded

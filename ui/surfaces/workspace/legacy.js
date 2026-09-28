@@ -21,7 +21,6 @@ import { refreshOutline } from '../../codex/outline.js';
 import { outlineHtml, attachOutlineEvents, alignOutlineNestedText } from './legacy-content.js';
 import { forceRefreshStepwise } from '../../codex/next.js';
 import { settingsHtml, attachSettingsEvents } from '../embedded/shell/settings-view.js';
-import { openSettings } from '../../codex/runtime/settings-sync.js';
 import { iconSvg, applyMaterial } from '../embedded/shell/panel-appearance.js';
 import {
   bindPanelWindowControls,
@@ -220,7 +219,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (windowGesture) face.setAttribute('aria-keyshortcuts', 'Alt+Enter');
   else face.removeAttribute('aria-keyshortcuts');
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span><button class="csw-icon" data-workbench-settings aria-label="设置" title="在浏览器中打开设置">${iconSvg('settings')}</button>`;
+  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span>`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
     paneContent.set(controls, controlsHtml);
@@ -233,10 +232,6 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       button.addEventListener('click', () =>
         changeLayout(button.dataset.layoutMode || button.dataset.layoutAction),
       );
-    });
-    controls.querySelector('[data-workbench-settings]').addEventListener('click', () => {
-      shellState.workbenchSettings = false;
-      void openSettings();
     });
     controls.querySelector('[data-workbench-close]')?.addEventListener('click', () => {
       if (shellState.layoutMode === 'workbench') closeWorkbench();

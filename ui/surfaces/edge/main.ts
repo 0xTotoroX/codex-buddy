@@ -3,7 +3,6 @@
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { mountFeature } from '../workspace/mount';
 import { titles, type FeatureState, type Request } from '../../shared/features';
-import { iconSvg } from '../../shared/icons/index.js';
 import { surfaceStyle } from '../theme/appearance';
 import styles from './styles.css?inline';
 export function startEdge(request: Request) {
@@ -11,11 +10,10 @@ export function startEdge(request: Request) {
   style.textContent = styles;
   document.head.append(style);
   const root = document.getElementById('root')!;
-  root.innerHTML = `<button id="edge-handle" aria-label="展开功能面板"></button><section id="edge-panel"><header><nav aria-label="功能"></nav><button id="edge-settings" aria-label="设置" title="设置">${iconSvg('settings')}</button></header><p id="edge-error" role="alert" hidden></p><div id="edge-views"></div></section>`;
+  root.innerHTML = `<button id="edge-handle" aria-label="展开功能面板"></button><section id="edge-panel"><header><nav aria-label="功能"></nav></header><p id="edge-error" role="alert" hidden></p><div id="edge-views"></div></section>`;
   const panel = document.getElementById('edge-panel')!,
     handle = document.getElementById('edge-handle')!,
     tabs = panel.querySelector('nav')!,
-    settings = document.getElementById('edge-settings') as HTMLButtonElement,
     error = document.getElementById('edge-error')!,
     views = document.getElementById('edge-views')!;
   const mounts = new Map<
@@ -95,7 +93,7 @@ export function startEdge(request: Request) {
             const headerActions = document.createElement('span');
             headerActions.className = 'edge-feature-actions';
             headerActions.hidden = true;
-            settings.before(headerActions);
+            tabs.after(headerActions);
             item = {
               id: entry.id,
               owner: candidate.owner,
@@ -201,22 +199,6 @@ export function startEdge(request: Request) {
     } else scheduleCollapse();
   });
   handle.onclick = () => ipc({ action: 'expand', keyboard: true });
-  settings.onclick = async () => {
-    const item = [...mounts.values()].find(
-      ({ id, node }) => id === selected && node.dataset.active === 'true',
-    );
-    if (!item) return;
-    settings.disabled = true;
-    error.hidden = true;
-    try {
-      await request({ op: 'settings', id: item.id, owner: item.owner });
-    } catch (e) {
-      error.textContent = e instanceof Error ? e.message : String(e);
-      error.hidden = false;
-    } finally {
-      settings.disabled = false;
-    }
-  };
   panel.addEventListener('pointerdown', () => ipc({ action: 'focus' }));
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && !held()) collapse();

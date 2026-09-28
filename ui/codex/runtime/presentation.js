@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，侧栏收起后回程优先使用左栏图标锚点，桌面置顶按钮串行保存目标值。
+ * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，窗口往返优先使用左栏图标锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -68,7 +68,7 @@ let preferencesRevision = -1;
 function panelWindowAnchor() {
   if (IS_POPOUT || !shellState.glass?.isConnected) return null;
   const layout = shellLayout();
-  const rail = !shellState.open ? launcherButton()?.getBoundingClientRect() : null;
+  const rail = launcherButton()?.getBoundingClientRect();
   // 弹出后玻璃背景层 display:none；从同一套布局计算收回位置，不能读取零尺寸 DOM。
   const dock =
     shellState.layoutMode === 'workbench' && shellState.dockRect?.anchor?.width > 0

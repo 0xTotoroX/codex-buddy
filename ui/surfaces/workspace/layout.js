@@ -43,7 +43,7 @@ export function installFeatureLayout(root, { save, error }) {
   let layout,
     placement,
     items = [],
-    shape = '',
+    shape = null,
     selected = '',
     activeAxis = 'vertical';
   let dirty = false,
@@ -129,7 +129,7 @@ export function installFeatureLayout(root, { save, error }) {
     arrange,
     targetAt(event, id, { width, height }) {
       for (const section of /** @type {NodeListOf<HTMLElement>} */ (
-        panes.querySelectorAll('section[data-pane]')
+        panes.querySelectorAll(':scope > section[data-pane]')
       )) {
         const box = section.getBoundingClientRect();
         const x = (event.clientX - box.left) / box.width,
@@ -170,7 +170,11 @@ export function installFeatureLayout(root, { save, error }) {
             separator,
             () => (activeAxis === 'horizontal' ? 'x' : 'y'),
             () => {
-              const sections = [...panes.querySelectorAll('section')];
+              const sections = [
+                .../** @type {NodeListOf<HTMLElement>} */ (
+                  panes.querySelectorAll(':scope > section')
+                ),
+              ];
               const size = activeAxis === 'horizontal' ? 'width' : 'height';
               return {
                 first: sections[index - 1].getBoundingClientRect()[size],
@@ -237,7 +241,9 @@ export function installFeatureLayout(root, { save, error }) {
         : 'vertical';
     panes.dataset.axis = activeAxis;
     root.dataset.composition = focused ? 'focus' : count > 1 ? 'split' : 'tabs';
-    const sections = [...panes.querySelectorAll('section')];
+    const sections = [
+      .../** @type {NodeListOf<HTMLElement>} */ (panes.querySelectorAll(':scope > section')),
+    ];
     const tracks = [];
     groups.forEach((group, index) => {
       const active = group.ids.includes(group.active) ? group.active : group.ids[0];
@@ -272,7 +278,7 @@ export function installFeatureLayout(root, { save, error }) {
     panes.style.gridTemplateRows =
       !single && activeAxis === 'vertical' ? tracks.join(' ') : 'minmax(0,1fr)';
     /** @type {NodeListOf<HTMLElement>} */ (
-      panes.querySelectorAll('div[role="separator"]')
+      panes.querySelectorAll(':scope > div[role="separator"]')
     ).forEach((handle, index) => {
       handle.hidden = single;
       handle.setAttribute(
@@ -302,7 +308,7 @@ export function installFeatureLayout(root, { save, error }) {
       if (placement !== surface) {
         arrangement.cancel();
         placement = surface;
-        shape = '';
+        shape = null;
         if (changedSurface) selected = '';
         layout = cache.get(surface) || (saved && structuredClone(saved));
         if (!layout) {

@@ -280,8 +280,8 @@ try {
     .click();
   assert.equal(await page.getByLabel('收起面板').count(), 0);
   assert.equal(await page.getByLabel('展开功能面板').textContent(), '');
-  await page.getByRole('button', { name: '设置', exact: true }).click();
-  assert.deepEqual(settingsRequests, [{ op: 'settings', id: 'model', owner: 'model-owner' }]);
+  assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+  assert.deepEqual(settingsRequests, []);
   await page.keyboard.press('Escape');
   await page.getByLabel('展开功能面板').click();
   await page
@@ -292,7 +292,7 @@ try {
   assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
 
   assert.equal(task.fields.title, '隔离任务');
-  record('edge settings uses the active owner; blank handle and Escape preserve tab drafts');
+  record('edge omits settings; blank handle and Escape preserve tab drafts');
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })
@@ -343,7 +343,7 @@ try {
     '0px',
   );
   const visibility = view.getByLabel('隐藏 Model A', { exact: true });
-  const edgeSettings = page.getByRole('button', { name: '设置', exact: true });
+  const headerRefresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
   const waitOpacity = async (locator, opacity) => {
     await locator.evaluate(async (node, opacity) => {
       const deadline = performance.now() + 5000;
@@ -357,25 +357,23 @@ try {
   await Promise.all([
     waitModelRefresh('0'),
     waitOpacity(visibility, '0'),
-    waitOpacity(edgeSettings, '0'),
+    waitOpacity(headerRefresh, '0'),
   ]);
   await page.locator('#edge-panel > header').hover();
   await Promise.all([
     waitModelRefresh('1'),
     waitOpacity(visibility, '1'),
-    waitOpacity(edgeSettings, '1'),
+    waitOpacity(headerRefresh, '1'),
   ]);
   await page.mouse.move(499, 699);
   await page.keyboard.press('Tab');
   await visibility.focus();
   await waitOpacity(visibility, '1');
-  await edgeSettings.focus();
-  await waitOpacity(edgeSettings, '1');
-  await edgeSettings.evaluate((node) => node.blur());
-  await waitOpacity(edgeSettings, '0');
-  record(
-    'model arrows and edge settings follow refresh hover visibility and remain keyboard accessible',
-  );
+  await headerRefresh.focus();
+  await waitOpacity(headerRefresh, '1');
+  await headerRefresh.evaluate((node) => node.blur());
+  await waitOpacity(headerRefresh, '0');
+  record('model arrows and header actions follow hover visibility and remain keyboard accessible');
   await view.getByRole('button', { name: /其他模型/ }).click();
   assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
@@ -408,13 +406,14 @@ try {
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
   const refreshBox = await page.getByRole('button', { name: '刷新可用模型' }).boundingBox();
-  const settingsBox = await page.getByRole('button', { name: '设置', exact: true }).boundingBox();
+  assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+  const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
   const plusBox = await view.getByRole('button', { name: '保存预设', exact: true }).boundingBox();
   const toolbarBox = await view.locator('.model-toolbar').boundingBox();
   assert.ok(
     Math.abs(refreshBox.y + refreshBox.height / 2 - settingsBox.y - settingsBox.height / 2) < 2,
   );
-  assert.ok(refreshBox.x + refreshBox.width <= settingsBox.x);
+  assert.ok(refreshBox.x >= settingsBox.x + settingsBox.width);
   assert.ok(Math.abs(plusBox.x + plusBox.width - toolbarBox.x - toolbarBox.width) < 1);
   await page.getByRole('button', { name: '刷新可用模型' }).click();
   await page.getByRole('button', { name: '刷新可用模型' }).evaluate(async (node) => {
@@ -437,7 +436,7 @@ try {
     .click();
   await page.getByRole('button', { name: '刷新可用模型' }).waitFor();
   record(
-    'edge model refresh sits before settings, follows the active tab and dispatches model refresh; plus and disclosure align',
+    'edge model refresh sits beside tabs, follows the active tab and dispatches model refresh; plus and disclosure align',
   );
   page.once('dialog', (dialog) => dialog.accept('日常'));
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
@@ -591,7 +590,7 @@ try {
     () => document.querySelectorAll('.csw-feature-panes > section').length === 1,
   );
   await page.setViewportSize({ width: 1200, height: 700 });
-  await board.getByRole('button', { name: '搜索任务' }).waitFor();
+  await page.getByRole('button', { name: '搜索任务' }).waitFor();
   assert.equal(await board.getByRole('button', { name: '新增分组' }).count(), 0);
   assert.equal(
     await page
@@ -600,23 +599,30 @@ try {
     'none',
   );
   await board.locator('.board-grid:not(.narrow)').waitFor();
-  const tools = await board.locator('.board-tools').boundingBox();
-  const area = await board.locator('.board-app').boundingBox();
-  assert.ok(area.y + area.height - tools.y - tools.height <= 16, 'search stays at the bottom');
-  assert.ok(area.x + area.width - tools.x - tools.width <= 16, 'search stays at the right');
-  await board.getByRole('button', { name: '搜索任务', exact: true }).click();
+  const tools = await page.getByRole('button', { name: '搜索任务', exact: true }).boundingBox();
+  const boardTab = await page.getByRole('tab', { name: '看板', exact: true }).boundingBox();
+  assert.ok(
+    Math.abs(tools.y + tools.height / 2 - boardTab.y - boardTab.height / 2) < 2,
+    'search shares the feature tab row',
+  );
+  assert.equal(await board.locator('.board-footer').count(), 0, 'closed search reserves no footer');
+  await page.getByRole('button', { name: '搜索任务', exact: true }).click();
   const searchBox = await board.getByRole('searchbox', { name: '搜索任务' }).boundingBox();
-  assert.ok(Math.abs(searchBox.y + searchBox.height / 2 - tools.y - tools.height / 2) < 6);
+  const area = await board.locator('.board-app').boundingBox();
+  assert.ok(
+    area.y + area.height - searchBox.y - searchBox.height <= 16,
+    'search field stays at the bottom',
+  );
   await board.getByRole('searchbox', { name: '搜索任务' }).fill('没有匹配任务');
   assert.equal(await board.getByText('隔离任务', { exact: true }).count(), 0);
-  await board.getByRole('button', { name: '搜索任务', exact: true }).click();
+  await page.getByRole('button', { name: '搜索任务', exact: true }).click();
   await board.getByText('隔离任务', { exact: true }).waitFor();
   await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByLabel('窗口置顶', { exact: true }).click();
   await page.getByLabel('取消窗口置顶', { exact: true }).waitFor();
   assert.equal(pinned, true);
-  record('shared layout restores drag split/merge, ratio, focus, persistence and bottom search');
+  record('shared layout restores drag split/merge, ratio, focus, persistence and header search');
   surfaceTheme = 'black';
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',
@@ -711,7 +717,8 @@ try {
     const button = page.getByRole('button', { name: label, exact: true });
     await button.waitFor();
     const box = await button.boundingBox();
-    const settingsBox = await page.getByRole('button', { name: '设置', exact: true }).boundingBox();
+    assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+    const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
     assert.ok(Math.abs(box.y + box.height / 2 - settingsBox.y - settingsBox.height / 2) < 2);
     assert.equal(await page.locator('#edge-panel > header [data-refresh]:visible').count(), 1);
     assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);

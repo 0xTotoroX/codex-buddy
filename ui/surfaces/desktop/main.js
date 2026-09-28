@@ -5,7 +5,7 @@
 import { mountFeature } from '../workspace/mount';
 import { installFeatureLayout } from '../workspace/layout';
 import { installStyle } from '../embedded/shell/install-styles.js';
-import { workbenchHeadHtml, workbenchSettingsHtml } from '../workspace/chrome.js';
+import { workbenchHeadHtml } from '../workspace/chrome.js';
 import { iconSvg } from '../../shared/icons/index.js';
 /** @param {import('../../shared/features').Request} request */
 export function startDesktop(request, lease) {
@@ -18,7 +18,7 @@ export function startDesktop(request, lease) {
     '--csw-default-chip-width:84px;--csw-default-chip-height:36px;--csw-default-panel-radius:24px;position:fixed;inset:12px;width:auto;height:auto;pointer-events:auto;';
   root.innerHTML = `<div class="csw-popover" data-open="true" data-morphing="false" style="position:absolute;inset:0;width:100%;height:100%"><div class="csw-glass" style="inset:0;width:100%;height:100%;border-radius:24px"></div><section class="csw-panel" style="inset:0;width:100%;height:100%;border-radius:24px"><div class="csw-workbench">${workbenchHeadHtml(true)}</div></section><div class="csw-resize-handle" data-corner="bl" style="position:absolute;left:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="从左下角调整窗口大小"></div><div class="csw-resize-handle" data-corner="br" style="position:absolute;right:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="从右下角调整窗口大小"></div></div>`;
   root.querySelector('.csw-workbench-controls').innerHTML =
-    `<button class="csw-icon" data-pin aria-label="取消窗口置顶" aria-pressed="true">${iconSvg('pin')}</button>${workbenchSettingsHtml()}`;
+    `<button class="csw-icon" data-pin aria-label="取消窗口置顶" aria-pressed="true">${iconSvg('pin')}</button>`;
   const mounts = new Map();
   let state,
     selected = '',
@@ -129,7 +129,7 @@ export function startDesktop(request, lease) {
     }
   });
   head.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || event.target.closest('[data-workbench-settings],[data-pin]')) return;
+    if (event.button !== 0 || event.target.closest('[data-pin]')) return;
     const x = event.clientX,
       y = event.clientY;
     const cleanup = () => {
@@ -152,9 +152,6 @@ export function startDesktop(request, lease) {
         native({ kind: 'resize', corner: handle.dataset.corner }),
       ),
     );
-  head
-    .querySelector('[data-workbench-settings]')
-    .addEventListener('click', () => void call('settings').catch(error));
   head.querySelector('[data-pin]').addEventListener('click', (event) => {
     const button = event.currentTarget,
       value = button.getAttribute('aria-pressed') !== 'true';

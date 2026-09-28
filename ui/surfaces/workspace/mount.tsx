@@ -51,7 +51,7 @@ export function mountFeature(
     handoff: () => Promise<unknown>;
     failed?: (pendingOwner: string) => void;
   },
-  headerActions: HTMLElement | undefined = ['outline', 'next'].includes(initial.id)
+  headerActions: HTMLElement | undefined = ['outline', 'next', 'board'].includes(initial.id)
     ? document.createElement('span')
     : undefined,
 ) {
