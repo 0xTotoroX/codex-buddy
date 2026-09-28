@@ -299,3 +299,59 @@ test(
     }
   },
 );
+
+test('Dev source widget survives settings unmount and remount', { timeout: 15000 }, async () => {
+  const bundle = await build({
+    stdin: {
+      contents: `import React from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { useSettingsPage, SettingsOutline } from './ui/settings/settings-outline';
+        function Page() { const page = useSettingsPage(true); return <><SettingsOutline {...page} /><div id="settings-dev-content" /></>; }
+        let root;
+        window.mountSettings = () => { root=createRoot(document.getElementById('root')); root.render(<React.StrictMode><Page /></React.StrictMode>); };
+        window.unmountSettings = () => root.unmount();`,
+      resolveDir: new URL('..', import.meta.url).pathname,
+      loader: 'tsx',
+    },
+    bundle: true,
+    write: false,
+    format: 'iife',
+    jsx: 'automatic',
+  });
+  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  const browser = await chromium.launch({
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
+  });
+  try {
+    const page = await browser.newPage();
+    await page.route('http://settings.test/**', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }),
+    );
+    await page.goto('http://settings.test/');
+    await page.evaluate(() => {
+      const host = document.createElement('section');
+      host.id = 'buddy-dev-sources';
+      host.attachShadow({ mode: 'open' }).innerHTML =
+        '<details><summary>开发来源</summary><input value="source-draft" /></details>';
+      document.body.prepend(host);
+      window.devHost = host;
+    });
+    await page.addScriptTag({ content: bundle.outputFiles[0].text });
+    for (let i = 0; i < 2; i++) {
+      await page.evaluate(() => window.mountSettings());
+      await page.getByRole('link', { name: '开发', exact: true }).waitFor();
+      assert.equal(
+        await page.evaluate(
+          () =>
+            document.querySelector('#settings-dev-content > #buddy-dev-sources') === window.devHost,
+        ),
+        true,
+      );
+      assert.equal(await page.locator('#buddy-dev-sources input').inputValue(), 'source-draft');
+      await page.evaluate(() => window.unmountSettings());
+      assert.equal(await page.evaluate(() => window.devHost.parentElement === document.body), true);
+    }
+  } finally {
+    await browser.close();
+  }
+});

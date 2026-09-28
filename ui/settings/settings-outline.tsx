@@ -85,11 +85,13 @@ export function useSettingsPage(ready: boolean) {
       }
     }
   }, [page, hash, ready]);
-  useEffect(() => {
+  useLayoutEffect(() => {
+    let attachedHost: HTMLElement | null = null;
     const attach = () => {
       const host = document.getElementById('buddy-dev-sources'),
         slot = document.getElementById('settings-dev-content');
       if (host && slot) {
+        attachedHost = host;
         if (host.parentNode !== slot) {
           slot.append(host);
           const details = host.shadowRoot?.querySelector('details');
@@ -103,8 +105,8 @@ export function useSettingsPage(ready: boolean) {
     observer.observe(document.body, { childList: true, subtree: true });
     return () => {
       observer.disconnect();
-      const host = document.getElementById('buddy-dev-sources');
-      if (host) document.body.prepend(host);
+      // React may already have detached the slot during a hot reload. Keep the actual node.
+      if (attachedHost) document.body.prepend(attachedHost);
     };
   }, []);
   return { page, dev, navigate };

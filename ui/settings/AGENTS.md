@@ -7,7 +7,7 @@
 成员清单：
 
 - [main.tsx](main.tsx)：页面入口、服务状态、分类容器及大纲开关；组合各设置模块，不持有任务或模型业务。
-- [settings-outline.tsx](settings-outline.tsx)：分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；旧深链接等待异步表单就绪再定位。
+- [settings-outline.tsx](settings-outline.tsx)：分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；旧深链接等待异步表单就绪再定位；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
 - [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步开关、生成方式、生成模型、常用提示词与高级生成限制；模型读取/连接测试仅由显式操作触发。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
