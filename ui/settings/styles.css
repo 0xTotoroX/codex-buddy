@@ -96,9 +96,12 @@
 
 /* Category navigation and form layout share the existing semantic colors. */
 .settings-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
   max-width: 1080px;
   margin: auto;
-  padding: 0 32px 32px;
+  padding: 0 32px 24px;
   font-size: 15px;
 }
 .settings-header {
@@ -109,6 +112,7 @@
   min-height: 88px;
 }
 .settings-layout {
+  flex: 1;
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
   gap: 44px;
@@ -224,7 +228,9 @@
   margin-bottom: 24px;
 }
 .settings-footer {
-  margin-top: 36px;
+  flex: none;
+  margin-top: 24px;
+  text-align: right;
   color: var(--buddy-muted);
   font-size: 14px;
 }

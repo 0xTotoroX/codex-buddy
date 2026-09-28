@@ -133,9 +133,9 @@ function App() {
             />
           </div>
           <div hidden={page !== 'dev'} id="settings-dev-content" />
-          <footer className="settings-footer">CodexBuddy {view?.version || '—'}</footer>
         </main>
       </div>
+      <footer className="settings-footer">CodexBuddy {view?.version || '—'}</footer>
     </div>
   );
 }
