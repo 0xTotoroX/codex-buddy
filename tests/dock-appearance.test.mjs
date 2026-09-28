@@ -12,8 +12,8 @@ import { chromium } from 'playwright';
 
 const bundle = await build({
   stdin: {
-    contents: `import * as appearance from './ui/panel/core/panel-appearance.js';
-      import {shellState} from './ui/panel/runtime/state.js';
+    contents: `import * as appearance from './ui/surfaces/embedded/shell/panel-appearance.js';
+      import {shellState} from './ui/codex/runtime/state.js';
       window.probe = {...appearance, shellState};`,
     resolveDir: new URL('..', import.meta.url).pathname,
   },
@@ -71,7 +71,7 @@ test('dock appearances remember independent choices and leave shared window pref
         assert.deepEqual(await read(), { material: 'native-glass', liquidVariant: 'clear' });
         await page.addStyleTag({
           content: readFileSync(
-            new URL('../ui/panel/core/styles/controls.css', import.meta.url),
+            new URL('../ui/surfaces/embedded/shell/styles/controls.css', import.meta.url),
             'utf8',
           ),
         });

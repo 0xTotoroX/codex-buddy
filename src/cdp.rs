@@ -265,7 +265,7 @@ impl Client {
         }
         self.request("Runtime.enable", json!({})).await?;
         self.request("Page.enable", json!({})).await?;
-        let model_script = include_str!("../ui/model-control/host.js");
+        let model_script = include_str!("../ui/codex/model.js");
         let installed_model = self
             .request(
                 "Page.addScriptToEvaluateOnNewDocument",

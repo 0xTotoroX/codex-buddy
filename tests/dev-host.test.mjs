@@ -347,7 +347,7 @@ test('development storage never reads or migrates installation preferences', asy
     const result = await build({
       absWorkingDir: resolve(import.meta.dirname, '..'),
       stdin: {
-        contents: "import * as c from './ui/panel/runtime/constants.js'; globalThis.result=c;",
+        contents: "import * as c from './ui/shared/constants.js'; globalThis.result=c;",
         resolveDir: resolve(import.meta.dirname, '..'),
       },
       bundle: true,

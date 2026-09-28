@@ -140,10 +140,9 @@ try {
     return e?.open && !e.pending;
   }, 'board ready');
   const board = page.locator('[data-feature="board"]');
-  await board.getByRole('button', { name: '隔离验收任务', exact: true }).click();
-  await board.getByLabel('标题', { exact: true }).fill('仍未保存的草稿');
-  await board.getByLabel('备注', { exact: true }).fill('不写入 Apple 或任务服务');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('仍未保存的草稿');
+
   const before = await api('tasks/state');
   const original = await entry('board');
   const destination = native ? 'desktop' : 'sidebar';
@@ -158,7 +157,7 @@ try {
       .filter((e) => e.placement !== 'edge')
       .every((e) => e.placement === destination),
   );
-  assert.equal(moved.view.board.editor.draft.title, '仍未保存的草稿');
+  assert.equal(moved.view.board.quickAdd.title, '仍未保存的草稿');
   assert.deepEqual((await api('tasks/state')).store, before.store);
   record('external placement waits for source draft and commits a new owner without task writes');
   await assert.rejects(() =>
@@ -214,9 +213,12 @@ try {
       null,
       'return retires the desktop lease before another move',
     );
-  await board.getByRole('button', { name: '继续编辑草稿' }).click();
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '仍未保存的草稿');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+  assert.equal(
+    await board.getByLabel('新任务标题', { exact: true }).inputValue(),
+    '仍未保存的草稿',
+  );
+
   record('round trip restores the original unsaved task snapshot and draft');
   if (native) {
     const helper = join(directory, 'native-probe');
@@ -262,7 +264,7 @@ try {
         return e?.placement === 'edge' && !e.pending;
       }, `${id} edge ready`);
     }
-    assert.equal((await entry('board')).view.board.editor.draft.title, '仍未保存的草稿');
+    assert.equal((await entry('board')).view.board.quickAdd.title, '仍未保存的草稿');
     await api('model-control/close', {});
     assert.equal((await entry('model')).open, false);
     const boardOwner = (await entry('board')).owner;
@@ -276,9 +278,12 @@ try {
       const e = await entry('board');
       return e.placement === 'overlay' && !e.pending;
     }, 'board returns from edge');
-    await board.getByRole('button', { name: '继续编辑草稿' }).click();
-    assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '仍未保存的草稿');
-    await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+    assert.equal(
+      await board.getByLabel('新任务标题', { exact: true }).inputValue(),
+      '仍未保存的草稿',
+    );
+
     await assert.rejects(() =>
       api('features', { op: 'save', id: 'board', owner: boardOwner, view: {} }),
     );

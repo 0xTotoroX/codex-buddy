@@ -74,7 +74,22 @@ try {
     },
     status: '本地看板',
   };
+  const projection = {
+    settings: {
+      enabled: true,
+      answerOutlineEnabled: true,
+      generationMode: 'manual',
+      quickPrompts: [],
+    },
+    outlineItems: [{ id: 'outline-fixture', text: '用于验证顶部按钮的大纲', displayLevel: 0 }],
+    outlineStatus: 'ok',
+    prompts: [{ label: '用于验证顶部按钮的建议', prompt: 'SYNTHETIC' }],
+    scanBusy: false,
+    bridgeStatus: 'ready',
+  };
+  let fontSizes = { board: 17.4, model: 16.3 };
   const actions = [];
+  const settingsRequests = [];
   const layouts = {};
   let pinned = false;
   let surfaceTheme = 'matte';
@@ -83,6 +98,8 @@ try {
   let pendingPlacement = null;
   await page.addInitScript(() => {
     window.nativeMessages = [];
+    let edgeSize = { width: 480, height: 650 },
+      expanded = true;
     window.ipc = {
       postMessage(raw) {
         const m = JSON.parse(raw);
@@ -93,15 +110,17 @@ try {
             window.__companionPopout.presented();
             window.__companionPopout.motionFinished();
           });
-        if (['ready', 'expand', 'collapse', 'focus'].includes(m.action)) {
-          const expanded = m.action !== 'collapse';
+        if (['ready', 'expand', 'collapse', 'focus', 'content-size'].includes(m.action)) {
+          if (m.action === 'content-size')
+            edgeSize = { width: Math.min(480, m.width), height: Math.min(650, m.height) };
+          else expanded = m.action !== 'collapse';
           window.dispatchEvent(
             new CustomEvent('edge-native', {
               detail: {
                 expanded,
                 unfold: expanded ? 1 : 0,
-                layoutWidth: 480,
-                layoutHeight: 650,
+                layoutWidth: edgeSize.width,
+                layoutHeight: edgeSize.height,
                 layoutX: 0,
                 layoutY: 0,
                 compactWidth: 10,
@@ -123,15 +142,19 @@ try {
       const p = route.request().postDataJSON();
       let value;
       if (p.op === 'main-window') value = { valid: true, alwaysOnTop: pinned };
-      else if (p.op === 'main-pin') value = { alwaysOnTop: (pinned = p.value) };
+      else if (p.op === 'settings') {
+        settingsRequests.push(p);
+        value = { ok: true };
+      } else if (p.op === 'main-pin') value = { alwaysOnTop: (pinned = p.value) };
       else if (p.op === 'layout') {
         layouts[p.placement] = p.layout;
         value = { layouts };
       } else if (p.op === 'main-anchor') value = { anchor: null };
       else if (p.op === 'read')
         value = {
-          ...(p.id === 'board' ? tasks : model),
+          ...(p.id === 'board' ? tasks : p.id === 'model' ? model : { snapshot: projection }),
           appearance: {
+            fontSizes,
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
             surface: { theme: surfaceTheme, liquidVariant: 'regular' },
@@ -143,6 +166,10 @@ try {
           Object.assign(task.fields, p.data.fields);
           tasks.store.revision++;
           return route.fulfill({ json: tasks });
+        }
+        if (['outline', 'next'].includes(p.id)) {
+          actions.push(p);
+          return route.fulfill({ json: { ok: true } });
         }
         assert.equal(p.id, 'model');
         actions.push(p);
@@ -191,6 +218,7 @@ try {
           activeFeature: 'model',
           mainWindow: { lease: 'main-owner', size: [840, 620] },
           appearance: {
+            fontSizes,
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
             themes: { desktop: { theme: surfaceTheme, liquidVariant: 'regular' } },
@@ -211,6 +239,14 @@ try {
   });
   await page.goto('http://127.0.0.1:47991/feature.html#token=fixture&surface=edge');
   const board = page.locator('[data-feature="board"]');
+  await board.locator('.card-title').first().waitFor();
+  assert.equal(
+    await board
+      .locator('.card-title')
+      .first()
+      .evaluate((n) => getComputedStyle(n).fontSize),
+    '17.4px',
+  );
   surfaceTheme = 'native-glass';
   await board.evaluate(async (node) => {
     const deadline = performance.now() + 5000;
@@ -229,84 +265,320 @@ try {
   await page.screenshot({ path: join(output, 'board-liquid.png') });
   const stageTabs = board.getByRole('navigation', { name: '任务阶段' });
   await board
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .dragTo(stageTabs.getByRole('button', { name: '进行中', exact: true }));
   await board
     .getByRole('region', { name: '进行中', exact: true })
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .waitFor();
   assert.equal(task.fields.column, 'doing');
   await board
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .dragTo(stageTabs.getByRole('button', { name: '待办', exact: true }));
   await board
     .getByRole('region', { name: '待办', exact: true })
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .waitFor();
   assert.equal(task.fields.column, 'todo');
   record('real mouse drag moves a card across compact group tabs inside Shadow DOM');
   surfaceTheme = 'matte';
-  await board.getByRole('button', { name: '隔离任务', exact: true }).click();
-  await board.getByLabel('标题', { exact: true }).fill('还未保存');
+  if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))
+    await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('还未保存');
   await page.evaluate(() => window.ipc.postMessage(JSON.stringify({ action: 'collapse' })));
   await page.evaluate(() => window.ipc.postMessage(JSON.stringify({ action: 'expand' })));
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })
     .click();
-  await page.getByLabel('收起面板').click();
+  assert.equal(await page.getByLabel('收起面板').count(), 0);
+  assert.equal(await page.getByLabel('展开功能面板').textContent(), '');
+  assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+  assert.deepEqual(settingsRequests, []);
+  await page.keyboard.press('Escape');
   await page.getByLabel('展开功能面板').click();
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '看板', exact: true })
     .click();
-  await board.getByRole('button', { name: '继续编辑草稿' }).click();
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   assert.equal(task.fields.title, '隔离任务');
-  record('edge tab switch and collapse preserve live unsaved editor without task writes');
+  record('edge omits settings; blank handle and Escape preserve tab drafts');
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
+  const waitModelRefresh = (opacity) =>
+    page.waitForFunction((opacity) => {
+      const hosts = [...document.querySelectorAll('.edge-view, .csw-feature-content > div')];
+      const button =
+        document.querySelector('#edge-panel [data-refresh="model"]') ||
+        hosts.map((host) => host.shadowRoot?.querySelector('[data-refresh="model"]')).find(Boolean);
+      return button && getComputedStyle(button).opacity === opacity;
+    }, opacity);
+  await page.mouse.move(499, 699);
+  await waitModelRefresh('0');
+  await page.locator('#edge-panel > header').hover();
+  await waitModelRefresh('1');
+  await page.mouse.move(499, 699);
+  await waitModelRefresh('0');
+  await page.keyboard.press('Tab');
+  await page.getByRole('button', { name: '刷新可用模型' }).focus();
+  await waitModelRefresh('1');
+  await page.getByRole('button', { name: '刷新可用模型' }).evaluate((node) => node.blur());
+  await waitModelRefresh('0');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  assert.equal(
+    await page
+      .getByRole('button', { name: '刷新可用模型' })
+      .evaluate((node) => getComputedStyle(node).transitionDuration),
+    '0s',
+  );
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await view.getByRole('button', { name: /其他模型/ }).waitFor();
+  assert.equal(
+    await view.locator('.model-row').count(),
+    0,
+    'no favorites means all models stay hidden',
+  );
+  assert.equal(await view.locator('.model-footer [role="status"]').count(), 0);
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  assert.equal(
+    await view
+      .locator('.model-name strong')
+      .first()
+      .evaluate((n) => getComputedStyle(n).fontSize),
+    '16.3px',
+  );
+  const modelNameBox = await view.locator('.model-name strong').first().boundingBox();
+  const disclosureBox = await view.locator('.model-disclosure').boundingBox();
+  assert.ok(Math.abs(disclosureBox.x - modelNameBox.x) < 1);
+  assert.equal(
+    await view.locator('.model-disclosure').evaluate((node) => getComputedStyle(node).paddingLeft),
+    '0px',
+  );
+  const visibility = view.getByLabel('隐藏 Model A', { exact: true });
+  const headerRefresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
+  const waitOpacity = async (locator, opacity) => {
+    await locator.evaluate(async (node, opacity) => {
+      const deadline = performance.now() + 5000;
+      while (getComputedStyle(node).opacity !== opacity) {
+        if (performance.now() > deadline) throw Error(`Expected opacity ${opacity}`);
+        await new Promise(requestAnimationFrame);
+      }
+    }, opacity);
+  };
+  await page.mouse.move(499, 699);
+  await Promise.all([
+    waitModelRefresh('0'),
+    waitOpacity(visibility, '0'),
+    waitOpacity(headerRefresh, '0'),
+  ]);
+  await page.locator('#edge-panel > header').hover();
+  await Promise.all([
+    waitModelRefresh('1'),
+    waitOpacity(visibility, '1'),
+    waitOpacity(headerRefresh, '1'),
+  ]);
+  await page.mouse.move(499, 699);
+  await page.keyboard.press('Tab');
+  await visibility.focus();
+  await waitOpacity(visibility, '1');
+  await headerRefresh.focus();
+  await waitOpacity(headerRefresh, '1');
+  await headerRefresh.evaluate((node) => node.blur());
+  await waitOpacity(headerRefresh, '0');
+  record('model arrows and header actions follow hover visibility and remain keyboard accessible');
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
   await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
   assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
-  assert.equal(actions[0].data.expectedRevision, 'v1');
-  await view.getByLabel('模型 Model B 菜单').click();
-  await view.getByLabel('置顶 Model B').click();
-  await view.locator('[aria-label="置顶 Model B"][aria-pressed="true"]').waitFor();
-  assert.deepEqual(model.preferences.pinned, ['b']);
+  assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model B', { exact: true }).click();
+  await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
+  assert.deepEqual(model.preferences.pinned, ['a', 'b']);
+  await view
+    .locator('[data-model-row="b"] strong')
+    .dragTo(view.locator('[data-model-row="a"]'), { targetPosition: { x: 40, y: 2 } });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.edge-view')].some(
+      (node) => node.shadowRoot?.querySelector('.model-row')?.dataset.modelRow === 'b',
+    ),
+  );
+  assert.deepEqual(model.preferences.modelOrder, ['b', 'a']);
+  await view.getByLabel('隐藏 Model A', { exact: true }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).waitFor();
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  assert.equal(
+    await view.locator('[data-model-row="a"]').count(),
+    0,
+    'current model also hides when removed from favorites',
+  );
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  const compactModelHeight = await page
+    .locator('#edge-panel')
+    .evaluate((node) => node.getBoundingClientRect().height);
+  assert.ok(compactModelHeight < 350, 'few model rows shrink the edge panel');
+  const refreshBox = await page.getByRole('button', { name: '刷新可用模型' }).boundingBox();
+  assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+  const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
+  const plusBox = await view.getByRole('button', { name: '保存预设', exact: true }).boundingBox();
+  const toolbarBox = await view.locator('.model-toolbar').boundingBox();
+  assert.ok(
+    Math.abs(refreshBox.y + refreshBox.height / 2 - settingsBox.y - settingsBox.height / 2) < 2,
+  );
+  assert.ok(refreshBox.x >= settingsBox.x + settingsBox.width);
+  assert.ok(Math.abs(plusBox.x + plusBox.width - toolbarBox.x - toolbarBox.width) < 1);
+  await page.getByRole('button', { name: '刷新可用模型' }).click();
+  await page.getByRole('button', { name: '刷新可用模型' }).evaluate(async (node) => {
+    const deadline = performance.now() + 5000;
+    while (node.disabled) {
+      if (performance.now() > deadline) throw Error('Refresh remained disabled');
+      await new Promise(requestAnimationFrame);
+    }
+  });
+  assert.equal(actions.at(-1).action, 'refresh');
+  assert.equal(actions.at(-1).id, 'model');
+  await page
+    .getByRole('navigation', { name: '功能' })
+    .getByRole('button', { name: '看板', exact: true })
+    .click();
+  await page.getByRole('button', { name: '刷新可用模型' }).waitFor({ state: 'hidden' });
+  await page
+    .getByRole('navigation', { name: '功能' })
+    .getByRole('button', { name: '模型快切' })
+    .click();
+  await page.getByRole('button', { name: '刷新可用模型' }).waitFor();
+  record(
+    'edge model refresh sits beside tabs, follows the active tab and dispatches model refresh; plus and disclosure align',
+  );
   page.once('dialog', (dialog) => dialog.accept('日常'));
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();
   await view.getByLabel('模型工具').click();
+  assert.equal(await view.getByRole('searchbox').count(), 0);
+  assert.equal(await view.getByRole('slider').count(), 0);
+  const columnHandle = view.getByRole('separator', { name: '模型名称列宽' });
+  const handleBox = await columnHandle.boundingBox();
+  const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
+  const beforeResize = preferenceCount();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
+  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
+  await page.mouse.up();
+  await page.waitForFunction(() => {
+    const host = document.querySelector('.edge-view:not([hidden])');
+    return (
+      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      'false'
+    );
+  });
+  assert.equal(model.preferences.modelColumnWidth, 190);
+  assert.equal(preferenceCount(), beforeResize + 1);
+  const cancelBox = await columnHandle.boundingBox();
+  await page.mouse.move(cancelBox.x + 4, cancelBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(cancelBox.x + 40, cancelBox.y + 10);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(preferenceCount(), beforeResize + 1, 'Escape cancels without saving');
+  await columnHandle.press('ArrowLeft');
+  await page.waitForFunction(() => {
+    const host = document.querySelector('.edge-view:not([hidden])');
+    return (
+      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      'false'
+    );
+  });
+  assert.equal(model.preferences.modelColumnWidth, 174);
+  record(
+    'model search and width slider removed; divider previews, saves on release and supports Escape/keyboard',
+  );
+  await page.waitForFunction(
+    (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
+    compactModelHeight,
+  );
   await view.getByLabel('删除预设 日常').click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
-  record('shared model view uses readback, preserves speed, pins models and saves/removes presets');
+  record(
+    'shared model view uses readback, preserves speed, hides/restores models, persists drag order and saves/removes presets',
+  );
   assert.deepEqual(errors, []);
-  await view.getByLabel('模型工具').click();
-  await view.getByLabel('模型 Model B 菜单').click();
+  assert.equal(await view.getByLabel('模型工具').count(), 0, 'no empty preset tools');
   await page.screenshot({ path: join(output, 'edge-model.png') });
+  model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  model.snapshot.models.push({ id: 'c', label: 'Model C', reasoning: ['high'], fast: false });
+  model.preferences.modelColumnWidth = 280;
+  await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
+  await view.getByRole('button', { name: /其他模型/, expanded: true }).waitFor();
+  await view.locator('.model-scroll').evaluate((node) => {
+    node.scrollLeft = 160;
+  });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.edge-view')].some(
+      (node) => node.shadowRoot?.querySelector('.model-scroll')?.scrollLeft > 0,
+    ),
+  );
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await page.waitForFunction(() => window.__buddyFeatureFlush !== undefined);
+  assert.equal(await page.evaluate(() => window.__buddyFeatureFlush()), true);
+  const modelReading = entries.find((e) => e.id === 'model').view;
+  assert.ok(modelReading.modelLeft > 0);
+  assert.equal(modelReading.modelTools, true);
+  assert.equal(modelReading.modelOthers, true);
   for (const entry of entries) entry.placement = 'desktop';
   await page.goto(
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
+  await view.getByRole('separator', { name: '模型名称列宽' }).waitFor();
+  await page.mouse.move(1, 1);
+  await waitModelRefresh('0');
+  await page.locator('.csw-workbench-head').hover();
+  await waitModelRefresh('1');
+  await page.mouse.move(1, 1);
+  await waitModelRefresh('0');
+  assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
+  assert.equal(
+    await view.getByRole('button', { name: /其他模型/ }).getAttribute('aria-expanded'),
+    'true',
+  );
+  assert.equal(
+    await view.locator('.model-scroll').evaluate((node) => node.scrollLeft),
+    await view
+      .locator('.model-scroll')
+      .evaluate(
+        (node, saved) => Math.min(saved, node.scrollWidth - node.clientWidth),
+        modelReading.modelLeft,
+      ),
+  );
+  record('model tools, expanded rows and horizontal reading survive remount');
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
-  await board.getByRole('button', { name: '隔离任务', exact: true }).click();
-  await board.getByLabel('标题', { exact: true }).fill('还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))
+    await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('还未保存');
+
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByRole('tab', { name: '看板', exact: true }).click();
-  await board.getByRole('button', { name: '继续编辑草稿' }).click();
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   assert.equal(await page.getByLabel('模型快切显示位置').count(), 0);
   entries.find((e) => e.id === 'model').reveal++;
@@ -348,7 +620,7 @@ try {
     () => document.querySelectorAll('.csw-feature-panes > section').length === 1,
   );
   await page.setViewportSize({ width: 1200, height: 700 });
-  await board.getByRole('button', { name: '搜索任务' }).waitFor();
+  await page.getByRole('button', { name: '搜索任务' }).waitFor();
   assert.equal(await board.getByRole('button', { name: '新增分组' }).count(), 0);
   assert.equal(
     await page
@@ -357,17 +629,30 @@ try {
     'none',
   );
   await board.locator('.board-grid:not(.narrow)').waitFor();
-  const tools = await board.locator('.board-tools').boundingBox();
-  const heading = await board.locator('.column-heading').last().boundingBox();
-  assert.ok(Math.abs(tools.y + tools.height / 2 - heading.y - heading.height / 2) < 2);
+  const tools = await page.getByRole('button', { name: '搜索任务', exact: true }).boundingBox();
+  const boardTab = await page.getByRole('tab', { name: '看板', exact: true }).boundingBox();
+  assert.ok(
+    Math.abs(tools.y + tools.height / 2 - boardTab.y - boardTab.height / 2) < 2,
+    'search shares the feature tab row',
+  );
+  assert.equal(await board.locator('.board-footer').count(), 0, 'closed search reserves no footer');
+  await page.getByRole('button', { name: '搜索任务', exact: true }).click();
+  const searchBox = await board.getByRole('searchbox', { name: '搜索任务' }).boundingBox();
+  const area = await board.locator('.board-app').boundingBox();
+  assert.ok(
+    area.y + area.height - searchBox.y - searchBox.height <= 16,
+    'search field stays at the bottom',
+  );
+  await board.getByRole('searchbox', { name: '搜索任务' }).fill('没有匹配任务');
+  assert.equal(await board.getByText('隔离任务', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: '搜索任务', exact: true }).click();
+  await board.getByText('隔离任务', { exact: true }).waitFor();
   await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByLabel('窗口置顶', { exact: true }).click();
   await page.getByLabel('取消窗口置顶', { exact: true }).waitFor();
   assert.equal(pinned, true);
-  record(
-    'shared layout restores drag split/merge, ratio, focus, persistence and aligned board tools',
-  );
+  record('shared layout restores drag split/merge, ratio, focus, persistence and header search');
   surfaceTheme = 'black';
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',
@@ -411,6 +696,221 @@ try {
   record(
     'desktop black theme restores host colors; failed return cancels motion and permits retry',
   );
+  fontSizes = undefined;
+  entries.splice(
+    0,
+    entries.length,
+    ...['outline', 'next'].map((id) => ({
+      id,
+      owner: id + '-owner',
+      placement: 'desktop',
+      open: true,
+      view: {},
+      size: [840, 620],
+      reveal: 1,
+      pending: null,
+    })),
+  );
+  pendingPlacement = null;
+  layouts.desktop = {
+    axis: 'horizontal',
+    groups: entries.map((e) => ({ ids: [e.id], active: e.id, weight: 1 })),
+  };
+  await page.goto(
+    'http://127.0.0.1:47991/feature.html#token=fixture&feature=main&lease=main-owner',
+  );
+  for (const [id, name, label, kind] of [
+    ['outline', '大纲', '刷新大纲', 'outline-refresh'],
+    ['next', '下一步', '重新生成建议', 'generate'],
+  ]) {
+    const button = page.getByRole('button', { name: label, exact: true });
+    await button.waitFor();
+    const box = await button.boundingBox();
+    const tab = await page.getByRole('tab', { name, exact: true }).boundingBox();
+    assert.ok(Math.abs(box.y + box.height / 2 - tab.y - tab.height / 2) < 2);
+    assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);
+    await button.click();
+    assert.equal(actions.at(-1).id, id);
+    assert.equal(actions.at(-1).data.kind, kind);
+  }
+  record('desktop split refresh buttons share their own tab row and dispatch the matching action');
+  projection.hostTypography = { baseItemFontSize: 13 };
+  projection.display = { labelOnly: false, promptClickMode: 'fill', fontSize: 19.4 };
+  for (const size of [19.4, 23.1]) {
+    projection.display.fontSize = size;
+    await page.waitForFunction(
+      (size) =>
+        ['outline', 'next'].every((id) => {
+          const host = [...document.querySelectorAll('.csw-feature-content > div')].find((node) =>
+            node.shadowRoot?.querySelector(`[data-feature="${id}"]`),
+          );
+          const label = host?.shadowRoot.querySelector(
+            id === 'outline' ? '.csw-outline-label' : '.csw-row-label',
+          );
+          return label && Math.abs(parseFloat(getComputedStyle(label).fontSize) - size) < 0.01;
+        }),
+      size,
+    );
+  }
+  assert.equal(
+    await page
+      .getByRole('tab', { name: '大纲', exact: true })
+      .evaluate((node) => getComputedStyle(node).fontSize),
+    '15px',
+  );
+  record('saved content font updates outline and next labels without resizing the tab chrome');
+  fontSizes = { outline: 18.2, next: 20.5, board: 17.4, model: 16.3 };
+  for (const [id, selector] of [
+    ['outline', '.csw-outline-label'],
+    ['next', '.csw-row-label'],
+  ]) {
+    await page.waitForFunction(
+      ({ id, selector, size }) => {
+        const host = [...document.querySelectorAll('.csw-feature-content > div')].find((n) =>
+          n.shadowRoot?.querySelector(`[data-feature="${id}"]`),
+        );
+        const label = host?.shadowRoot.querySelector(selector);
+        return label && Math.abs(parseFloat(getComputedStyle(label).fontSize) - size) < 0.01;
+      },
+      { id, selector, size: fontSizes[id] },
+    );
+  }
+
+  // Build the user's T-shaped layout through the same pointer gestures as the UI.
+  entries.push({
+    id: 'board',
+    owner: 'board-owner',
+    placement: 'desktop',
+    open: true,
+    view: {},
+    size: [840, 620],
+    reveal: 1,
+    pending: null,
+  });
+  projection.outlineItems = Array.from({ length: 50 }, (_, i) => ({
+    id: `long-${i}`,
+    text: `有实际内容的长大纲条目 ${i + 1}，用于检查分栏后的阅读区域`,
+    displayLevel: i % 3,
+  }));
+  layouts.desktop = {
+    axis: 'auto',
+    groups: [{ ids: ['outline', 'next', 'board'], active: 'board', weight: 1 }],
+  };
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.reload();
+  await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('嵌套分栏中保留的草稿');
+  const dragTab = async (name, destination, edge) => {
+    const source = await page.getByRole('tab', { name, exact: true }).boundingBox();
+    const target = await page.locator(destination).boundingBox();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      target.x + (edge === 'right' ? target.width - 15 : target.width / 2),
+      target.y + (edge === 'bottom' ? target.height - 15 : target.height / 2),
+      { steps: 12 },
+    );
+    await page.locator('.csw-drop-preview:not([hidden])').waitFor();
+    await page.mouse.up();
+    await page.waitForFunction(() => !document.querySelector('[data-layout-saving="true"]'));
+  };
+  await dragTab('看板', '.csw-feature-panes > section', 'bottom');
+  const topBefore = await page.locator('.csw-feature-panes > section').first().boundingBox();
+  await dragTab('下一步', '[data-pane="board"]', 'right');
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 3);
+  assert.equal(await page.locator('.csw-feature-split').count(), 1);
+  const upper = await page.locator('[data-pane="outline"]').boundingBox();
+  const lowerLeft = await page.locator('[data-pane="board"]').boundingBox();
+  const lowerRight = await page.locator('[data-pane="next"]').boundingBox();
+  assert.ok(
+    Math.abs(upper.height - topBefore.height) < 2,
+    'splitting the bottom keeps the top allocation',
+  );
+  assert.ok(Math.abs(upper.height - lowerLeft.height) < 2, 'top and bottom start at half');
+  assert.ok(Math.abs(lowerLeft.width - lowerRight.width) < 2, 'bottom children start at half');
+  assert.ok(Math.abs(lowerLeft.y - lowerRight.y) < 2 && lowerLeft.y > upper.y + upper.height);
+  assert.ok(Math.abs(upper.width - lowerLeft.width - lowerRight.width - 8) < 2);
+  const outer = page.locator('.csw-feature-panes > [role="separator"]');
+  const inner = page.locator('.csw-feature-split > [role="separator"]');
+  assert.equal(await outer.getAttribute('aria-orientation'), 'horizontal');
+  assert.equal(await inner.getAttribute('aria-orientation'), 'vertical');
+  await inner.focus();
+  await inner.press('ArrowRight');
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  assert.equal(await outer.getAttribute('aria-valuenow'), '50');
+  await outer.focus();
+  await outer.press('ArrowDown');
+  assert.ok(Number(await outer.getAttribute('aria-valuenow')) > 50);
+  await page.getByRole('tab', { name: '下一步', exact: true }).dblclick();
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 1);
+  assert.equal(await page.getByRole('separator', { name: '调整分栏比例' }).count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 3);
+  assert.equal(
+    await board.getByLabel('新任务标题', { exact: true }).inputValue(),
+    '嵌套分栏中保留的草稿',
+  );
+  await page.screenshot({ path: join(output, 'nested-split-wide.png') });
+  const savedNested = structuredClone(layouts.desktop);
+  await page.reload();
+  await inner.waitFor();
+  assert.deepEqual(layouts.desktop, savedNested);
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.waitForFunction(
+    () => document.querySelector('.csw-feature-split')?.dataset.axis === 'vertical',
+  );
+  assert.deepEqual(
+    layouts.desktop,
+    savedNested,
+    'narrow fallback does not rewrite saved directions',
+  );
+  await page.screenshot({ path: join(output, 'nested-split-narrow.png') });
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.waitForFunction(
+    () => document.querySelector('.csw-feature-split')?.dataset.axis === 'horizontal',
+  );
+  await dragTab('下一步', '[data-pane="board"]', 'merge');
+  assert.equal(
+    await page.locator('.csw-feature-split').count(),
+    0,
+    'merging removes the empty nested branch',
+  );
+  assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 2);
+  record(
+    'nested half splits preserve parent geometry, independent ratios, draft, focus, reload and narrow fallback',
+  );
+  entries.pop();
+  for (const entry of entries) entry.placement = 'edge';
+  await page.setViewportSize({ width: 500, height: 700 });
+  await page.goto('http://127.0.0.1:47991/feature.html?surface=edge#token=fixture');
+  for (const [id, name, label] of [
+    ['outline', '大纲', '刷新大纲'],
+    ['next', '下一步', '重新生成建议'],
+  ]) {
+    await page
+      .locator('#edge-panel > header nav')
+      .getByRole('button', { name, exact: true })
+      .click();
+    const button = page.getByRole('button', { name: label, exact: true });
+    await button.waitFor();
+    const box = await button.boundingBox();
+    assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
+    const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
+    assert.ok(Math.abs(box.y + box.height / 2 - settingsBox.y - settingsBox.height / 2) < 2);
+    assert.equal(await page.locator('#edge-panel > header [data-refresh]:visible').count(), 1);
+    assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);
+  }
+  assert.equal(
+    await page
+      .locator('[data-feature="next"] .csw-row-label')
+      .evaluate((node) => getComputedStyle(node).fontSize),
+    '20.5px',
+  );
+  record(
+    'edge outline/next refresh follows the active tab in the top row and preserves the content font',
+  );
+  assert.deepEqual(errors, []);
   report.passed = true;
 } finally {
   writeFileSync(join(output, 'report.json'), JSON.stringify(report, null, 2));

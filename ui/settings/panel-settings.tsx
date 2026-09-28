@@ -1,39 +1,39 @@
-/*
- * [INPUT]: SSE 外观快照、后台弹出能力与经过认证的外观 API。
- * [OUTPUT]: Web 胶囊展开方式与工作台布局偏好；逐项保存并处理其他窗口的并发更新，不改变功能开关。
- * [POS]: 设置页外观、交互与窗口控件；不接收聊天内容。
- * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
- */
-import { Input } from './components/ui/input';
-import { Card } from './components/ui/card';
-import { NativeSelect } from './components/ui/native-select';
+/* [INPUT]: 版本化外观偏好与认证 API。
+ * [OUTPUT]: 下一步的显示/点击设置，及四功能独立字号、一键重置、宽度和置顶设置。
+ * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
+ * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useState } from 'react';
-import { Star } from 'lucide-react';
+import { Minus, Plus } from 'lucide-react';
+import { Button } from './components/ui/button';
+import { titles, defaultFontSizes, featureFontSize, type FeatureId } from '../shared/features';
+import { Input } from './components/ui/input';
+import { NativeSelect } from './components/ui/native-select';
+import { Field, Toggle, Feedback } from './settings-controls';
 import { request } from './api';
-import type { AppearanceSettings, PanelPreferences, WorkbenchLayout } from '../contracts';
-
+import type { AppearanceSettings, PanelPreferences } from '../shared/contracts';
 export function PanelSettings({
   value,
   fontBase = 13,
-  popoutSupported,
-  notify,
+  section = 'surfaces',
 }: {
   value?: AppearanceSettings;
   fontBase?: number;
-  popoutSupported: boolean;
-  notify: (text: string, failed?: boolean) => void;
+  section?: 'next' | 'surfaces';
 }) {
-  const [prefs, setPrefs] = useState(value);
-  const [busy, setBusy] = useState(false);
+  const [prefs, setPrefs] = useState(value),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(''),
+    [fontReset, setFontReset] = useState(0);
   useEffect(() => {
     if (value)
       setPrefs((current) => (!current || value.revision >= current.revision ? value : current));
   }, [value]);
   if (!prefs) return null;
   const { ui } = prefs;
-  async function update(body: Record<string, unknown>) {
+  async function update(body: object) {
     if (!prefs || busy) return;
     setBusy(true);
+    setError('');
     try {
       setPrefs(
         await request<AppearanceSettings>('appearance', {
@@ -41,8 +41,9 @@ export function PanelSettings({
           expectedRevision: prefs.revision,
         }),
       );
-    } catch (error) {
-      notify((error as Error).message, true);
+      return true;
+    } catch (e) {
+      setError((e as Error).message);
       try {
         setPrefs(await request<AppearanceSettings>('appearance'));
       } catch {}
@@ -50,324 +51,166 @@ export function PanelSettings({
       setBusy(false);
     }
   }
-  const change = <K extends keyof PanelPreferences>(key: K, value: PanelPreferences[K]) =>
+  const change = (key: keyof PanelPreferences, value: unknown) =>
     void update({ ui: { [key]: value } });
-  async function action(path: string, body: object = {}) {
-    if (path === 'panel/open' && !popoutSupported) return;
-    setBusy(true);
-    try {
-      await request(path, body);
-      setPrefs(await request<AppearanceSettings>('appearance'));
-    } catch (error) {
-      notify((error as Error).message, true);
-    } finally {
-      setBusy(false);
-    }
-  }
-  const select = (label: string, key: keyof PanelPreferences, options: [string, string][]) => (
-    <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-      <span>{label}</span>
-      <NativeSelect
-        aria-label={label}
-        value={String(ui[key])}
-        onChange={(e) => change(key, e.target.value)}
-      >
-        {options.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </NativeSelect>
-    </label>
-  );
   const number = (
+    id: string,
     label: string,
     value: number,
     min: number,
-    max: number | undefined,
-    commit: (value: number) => void,
-  ) => (
-    <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-      <span>{label}</span>
-      <Input
-        key={value}
-        aria-label={label}
-        type="number"
-        defaultValue={value}
-        min={min}
-        max={max}
-        step="any"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            e.currentTarget.blur();
-          }
-        }}
-        onBlur={(e) => {
-          const next = e.currentTarget.valueAsNumber;
-          if (Number.isFinite(next) && next >= min && (max === undefined || next <= max)) {
-            if (next !== value) commit(next);
-          } else {
-            e.currentTarget.value = String(value);
-            notify(`${label}范围为 ${min}–${max}`, true);
-          }
-        }}
-      />
-    </label>
-  );
-  const workbenchLayout = (key: 'dockLayout' | 'popoutLayout', title: string) => {
-    const layout: WorkbenchLayout = ui[key] ?? {
-      group: 'split',
-      active: 'outline',
-      mode: 'auto',
-      first: 'outline',
-      verticalRatio: ui.splitRatio,
-      horizontalRatio: 0.4,
+    max: number,
+    commit: (n: number) => void,
+    decimal = false,
+  ) => {
+    const bump = (input: HTMLInputElement, delta: number) => {
+      const current = input.valueAsNumber;
+      const next =
+        Math.round(
+          Math.max(min, Math.min(max, (Number.isFinite(current) ? current : value) + delta)) * 10,
+        ) / 10;
+      input.value = String(next);
+      return next;
     };
-    const set = <K extends keyof WorkbenchLayout>(field: K, value: WorkbenchLayout[K]) =>
-      change(key, { ...layout, [field]: value });
     return (
-      <details className="col-span-full group">
-        <summary className="cursor-pointer text-xs font-[550] group-open:mb-5">{title}布局</summary>
-        <div className="grid grid-cols-2 gap-5">
-          <label className="min-w-0 text-xs">
-            <span className="mb-2 block">编排</span>
-            <NativeSelect
-              aria-label={`${title}编排`}
-              value={layout.group || 'split'}
-              onChange={(e) => set('group', e.target.value as WorkbenchLayout['group'])}
-            >
-              <option value="split">分栏</option>
-              <option value="tabs">标签组</option>
-            </NativeSelect>
-          </label>
-          <label className="min-w-0 text-xs">
-            <span className="mb-2 block">选中标签</span>
-            <NativeSelect
-              aria-label={`${title}选中标签`}
-              value={layout.active || 'outline'}
-              onChange={(e) => set('active', e.target.value as WorkbenchLayout['active'])}
-            >
-              <option value="outline">大纲</option>
-              <option value="next">下一步</option>
-            </NativeSelect>
-          </label>
-          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-            <span>排列</span>
-            <NativeSelect
-              aria-label={`${title}排列`}
-              value={layout.mode}
-              onChange={(e) => set('mode', e.target.value as WorkbenchLayout['mode'])}
-            >
-              <option value="auto">自动</option>
-              <option value="vertical">上下</option>
-              <option value="horizontal">左右</option>
-            </NativeSelect>
-          </label>
-          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-            <span>首个面板</span>
-            <NativeSelect
-              aria-label={`${title}首个面板`}
-              value={layout.first}
-              onChange={(e) =>
-                change(key, {
-                  ...layout,
-                  first: e.target.value as WorkbenchLayout['first'],
-                  verticalRatio: 1 - layout.verticalRatio,
-                  horizontalRatio: 1 - layout.horizontalRatio,
-                })
+      <Field id={id} label={label}>
+        <div className={decimal ? 'font-stepper' : undefined}>
+          <Input
+            key={decimal ? `${value}-${fontReset}` : value}
+            id={id}
+            type="number"
+            defaultValue={value}
+            min={min}
+            max={max}
+            step={1}
+            onKeyDown={(e) => {
+              if (decimal && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
+                e.preventDefault();
+                bump(e.currentTarget, e.key === 'ArrowUp' ? 1 : -1);
               }
-            >
-              <option value="outline">大纲</option>
-              <option value="next">下一步</option>
-            </NativeSelect>
-          </label>
-          {number(`${title}上下比例`, layout.verticalRatio, 0.2, 0.8, (v) =>
-            set('verticalRatio', v),
-          )}
-          {number(`${title}左右比例`, layout.horizontalRatio, 0.2, 0.8, (v) =>
-            set('horizontalRatio', v),
-          )}
-          <button
-            type="button"
-            className="col-span-full text-xs text-muted-foreground text-left"
-            onClick={() =>
-              change(key, {
-                group: 'split',
-                active: 'outline',
-                mode: 'auto',
-                first: 'outline',
-                verticalRatio: 0.45,
-                horizontalRatio: 0.4,
-              })
-            }
-          >
-            恢复{title}默认布局
-          </button>
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+            onBlur={(e) => {
+              const entered = e.currentTarget.valueAsNumber;
+              const n = decimal ? Math.round(entered * 10) / 10 : entered;
+              if (Number.isFinite(n) && n >= min && n <= max) {
+                e.currentTarget.value = String(n);
+                if (n !== value) commit(n);
+              } else {
+                e.currentTarget.value = String(value);
+                setError(`${label}范围为 ${min}–${max}`);
+              }
+            }}
+          />
+          {decimal &&
+            [-1, 1].map((delta) => (
+              <button
+                type="button"
+                key={delta}
+                aria-label={`${delta < 0 ? '减小' : '增大'}${label}`}
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  const input = e.currentTarget.parentElement!.querySelector('input')!;
+                  const next = bump(input, delta);
+                  if (next !== value) commit(next);
+                }}
+              >
+                {delta < 0 ? <Minus size={16} /> : <Plus size={16} />}
+              </button>
+            ))}
         </div>
-      </details>
+      </Field>
     );
   };
   return (
-    <Card tabIndex={-1} id="settings-capsule" aria-label="胶囊设置">
-      <div className="mb-[22px] flex items-center justify-between [&>span]:text-[11px] [&>span]:text-muted-foreground">
-        <h2 className="text-[15px] font-semibold leading-normal tracking-[-0.3px]">胶囊</h2>
-        <span>即时保存</span>
-      </div>
-      <fieldset className="m-0 min-w-0 border-0 p-0" disabled={busy}>
-        <div className="grid grid-cols-2 gap-5">
-          <div className="col-span-full grid grid-cols-2 gap-5">
-            {select('点击胶囊后展开为', 'layoutMode', [
-              ['capsule', '聊天内浮动工作台'],
-              ['workbench', '右侧嵌入工作台'],
-            ])}
-            {number('侧栏宽度（px）', ui.dockWidth, 300, 460, (v) => change('dockWidth', v))}
-            <p className="col-span-full m-0 text-xs leading-relaxed text-muted-foreground">
-              两种方式都留在当前聊天内；浮动工作台可拖动位置，右侧嵌入会为聊天预留空间。双击表情另行弹出独立窗口。
-            </p>
-            {workbenchLayout('dockLayout', '停靠')}
-            {workbenchLayout('popoutLayout', '浮窗')}
-          </div>
-          <div className="col-span-full flex items-end gap-2 [&>label]:flex-1">
-            {select('材质', 'material', [
-              ['matte', '哑光'],
-              ['frosted', '磨砂'],
-              ['native-glass', '液态'],
-            ])}
-            {ui.material === 'native-glass' && (
-              <button
-                type="button"
-                aria-label="通透液态（Clear）"
-                aria-pressed={ui.liquidVariant === 'clear'}
-                title={
-                  ui.liquidVariant === 'clear' ? '已开启通透液态，点击恢复标准' : '开启通透液态'
-                }
-                onClick={() =>
-                  void change('liquidVariant', ui.liquidVariant === 'clear' ? 'regular' : 'clear')
-                }
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground aria-pressed:bg-accent aria-pressed:text-primary focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                <Star
-                  aria-hidden="true"
-                  size={17}
-                  fill={ui.liquidVariant === 'clear' ? 'currentColor' : 'none'}
-                />
-              </button>
-            )}
-          </div>
-          <p className="col-span-full text-xs leading-normal text-muted-foreground">
-            内嵌液态使用 SVG；弹出液态使用 macOS 26+ 原生 Regular /
-            Clear，旧系统仅弹出液态回退哑光。
-          </p>
-          {number('字号（px）', Math.max(10, Math.min(24, ui.fontOffset + fontBase)), 10, 24, (v) =>
-            change('fontOffset', v - fontBase),
-          )}
-          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-            <span>内容显示</span>
+    <fieldset className="min-w-0 border-0 p-0" disabled={busy}>
+      {section === 'next' ? (
+        <>
+          <Field id="suggestion-labels" label="内容显示">
             <NativeSelect
-              aria-label="内容显示"
+              id="suggestion-labels"
               value={String(ui.labelOnly)}
               onChange={(e) => change('labelOnly', e.target.value === 'true')}
             >
               <option value="false">标题 + 摘要</option>
               <option value="true">仅标题</option>
             </NativeSelect>
-          </label>
-          {select('点击建议', 'promptClickMode', [
-            ['fill', '仅填入'],
-            ['direct', '直接发送'],
-            ['hybrid', '单击填入 · 双击发送'],
-          ])}
-          <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-            <span>面板顺序</span>
+          </Field>
+          <Field
+            id="suggestion-click"
+            label="点击建议"
+            hint={
+              ui.promptClickMode === 'direct'
+                ? '单击建议会直接发送。'
+                : ui.promptClickMode === 'hybrid'
+                  ? '双击建议会直接发送。'
+                  : undefined
+            }
+          >
             <NativeSelect
-              aria-label="面板顺序"
-              value={ui.viewOrder[0]}
-              onChange={(e) =>
-                change(
-                  'viewOrder',
-                  e.target.value === 'next' ? ['next', 'outline'] : ['outline', 'next'],
-                )
-              }
+              id="suggestion-click"
+              value={ui.promptClickMode}
+              onChange={(e) => change('promptClickMode', e.target.value)}
             >
-              <option value="next">建议 → 大纲</option>
-              <option value="outline">大纲 → 建议</option>
+              <option value="fill">仅填入</option>
+              <option value="direct">直接发送</option>
+              <option value="hybrid">单击填入 · 双击发送</option>
             </NativeSelect>
-          </label>
-        </div>
-        {ui.promptClickMode !== 'fill' && (
-          <p className="mt-[7px] text-[10px] leading-[1.7] text-muted-foreground">
-            {ui.promptClickMode === 'direct' ? '单击建议会直接发送。' : '双击建议会直接发送。'}
-          </p>
-        )}
-        <details className="group mt-5">
-          <summary className="cursor-pointer text-xs font-[550] group-open:mb-5">窗口</summary>
-          <div className="grid grid-cols-2 gap-5">
-            <label className="min-w-0 [&>span]:mb-2 [&>span]:block [&>span]:text-xs [&>span]:font-[550]">
-              <span>显示方式</span>
-              <NativeSelect
-                aria-label="显示方式"
-                value={prefs.detached ? 'desktop' : 'embedded'}
-                onChange={(e) =>
-                  void action(e.target.value === 'desktop' ? 'panel/open' : 'panel/close')
-                }
+          </Field>
+        </>
+      ) : (
+        <>
+          <section className="settings-section settings-surface-group" id="settings-fonts">
+            <div className="settings-row settings-font-heading">
+              <h2>内容字号</h2>
+              <Button
+                type="button"
+                variant="ghost"
+                onPointerDown={(e) => e.preventDefault()}
+                onClick={async () => {
+                  if (await update({ ui: { fontSizes: defaultFontSizes, fontOffset: 0 } }))
+                    setFontReset((n) => n + 1);
+                }}
               >
-                <option value="embedded">聊天内</option>
-                <option value="desktop" disabled={!popoutSupported}>
-                  {popoutSupported ? '独立窗口' : '独立窗口（需 macOS 15+ Apple Silicon）'}
-                </option>
-              </NativeSelect>
-            </label>
-            {select('当前面板', 'activeTab', [
-              ['next', '建议'],
-              ['outline', '大纲'],
-              ['settings', '设置'],
-            ])}
-            {number('宽度（px）', ui.width, 300, undefined, (v) => change('width', v))}
-            {number('高度（px）', ui.height, 340, undefined, (v) => change('height', v))}
-          </div>
-          <Check label="展开胶囊" checked={ui.open} onChange={(v) => change('open', v)} />
-          <Check
-            label="独立窗口置顶"
-            checked={prefs.alwaysOnTop}
-            onChange={(v) => void update({ alwaysOnTop: v })}
-          />
-          {prefs.detached && (
-            <div className="grid grid-cols-2 gap-5 mt-5">
-              {number(
-                '屏幕 X',
-                prefs.position?.x ?? 0,
-                -100000,
-                100000,
-                (x) => void update({ position: { x, y: prefs.position?.y ?? 0 } }),
-              )}
-              {number(
-                '屏幕 Y',
-                prefs.position?.y ?? 0,
-                -100000,
-                100000,
-                (y) => void update({ position: { x: prefs.position?.x ?? 0, y } }),
-              )}
+                重置全部字号
+              </Button>
             </div>
-          )}
-        </details>
-      </fieldset>
-    </Card>
-  );
-}
-function Check({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="mt-4 flex items-center gap-1.5 text-xs leading-5 text-muted-foreground [&_input]:m-0 [&_input]:accent-primary">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      {label}
-    </label>
+            {(Object.keys(defaultFontSizes) as FeatureId[]).map((id) => (
+              <div key={id}>
+                {number(
+                  `font-${id}`,
+                  `${titles[id]}字号（px）`,
+                  featureFontSize(
+                    id,
+                    ui.fontSizes,
+                    ui.fontOffset ? ui.fontOffset + fontBase : undefined,
+                  ),
+                  10,
+                  24,
+                  (n) => change('fontSizes', { ...ui.fontSizes, [id]: n }),
+                  true,
+                )}
+              </div>
+            ))}
+          </section>
+          <section className="settings-section settings-surface-group">
+            <h2>尺寸与窗口</h2>
+            {number('dock-width', '侧栏宽度（px）', ui.dockWidth, 300, 460, (n) =>
+              change('dockWidth', n),
+            )}
+            <div id="window-pinning">
+              <Toggle
+                label="桌面窗口置顶"
+                checked={prefs.alwaysOnTop}
+                onChange={(v) => void update({ alwaysOnTop: v })}
+              />
+            </div>
+          </section>
+        </>
+      )}
+      <Feedback text={error} failed />
+    </fieldset>
   );
 }

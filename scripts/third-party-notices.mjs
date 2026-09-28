@@ -90,7 +90,7 @@ export function generateNotices(directory = join(root, 'dist/licenses')) {
     version: '0f00143c7a639906f1621fe58e1b6be7b5bea46d',
     license: 'MIT',
     source: 'https://github.com/openai/apps-sdk-ui',
-    directory: join(root, 'ui/panel/icons'),
+    directory: join(root, 'ui/shared/icons'),
   });
   components.push({
     ecosystem: 'source',
@@ -106,7 +106,7 @@ export function generateNotices(directory = join(root, 'dist/licenses')) {
     version: '0.3.9',
     license: 'MIT',
     source: 'https://github.com/0xTotoroX/model-deck',
-    directory: join(root, 'ui/model-control'),
+    directory: join(root, 'ui/codex'),
   });
   components.sort(
     (a, b) =>

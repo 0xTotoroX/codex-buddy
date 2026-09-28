@@ -1,36 +1,74 @@
-// [INPUT]: Feature owners and a requested main placement.
-// [OUTPUT]: One shared main window and atomic group handoff; edge owners stay independent.
+// [INPUT]: Feature owners, main placement and saved flat/nested layouts.
+// [OUTPUT]: Validated recursive layout persistence, one main window and atomic group handoff.
 // [POS]: Main-surface lifecycle within features; no task or model business logic.
 // [PROTOCOL]: Keep features/AGENTS.md in sync.
 use super::*;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct LayoutGroup {
     pub ids: Vec<String>,
     pub active: String,
     pub weight: f64,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct LayoutSplit {
+    pub axis: String,
+    pub groups: Vec<LayoutNode>,
+    pub weight: f64,
+}
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub(super) enum LayoutNode {
+    Group(LayoutGroup),
+    Split(LayoutSplit),
+}
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FeatureLayout {
     pub axis: String,
-    pub groups: Vec<LayoutGroup>,
+    pub groups: Vec<LayoutNode>,
 }
 impl FeatureLayout {
     pub fn valid(&self) -> bool {
-        let mut ids = std::collections::BTreeSet::new();
-        ["auto", "vertical", "horizontal"].contains(&self.axis.as_str())
-            && (1..=4).contains(&self.groups.len())
-            && self.groups.iter().all(|group| {
-                !group.ids.is_empty()
-                    && group.ids.contains(&group.active)
-                    && group.weight.is_finite()
-                    && (0.01..=100.0).contains(&group.weight)
-                    && group
-                        .ids
-                        .iter()
-                        .all(|id| IDS.contains(&id.as_str()) && ids.insert(id))
+        Self::valid_groups(
+            &self.axis,
+            &self.groups,
+            0,
+            &mut std::collections::BTreeSet::new(),
+        )
+    }
+    fn valid_groups<'a>(
+        axis: &str,
+        groups: &'a [LayoutNode],
+        depth: usize,
+        ids: &mut std::collections::BTreeSet<&'a str>,
+    ) -> bool {
+        depth < IDS.len()
+            && ["auto", "vertical", "horizontal"].contains(&axis)
+            && ((if depth == 0 { 1 } else { 2 })..=4).contains(&groups.len())
+            && groups.iter().all(|node| {
+                let weight = match node {
+                    LayoutNode::Group(group) => group.weight,
+                    LayoutNode::Split(split) => split.weight,
+                };
+                if !weight.is_finite() || !(0.01..=100.0).contains(&weight) {
+                    return false;
+                }
+                match node {
+                    LayoutNode::Group(group) => {
+                        !group.ids.is_empty()
+                            && group.ids.contains(&group.active)
+                            && group
+                                .ids
+                                .iter()
+                                .all(|id| IDS.contains(&id.as_str()) && ids.insert(id))
+                    }
+                    LayoutNode::Split(split) => {
+                        Self::valid_groups(&split.axis, &split.groups, depth + 1, ids)
+                    }
+                }
             })
     }
 }

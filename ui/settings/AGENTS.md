@@ -2,28 +2,33 @@
 
 > L2 | 父级：[AGENTS.md](../../AGENTS.md)
 
-main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责传输；类型来自 ../contracts.ts，API 层处理认证和 SSE 通信；设置版本变化时刷新，取消固定轮询。Web 覆盖模型、外观、交互与窗口设置；外观即时保存，模型表单失焦/选择自动保存与手动保存共用串行队列；在途编辑、保存失败和外部冲突保留草稿。Vite 构建到 target/web，由 Rust 内嵌；不接收聊天正文。
+设置包含只读总览，并按大纲、下一步、看板、模型快切、显示与布局、启动与连接分类，Dev 另有开发来源。分类切换隐藏而不卸载内容，保留草稿和阅读位置；窄屏用顶部横向导航。功能设置调用各自后台服务，形式、主题和布局分别写入 features/surfaces/appearance，不在设置页实现业务。模型表单失焦或选项切换自动保存，失败保留草稿；串行队列及 configurationRevision 沿用 use-settings-form。
 
 成员清单：
 
-- [index.html](index.html)：设置页 HTML 入口，加载同目录 main.tsx；标签页图标复用 ../icon.png。
-- [direction-settings.tsx](direction-settings.tsx)：自动探索/自选/智能挑选、方向库增删改、有序位置、启用候选和 Jev 同意/独立凭据；共用自动保存，无面板新入口。
-- [use-settings-form.ts](use-settings-form.ts)：模型表单和两套独立密钥草稿、修订校验、自动/手动保存队列及并发编辑合并，不触发模型调用或宿主重启。
-- [main.tsx](main.tsx)：页面入口、连续分组设置表单、完整/限长上下文和常用提示词编辑、Field/Toggle 业务组合及操作反馈；页头复用产品图标；挂载设置大纲和模型快切局部设置；启动行为表单选择询问正常重开或直接强制重开，明确强退影响，自动/手动保存；开发构建标明真实调试并固定启动端点和窗口。
-- [settings-outline.tsx](settings-outline.tsx)：按已加载分组（含建议方向与常用提示词）提供锚点导航，滚动跟随当前项并支持键盘及深链接；桌面固定侧栏，窄屏顶部横向导航。
-- [panel-settings.tsx](panel-settings.tsx)：哑光/磨砂/液态材质、液态旁的 Clear 星星按钮、字号、摘要、点击、顺序及窗口设置，另提供明确的点击胶囊后展开方式（右侧嵌入/聊天内浮动，两者均留在宿主内）、侧栏宽度及停靠/浮窗各自的分栏/标签编排、选中标签、排列、首个面板、双轴比例和恢复默认，保存偏好不启用功能或更改主题；依据后台 popoutSupported 禁用不支持设备的桌面选项；按版本逐项保存，冲突时读取新状态；说明三材质在内嵌、弹出与旧系统下的实际效果。
-- [model-control-settings.tsx](model-control-settings.tsx)：模型业务独立开启/停用与唤起，不持有屏幕、位置或主题设置。
-- [dev-sources.js](dev-sources.js)：由 Dev 监督进程注入的独立设置入口，显示实际来源与资源确认、切换 worktree；沿用语义外观变量并局部隔离样式，不进入正式页面或聊天前端；缺失/失效凭据在展开区显示明确错误并禁用切换。
-- [api.ts](api.ts)：公开数据类型、认证请求、错误和 SSE 状态订阅；普通设置页按认证状态跳转到 Dev 统一页，缺失或过期凭据明确显示恢复方式。
-- [styles.css](styles.css)：Tailwind v4 入口、共享语义变量、锚点滚动留白及全局焦点/减少动效规则；只扫描本目录，布局和控件样式均由 TSX 工具类负责。
-- [vite.config.ts](vite.config.ts)：React/Tailwind 构建插件、@ 别名、本机开发代理与 target/web 输出；缓存隔离到本 worktree 的 target 并去重 React；仅代理 /api/ 请求，保留 api.ts 模块加载；依赖优化不等待全量模块遍历结束，避免冷启动后关闭卡住；只重写当前开发 HTTP 端口的来源，外部 Origin 交由后台拒绝。
+- [main.tsx](main.tsx)：页面入口、服务状态、分类容器及大纲开关，版本位于页面末尾右下角，短页面贴近底部，不覆盖内容；组合各设置模块，不持有任务或模型业务。
+- [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
+- [settings-outline.tsx](settings-outline.tsx)：总览为首次打开的默认分类，分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
+- [settings-controls.tsx](settings-controls.tsx)：共用设置行、各功能页顶部的独立开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
+- [next-settings.tsx](next-settings.tsx)：下一步开关、生成方式、生成模型、常用提示词与高级生成限制；模型读取/连接测试仅由显式操作触发。
+- [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
+- [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
+- [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
+- [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示/点击行为、四功能独立内容字号（步进 1px，手填保留一位小数）及全部字号重置、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
+- [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
+- [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
+- [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关与打开操作，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；不持有位置或主题。
+- [task-settings.tsx](task-settings.tsx)：看板分组管理、看板/同步独立开关、显式授权、唯一 iCloud 列表及旧同步配置恢复；不修改同步规则。
+- [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
+- [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
+- [styles.css](styles.css)：Tailwind v4、语义主题、分类导航、设置行和窄屏布局、焦点及减少动效规则；只扫描本目录，不注入宿主。
+- [index.html](index.html)：设置网页入口，图标复用 ../icon.png。
+- [board.html](board.html)：旧独立看板 HTML 入口，仍挂载 ../surfaces/desktop/legacy-board.tsx 及共用看板内容。
+- [feature.html](feature.html)：桌面和贴边通用 HTML 入口。
+- [vite.config.ts](vite.config.ts)：React/Tailwind 多入口构建到 target/web，缓存按 worktree 隔离并去重 React；本机代理只处理 /api/ 请求。
+- [utils.ts](utils.ts)：合并条件类名与 Tailwind 冲突工具类。
+- [components/ui/AGENTS.md](components/ui/AGENTS.md)：本地基础组件，保留上游 MIT 许可。
 
-- [utils.ts](utils.ts)：cn 合并条件类名与 Tailwind 冲突工具类。
-- [components/ui/AGENTS.md](components/ui/AGENTS.md)：本地 shadcn/ui 基础组件，页面功能通过 props 组合；保留上游 MIT 许可。
+旧布局与外观字段仍由后台兼容，不提供第二套完整设置界面；旧窗口及 CLI 入口迁移完成后再退出对应兼容逻辑。
 
-[PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
-
-- [task-settings.tsx](task-settings.tsx)：看板分组新增/改名、任务看板和 Apple 同步独立开关、授权、一个 iCloud 列表选择、旧配置暂停迁移说明及失效列表修复；不修改模型快切与胶囊偏好。
-- [board.html](board.html)：独立任务看板 HTML 入口；Vite 多入口构建输出 board.html 和共享资源，页面业务位于 ../board。
-
-`feature-settings.tsx` 在呈现形式分组提供三选一主界面形式；每个功能仅选择当前主界面或贴边，并可唤起。整组交接中禁用位置变更，改变位置不启用业务。`surface-settings.tsx` 管理四种形式独立主题及共享贴边位置。`feature.html` 是桌面和贴边通用入口。
+[PROTOCOL]: 结构或契约变化时更新本文，并核对父级地图。

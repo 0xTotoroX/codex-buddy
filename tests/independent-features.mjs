@@ -24,14 +24,23 @@ export function independentFeatureCases({ mode, syncSettings }) {
           const fixture = window.workbenchFixture,
             entries = new Map();
           fixture.features = entries;
+          fixture.layouts = {};
           fixture.mainPlacement = 'sidebar';
           fixture.pendingPlacement = null;
           fixture.activeFeature = '';
           fixture.busyOnce = new Set(['handoff', 'ready']);
           fixture.featureActions = [];
+          fixture.outlineProjection = {
+            outlineItems: Array.from({ length: 60 }, (_, i) => ({
+              id: `test-${i}`,
+              text: `合成大纲条目 ${i + 1}`,
+              displayLevel: i % 3,
+            })),
+            outlineStatus: 'ok',
+          };
           const modelState = {
             revision: 1,
-            preferences: { enabled: true, pinned: [], presets: [] },
+            preferences: { enabled: true, pinned: ['a'], presets: [] },
             snapshot: {
               target: { id: 'synthetic-chat' },
               revision: 'model-v1',
@@ -77,6 +86,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
             let result;
             const state = () => ({
               features: structuredClone([...entries.values()]),
+              layouts: structuredClone(fixture.layouts),
               mainPlacement: fixture.mainPlacement,
               pendingPlacement: fixture.pendingPlacement,
               activeFeature: fixture.activeFeature,
@@ -91,7 +101,10 @@ export function independentFeatureCases({ mode, syncSettings }) {
               return;
             }
             if (p.op === 'state') result = state();
-            else if (p.op === 'reveal' || p.op === 'move') {
+            else if (p.op === 'layout') {
+              fixture.layouts[p.placement] = p.layout;
+              result = state();
+            } else if (p.op === 'reveal' || p.op === 'move') {
               fixture.activeFeature = p.id;
               if (entry?.open && p.op === 'reveal') {
                 entry.reveal++;
@@ -162,7 +175,14 @@ export function independentFeatureCases({ mode, syncSettings }) {
                   ? modelState
                   : p.id === 'board'
                     ? tasks
-                    : { snapshot: window.__companionFloatingPanel.exportPanelState() };
+                    : {
+                        snapshot: {
+                          ...window.__companionFloatingPanel.exportPanelState(),
+                          ...(p.id === 'next'
+                            ? fixture.nextProjection || {}
+                            : fixture.outlineProjection || {}),
+                        },
+                      };
             else if (p.owner !== entry?.owner || entry.pending) result = { error: '过期归属' };
             else if (p.op === 'save' || p.op === 'close') {
               entry.view = p.view;
@@ -193,9 +213,64 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await openFeature('outline');
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
+        await page.evaluate(() => {
+          const fixture = window.workbenchFixture;
+          fixture.populatedOutline = fixture.outlineProjection;
+          fixture.outlineProjection = { outlineItems: [], outlineStatus: 'ok' };
+        });
+        await outline.getByText('暂无大纲', { exact: true }).waitFor();
+        const emptyTitle = await outline.locator('.csw-empty-title').boundingBox();
+        const emptyArea = await outline.locator('.feature-projection').boundingBox();
+        const emptyBody = await outline.locator('.feature-body').boundingBox();
+        assert.ok(
+          emptyArea.height > emptyBody.height - 65,
+          'outline empty state fills remaining content',
+        );
+        assert.ok(
+          Math.abs(emptyTitle.y + emptyTitle.height / 2 - emptyArea.y - emptyArea.height / 2) < 2,
+        );
+        assert.ok(
+          Math.abs(emptyTitle.x + emptyTitle.width / 2 - emptyArea.x - emptyArea.width / 2) < 2,
+        );
+        await page.evaluate(() => {
+          window.workbenchFixture.outlineProjection = window.workbenchFixture.populatedOutline;
+        });
+        await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
+        const refresh = page.getByRole('button', { name: '刷新大纲', exact: true });
+        const refreshBox = await refresh.boundingBox();
+        const titleBox = await page.getByRole('tab', { name: '大纲', exact: true }).boundingBox();
+        assert.ok(
+          Math.abs(refreshBox.y + refreshBox.height / 2 - titleBox.y - titleBox.height / 2) < 2,
+          'outline refresh shares the tab row',
+        );
+        assert.equal(await outline.locator('.feature-pane-head').count(), 0);
+        const waitRefresh = (opacity) =>
+          page.waitForFunction((opacity) => {
+            const button = document.querySelector(
+              '.csw-feature-header-actions [data-refresh="outline"]',
+            );
+            return button && getComputedStyle(button).opacity === opacity;
+          }, opacity);
+        await page.mouse.move(10, 10);
+        await waitRefresh('0');
+        await page.locator('.csw-workbench-head').hover();
+        await waitRefresh('1');
+        await page.mouse.move(10, 10);
+        await waitRefresh('0');
+        await page.keyboard.press('Tab');
+        await refresh.focus();
+        await waitRefresh('1');
+        await refresh.evaluate((node) => node.blur());
+        await waitRefresh('0');
+        await page.getByRole('tab', { name: '大纲', exact: true }).dblclick();
+        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 0);
+        assert.equal(await outline.locator('.feature-pane-head strong').count(), 0);
         await page.locator('.csw-workbench-face').click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
-        await page.locator('.csw-fab').click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         const widthHandle = page.getByRole('separator', { name: '调整工作台宽度' });
         const beforeWidth = Number(await widthHandle.getAttribute('aria-valuenow'));
@@ -208,17 +283,60 @@ export function independentFeatureCases({ mode, syncSettings }) {
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
           Math.min(460, beforeWidth + 16),
         );
+        const dock = page.locator('[data-codex-buddy-dock]');
+        const dockBefore = await dock.boundingBox();
+        const handleBox = await widthHandle.boundingBox();
+        const savedBefore = Number(await widthHandle.getAttribute('aria-valuenow'));
+        const dx = savedBefore > 400 ? 50 : -50;
+        await page.mouse.move(
+          handleBox.x + handleBox.width / 2,
+          handleBox.y + handleBox.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          handleBox.x + handleBox.width / 2 + dx,
+          handleBox.y + handleBox.height / 2,
+          { steps: 10 },
+        );
+        await page.mouse.up();
+        await page.waitForFunction(
+          (expected) => window.__companionFloatingPanel.panelPreferences().dockWidth === expected,
+          savedBefore - dx,
+        );
+        await page.waitForFunction(
+          ({ before, dx }) =>
+            Math.abs(
+              document.querySelector('[data-codex-buddy-dock]').getBoundingClientRect().width -
+                before +
+                dx,
+            ) < 2,
+          { before: dockBefore.width, dx },
+        );
+        await outline.locator('.feature-body').evaluate((node) => {
+          node.scrollTop = 150;
+        });
+        await page.waitForFunction(
+          () => window.workbenchFixture.features.get('outline').view.top === 150,
+        );
+        await openFeature('board');
+        await page.waitForTimeout(2100);
+        await openFeature('outline');
+        await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        assert.equal(
+          await outline.locator('.feature-body').evaluate((node) => node.scrollTop),
+          150,
+          'hidden tabs preserve reading across periodic save',
+        );
         await openFeature('board');
         const capsule = page.locator('.csw-fab');
         assert.equal(await capsule.locator('.csw-status-stage').count(), 1);
         assert.equal(await page.locator('select[aria-label="打开功能"]').count(), 0);
         const board = page.locator('[data-feature="board"]');
-        await board.getByRole('button', { name: '保留原任务', exact: true }).waitFor();
+        await board.getByText('保留原任务', { exact: true }).waitFor();
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
-        await board.getByRole('button', { name: '保留原任务', exact: true }).click();
-        await board.getByLabel('标题', { exact: true }).fill('尚未保存的标题');
-        await board.getByLabel('备注', { exact: true }).fill('切换位置仍保留');
-        await board.getByRole('button', { name: '保留草稿并返回' }).click();
+        await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+        await board.getByLabel('新任务标题', { exact: true }).fill('尚未保存的标题');
+
         for (let i = 0; i < 10; i++) {
           await configureFeature('board', 'overlay');
           await page.waitForFunction(
@@ -226,7 +344,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               window.workbenchFixture.features.get('board').placement === 'overlay' &&
               !window.workbenchFixture.features.get('board').pending,
           );
-          await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+          await board.getByLabel('新任务标题', { exact: true }).waitFor();
           assert.equal(await outline.count(), 1);
           if (i === 0) {
             await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -242,10 +360,13 @@ export function independentFeatureCases({ mode, syncSettings }) {
                 !window.__companionFloatingPanel.state.open &&
                 window.__companionFloatingPanel.state.popover.dataset.morphing === 'false',
             );
-            const rect = await page.locator('.csw-fab').boundingBox();
-            assert.equal(Math.round(rect.width), 84);
+            const rect = await page
+              .getByRole('button', { name: 'CodexBuddy', exact: true })
+              .boundingBox();
+            assert.equal(await page.locator('.csw-fab').isVisible(), false);
+            assert.equal(Math.round(rect.width), 36);
             assert.equal(Math.round(rect.height), 36);
-            await page.locator('.csw-fab').click();
+            await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
             await page.waitForFunction(
               () => window.__companionFloatingPanel.state.popover.dataset.morphing === 'true',
             );
@@ -258,7 +379,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               await page.locator('.csw-feature-menu,select[aria-label="打开功能"]').count(),
               0,
             );
-            await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+            await board.getByLabel('新任务标题', { exact: true }).waitFor();
             assert.equal(
               await page.locator('[data-companion-stepwise-root]').count(),
               1,
@@ -278,22 +399,18 @@ export function independentFeatureCases({ mode, syncSettings }) {
               window.workbenchFixture.features.get('board').placement === 'sidebar' &&
               !window.workbenchFixture.features.get('board').pending,
           );
-          await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+          await board.getByLabel('新任务标题', { exact: true }).waitFor();
           assert.equal(await page.locator('[data-feature="board"]').count(), 1);
           assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
         }
-        await board.getByRole('button', { name: '继续编辑草稿' }).click();
+
         assert.equal(
-          await board.getByLabel('标题', { exact: true }).inputValue(),
+          await board.getByLabel('新任务标题', { exact: true }).inputValue(),
           '尚未保存的标题',
         );
-        assert.equal(
-          await board.getByLabel('备注', { exact: true }).inputValue(),
-          '切换位置仍保留',
-        );
-        await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
         await page.waitForFunction(
-          () => window.workbenchFixture.features.get('board').view.board?.editor?.draft,
+          () => window.workbenchFixture.features.get('board').view.board?.quickAdd,
         );
         await page.evaluate(() => {
           const e = window.workbenchFixture.features.get('board');
@@ -308,7 +425,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.equal(await outline.count(), 1);
         await page.locator('.csw-workbench-face').click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
-        await page.locator('.csw-fab').click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         assert.equal(
           await board.count(),
@@ -317,7 +434,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
 
         await openFeature('board');
-        await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+        await board.getByLabel('新任务标题', { exact: true }).waitFor();
         assert.equal(
           await page.evaluate(() => window.workbenchFixture.featureActions.length),
           0,
@@ -325,19 +442,129 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
         await openFeature('next');
         const next = page.locator('[data-feature="next"]');
-        await next.getByRole('button', { name: '生成下一步', exact: true }).waitFor();
+        await page.getByRole('button', { name: '重新生成建议', exact: true }).waitFor();
+        await page.mouse.move(10, 10);
+        const waitNextRefresh = (opacity) =>
+          page.waitForFunction(
+            (opacity) =>
+              [
+                ...document.querySelectorAll('.csw-feature-header-actions [data-refresh="next"]'),
+              ].some((button) => getComputedStyle(button).opacity === opacity),
+            opacity,
+          );
+        await waitNextRefresh('0');
+        await page.locator('.csw-workbench-head').hover();
+        await waitNextRefresh('1');
+        const nextRefreshBox = await page
+          .getByRole('button', { name: '重新生成建议', exact: true })
+          .boundingBox();
+        const nextTabBox = await page
+          .getByRole('tab', { name: '下一步', exact: true })
+          .boundingBox();
+        assert.ok(
+          Math.abs(
+            nextRefreshBox.y + nextRefreshBox.height / 2 - nextTabBox.y - nextTabBox.height / 2,
+          ) < 2,
+          'next refresh shares the tab row',
+        );
+        assert.equal(await next.locator('.feature-pane-head').count(), 0);
+        await page.mouse.move(10, 10);
+        await waitNextRefresh('0');
+        await page.evaluate(() => {
+          window.workbenchFixture.nextProjection = {
+            prompts: [
+              { label: '第一条合成建议', prompt: 'SYNTHETIC_FIRST' },
+              {
+                label: '第二条合成建议',
+                prompt: 'SYNTHETIC_SECOND\n' + '合成的长预览内容，用于验证阅读位置。\n'.repeat(50),
+              },
+            ],
+            display: { labelOnly: true, promptClickMode: 'fill' },
+            bridgeStatus: 'ok',
+          };
+        });
+        await next.locator('.csw-row[data-index="1"]').waitFor();
+        await next.locator('.csw-row[data-index="1"]').focus();
+        await page.waitForTimeout(1800);
+        assert.equal(
+          await next
+            .locator('.csw-row[data-index="1"]')
+            .evaluate((node) => node.getRootNode().activeElement === node),
+          true,
+          'polling preserves preview focus and pending click targets',
+        );
+        assert.equal(
+          (await next.locator('.csw-prompt-preview-body').innerText()).split('\n')[0],
+          'SYNTHETIC_SECOND',
+        );
+        const preview = next.locator('.csw-prompt-preview-scroll');
+        const oldTop = await preview.evaluate((node) => {
+          node.scrollTop = node.scrollHeight;
+          return node.scrollTop;
+        });
+        assert.ok(oldTop > 0, 'long preview scrolls within the feature');
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        await page.waitForFunction(
+          (top) => window.workbenchFixture.features.get('next').view.previewTop === top,
+          oldTop,
+        );
+        const originalHeight = await preview.evaluate((node) => node.clientHeight);
+        await preview.evaluate((node) => {
+          node.style.height = `${node.clientHeight + 200}px`;
+        });
+        await page.waitForFunction(
+          ({ height }) => {
+            const host = [...document.querySelectorAll('[data-codex-buddy-features-root]')].find(
+              (node) => node.shadowRoot?.querySelector('[data-feature="next"]'),
+            );
+            return (
+              host?.shadowRoot.querySelector('.csw-prompt-preview-scroll')?.clientHeight ===
+              height + 200
+            );
+          },
+          { height: originalHeight },
+        );
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        assert.ok(
+          (await preview.evaluate((node) => node.scrollTop)) < oldTop,
+          'larger preview clamps the visible scroll',
+        );
+        await preview.evaluate((node) => node.style.removeProperty('height'));
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        assert.equal(
+          await preview.evaluate((node) => node.scrollTop),
+          oldTop,
+          'preview restores reading after a resize clamp',
+        );
+        await page.screenshot({ path: 'target/reports/workbench/independent-next.png' });
+        await next.locator('.csw-row[data-index="1"]').click();
+        await page.waitForFunction(() => window.workbenchFixture.featureActions.length === 1);
+        const fill = await page.evaluate(() => window.workbenchFixture.featureActions[0]);
+        assert.equal(fill.data.kind, 'fill');
+        assert.equal(fill.data.index, 1);
+        assert.equal(fill.data.submit, false, 'fill preference never sends a message');
+        await page.evaluate(() => {
+          window.workbenchFixture.featureActions.length = 0;
+        });
+
         await syncSettings(page, { enabled: false });
         await next.getByText('功能已停用，可在设置中重新开启。').waitFor();
         assert.equal(
-          await next.getByRole('button', { name: '生成下一步', exact: true }).isDisabled(),
+          await page.getByRole('button', { name: '重新生成建议', exact: true }).isDisabled(),
           true,
         );
-        assert.equal(await next.locator('.feature-actions button:enabled').count(), 0);
+        assert.equal(await next.locator('.feature-projection button:enabled').count(), 0);
         await syncSettings(page, { enabled: true, answerOutlineEnabled: false });
         await openFeature('outline');
         await outline.getByText('功能已停用，可在设置中重新开启。').waitFor();
         assert.equal(
-          await outline.getByRole('button', { name: '刷新大纲', exact: true }).isDisabled(),
+          await page.getByRole('button', { name: '刷新大纲', exact: true }).isDisabled(),
           true,
         );
         await syncSettings(page, { answerOutlineEnabled: true });
@@ -367,19 +594,17 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.waitForFunction(
           () => document.querySelector('[data-codex-buddy-dock]')?.dataset.reason === 'space',
         );
-        await page.locator('.csw-fab').click();
-        await page.getByRole('button', { name: '在聊天内展开', exact: true }).click();
-        await page.waitForFunction(
-          () =>
-            window.workbenchFixture.features.get('model').placement === 'overlay' &&
-            !window.workbenchFixture.features.get('model').pending,
-        );
-        await model.locator('[data-model="a"][data-reasoning="low"]').waitFor();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.waitForTimeout(150);
+        assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
         assert.equal(
-          await model.isVisible(),
-          true,
-          'narrow sidebar offers an accessible alternate placement',
+          await page.evaluate(() => window.workbenchFixture.features.get('model').placement),
+          'sidebar',
         );
+        assert.equal(await model.isVisible(), false);
+        await page.setViewportSize({ width: 1500, height: 1000 });
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
+        await model.locator('[data-model="a"][data-reasoning="low"]').waitFor();
         await page.evaluate(() => {
           window.workbenchFixture.modelState.preferences.enabled = false;
         });
@@ -392,6 +617,24 @@ export function independentFeatureCases({ mode, syncSettings }) {
           await model.locator('[data-model="a"][data-reasoning="low"]').isDisabled(),
           true,
         );
+        await page.setViewportSize({ width: 1500, height: 1000 });
+        await configureFeature('model', 'sidebar');
+        await page.waitForFunction(() => !window.workbenchFixture.features.get('model').pending);
+        await page
+          .locator('.workspace')
+          .evaluate((node) => node.classList.remove('app-shell-main-content-frame'));
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
+        );
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.waitForTimeout(150);
+        assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
+          'workbench',
+        );
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.csw-dock-menu').count(), 0);
         await page.evaluate(() => window.__companionFloatingPanel.destroy());
         assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 0);

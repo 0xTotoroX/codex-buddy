@@ -1,0 +1,116 @@
+/* [INPUT]: Stable native viewport. [OUTPUT]: Minimal edge shell and preserved tab views.
+ * [POS]: Native mask owns the outline and animation. [PROTOCOL]: Keep AGENTS.md in sync. */
+html,
+body {
+  background: transparent;
+  color: #ddd;
+  font:
+    13px -apple-system,
+    sans-serif;
+}
+#edge-panel,
+#edge-handle {
+  position: absolute;
+  box-sizing: border-box;
+}
+#edge-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  overflow: hidden;
+}
+#edge-panel > header {
+  display: flex;
+  gap: 8px;
+  flex: none;
+  min-height: 34px;
+  align-items: center;
+}
+#edge-panel nav {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+#edge-panel button,
+#edge-handle {
+  font: inherit;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 5px;
+  padding: 6px;
+}
+#edge-panel button[aria-pressed='true'] {
+  background: #8883;
+}
+#edge-panel button:focus-visible,
+#edge-handle:focus-visible {
+  outline: 2px solid #888;
+}
+#edge-handle {
+  padding: 0;
+}
+.edge-feature-actions button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+.edge-feature-actions svg {
+  width: 18px;
+  height: 18px;
+}
+.edge-feature-actions {
+  display: flex;
+}
+.edge-feature-actions:empty,
+.edge-feature-actions[hidden] {
+  display: none;
+}
+.edge-feature-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+#edge-error {
+  margin: 8px 0;
+  color: var(--error, inherit);
+}
+#edge-views {
+  min-height: 0;
+  flex: 1;
+  position: relative;
+}
+.edge-view {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+.edge-view[hidden] {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #edge-panel {
+    --feature-refresh-opacity: 0;
+  }
+  #edge-panel:hover {
+    --feature-refresh-opacity: 1;
+  }
+  .edge-feature-actions button {
+    opacity: var(--feature-refresh-opacity, 0);
+    transition: opacity 140ms ease-out;
+  }
+  .edge-feature-actions button:disabled {
+    opacity: calc(var(--feature-refresh-opacity, 0) * 0.45);
+  }
+  .edge-feature-actions button:focus-visible {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge-feature-actions button {
+    transition: none;
+  }
+}

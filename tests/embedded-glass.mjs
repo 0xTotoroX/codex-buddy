@@ -20,13 +20,13 @@ mkdirSync(output, { recursive: true });
 const bundle = (
   await build({
     absWorkingDir: root,
-    entryPoints: ['ui/panel/glass/lab.js'],
+    entryPoints: ['ui/surfaces/theme/glass/lab.js'],
     bundle: true,
     format: 'iife',
     write: false,
   })
 ).outputFiles[0].text;
-const style = readFileSync(resolve(root, 'ui/panel/glass/lab.css'), 'utf8');
+const style = readFileSync(resolve(root, 'ui/surfaces/theme/glass/lab.css'), 'utf8');
 const html = `<!doctype html><html><head><style>
 body{margin:0;background:white;font:14px system-ui}
 #background{height:1200px;display:flex;overflow:hidden}

@@ -40,7 +40,7 @@ test('popout serializes position pin and appearance without hiding external conf
     await tick();
     return result;
   };
-  runInNewContext(readFileSync('ui/panel/popout/boot.js', 'utf8'), {
+  runInNewContext(readFileSync('ui/surfaces/desktop/legacy/boot.js', 'utf8'), {
     window,
     URLSearchParams,
     AbortSignal,

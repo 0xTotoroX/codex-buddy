@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from 'react';
 import { FeatureSettings } from './feature-settings';
 import { request } from './api';
 import { NativeSelect } from './components/ui/native-select';
-import type { SurfaceTheme } from '../features/surface';
+import { PanelSettings } from './panel-settings';
+import type { AppearanceSettings } from '../shared/contracts';
+import type { SurfaceTheme } from '../surfaces/theme/appearance';
 const labels = { sidebar: '侧栏', overlay: '页面浮层', desktop: '桌面窗口', edge: '贴边 / 刘海' };
 type Edge = { edge: string; screen: string; position: number; keepOpen: boolean };
-type State = {
+export type SurfaceState = {
   revision: number;
   preferences: { themes: Record<string, SurfaceTheme>; edge: Edge };
   error?: string;
@@ -17,15 +19,20 @@ type Displays = { screens: { id: string; label: string }[]; nativeGlassAvailable
 export function SurfaceSettings({
   live,
   desktopSupported,
+  appearance,
+  fontBase,
 }: {
   live: boolean;
   desktopSupported: boolean;
+  appearance?: AppearanceSettings;
+  fontBase?: number;
 }) {
-  const [state, setState] = useState<State | null>(null),
+  const [state, setState] = useState<SurfaceState | null>(null),
     [displays, setDisplays] = useState<Displays>({ screens: [], nativeGlassAvailable: false }),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
-    [position, setPosition] = useState(50);
+    [position, setPosition] = useState(50),
+    [primary, setPrimary] = useState('sidebar');
   const writing = useRef(false),
     generation = useRef(0);
   useEffect(() => {
@@ -36,7 +43,7 @@ export function SurfaceSettings({
       const current = ++generation.current;
       try {
         const [value, screens] = await Promise.all([
-          request<State>('surfaces', { op: 'state' }),
+          request<SurfaceState>('surfaces', { op: 'state' }),
           request<Displays>('surfaces/displays'),
         ]);
         if (!disposed && current === generation.current) {
@@ -62,7 +69,7 @@ export function SurfaceSettings({
     setBusy(true);
     setMessage('');
     try {
-      const next = await request<State>('surfaces', {
+      const next = await request<SurfaceState>('surfaces', {
         op: 'save',
         revision: state.revision,
         ...patch,
@@ -72,7 +79,7 @@ export function SurfaceSettings({
     } catch (error) {
       setMessage(String(error));
       try {
-        const next = await request<State>('surfaces', { op: 'state' });
+        const next = await request<SurfaceState>('surfaces', { op: 'state' });
         setState(next);
         setPosition(next.preferences.edge.position * 100);
       } catch {
@@ -90,64 +97,69 @@ export function SurfaceSettings({
       id="settings-surfaces"
       tabIndex={-1}
       aria-label="呈现形式设置"
-      className="mb-5 rounded-xl border border-border bg-card p-4"
+      className="settings-section"
     >
-      <h2 className="text-sm font-medium">呈现形式</h2>
-      <p className="mt-1 mb-4 text-xs text-muted-foreground">
-        每种形式独立保存主题，所有功能共用。纯黑固定配色，其他主题跟随 Codex 明暗。
-      </p>
-      <div className="space-y-3">
-        {Object.entries(labels).map(([placement, label]) => {
-          const theme = state?.preferences.themes[placement] || {
-            theme: 'matte',
-            liquidVariant: 'regular',
-          };
-          return (
-            <div
-              key={placement}
-              className="grid grid-cols-[minmax(104px,1fr)_minmax(140px,280px)] items-center gap-3"
-            >
-              <span className="whitespace-nowrap text-sm">{label}</span>
-              <div className="flex min-w-0 gap-2">
-                <NativeSelect
-                  aria-label={`${label}主题`}
-                  disabled={disabled}
-                  value={theme.theme}
-                  onChange={(event) =>
-                    void save({ placement, theme: { ...theme, theme: event.target.value } })
-                  }
-                >
-                  <option value="black">纯黑</option>
-                  <option value="matte">哑光</option>
-                  <option value="frosted">磨砂</option>
-                  <option value="native-glass">液态</option>
-                </NativeSelect>
-                {theme.theme === 'native-glass' && (
-                  <NativeSelect
-                    aria-label={`${label}液态变体`}
-                    disabled={disabled}
-                    value={theme.liquidVariant}
-                    onChange={(event) =>
-                      void save({
-                        placement,
-                        theme: { ...theme, liquidVariant: event.target.value },
-                      })
-                    }
-                  >
-                    <option value="regular">Regular</option>
-                    <option value="clear">Clear</option>
-                  </NativeSelect>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <FeatureSettings notify={setMessage} desktopSupported={desktopSupported} />
-      <details className="mt-5 border-t border-border pt-3">
-        <summary className="cursor-pointer text-sm">贴边 / 刘海位置</summary>
+      <FeatureSettings live={live} desktopSupported={desktopSupported} onPlacement={setPrimary} />
+      <section className="settings-section settings-surface-group">
+        <h2>主题</h2>
+        <div className="space-y-3">
+          {Object.entries(labels).map(([placement, label]) => {
+            const theme = state?.preferences.themes[placement] || {
+              theme: 'matte',
+              liquidVariant: 'regular',
+            };
+            return (
+              <details
+                key={placement}
+                id={`theme-${placement}`}
+                open={placement === primary || placement === 'edge'}
+                className="settings-details"
+              >
+                <summary>{label}</summary>
+                <div className="settings-field">
+                  <span className="text-sm">材质</span>
+                  <div className="flex min-w-0 flex-wrap gap-2 [&>div]:flex-1">
+                    <NativeSelect
+                      aria-label={`${label}主题`}
+                      disabled={disabled}
+                      value={theme.theme}
+                      onChange={(event) =>
+                        void save({ placement, theme: { ...theme, theme: event.target.value } })
+                      }
+                    >
+                      <option value="black">纯黑</option>
+                      <option value="matte">哑光</option>
+                      <option value="frosted">磨砂</option>
+                      <option value="native-glass">液态</option>
+                    </NativeSelect>
+                    {theme.theme === 'native-glass' && (
+                      <NativeSelect
+                        aria-label={`${label}液态变体`}
+                        disabled={disabled}
+                        value={theme.liquidVariant}
+                        onChange={(event) =>
+                          void save({
+                            placement,
+                            theme: { ...theme, liquidVariant: event.target.value },
+                          })
+                        }
+                      >
+                        <option value="regular">Regular</option>
+                        <option value="clear">Clear</option>
+                      </NativeSelect>
+                    )}
+                  </div>
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      </section>
+      <PanelSettings value={appearance} fontBase={fontBase} />
+      <details id="edge-position" className="settings-section settings-surface-group">
+        <summary className="settings-group-title">贴边 / 刘海位置</summary>
         <div className="mt-3 space-y-3">
-          <label className="grid grid-cols-[minmax(104px,1fr)_minmax(140px,280px)] items-center gap-3 text-sm">
+          <label className="settings-field text-sm">
             <span className="whitespace-nowrap">屏幕</span>
             <NativeSelect
               aria-label="贴边屏幕"
@@ -166,7 +178,7 @@ export function SurfaceSettings({
               )}
             </NativeSelect>
           </label>
-          <label className="grid grid-cols-[minmax(104px,1fr)_minmax(140px,280px)] items-center gap-3 text-sm">
+          <label className="settings-field text-sm">
             <span className="whitespace-nowrap">边缘</span>
             <NativeSelect
               aria-label="贴边边缘"
@@ -179,7 +191,7 @@ export function SurfaceSettings({
               <option value="top">顶部 / 刘海</option>
             </NativeSelect>
           </label>
-          <label className="grid grid-cols-[minmax(104px,1fr)_minmax(140px,280px)] items-center gap-3 text-sm">
+          <label className="settings-field text-sm">
             <span className="whitespace-nowrap">位置 {Math.round(position)}%</span>
             <input
               aria-label="贴边位置"
@@ -193,9 +205,10 @@ export function SurfaceSettings({
               onKeyUp={() => void save({ edge: { position: position / 100 } })}
             />
           </label>
-          <label className="grid grid-cols-[minmax(104px,1fr)_minmax(140px,280px)] items-center gap-3 text-sm">
+          <label className="settings-field text-sm">
             <span className="whitespace-nowrap">保持展开</span>
             <input
+              id="edge-keep-open"
               aria-label="贴边保持展开"
               type="checkbox"
               disabled={disabled}
@@ -205,12 +218,8 @@ export function SurfaceSettings({
           </label>
         </div>
       </details>
-      <p className="mt-3 text-xs text-muted-foreground">
-        贴边形式共用一个窗口，通过标签切换功能。侧栏和页面浮层使用网页材质；桌面和贴边使用系统材质
-        {!displays.nativeGlassAvailable ? '，当前系统不支持原生液态时以哑光显示' : ''}。
-      </p>
       {(message || state?.error) && (
-        <p role="status" className="mt-2 text-xs text-muted-foreground">
+        <p role="status" className="mt-2 text-[14px] text-muted-foreground">
           {message || state?.error}
         </p>
       )}

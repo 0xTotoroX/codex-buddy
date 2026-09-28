@@ -55,7 +55,7 @@ test('worktree discovery handles spaces, dirty files, shared preferences and rej
   assert.throws(() => selectSource(root, other), /尚未准备/);
   for (const file of [
     'Cargo.toml',
-    'ui/panel/runtime/lifecycle.js',
+    'ui/codex/runtime/lifecycle.js',
     'ui/settings/vite.config.ts',
     'node_modules/vite/package.json',
   ]) {

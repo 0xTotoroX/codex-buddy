@@ -74,9 +74,9 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         await page.getByLabel('功能显示位置', { exact: true }).selectOption('sidebar');
         await page.getByLabel('显示功能', { exact: true }).selectOption('board');
         const board = page.locator('.csw-board-mount');
-        await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByText('试点任务', { exact: true }).waitFor();
         await board
-          .getByRole('button', { name: '试点任务', exact: true })
+          .getByText('试点任务', { exact: true })
           .dragTo(
             board
               .getByRole('navigation', { name: '任务阶段' })
@@ -86,19 +86,21 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
           .getByRole('navigation', { name: '任务阶段' })
           .getByRole('button', { name: '进行中', exact: true })
           .click();
-        await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByText('试点任务', { exact: true }).waitFor();
         await board.getByRole('button', { name: '搜索任务', exact: true }).click();
         await board.getByPlaceholder('搜索任务…').fill('试点');
         await page.getByLabel('功能显示位置', { exact: true }).selectOption('overlay');
         await page.waitForFunction(() => !document.querySelector('[data-codex-buddy-dock]'));
-        await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByText('试点任务', { exact: true }).waitFor();
         assert.equal(await board.getByPlaceholder('搜索任务…').inputValue(), '试点');
-        await board.getByRole('button', { name: '试点任务', exact: true }).click();
-        await board.getByLabel('标题', { exact: true }).fill('');
-        await board.getByLabel('标题', { exact: true }).press('Shift+O');
-        assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), 'O');
-        await board.getByLabel('标题', { exact: true }).press('Escape');
-        await board.locator('dialog').waitFor({ state: 'detached' });
+        await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+        await board.getByLabel('新任务标题', { exact: true }).fill('');
+        await board.getByLabel('新任务标题', { exact: true }).press('Shift+O');
+        assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), 'O');
+        await board.getByLabel('新任务标题', { exact: true }).press('Escape');
+        await board.getByLabel('新任务标题', { exact: true }).waitFor({ state: 'detached' });
+        await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+        await board.getByLabel('新任务标题', { exact: true }).fill('跨窗口新建草稿');
         assert.equal(await board.isVisible(), true);
         for (let i = 0; i < 3; i++) {
           await page.getByLabel('功能显示位置', { exact: true }).selectOption('sidebar');
@@ -115,16 +117,18 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
           });
           await window.__companionFloatingPanel.syncSettings(window.workbenchFixture.settings);
         });
-        await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByText('试点任务', { exact: true }).waitFor();
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.state.runtimeActive),
           true,
         );
         for (let i = 0; i < 3; i++) {
           await page.evaluate(() => window.__companionFloatingPanel.setOpen(false));
-          await page.locator('.csw-fab').waitFor({ state: 'visible' });
-          await page.locator('.csw-fab').press('Enter');
-          await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+          await page
+            .getByRole('button', { name: 'CodexBuddy', exact: true })
+            .waitFor({ state: 'visible' });
+          await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
+          await board.getByText('试点任务', { exact: true }).waitFor();
         }
         const reads = await page.evaluate(() => window.workbenchFixture.taskReads);
         await page.waitForTimeout(2200);
@@ -133,15 +137,25 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         await page.getByLabel('功能显示位置', { exact: true }).selectOption('desktop');
         const { page: desktop, projection } = await createPopout(page, true);
         const desktopBoard = desktop.locator('.csw-board-mount');
-        await desktopBoard.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await desktopBoard.getByText('试点任务', { exact: true }).waitFor();
         assert.equal(await desktopBoard.getByPlaceholder('搜索任务…').inputValue(), '试点');
         await desktop.evaluate(() =>
           window.__companionFloatingPanel.panelDisconnected('测试宿主断开'),
         );
-        await desktopBoard.getByRole('button', { name: '试点任务', exact: true }).click();
-        await desktopBoard.getByLabel('备注', { exact: true }).fill('桌面编辑后仍是同一条任务');
-        await desktopBoard.getByRole('button', { name: '保存任务', exact: true }).click();
-        await desktopBoard.locator('dialog').waitFor({ state: 'detached' });
+        assert.equal(
+          await desktopBoard.getByLabel('新任务标题', { exact: true }).inputValue(),
+          '跨窗口新建草稿',
+        );
+        await desktopBoard
+          .getByText('试点任务', { exact: true })
+          .dragTo(
+            desktopBoard
+              .getByRole('navigation', { name: '任务阶段' })
+              .getByRole('button', { name: '完成', exact: true }),
+          );
+        await desktop.waitForFunction(
+          () => window.__companionFloatingPanel.state.taskView.stage === 'done',
+        );
         await desktopBoard.getByPlaceholder('搜索任务…').fill('任务');
         const presentation = await desktop.evaluate(() =>
           window.__companionFloatingPanel.panelReadingState(),
@@ -153,12 +167,14 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         );
         assert.equal(presentation.taskView.search, '任务');
         await page.getByLabel('功能显示位置', { exact: true }).selectOption('sidebar');
-        await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByText('试点任务', { exact: true }).waitFor();
         assert.equal(await board.getByPlaceholder('搜索任务…').inputValue(), '任务');
         await settle(page);
         const state = await page.evaluate(() => window.workbenchFixture.taskState);
         assert.equal(state.store.tasks.length, 1);
-        assert.equal(state.store.tasks[0].fields.notes, '桌面编辑后仍是同一条任务');
+        assert.equal(state.store.tasks[0].fields.completed, true);
+        assert.equal(state.store.tasks[0].fields.notes, '同一任务，切换位置');
+        assert.equal(presentation.taskView.quickAdd.title, '跨窗口新建草稿');
         assert.equal(state.store.syncEnabled, false);
         assert.equal(
           await page.evaluate(
@@ -187,8 +203,10 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         });
         await page.evaluate(bundle);
         await page.waitForFunction(() => window.__companionFloatingPanel?.state.settingsLoaded);
-        await page.locator('.csw-fab').waitFor({ state: 'visible' });
-        await page.locator('.csw-fab').press('Enter');
+        await page
+          .getByRole('button', { name: 'CodexBuddy', exact: true })
+          .waitFor({ state: 'visible' });
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.getByLabel('显示功能', { exact: true }).selectOption('board');
         await board.getByRole('button', { name: '搜索任务', exact: true }).waitFor();
       },

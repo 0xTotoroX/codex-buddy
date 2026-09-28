@@ -1,114 +1,153 @@
-/*
- * [INPUT]: 设置分组是否已加载、页面滚动与 URL 锚点。
- * [OUTPUT]: 可键盘访问的设置大纲，跟随滚动标记当前分组。
- * [POS]: 设置页导航；桌面侧栏、窄屏顶部导航，不调用业务 API。
- * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
- */
-import { useEffect, useMemo, useRef, useState } from 'react';
-
-export function SettingsOutline({
-  panelReady,
-  formReady,
-}: {
-  panelReady: boolean;
-  formReady: boolean;
-}) {
-  const nav = useRef<HTMLElement>(null);
-  const [active, setActive] = useState('settings-model-control');
-  const sections = useMemo(
-    () => [
-      { id: 'settings-model-control', label: '模型快切' },
-      { id: 'settings-tasks', label: '任务看板' },
-      { id: 'settings-surfaces', label: '呈现形式' },
-      ...(panelReady ? [{ id: 'settings-capsule', label: '胶囊' }] : []),
-      ...(formReady
-        ? [
-            { id: 'settings-features', label: '桌面浮窗' },
-            { id: 'settings-model', label: 'Stepwise 模型' },
-            { id: 'settings-directions', label: '建议方向' },
-            { id: 'settings-quick-prompts', label: '常用提示词' },
-            { id: 'settings-limits', label: '生成设置' },
-            { id: 'settings-startup', label: '启动行为' },
-          ]
-        : []),
-      { id: 'settings-connection', label: '桌面连接' },
-    ],
-    [panelReady, formReady],
-  );
-
+/* [INPUT]: URL 锚点、当前设置分类与 Dev 注入入口。
+ * [OUTPUT]: 单页分类导航、属性定位与折叠展开、旧锚点兼容、各分类阅读位置及最后访问分类。
+ * [POS]: 设置导航；隐藏而不卸载内容，保留编辑草稿。
+ * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+export const pageTitles = {
+  overview: '总览',
+  outline: '大纲',
+  next: '下一步',
+  board: '看板',
+  model: '模型快切',
+  surfaces: '显示与布局',
+  connection: '启动与连接',
+  dev: '开发',
+};
+export type SettingsPage = keyof typeof pageTitles;
+const aliases: Record<string, SettingsPage> = {
+  'settings-tasks': 'board',
+  'settings-model-control': 'model',
+  'settings-capsule': 'surfaces',
+  'settings-features': 'next',
+  'settings-model': 'next',
+  'settings-directions': 'next',
+  'settings-quick-prompts': 'next',
+  'settings-limits': 'next',
+  'settings-startup': 'connection',
+};
+function fromHash(): SettingsPage | null {
+  const hash = location.hash.slice(1).split('/')[0];
+  if (aliases[hash]) return aliases[hash];
+  const key = hash.replace(/^settings-/, '');
+  return key in pageTitles ? (key as SettingsPage) : null;
+}
+export function useSettingsPage(ready: boolean) {
+  const [selection, setSelection] = useState(() => {
+    const saved = sessionStorage.getItem('buddy-settings-page') || '';
+    return {
+      page: fromHash() || (saved in pageTitles ? (saved as SettingsPage) : ('overview' as const)),
+      hash: location.hash,
+    };
+  });
+  const { page, hash } = selection;
+  const [dev, setDev] = useState(false);
+  const positions = useRef(new Map<string, number>());
+  const current = useRef(page);
+  function select(next: SettingsPage, hash: string) {
+    if (next !== current.current) positions.current.set(current.current, window.scrollY);
+    setSelection({ page: next, hash });
+  }
+  function navigate(next: SettingsPage, hash: string) {
+    if (location.hash !== hash) history.pushState(null, '', hash);
+    select(next, hash);
+  }
   useEffect(() => {
-    let frame = 0;
-    const update = () => {
-      frame = 0;
-      const offset = matchMedia('(max-width: 850px)').matches
-        ? (nav.current?.offsetHeight || 0) + 24
-        : 48;
-      let current = sections[0].id;
-      for (const { id } of sections) {
-        const target = document.getElementById(id);
-        if (target && target.getBoundingClientRect().top <= offset) current = id;
-      }
-      if (
-        window.scrollY > 0 &&
-        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2
-      ) {
-        const hash = window.location.hash.slice(1);
-        const target = sections.some(({ id }) => id === hash)
-          ? document.getElementById(hash)
-          : null;
-        // Several short final groups can share the same clamped scroll position.
-        current =
-          target && target.getBoundingClientRect().top >= 0
-            ? hash
-            : sections[sections.length - 1].id;
-      }
-      setActive(current);
+    const change = () => {
+      const next = fromHash();
+      if (next) select(next, location.hash);
     };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(update);
-    };
-    const resize = new ResizeObserver(schedule);
-    resize.observe(document.body);
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    window.addEventListener('hashchange', schedule);
-    update();
+    window.addEventListener('hashchange', change);
+    window.addEventListener('popstate', change);
     return () => {
-      cancelAnimationFrame(frame);
-      resize.disconnect();
-      window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      window.removeEventListener('hashchange', schedule);
+      window.removeEventListener('hashchange', change);
+      window.removeEventListener('popstate', change);
     };
-  }, [sections]);
-
-  useEffect(() => {
-    const id = window.location.hash.slice(1);
-    if (!sections.some((section) => section.id === id)) return;
-    const frame = requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView());
-    return () => cancelAnimationFrame(frame);
-  }, [sections]);
-
+  }, []);
+  useLayoutEffect(() => {
+    current.current = page;
+    sessionStorage.setItem('buddy-settings-page', page);
+    window.scrollTo({ top: positions.current.get(page) || 0, behavior: 'instant' });
+    if (!ready) return;
+    const [section, field] = hash.slice(1).split('/');
+    const target = field || (aliases[section] === page ? section : '');
+    if (!target) return;
+    const focusTarget = () => {
+      const node = document.getElementById(target);
+      if (!node) return false;
+      for (let parent: HTMLElement | null = node; parent; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
+      }
+      if (!node.hasAttribute('tabindex') && !node.matches('input,select,button,a'))
+        node.tabIndex = -1;
+      node.focus({ preventScroll: true });
+      node.scrollIntoView({ behavior: 'instant', block: 'center' });
+      return true;
+    };
+    if (focusTarget()) return;
+    const observer = new MutationObserver(() => {
+      if (focusTarget()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timer = setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      clearTimeout(timer);
+    };
+  }, [page, hash, ready]);
+  useLayoutEffect(() => {
+    let attachedHost: HTMLElement | null = null;
+    const attach = () => {
+      const host = document.getElementById('buddy-dev-sources'),
+        slot = document.getElementById('settings-dev-content');
+      if (host && slot) {
+        attachedHost = host;
+        if (host.parentNode !== slot) {
+          slot.append(host);
+          const details = host.shadowRoot?.querySelector('details');
+          if (details) details.open = true;
+        }
+        setDev(true);
+      }
+    };
+    attach();
+    const observer = new MutationObserver(attach);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      // React may already have detached the slot during a hot reload. Keep the actual node.
+      if (attachedHost) document.body.prepend(attachedHost);
+    };
+  }, []);
+  return { page, dev, navigate };
+}
+export function SettingsOutline({
+  page,
+  dev,
+  navigate,
+}: {
+  page: SettingsPage;
+  dev: boolean;
+  navigate: (page: SettingsPage, hash: string) => void;
+}) {
   return (
-    <nav
-      ref={nav}
-      aria-label="设置大纲"
-      className="sticky top-6 pt-10 max-[850px]:top-0 max-[850px]:z-20 max-[850px]:-mx-2 max-[850px]:border-b max-[850px]:border-border max-[850px]:bg-background max-[850px]:px-2 max-[850px]:py-3"
-    >
-      <p className="mb-4 pl-3 text-[11px] text-muted-foreground max-[850px]:hidden">设置大纲</p>
-      <ul className="flex flex-col gap-1 border-l border-border max-[850px]:flex-row max-[850px]:overflow-x-auto max-[850px]:border-0">
-        {sections.map(({ id, label }) => (
-          <li key={id} className="shrink-0">
-            <a
-              href={`#${id}`}
-              aria-current={active === id ? 'location' : undefined}
-              className="-ml-px block border-l-2 border-transparent px-3 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground aria-[current=location]:border-foreground aria-[current=location]:font-medium aria-[current=location]:text-foreground max-[850px]:ml-0 max-[850px]:rounded-md max-[850px]:border-0 max-[850px]:aria-[current=location]:bg-muted"
-            >
-              {label}
-            </a>
-          </li>
+    <nav aria-label="设置分类" className="settings-nav">
+      {(Object.keys(pageTitles) as SettingsPage[])
+        .filter((id) => id !== 'dev' || dev)
+        .map((id) => (
+          <a
+            key={id}
+            onClick={(event) => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              navigate(id, event.currentTarget.hash);
+            }}
+            className={id === 'surfaces' || id === 'outline' ? 'settings-nav-divider' : ''}
+            href={`#settings-${id === 'model' ? 'model-control' : id}`}
+            aria-current={page === id ? 'page' : undefined}
+          >
+            {pageTitles[id]}
+          </a>
         ))}
-      </ul>
     </nav>
   );
 }

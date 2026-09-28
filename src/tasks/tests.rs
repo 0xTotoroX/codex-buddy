@@ -565,3 +565,92 @@ async fn archive_keeps_remote_identity_and_delete_is_rejected() {
     assert!(inner.store.tasks[0].remote.is_some());
     assert!(inner.store.tasks[0].sync_intent().is_none());
 }
+
+#[tokio::test]
+async fn local_removal_persists_without_reimporting_or_writing_remote() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = Paths::new(Some(dir.path().into())).unwrap();
+    let service = Service::load(&paths);
+    let mut original = remote("one", "remote task");
+    original.marker = Some("codexbuddy://task/old".into());
+    let snapshot = Snapshot {
+        reminders: vec![original.clone()],
+        ..Default::default()
+    };
+    let task = {
+        let mut inner = service.inner.lock().await;
+        inner.store.board_enabled = true;
+        reconcile(&mut inner.store, &snapshot);
+        // A local change awaiting sync must not be written after removal.
+        inner.store.tasks[0].fields.notes = "local change".into();
+        inner.store.tasks[0].clone()
+    };
+    assert!(
+        service
+            .view_command(json!({"op":"remove","revision":0,"id":task.id}))
+            .await
+            .is_err()
+    );
+    assert!(
+        service
+            .view_command(json!({"op":"remove","revision":1,"id":task.id,"expectedTask":null}))
+            .await
+            .is_err()
+    );
+    {
+        let mut inner = service.inner.lock().await;
+        inner.store.inflight = task.sync_intent();
+    }
+    assert!(
+        service
+            .view_command(json!({"op":"remove","revision":1,"id":task.id}))
+            .await
+            .is_err()
+    );
+    service.inner.lock().await.store.inflight = None;
+    service
+        .view_command(json!({"op":"remove","revision":1,"id":task.id,"expectedTask":task}))
+        .await
+        .unwrap();
+    let reloaded = Service::load(&paths);
+    let mut inner = reloaded.inner.lock().await;
+    assert!(inner.store.tasks.is_empty());
+    assert!(inner.store.inflight.is_none());
+    assert_eq!(inner.store.deleted_reminders.len(), 1);
+    reconcile(&mut inner.store, &snapshot);
+    let mut changed_id = original.clone();
+    changed_id.id = "new-id".into();
+    changed_id.fields.title = "Apple edit".into();
+    changed_id.marker = None;
+    reconcile(
+        &mut inner.store,
+        &Snapshot {
+            reminders: vec![changed_id],
+            ..Default::default()
+        },
+    );
+    let mut marker_only = original.clone();
+    marker_only.id = "another-id".into();
+    marker_only.external_id = None;
+    reconcile(
+        &mut inner.store,
+        &Snapshot {
+            reminders: vec![marker_only],
+            ..Default::default()
+        },
+    );
+    assert!(inner.store.tasks.is_empty());
+    reconcile(
+        &mut inner.store,
+        &Snapshot {
+            reminders: vec![original.clone(), remote("other", "remote task")],
+            ..Default::default()
+        },
+    );
+    assert_eq!(
+        inner.store.tasks.len(),
+        1,
+        "a separate same-title reminder still imports"
+    );
+    assert_eq!(snapshot.reminders[0], original);
+}

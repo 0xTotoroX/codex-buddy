@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸、分功能字号及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化，收回偏好按版本校验并保存。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -11,6 +11,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{
+    collections::BTreeMap,
     process::Stdio,
     time::{Duration, Instant},
 };
@@ -70,6 +71,7 @@ pub struct Ui {
     pub material: String,
     pub liquid_variant: String,
     pub font_offset: f64,
+    pub font_sizes: BTreeMap<String, f64>,
     pub label_only: bool,
     pub prompt_click_mode: String,
     pub view_order: Vec<String>,
@@ -91,6 +93,7 @@ impl Default for Ui {
             material: "frosted".into(),
             liquid_variant: "regular".into(),
             font_offset: 0.,
+            font_sizes: BTreeMap::new(),
             label_only: false,
             prompt_click_mode: "fill".into(),
             view_order: vec!["next".into(), "outline".into()],
@@ -98,6 +101,12 @@ impl Default for Ui {
     }
 }
 impl Ui {
+    // Legacy full-UI clients cannot clear feature fonts; reset uses explicit default values.
+    fn preserve_font_sizes(&mut self, previous: &Self) {
+        if self.font_sizes.is_empty() {
+            self.font_sizes = previous.font_sizes.clone();
+        }
+    }
     fn validate(&self) -> Result<()> {
         if !["next", "outline", "settings"].contains(&self.active_tab.as_str())
             || !["frosted", "matte", "native-glass"].contains(&self.material.as_str())
@@ -120,6 +129,9 @@ impl Ui {
                 .as_ref()
                 .is_some_and(|layout| !layout.valid())
             || !(-14. ..=14.).contains(&self.font_offset)
+            || self.font_sizes.iter().any(|(id, size)| {
+                !crate::features::IDS.contains(&id.as_str()) || !(10. ..=24.).contains(size)
+            })
             || self.view_order.len() != 2
             || !self.view_order.contains(&"next".into())
             || !self.view_order.contains(&"outline".into())
@@ -281,6 +293,10 @@ pub struct Input {
 pub struct TaskView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quick_add: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid_left: Option<f64>,
     pub search: String,
     pub tab: String,
     pub stage: String,
@@ -324,9 +340,19 @@ impl ReadingState {
                 .editor
                 .as_ref()
                 .is_some_and(|v| v.to_string().len() > 128 * 1024)
+                || view
+                    .quick_add
+                    .as_ref()
+                    .is_some_and(|v| v.to_string().len() > 8192)
+                || view.grid_left.is_some_and(|x| !x.is_finite() || x < 0.)
                 || view.search.len() > 4000
                 || !["board", "archive", "attention"].contains(&view.tab.as_str())
-                || !["todo", "doing", "waiting", "done"].contains(&view.stage.as_str()))
+                || view.stage.is_empty()
+                || view.stage.len() > 64
+                || !view
+                    .stage
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'-'))
         {
             bail!("任务视图状态无效");
         }
@@ -400,7 +426,8 @@ impl App {
         {
             return Ok(());
         }
-        if let Some(ui) = ui {
+        if let Some(mut ui) = ui {
+            ui.preserve_font_sizes(&panel.prefs.ui);
             ui.validate()?;
             panel.prefs.return_open = Some(ui.open);
             panel.prefs.ui = ui;
@@ -536,6 +563,7 @@ impl App {
                 if panel.prefs.ui != *ui {
                     let mut next = panel.prefs.clone();
                     next.ui = ui.clone();
+                    next.ui.preserve_font_sizes(&panel.prefs.ui);
                     next.ui.open = true;
                     next.revision += 1;
                     next.save(&self.paths)?;
@@ -580,6 +608,7 @@ impl App {
         if let Some(ui) = &input.ui {
             ui.validate()?;
             next.ui = ui.clone();
+            next.ui.preserve_font_sizes(&panel.prefs.ui);
         }
         if let Some(pinned) = input.always_on_top {
             next.always_on_top = pinned;
@@ -749,7 +778,8 @@ impl App {
         if panel.ready || panel.prefs.detached || panel.prefs.revision != revision {
             return Ok(());
         }
-        let ui: Ui = serde_json::from_value(ui)?;
+        let mut ui: Ui = serde_json::from_value(ui)?;
+        ui.preserve_font_sizes(&panel.prefs.ui);
         ui.validate()?;
         if panel.prefs.ui != ui {
             let mut next = panel.prefs.clone();
@@ -959,7 +989,7 @@ mod tests {
         ] {
             let ui: Ui = serde_json::from_value(json!({
                 "layoutMode":"workbench", "dockWidth":width, "splitRatio":ratio,
-                "dockOpen":false, "width":510, "height":600
+                "dockOpen":false, "width":510, "height":600, "launcher":"rail"
             }))
             .unwrap();
             assert!(ui.validate().is_ok());
@@ -1098,6 +1128,8 @@ mod tests {
         assert!(old.validate().is_ok());
         assert_eq!(json!(old), legacy);
         let mut value = legacy;
+        value["taskView"] = json!({"search":"task","tab":"board","stage":"group-custom",
+            "quickAdd":{"column":"group-custom","title":"未保存任务"},"gridLeft":240.});
         value["panes"] = json!({
             "outline":{"contentToken":"outline-content","scrollTop":320.},
             "next":{"contentToken":"prompt-content","scrollTop":120.}
@@ -1278,7 +1310,7 @@ mod tests {
         let before = app.appearance().await;
         let changed = app
             .save_appearance(json!({"expectedRevision":before.revision,
-            "ui":{"material":"native-glass","fontOffset":2.,"promptClickMode":"hybrid"},
+            "ui":{"material":"native-glass","fontOffset":2.,"fontSizes":{"outline":18.2,"board":17.4},"promptClickMode":"hybrid"},
             "alwaysOnTop":true}))
             .await
             .unwrap();
@@ -1308,6 +1340,26 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(app.appearance().await, changed);
+        let mut legacy_ui = json!(changed.ui);
+        legacy_ui.as_object_mut().unwrap().remove("fontSizes");
+        app.observe_panel_ui(changed.revision, legacy_ui)
+            .await
+            .unwrap();
+        assert_eq!(app.appearance().await.ui.font_sizes, changed.ui.font_sizes);
+        let latest = app.appearance().await;
+        for fonts in [json!({"board":30}), json!({"unknown":16})] {
+            assert!(
+                app.save_appearance(
+                    json!({"expectedRevision":latest.revision,"ui":{"fontSizes":fonts}})
+                )
+                .await
+                .is_err()
+            );
+        }
+        assert_eq!(
+            app.surface_appearance("sidebar").await["fontSizes"]["board"],
+            17.4
+        );
     }
 
     #[test]

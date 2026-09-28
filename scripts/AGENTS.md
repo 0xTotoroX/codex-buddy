@@ -16,7 +16,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 - [dev-runtime.mjs](dev-runtime.mjs)：受控子进程与稳定鉴权代理，开发来源 API 在后台切换时仍可用，切换中请求暂停、旧设置页写入按来源标识拒绝；可捕获宿主准备命令的端点及具体失败原因；后台重启后设置页会话保持有效；模型超时由后台控制，客户端断开时取消上游代理请求。
 - [verify.mjs](verify.mjs)：统一检查、工作台/模型控制浏览器行为、构建、模型控制 HTTP/CDP 链路、端到端与生命周期验收；按源码/工具链摘要验证产物新鲜度，排除 Markdown 与 Finder 的 .DS_Store；原生检查显式选择。
 
-- [build-panel.mjs](build-panel.mjs)：从 lifecycle 入口解析 ES modules，输出可重复注入的脚本，供 Cargo 内嵌。
+- [build-panel.mjs](build-panel.mjs)：从 ui/codex/runtime/lifecycle.js 入口解析 ES modules，输出可重复注入的脚本，供 Cargo 内嵌。
 - [install.mjs](install.mjs)：源码安装入口，不修改 shell PATH；本地 CLI / .app 启动器安装、旧默认数据目录迁移、旧程序保留和服务恢复；App 默认位于 /Applications。
 - [launcher.mjs](launcher.mjs)：为安装器生成带本地签名的 CodexBuddy.app；从 ui/icon.png 生成多尺寸 ICNS 并绑定应用图标；双击调用 launch --restart-running 按设置处理缺少连接的宿主，取消不再弹错误；连接后在受支持系统弹出，以后台应用方式运行、不显示运行中的 Dock 图标；macOS 14 遇到浮窗门槛时保留内嵌，其他错误用系统对话框显示。
 - [package.mjs](package.mjs)：本地打包入口，构建并校验当前 release、最低系统版本及许可；归档自带与其文件匹配的使用说明；macOS arm64 分发目录、manifest、程序包与源码包及供 Release 使用的总 SHA-256 校验文件，并从当前公开工作树重新生成源码归档。
@@ -26,14 +26,16 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
-内嵌液态：build-panel 在正式与开发构建中追加 ui/panel/glass/lab.js，且只在非弹出页面启动；dev-panel 的只读测量记录实际渲染路径和阶段，不记录画面或错误文本。SVG 无第三方渲染依赖；third-party-notices 继续收集现用依赖及 shadcn/ui、OpenAI apps-sdk-ui 图标的许可。
+内嵌液态：build-panel 在正式与开发构建中追加 ui/surfaces/theme/glass/lab.js，且只在非弹出页面启动；dev-panel 的只读测量记录实际渲染路径和阶段，不记录画面或错误文本。SVG 无第三方渲染依赖；third-party-notices 继续收集现用依赖及 shadcn/ui、OpenAI apps-sdk-ui 图标的许可。
 
 任务看板由现有 Vite 多入口和 RustEmbed 随程序分发。verify 运行 board.mjs；提醒事项原生辅助 App 按需由程序在自身数据目录创建，不要求安装额外 CLI 或模型服务。
 
-胶囊 bundle 包含独立任务 React 视图；build-panel 使用现有 React 自动 JSX 转换和隔离样式文本。dev-panel 将 ui/board（含内嵌 CSS）及任务客户端计入逻辑指纹，dev 监听并重建；通用 panel CSS 仍原位更新。
+胶囊 bundle 包含共用功能内容；build-panel 使用现有 React JSX 转换和隔离样式。dev-panel 将 ui/features 的内容 CSS 与 ui/surfaces/workspace 的隔离挂载计入逻辑指纹，dev 监听 ui/codex、ui/features、ui/surfaces、ui/shared；外壳 CSS 可原位更新。
 
-build/dev 追踪 ui/features（包括内嵌 CSS）为逻辑资源；verify 纳入独立功能的真实 HTTP/CDP 验收，原生窗口另选 features-e2e --native。
+build/dev 追踪功能内容、容器和 Codex 适配的实际依赖；verify 纳入独立功能的真实 HTTP/CDP 验收，原生窗口另选 features-e2e --native。
 
 Dev 控制器使用所选源码的 dev-panel 构建器，监听看板和通用功能视图；不能以控制器自身较旧的资源指纹确认新分支。构建脚本自身更新后须正常重启 Dev 监督进程。
 
-开发快照同时提供 feature.html/feature-dev.js；独立桌面和贴边以独立功能修订号检测更新，保存全部视图草稿后重载，忙碌/交接/分栏拖动时延期。development 几何回读区分宿主与桌面/贴边，不读取卡片标题或聊天正文。
+开发快照从 ui/surfaces/main.ts 构建 feature.html/feature-dev.js；独立桌面和贴边以独立功能修订号检测更新，保存全部视图草稿后重载，忙碌/交接/分栏拖动时延期。development 几何回读区分宿主与桌面/贴边，不读取卡片标题或聊天正文。
+
+Dev 来源识别和原生资源输入兼容新旧源码布局；旧路径仅作为历史 worktree 回退。升级目录布局时使用新版监督脚本正常重开，分别核对嵌入与实际存在的原生窗口资源修订号；没有活动窗口的旧遥测不代表当前已加载。

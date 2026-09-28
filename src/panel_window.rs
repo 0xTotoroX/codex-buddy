@@ -253,7 +253,10 @@ mod macos {
         let top = value["y"].as_f64()?;
         let width = value["width"].as_f64()?;
         let height = value["height"].as_f64()?;
-        if ![x, top, width, height].iter().all(|n| n.is_finite()) || width < 40. || height < 20. {
+        if ![x, top, width, height].iter().all(|n| n.is_finite())
+            || !(24. ..=640.).contains(&width)
+            || !(20. ..=720.).contains(&height)
+        {
             return None;
         }
         let mtm = MainThreadMarker::new()?;
@@ -267,9 +270,6 @@ mod macos {
             NSRect::new(NSPoint::new(x, y), NSSize::new(width, height)),
             frame,
         ) {
-            return None;
-        }
-        if !(40. ..=640.).contains(&width) || !(20. ..=720.).contains(&height) {
             return None;
         }
         Some(super::Pose {

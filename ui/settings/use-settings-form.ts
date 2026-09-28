@@ -1,13 +1,18 @@
 /*
  * [INPUT]: 版本化设置 API、连接状态与服务端修订。
- * [OUTPUT]: 生成/Jev 独立密钥及表单的失焦/选择自动保存与手动保存共用队列，保留在途编辑和失败草稿。
+ * [OUTPUT]: 生成/Jev 独立密钥及表单的失焦/选择自动保存与手动保存共用队列，功能开关单独保存，保留在途编辑和失败草稿。
  * [POS]: 设置表单事务；不执行模型生成、宿主重启或窗口操作。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { useEffect, useRef, useState } from 'react';
 import { request, type EditableSettings, type Settings } from './api';
 
-type ControlPatch = { directionSource?: EditableSettings['directionSource']; jevConsent?: boolean };
+type ControlPatch = {
+  directionSource?: EditableSettings['directionSource'];
+  jevConsent?: boolean;
+  enabled?: boolean;
+  answerOutlineEnabled?: boolean;
+};
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 type Draft = {
   form: EditableSettings | null;
@@ -156,6 +161,9 @@ export function useSettingsForm(
                 Object.assign(form, { [key]: editable(value)[key] });
             }
           } else {
+            for (const key of ['enabled', 'answerOutlineEnabled'] as const) {
+              if (control[key] !== undefined && form[key] === control[key]) form[key] = value[key];
+            }
             if (
               control.directionSource !== undefined &&
               form.directionSource === control.directionSource
@@ -172,7 +180,7 @@ export function useSettingsForm(
             clearJevKey:
               !control && latest.clearJevKey === submitted.clearJevKey ? false : latest.clearJevKey,
           });
-          notifyRef.current('设置已保存，桌面浮窗会自动同步。');
+          notifyRef.current(value.presentationError || '', !!value.presentationError);
         }
         return baseline.current;
       } catch (error) {
@@ -220,11 +228,13 @@ export function useSettingsForm(
     update({ ...current.current, form: { ...previous, [key]: value } });
     notifyRef.current('');
     const control: ControlPatch | null =
-      key === 'directionSource' && value !== 'smart'
-        ? { directionSource: value as EditableSettings['directionSource'] }
-        : key === 'jev' && previous.jev.consent && !(value as EditableSettings['jev']).consent
-          ? { jevConsent: false }
-          : null;
+      key === 'enabled' || key === 'answerOutlineEnabled'
+        ? { [key]: value }
+        : key === 'directionSource' && value !== 'smart'
+          ? { directionSource: value as EditableSettings['directionSource'] }
+          : key === 'jev' && previous.jev.consent && !(value as EditableSettings['jev']).consent
+            ? { jevConsent: false }
+            : null;
     if (control) {
       void saveRef
         .current(current.current, control)
@@ -273,3 +283,5 @@ export function useSettingsForm(
     setClearKey,
   };
 }
+
+export type SettingsEditor = ReturnType<typeof useSettingsForm>;

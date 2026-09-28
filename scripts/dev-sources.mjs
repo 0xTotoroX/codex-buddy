@@ -65,13 +65,18 @@ export function selectSource(root, path) {
   if (!selected) throw new Error('来源不在当前仓库的 worktree 清单内，请刷新后重选。');
   for (const file of [
     'Cargo.toml',
-    'ui/panel/runtime/lifecycle.js',
     'ui/settings/vite.config.ts',
     'node_modules/vite/package.json',
   ]) {
     if (!existsSync(join(selected.path, file)))
       throw new Error(`此 worktree 尚未准备好：缺少 ${file}`);
   }
+  if (
+    !['ui/codex/runtime/lifecycle.js', 'ui/panel/runtime/lifecycle.js'].some((file) =>
+      existsSync(join(selected.path, file)),
+    )
+  )
+    throw new Error('此 worktree 缺少界面运行入口');
   return selected;
 }
 export function readRecord(path) {

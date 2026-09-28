@@ -10,9 +10,19 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import ts from 'typescript';
 
-const root = resolve(import.meta.dirname, '../ui/panel');
+const root = resolve(import.meta.dirname, '../ui');
 const files = readdirSync(root, { recursive: true })
-  .filter((f) => f.endsWith('.js') && f !== 'popout/boot.js')
+  .filter(
+    (f) =>
+      f.endsWith('.js') &&
+      ![
+        'surfaces/desktop/legacy/boot.js',
+        'codex/model.js',
+        'settings/dev-sources.js',
+        'shared/bridge/requests.js',
+        'surfaces/desktop/main.js',
+      ].includes(f),
+  )
   .map((f) => resolve(root, f));
 
 test('panel boundaries and fixtures pass every checkJs diagnostic', () => {
@@ -77,8 +87,8 @@ test('panel imports form a DAG and features do not depend on one another', () =>
     return (graph.get(from) || []).some((dependency) => reachable(dependency, target, seen));
   }
   for (const [from, to] of [
-    ['stepwise.js', 'outline.js'],
-    ['outline.js', 'stepwise.js'],
+    ['codex/next.js', 'codex/outline.js'],
+    ['codex/outline.js', 'codex/next.js'],
   ]) {
     assert.equal(
       reachable(resolve(root, from), resolve(root, to)),
@@ -86,8 +96,15 @@ test('panel imports form a DAG and features do not depend on one another', () =>
       `${from} must not depend on ${to}`,
     );
   }
-  for (const file of files.filter((f) => relative(root, f).startsWith('host/'))) {
-    assert.equal(reachable(file, resolve(root, 'stepwise.js')), false);
-    assert.equal(reachable(file, resolve(root, 'outline.js')), false);
+  for (const file of files.filter((f) =>
+    [
+      'codex/context.js',
+      'codex/composer.js',
+      'codex/appearance.js',
+      'codex/page-context.js',
+    ].includes(relative(root, f)),
+  )) {
+    assert.equal(reachable(file, resolve(root, 'codex/next.js')), false);
+    assert.equal(reachable(file, resolve(root, 'codex/outline.js')), false);
   }
 });

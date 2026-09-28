@@ -347,6 +347,18 @@ impl App {
         }) {
             bail!("设置已在其他窗口更新，请重新载入后再保存");
         }
+        let toggles = [
+            (
+                "outline",
+                patch
+                    .answer_outline_enabled
+                    .filter(|v| *v != config.stepwise.answer_outline_enabled),
+            ),
+            (
+                "next",
+                patch.enabled.filter(|v| *v != config.stepwise.enabled),
+            ),
+        ];
         let mut next = config.clone();
         if let Some(value) = patch.host_restart_policy {
             next.host_restart_policy = value;
@@ -516,8 +528,16 @@ impl App {
                 .load(std::sync::atomic::Ordering::SeqCst);
         });
         drop(config);
-        let settings = self.settings().await;
+        let mut settings = self.settings().await;
         self.sync_desktop_settings(&settings).await;
+        for (id, enabled) in toggles {
+            if let Some(enabled) = enabled
+                && let Err(error) = self.set_feature_enabled(id, enabled).await
+            {
+                settings["presentationError"] =
+                    json!(format!("功能开关已保存，窗口更新失败：{error}"));
+            }
+        }
         Ok(settings)
     }
 

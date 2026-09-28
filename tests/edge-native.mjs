@@ -14,6 +14,7 @@ import { once } from 'node:events';
 
 if (process.platform !== 'darwin') throw Error('Native edge acceptance requires macOS');
 const root = resolve(import.meta.dirname, '..');
+let screenshots = process.argv.includes('--screenshots');
 const binaryIndex = process.argv.indexOf('--binary');
 const binary =
   binaryIndex < 0 ? join(root, 'target/debug/codex-buddy') : resolve(process.argv[binaryIndex + 1]);
@@ -80,6 +81,14 @@ const report = {
   environment,
   checks: [],
   skipped: [
+    ...(!screenshots
+      ? [
+          {
+            name: 'screen capture',
+            reason: 'Disabled by default; --screenshots requires an explicit screenshot request',
+          },
+        ]
+      : []),
     {
       name: 'real Spaces and full-screen transitions',
       reason:
@@ -342,6 +351,7 @@ function windowInfo() {
     )[0];
 }
 async function capture(name) {
+  if (!screenshots) return;
   const info = windowInfo();
   const path = join(output, `${name}.png`);
   try {
@@ -352,6 +362,7 @@ async function capture(name) {
     );
     report.screenshots.push(path);
   } catch (error) {
+    screenshots = false; // A failed capture must not trigger another permission prompt.
     report.screenshots.push({ name, unavailable: error.message });
   }
 }
@@ -410,8 +421,10 @@ try {
   assert.equal(telemetry.native.expanded, false);
   assert.equal(telemetry.native.keyboard, false);
   const initial = windowInfo();
-  assert.equal(initial.kCGWindowBounds.Width, 480);
-  assert.deepEqual(telemetry.viewport, [480, initial.kCGWindowBounds.Height]);
+  const preparedWidth = initial.kCGWindowBounds.Width;
+  assert.equal(preparedWidth, telemetry.native.layoutWidth);
+  assert.ok(preparedWidth >= 320 && preparedWidth <= 720);
+  assert.deepEqual(telemetry.viewport, [preparedWidth, initial.kCGWindowBounds.Height]);
   check('initial painted compact shell has a prepared stable viewport', initial.kCGWindowBounds);
   check('initial presentation waits for current scene and rejects stale paint acknowledgements');
   assert.equal(telemetry.native.allSpaces, true);
@@ -461,9 +474,11 @@ try {
   );
   assert.ok(telemetry.native.unfold > 0 && telemetry.native.unfold < 1);
   const intermediate = windowInfo().kCGWindowBounds;
-  assert.equal(intermediate.Width, 480);
-  assert.ok(telemetry.native.shell.width > 10 && telemetry.native.shell.width < 480);
-  assert.ok(Math.abs(telemetry.native.shell.x + telemetry.native.shell.width - 480) < 0.001);
+  assert.equal(intermediate.Width, preparedWidth);
+  assert.ok(telemetry.native.shell.width > 10 && telemetry.native.shell.width < preparedWidth);
+  assert.ok(
+    Math.abs(telemetry.native.shell.x + telemetry.native.shell.width - preparedWidth) < 0.001,
+  );
   await capture('unfold-middle');
   check('native contour unfolds against a fixed screen edge inside a stable window');
   await until(() => telemetry.native.expanded && !telemetry.native.animating, 'unfold settles');
@@ -481,6 +496,37 @@ try {
   assert.equal(telemetry.featureVisible, true);
   check('shared model feature is mounted inside the native edge shell');
   await capture('expanded');
+  const shortHeight = telemetry.native.layoutHeight;
+  snapshot.models.push({
+    id: 'fixture-c',
+    label: 'Fixture Gamma',
+    reasoning: ['high'],
+    fast: false,
+  });
+  prefs.pinned.push('fixture-b', 'fixture-c');
+  revision++;
+  await until(
+    () => telemetry.native.layoutHeight > shortHeight,
+    'content grows for more model rows',
+  );
+  prefs.pinned.splice(1);
+  snapshot.models.pop();
+  revision++;
+  await until(
+    () => telemetry.native.layoutHeight === shortHeight,
+    'content shrinks when models are hidden',
+  );
+  prefs.modelColumnWidth += 30;
+  revision++;
+  await until(
+    () => telemetry.native.layoutWidth === preparedWidth + 30,
+    'content width follows readable columns',
+  );
+  prefs.modelColumnWidth -= 30;
+  revision++;
+  await until(() => telemetry.native.layoutWidth === preparedWidth, 'content width restores');
+  check('native panel fits active content height and width, including shrinking');
+
   const stableBounds = windowInfo().kCGWindowBounds;
   await command('window.deferNative = true');
   await ipc({ action: 'collapse' });
@@ -560,7 +606,7 @@ try {
     () => !telemetry.native.expanded && !telemetry.native.animating && !telemetry.native.keyboard,
     'collapse',
   );
-  assert.equal(windowInfo().kCGWindowBounds.Width, 480);
+  assert.equal(windowInfo().kCGWindowBounds.Width, preparedWidth);
   assert.equal(telemetry.native.shell.width, 10);
   check('collapse retains prepared viewport and shrinks only the native contour');
   await command('window.fixturePointer({inside:false,buttons:0,hoverSuppressed:false})');

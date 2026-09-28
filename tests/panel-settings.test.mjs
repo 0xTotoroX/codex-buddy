@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 实际 React PanelSettings 与隔离浏览器中的合成外观 API。
- * [OUTPUT]: 工作台设置逐字段保存、数值范围及胶囊尺寸/主题/功能开关隔离的回归。
+ * [OUTPUT]: 内容/容器设置逐字段保存，保留旧布局、材质和尺寸，核对数值范围。
  * [POS]: Web 设置交互契约，不连接真实宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -16,9 +16,8 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       contents: `import React from 'react';
         import { createRoot } from 'react-dom/client';
         import { PanelSettings } from './ui/settings/panel-settings';
-        window.renderSettings = (value) => createRoot(document.getElementById('root')).render(
-          <PanelSettings value={value} popoutSupported={true}
-            notify={(text, failed) => window.notices.push({text, failed})} />);`,
+        const root = createRoot(document.getElementById('root')); window.renderSettings = (value) => root.render(
+          <><PanelSettings value={value} /><PanelSettings value={value} section="next" /></>);`,
       resolveDir: new URL('..', import.meta.url).pathname,
       loader: 'tsx',
     },
@@ -50,7 +49,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
         dockOpen: true,
         material: 'frosted',
         liquidVariant: 'regular',
-        fontOffset: 0,
+        fontOffset: 10.130000000000003,
         labelOnly: false,
         promptClickMode: 'fill',
         viewOrder: ['next', 'outline'],
@@ -63,11 +62,13 @@ test('workbench settings save only their own preference fields', { timeout: 3000
         assert.equal(input.expectedRevision, prefs.revision);
         prefs = {
           ...prefs,
+          ...input,
           revision: prefs.revision + 1,
           webRevision: prefs.webRevision + 1,
           ui: { ...prefs.ui, ...input.ui },
         };
         await route.fulfill({ json: prefs });
+        await page.evaluate((value) => window.renderSettings(value), prefs);
       } else {
         await route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' });
       }
@@ -78,81 +79,81 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
-    const mode = page.getByLabel('点击胶囊后展开为', { exact: true });
-    await mode.waitFor();
-    assert.deepEqual(await mode.locator('option').allTextContents(), [
-      '聊天内浮动工作台',
-      '右侧嵌入工作台',
-    ]);
-    assert.equal(await mode.inputValue(), 'capsule');
-    await mode.selectOption('workbench');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    await page.getByText('停靠布局', { exact: true }).click();
-    for (const [label, value] of [
-      ['侧栏宽度（px）', '380'],
-      ['停靠上下比例', '0.6'],
+    const font = page.getByLabel('大纲字号（px）', { exact: true });
+    assert.equal(await font.inputValue(), '23.1');
+    assert.equal(await font.getAttribute('step'), '1');
+    const width = page.getByLabel('侧栏宽度（px）', { exact: true });
+    await width.fill('400');
+    await width.press('Tab');
+    await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '400');
+    await page.getByLabel('大纲字号（px）', { exact: true }).fill('16.34');
+    await page.getByLabel('大纲字号（px）', { exact: true }).press('Tab');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
+    );
+    await page.getByLabel('内容显示', { exact: true }).selectOption('true');
+    await page.getByLabel('点击建议', { exact: true }).selectOption('hybrid');
+    await page.getByText('双击建议会直接发送。', { exact: true }).waitFor();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
+    );
+    await page.getByRole('switch', { name: '桌面窗口置顶' }).click();
+    await page.waitForFunction(
+      () => document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true',
+    );
+    assert.equal(prefs.ui.dockWidth, 400);
+    assert.equal(prefs.ui.fontSizes.outline, 16.3);
+    assert.equal(prefs.ui.fontOffset, 10.130000000000003);
+    assert.equal(await font.inputValue(), '16.3');
+    await font.press('ArrowUp');
+    assert.equal(await font.inputValue(), '17.3');
+    await font.press('ArrowDown');
+    assert.equal(await font.inputValue(), '16.3');
+    await font.blur();
+    await page.getByRole('button', { name: '增大大纲字号（px）', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '17.3');
+    await page.getByRole('button', { name: '减小大纲字号（px）', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16.3');
+    for (const [label, size] of [
+      ['下一步', 18.5],
+      ['看板', 17.2],
+      ['模型快切', 16.1],
     ]) {
-      await page.getByLabel(label, { exact: true }).fill(value);
-      await page.getByLabel(label, { exact: true }).press('Tab');
-      await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
+      const input = page.getByLabel(`${label}字号（px）`, { exact: true });
+      await input.fill(String(size));
+      await input.blur();
+      await page.waitForFunction(() =>
+        [...document.querySelectorAll('fieldset')].every((f) => !f.disabled),
+      );
     }
-    assert.deepEqual(saves, [
-      { expectedRevision: 0, ui: { layoutMode: 'workbench' } },
-      { expectedRevision: 1, ui: { dockWidth: 380 } },
-      {
-        expectedRevision: 2,
-        ui: {
-          dockLayout: {
-            group: 'split',
-            active: 'outline',
-            mode: 'auto',
-            first: 'outline',
-            verticalRatio: 0.6,
-            horizontalRatio: 0.4,
-          },
-        },
-      },
-    ]);
-    for (const [label, invalid, restored] of [
-      ['侧栏宽度（px）', '299', '380'],
-      ['停靠上下比例', '0.9', '0.6'],
-    ]) {
-      const input = page.getByLabel(label, { exact: true });
-      await input.fill(invalid);
-      await input.press('Tab');
-      assert.equal(await input.inputValue(), restored);
-    }
-    assert.equal(saves.length, 3);
-    await page.getByText('浮窗布局', { exact: true }).click();
-    await page.getByLabel('浮窗编排', { exact: true }).selectOption('tabs');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    await page.getByLabel('浮窗选中标签', { exact: true }).selectOption('next');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    assert.equal(prefs.ui.popoutLayout.group, 'tabs');
-    assert.equal(prefs.ui.popoutLayout.active, 'next');
-    assert.equal(prefs.ui.dockLayout.group, 'split');
-    await page.getByLabel('浮窗排列', { exact: true }).selectOption('horizontal');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    assert.equal(prefs.ui.popoutLayout.mode, 'horizontal');
-    assert.equal(prefs.ui.dockLayout.verticalRatio, 0.6);
-    await page.getByLabel('浮窗首个面板', { exact: true }).selectOption('next');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    assert.equal(prefs.ui.popoutLayout.first, 'next');
-    assert.equal(prefs.ui.popoutLayout.horizontalRatio, 0.6);
-    await page.getByRole('button', { name: '恢复浮窗默认布局' }).click();
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    assert.equal(prefs.ui.popoutLayout.mode, 'auto');
-    assert.equal(prefs.ui.dockLayout.verticalRatio, 0.6);
+    assert.deepEqual(prefs.ui.fontSizes, { outline: 16.3, next: 18.5, board: 17.2, model: 16.1 });
+    await page.getByRole('button', { name: '重置全部字号' }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
+    assert.deepEqual(prefs.ui.fontSizes, { outline: 16, next: 16, board: 15, model: 14 });
+    assert.equal(prefs.ui.fontOffset, 0);
+    await font.fill('18.9');
+    await page.getByRole('button', { name: '重置全部字号' }).click();
+    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
+    assert.equal(prefs.ui.fontSizes.outline, 16);
 
-    assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).count(), 0);
+    assert.equal(prefs.ui.labelOnly, true);
+    assert.equal(prefs.ui.promptClickMode, 'hybrid');
+    assert.equal(prefs.alwaysOnTop, true);
+    assert.equal(await page.getByLabel('入口位置', { exact: true }).count(), 0);
+    for (const save of saves) {
+      assert.equal('dockLayout' in (save.ui || {}), false);
+      assert.equal('popoutLayout' in (save.ui || {}), false);
+      assert.equal('material' in (save.ui || {}), false);
+      assert.equal('layoutMode' in (save.ui || {}), false);
+    }
     assert.equal(prefs.ui.width, 510);
     assert.equal(prefs.ui.height, 600);
     assert.equal(prefs.ui.material, 'frosted');
-    assert.equal(prefs.ui.dockOpen, true);
-    await mode.selectOption('capsule');
-    await page.waitForFunction(() => !document.querySelector('fieldset').disabled);
-    assert.deepEqual(saves.at(-1).ui, { layoutMode: 'capsule' });
-    assert.equal(await page.evaluate(() => window.notices.filter((item) => item.failed).length), 2);
+    assert.equal(await page.getByLabel('点击胶囊后展开为').count(), 0);
+    await width.fill('200');
+    await width.press('Tab');
+    await page.getByRole('alert').waitFor();
+    assert.equal(prefs.ui.dockWidth, 400);
   } finally {
     await browser.close();
   }

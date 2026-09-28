@@ -17,27 +17,30 @@ test('dev snapshots publish CSS independently and preserve the last successful b
   try {
     cpSync(resolve(import.meta.dirname, '../ui'), join(root, 'ui'), { recursive: true });
     const initial = await buildDevPanel(root, output);
-    appendFileSync(join(root, 'ui/tokens.css'), '\n:root { --buddy-development-check: 1; }');
+    appendFileSync(join(root, 'ui/shared/tokens.css'), '\n:root { --buddy-development-check: 1; }');
     const css = await buildDevPanel(root, output);
     assert.notEqual(css.revision, initial.revision);
     assert.equal(css.page, initial.page);
     assert.match(css.script, /--buddy-development-check/);
     const code = (snapshot) => snapshot.script.match(/"code":"([a-f0-9]+)"/)[1];
     assert.equal(code(css), code(initial));
-    appendFileSync(join(root, 'ui/panel/runtime/constants.js'), '\n// Development logic update\n');
+    appendFileSync(join(root, 'ui/shared/constants.js'), '\n// Development logic update\n');
     const logic = await buildDevPanel(root, output);
     assert.notEqual(code(logic), code(css));
-    appendFileSync(join(root, 'ui/board/styles.css'), '\n.board-app { --board-update: 1; }');
+    appendFileSync(
+      join(root, 'ui/features/board/styles.css'),
+      '\n.board-app { --board-update: 1; }',
+    );
     const boardStyles = await buildDevPanel(root, output);
     assert.notEqual(code(boardStyles), code(logic));
     assert.notEqual(boardStyles.featureRevision, logic.featureRevision);
     assert.match(boardStyles.featureHtml, /feature-dev.js/);
     assert.match(boardStyles.featureScript, /--board-update/);
-    appendFileSync(join(root, 'ui/board/app.tsx'), '\n// Board logic update\n');
+    appendFileSync(join(root, 'ui/features/board/app.tsx'), '\n// Board logic update\n');
     const boardLogic = await buildDevPanel(root, output);
     assert.notEqual(code(boardLogic), code(boardStyles));
     const saved = readFileSync(output, 'utf8');
-    appendFileSync(join(root, 'ui/panel/runtime/constants.js'), '\nexport const broken = ;\n');
+    appendFileSync(join(root, 'ui/shared/constants.js'), '\nexport const broken = ;\n');
     await assert.rejects(buildDevPanel(root, output));
     assert.equal(readFileSync(output, 'utf8'), saved);
   } finally {

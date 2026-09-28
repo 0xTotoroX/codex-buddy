@@ -15,7 +15,7 @@
 
 CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, generate follow-up questions, and keep your tools inside the conversation or in a desktop window.
 
-Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. The gear opens settings in your browser. Desktop windows stay on top by default; use the pin beside the gear to turn this off or on. Your choice is saved.
+Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. Right-click the left navigation icon to open settings in your browser, organized by feature with separate display/layout and startup/connection categories. Category changes preserve drafts and reading positions. Desktop windows stay on top by default; use the pin in the window header to turn this off or on. Your choice is saved.
 
 ## Features
 
@@ -33,7 +33,7 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
+In Web settings, choose **下一步 → 高级生成设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
 
 **Suggestion directions** are independent of when generation starts:
 
@@ -43,15 +43,17 @@ In Web settings, choose **输入上下文 → 最近一次聊天（完整）** t
 
 Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
+The CodexBuddy icon sits above Help in the left navigation rail, separated by a short divider. Click to expand or collapse the workbench, double-click to move it to the desktop or return it to the chat, and right-click to open settings. Alt+Enter provides the keyboard equivalent of double-click. The icon has no persistent selected background. Hosts without a navigation rail retain the legacy capsule.
+
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face for returning to the chat.
 
-Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
+Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Choose tabs, vertical, horizontal or automatic splits under **显示与布局 → 主界面布局** in Web settings. Press Esc during a drag to cancel it.
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
 ## Task board and Apple Reminders
 
-Open **任务看板与提醒事项** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.
+Open **看板** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.
 
 To sync, grant macOS access, select one writable iCloud Reminders list, confirm and save it, then enable sync. Only titles, notes and completion are synchronized. To do/Doing stages and archive remain local; archiving never deletes Apple reminders. Apple handles iCloud delivery.
 
@@ -63,11 +65,13 @@ Task content stays local and is never sent to a model. An internal **CodexBuddy 
 
 ### Feature display locations
 
-In Web settings, use **Presentation → Main interface form** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
-The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Open a card for notes; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
+In Web settings, use **显示与布局 → 主界面** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
+
+The settings **总览** (overview) shows saved placement, themes, layout, generation options, task counts by group, and current/favorite models. Click a property to open its setting. **显示与布局 → 内容字号** adjusts each feature independently in 1px steps, accepts one decimal place, and resets all fonts in one click. Defaults are 16px for outline and next steps, 15px for the board, and 14px for model switching; existing font preferences are preserved.
+The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Hover over a card to reveal its trash button and remove it from Buddy immediately. The Apple reminder stays intact and is not imported again. Cards do not open details; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
 
 
-Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
+Return an existing desktop workbench before entering independent mode. Moving preserves reading state and inline creation drafts for the current service session without leaving the form. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
 
 Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 
@@ -100,7 +104,7 @@ All three connections work in both directions. A window opened directly from the
 | Pop-out window | Double-click eyes | Return to Codex, restoring the previous compact or expanded state and placement preference |
 | Pop-out window | Single-click eyes | Stay expanded |
 
-With the eyes focused, **Alt+Enter** is equivalent to a double-click. Floating and docked are two placements of the second state, selected in Web settings; repeated clicks do not cycle through them. The pop-out window stays on top by default; the pin toggles this, and the gear opens Web settings. Splits, tabs, and temporary panel focus only arrange the contents; they do not add window states.
+With the eyes focused, **Alt+Enter** is equivalent to a double-click. Floating and docked are two placements of the second state, selected in Web settings; repeated clicks do not cycle through them. The pop-out window stays on top by default; the pin toggles this, and right-clicking the left navigation icon opens Web settings. Splits, tabs, and temporary panel focus only arrange the contents; they do not add window states.
 
 ## Installation and use
 
@@ -132,14 +136,14 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 - **Navigate an answer:** open the outline and click a heading to jump to the source text.
 - **Quick prompts:** the next-step panel starts with “继续” and “执行”. Clicking fills the composer without sending. Edit labels and text, add, or remove buttons in Web settings under “常用提示词”; they use no model requests and do not count toward generated suggestions.
 - **Ask a follow-up:** refresh the next-step panel to generate suggestions, or enable automatic generation. Clicking a suggestion inserts it without sending by default. If a draft already exists, CodexBuddy asks before appending.
-- **View both panels:** in Web settings, use the capsule’s “点击胶囊后展开为” (expand capsule as) option to choose “右侧嵌入工作台” (right sidebar) or “聊天内浮动工作台” (floating inside the chat). Both stay inside the host; the floating option is not an independent desktop window. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient, the capsule explains why and offers an independent window or a directly expanded floating workbench. Once space returns, click it to reopen the sidebar. You can still pop out or return the entire workbench.
-- **Adjust the window:** click the face to expand or collapse inside the chat, and double-click (or press Alt+Enter on the face) to pop out or return. Drag the header to move and a lower corner to resize. Desktop windows stay expanded and on top by default; the pin toggles always-on-top. The gear opens Web settings, with an outline for jumping between groups. Buddy follows Codex appearance without changing its colors.
+- **View both panels:** in Web settings, use the capsule’s “点击胶囊后展开为” (expand capsule as) option to choose “右侧嵌入工作台” (right sidebar) or “聊天内浮动工作台” (floating inside the chat). Both stay inside the host; the floating option is not an independent desktop window. Drag the left edge to resize the sidebar and the internal divider to change proportions. Drag headings to arrange panels; Web settings provide automatic, vertical, or horizontal layout and restore defaults. The workbench follows a separately opened chat and returns when it closes. When space is insufficient or the page cannot host a sidebar, the capsule stays compact without prompts or alternative-placement menus, preserving the saved position. Once space returns, click it to reopen the sidebar. You can still pop out or return the entire workbench.
+- **Adjust the window:** click the face to expand or collapse inside the chat, and double-click (or press Alt+Enter on the face) to pop out or return. Drag the header to move and a lower corner to resize. Desktop windows stay expanded and on top by default; the pin toggles always-on-top. Right-clicking the left navigation icon opens Web settings, with an outline for jumping between groups. Buddy follows Codex appearance without changing its colors.
 
 ### Model quick switch
 
 Enable the model feature in settings or run `codex-buddy model-control`. It initially opens in the shared edge form and subsequently uses its saved placement. Search, pinned models, reasoning, speed and presets are available in every form; next-step generation settings remain independent.
 
-The edge/notch form now hosts all four features. Use **Presentation** settings for its theme, display, edge, position and keep-open preference. Hover to expand, leave for roughly half a second to collapse, or press `⌘⇧M` to toggle. Editing and business operations suppress automatic collapse; collapsing or switching tabs preserves drafts. The panel stays on its selected display across Spaces and full-screen apps regardless of Codex focus. Stopping Buddy closes it.
+The edge/notch form now hosts all four features. Use **显示与布局** settings for its theme, display, edge, position and keep-open preference. Hover to expand, leave for roughly half a second to collapse, or press `⌘⇧M` to toggle. Editing and business operations suppress automatic collapse; collapsing or switching tabs preserves drafts. The panel stays on its selected display across Spaces and full-screen apps regardless of Codex focus. Stopping Buddy closes it.
 
 Legacy model visual preferences migrate once to `surfaces.json`; model pins and presets remain in `model-control.json`.
 
@@ -163,10 +167,11 @@ Built with **Rust, JavaScript / TypeScript, and React**.
 
 ```text
 src/               Backend, CLI, and native windows
-ui/panel/          Capsule, next-step suggestions, and outlines
+ui/features/       Board, outline, next-step, and model content
+ui/surfaces/       Shared workspace, embedded, desktop, edge, and themes
+ui/codex/          Codex page reading, navigation, and input adapters
+ui/shared/         Shared contracts, communication, icons, and tokens
 ui/settings/       Settings web app
-ui/model-control/  Official model-menu business adapter
-ui/bridge/         Host communication
 tests/            Automated tests
 scripts/           Development, build, and installation tools
 ```
@@ -179,7 +184,7 @@ npm run dev
 
 Alternatively, run `npm run install:dev` once to install **CodexBuddy Dev.app**. Opening it starts development in the background, updates saved source automatically, and does not open a terminal. Opening it again brings up the existing workbench. Without a debugging connection, it follows the development launch setting, initially inherited from the everyday installation. Stop background development with `npm run dev:stop`; logs are written to `target/dev/launcher.log`. After an abnormal exit, stale ownership records are recovered only when the supervisor and its associated backends have exited; otherwise startup reports the reason and preserves the records. This launcher depends on the local source tree and development tools. Stop and reopen it after changing development scripts or dependencies; regenerate it after moving the source tree or changing the Node.js path.
 
-For multiple Git worktrees, open the workbench settings gear, then expand **Development source** at the top of the same settings page. `npm run dev:settings` opens this same page with its session credentials. After upgrading the development scripts, stop and reopen Dev once. Older worktrees without the unified-entry fix still use their original gear destination; use the existing Dev settings tab to switch back. Select a worktree to switch its backend, settings UI, and hot reload together without restarting Codex. The settings address stays the same, and the last successful source is remembered. Each worktree keeps its own configuration. Compilation failure leaves the current source running; connection failure attempts to restore it. Use one Dev supervisor for the target window; stop older standalone Dev sessions before adopting this workflow. An explicit startup override is available with `npm run dev -- --source /path/to/worktree`.
+For multiple Git worktrees, right-click the left navigation icon, then select **开发** on the same settings page (older worktrees keep their top-of-page source selector). `npm run dev:settings` opens this same page with its session credentials. After upgrading the development scripts, stop and reopen Dev once. Older worktrees without the unified-entry fix still use their original gear destination; use the existing Dev settings tab to switch back. Select a worktree to switch its backend, settings UI, and hot reload together without restarting Codex. The settings address stays the same, and the last successful source is remembered. Each worktree keeps its own configuration. Compilation failure leaves the current source running; connection failure attempts to restore it. Use one Dev supervisor for the target window; stop older standalone Dev sessions before adopting this workflow. An explicit startup override is available with `npm run dev -- --source /path/to/worktree`.
 
 Development mode connects to real Codex. UI changes reload automatically, and Rust changes trigger a rebuild. For command-line development, press Ctrl+C to stop. Development configuration is separate from the everyday installation. Embedded liquid material uses the same SVG renderer in development and release builds.
 

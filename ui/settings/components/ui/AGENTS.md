@@ -7,7 +7,7 @@
 - [button.tsx](button.tsx)：按钮变体与尺寸；Slot 支持复用子元素。
 - [input.tsx](input.tsx)：输入框及输入控件的公共样式。
 - [native-select.tsx](native-select.tsx)：保留原生选择语义与事件的下拉框，复用输入样式。
-- [card.tsx](card.tsx)：语义 section 卡片和响应式边距。
+- [card.tsx](card.tsx)：语义设置分组，沿用共享留白，不重复叠加卡片边框。
 - [switch.tsx](switch.tsx)：Radix 开关负责键盘与受控状态，Tailwind 负责轨道和滑块。
 - [LICENSE](LICENSE)：shadcn/ui 原始 MIT 许可，分发时并入第三方声明。
 

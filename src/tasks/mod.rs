@@ -1,5 +1,5 @@
 // [INPUT]: Authenticated board commands, local store and EventKit DTO transport.
-// [OUTPUT]: Independent board/sync lifecycle, durable edits and conflict recovery.
+// [OUTPUT]: Independent board/sync lifecycle, durable edits, local removal and conflict recovery.
 // [POS]: Local task service; no dependency on Codex sessions or model control.
 // [PROTOCOL]: Keep tasks/AGENTS.md in sync when changing the contract.
 mod bridge;
@@ -119,6 +119,7 @@ impl Service {
                 "create",
                 "update",
                 "archive",
+                "remove",
                 "resolve",
                 "restore",
                 "keepLocal",
@@ -359,7 +360,7 @@ impl Service {
                 }
                 next.tasks = tasks;
             }
-            "update" | "archive" | "resolve" | "restore" | "keepLocal" => {
+            "update" | "archive" | "remove" | "resolve" | "restore" | "keepLocal" => {
                 ensure!(next.board_enabled, "看板已停用");
                 let id = command["id"].as_str().context("缺少任务 ID")?;
                 ensure!(
@@ -374,10 +375,23 @@ impl Service {
                 if let Some(expected) = command.get("expectedTask") {
                     ensure!(
                         expected == &serde_json::to_value(&task)?,
-                        "此任务已更新，当前草稿已保留；请核对最新任务内容后再编辑"
+                        "此任务已更新，请核对最新内容后重试"
                     );
                 }
                 match op {
+                    "remove" => {
+                        // Keep identities only: never delete in EventKit or re-import this reminder.
+                        for remote in task
+                            .remote
+                            .iter()
+                            .chain(task.conflict.iter().map(|c| &c.remote))
+                        {
+                            let identity = ReminderIdentity::from(remote);
+                            if !next.deleted_reminders.contains(&identity) {
+                                next.deleted_reminders.push(identity);
+                            }
+                        }
+                    }
                     "update" => {
                         let fields: Fields = serde_json::from_value(command["fields"].clone())?;
                         fields.validate()?;
@@ -444,6 +458,9 @@ impl Service {
                         task.archived = op == "keepLocal";
                     }
                     _ => unreachable!(),
+                }
+                if op == "remove" {
+                    next.tasks.retain(|task| task.id != id);
                 }
                 if op == "update"
                     && let Some(before) = command["before"].as_str()

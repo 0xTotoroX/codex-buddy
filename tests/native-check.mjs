@@ -1,5 +1,5 @@
 /*
- * [INPUT]: 编译后的系统窗口、合成投影；完整验收另需 Swift 背景窗口和 macOS 屏幕录制权限。
+ * [INPUT]: 编译后的系统窗口、合成投影；默认免截图；显式 --screenshots 才启动像素采样验收。
  * [OUTPUT]: --features-only 验证真实 Wry 的大纲/看板切换与响应式任务视图；target/reports/native 中的背景验收；--genie-only 加验开发版网格接口及复位（--cross-screen/--reverse-screens 验实际双屏）；--motion-only 单测三材质空间交接与取消；--appearance-only 将免截图的窗口透明度轨迹、呈现确认、强调色/材质和尺寸检查写入 native-appearance。
  * [POS]: --header-only 免鼠标权限验证三材质透明头部和实际置顶层级；原生合成验收；--workbench-only 单测 Wry 双栏布局、独立滚动、设置覆盖页、拒绝收起及缩放退出，报告写入 native-workbench；仅启动自有测试窗口，临时数据不使用真实宿主或模型。
  * 设置验收使用公共头部入口与实际设置区可见性，不依赖旧 activeTab。
@@ -13,10 +13,10 @@ import { fixtureSettings, fixtureTypography } from './fixtures.mjs';
 import { buildPanel } from '../scripts/build-panel.mjs';
 import { resolve, join } from 'node:path';
 import { tmpdir } from 'node:os';
-if (process.platform !== 'darwin')
-  throw Error('Native backdrop acceptance requires macOS and Screen Recording permission.');
+if (process.platform !== 'darwin') throw Error('Native backdrop acceptance requires macOS.');
 const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
+const screenshots = process.argv.includes('--screenshots');
 const featuresOnly = process.argv.includes('--features-only');
 const headerOnly = process.argv.includes('--header-only');
 const workbenchOnly = featuresOnly || headerOnly || process.argv.includes('--workbench-only');
@@ -25,7 +25,8 @@ const chipAnchor = genieOnly && process.argv.includes('--chip-anchor');
 const crossScreen = genieOnly && process.argv.includes('--cross-screen');
 const reverseScreens = crossScreen && process.argv.includes('--reverse-screens');
 const motionOnly = genieOnly || process.argv.includes('--motion-only');
-const appearanceOnly = workbenchOnly || motionOnly || process.argv.includes('--appearance-only');
+const appearanceOnly =
+  !screenshots || workbenchOnly || motionOnly || process.argv.includes('--appearance-only');
 const dir = mkdtempSync(join(tmpdir(), 'buddy-native-'));
 const output =
   root +
@@ -289,11 +290,19 @@ function probePage() {
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
         if (cmd.kind === 'board-stage') {
-          const select = document
-            .querySelector('.csw-board-mount')
-            .shadowRoot.querySelector('select[aria-label="移动 原生试点任务"]');
-          select.value = 'doing';
-          select.dispatchEvent(new Event('change', { bubbles: true }));
+          const board = document.querySelector('.csw-board-mount').shadowRoot;
+          const target =
+            [...board.querySelectorAll('.stage-tabs button')].find(
+              (node) => node.textContent === '进行中',
+            ) || board.querySelector('[aria-label="进行中"]');
+          const dataTransfer = new DataTransfer();
+          board
+            .querySelector('.task-card')
+            .dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
+          target.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer }));
+          board
+            .querySelector('.task-card')
+            .dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer }));
         }
         if (cmd.kind === 'workbench-layout')
           document
@@ -369,7 +378,7 @@ const server = createServer(async (req, res) => {
   if (req.url === '/panel') {
     res.setHeader('Content-Type', 'text/html');
     res.end(
-      readFileSync(root + '/ui/panel/popout/index.html', 'utf8').replace(
+      readFileSync(root + '/ui/surfaces/desktop/legacy/index.html', 'utf8').replace(
         '</head>',
         `<script>window.probeErrors=[];window.addEventListener('error',e=>window.probeErrors.push(e.message));window.addEventListener('unhandledrejection',e=>window.probeErrors.push(String(e.reason)));</script><script src="/probe.js" defer></script></head>`,
       ),
@@ -383,7 +392,7 @@ const server = createServer(async (req, res) => {
         ? script
         : req.url === '/probe.js'
           ? probe
-          : readFileSync(root + '/ui/panel/popout/boot.js'),
+          : readFileSync(root + '/ui/surfaces/desktop/legacy/boot.js'),
     );
     return;
   }
@@ -477,6 +486,7 @@ function windows() {
   return JSON.parse(execFileSync(helper, ['windows', String(panel.pid)], { encoding: 'utf8' }));
 }
 function capture(name) {
+  if (!screenshots) throw Error('Screen capture requires explicit --screenshots');
   const bounds = windows()
     .filter((w) => w.kCGWindowBounds.Width > 0 && w.kCGWindowBounds.Height > 0)
     .sort(
