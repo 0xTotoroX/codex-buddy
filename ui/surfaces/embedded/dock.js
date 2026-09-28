@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已识别的 Codex 主内容、标签页与前景聊天布局、期望侧栏宽度和开合状态。
- * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时保留紧凑入口，不创建提示或替代菜单。
+ * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时仅保留左栏入口，不创建提示或替代菜单。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -40,12 +40,13 @@ export function createDock(onChange, beforeMove = () => {}) {
     fingerprint = '';
   let options = { width: 340, open: true, detached: false };
   let blocked = false;
+  let destroyed = false;
   let observer = null;
   let attachedRoot = null;
   let dockExpanded = false;
   const blockedRows = new WeakMap();
   const schedule = () => {
-    if (!frame)
+    if (!destroyed && !frame)
       frame = requestAnimationFrame(() => {
         frame = 0;
         update();
@@ -113,6 +114,7 @@ export function createDock(onChange, beforeMove = () => {}) {
     host = null;
   }
   function update(next = options) {
+    if (destroyed) return;
     options = next;
     const found = findDockHost();
     if (!found) {
@@ -209,6 +211,7 @@ export function createDock(onChange, beforeMove = () => {}) {
   return {
     update,
     attachRoot(root) {
+      if (destroyed) return;
       attachedRoot = root;
       placeRoot();
     },
@@ -217,6 +220,8 @@ export function createDock(onChange, beforeMove = () => {}) {
       update({ ...options, open: true });
     },
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
       mutations.disconnect();
       observer?.disconnect();
       window.removeEventListener('resize', schedule);
@@ -224,6 +229,7 @@ export function createDock(onChange, beforeMove = () => {}) {
       document.removeEventListener('pointerdown', schedule);
       cancelAnimationFrame(frame);
       removeSlot();
+      attachedRoot = null;
     },
   };
 }

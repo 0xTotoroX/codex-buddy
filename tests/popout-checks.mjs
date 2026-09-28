@@ -880,7 +880,7 @@ export async function checkPopout({
     // 胶囊出发时首击可能已在 100ms 后展开；双击仍须记住首击前的形态。
     await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(false));
     await settle();
-    await desktop.locator('.csw-fab').dblclick({ delay: 180 });
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick({ delay: 180 });
     await waitFor(
       async () =>
         !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detachPending)),

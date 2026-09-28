@@ -93,7 +93,7 @@ independent-features 的配置操作模拟设置 API；十轮往返保留草稿�
 
 共享功能验收覆盖实际拖动分栏/合并、比例、专注恢复、重载布局、侧栏宽度导出与看板工具同行；Dev 快照验证独立 feature 页面和样式更新，Rust 验证布局持久化、旧 owner 拒绝及设置重置。
 
-结构重构继续复用 workbench、independent-features、feature-views 与 dev-panel 检查；旧工作台验收通过 workspace/legacy-content 使用同一份大纲/下一步渲染。source 路径随目录变更更新，不为搬文件单独增加测试。真实 Dev 生效另核对当前来源、活动窗口和资源修订号，不能以合成验收替代。
+结构重构继续复用 workbench、independent-features、feature-views 与 dev-panel 检查；旧工作台验收通过 workspace/legacy-content 使用同一份大纲/下一步渲染。source 路径随目录变更更新，不为搬文件单独增加测试。真实 Dev 生效另核对当前来源、活动窗口和资源修订号，不能以合成验收替代。宿主 fixture 提供左栏入口，前端验收不再点击隐藏胶囊；导航缺失仍须隐藏胶囊，重载须清除空侧栏占位，销毁后的迟到回调不得重新挂载。
 
 panel-settings 复用逐项保存检查，核对内容/容器字段不会写入旧布局与主题；startup-settings 覆盖切换分类期间的在途草稿、失败及并发保护，以及 Dev 来源组件跨卸载/重新挂载的节点和编辑状态保留。
 

@@ -177,14 +177,14 @@
   pointer-events: auto;
 }
 
-[data-companion-stepwise-root][data-launcher='rail']
+[data-companion-stepwise-root][data-presentation='embedded']
   .csw-popover[data-open='false'][data-morphing='false'] {
   visibility: hidden;
   pointer-events: none;
 }
 
-[data-companion-stepwise-root][data-launcher='rail'] .csw-fab {
-  visibility: hidden;
+[data-companion-stepwise-root][data-presentation='embedded'] .csw-fab {
+  display: none;
   pointer-events: none;
 }
 

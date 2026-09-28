@@ -124,8 +124,10 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         );
         for (let i = 0; i < 3; i++) {
           await page.evaluate(() => window.__companionFloatingPanel.setOpen(false));
-          await page.locator('.csw-fab').waitFor({ state: 'visible' });
-          await page.locator('.csw-fab').press('Enter');
+          await page
+            .getByRole('button', { name: 'CodexBuddy', exact: true })
+            .waitFor({ state: 'visible' });
+          await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
           await board.getByText('试点任务', { exact: true }).waitFor();
         }
         const reads = await page.evaluate(() => window.workbenchFixture.taskReads);
@@ -201,8 +203,10 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         });
         await page.evaluate(bundle);
         await page.waitForFunction(() => window.__companionFloatingPanel?.state.settingsLoaded);
-        await page.locator('.csw-fab').waitFor({ state: 'visible' });
-        await page.locator('.csw-fab').press('Enter');
+        await page
+          .getByRole('button', { name: 'CodexBuddy', exact: true })
+          .waitFor({ state: 'visible' });
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.getByLabel('显示功能', { exact: true }).selectOption('board');
         await board.getByRole('button', { name: '搜索任务', exact: true }).waitFor();
       },

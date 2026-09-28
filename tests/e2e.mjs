@@ -575,7 +575,10 @@ try {
 
     const clickTiming = await desktop.evaluate(async () => {
       const p = window.__companionFloatingPanel;
-      document.querySelector('.csw-fab').dispatchEvent(new MouseEvent('click', { detail: 1 }));
+      document
+        .querySelector('[data-codex-buddy-launcher]')
+        .shadowRoot.querySelector('button')
+        .dispatchEvent(new MouseEvent('click', { detail: 1 }));
       const immediate = p.state.open;
       await new Promise((resolve) => setTimeout(resolve, 60));
       const beforeDelay = p.state.open;
@@ -986,12 +989,12 @@ try {
     await desktop.locator('.csw-workbench-face').click();
     await settle();
     assert.equal((await panelState()).open, false);
-    await desktop.locator('.csw-fab').click();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
     await delay(100);
     await desktop.keyboard.press('Escape');
     await settle();
     assert.equal((await panelState()).open, false);
-    await desktop.locator('.csw-fab').click();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
     await settle();
     await desktop.locator('.csw-workbench-face').focus();
     await desktop.keyboard.press('Enter');
@@ -1001,7 +1004,7 @@ try {
       'Keyboard collapse must not wait for double click',
     );
     await settle();
-    await desktop.locator('.csw-fab').focus();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).focus();
     await desktop.keyboard.press('Enter');
     assert.equal((await panelState()).open, true, 'Keyboard expand must respond immediately');
     await settle();
@@ -1135,7 +1138,7 @@ try {
       async () => (await desktop.locator('[data-companion-stepwise-root]').count()) === 1,
       'Runtime did not reactivate',
     );
-    await desktop.locator('.csw-fab').click();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
     await settle();
     record('桌面／网页设置双向同步与独立功能开关');
 

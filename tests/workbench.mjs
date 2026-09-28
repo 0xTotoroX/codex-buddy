@@ -456,14 +456,6 @@ const cases = [
     'rail launcher replaces capsule and survives navigation without duplicating the workspace',
     async (page) => {
       await mode(page, true);
-      await page.evaluate(() => {
-        const rail = document.createElement('nav');
-        rail.className = 'group/sidebar-rail';
-        rail.style.cssText =
-          'position:fixed;left:0;top:0;width:52px;height:100vh;display:flex;flex-direction:column;z-index:100';
-        rail.innerHTML = '<div style="flex:1"></div><div data-footer>帮助</div>';
-        document.body.append(rail);
-      });
       const icon = page.getByRole('button', { name: 'CodexBuddy', exact: true });
       await icon.waitFor();
       assert.equal(await icon.getAttribute('aria-expanded'), 'true');
@@ -527,9 +519,19 @@ const cases = [
         settingsCount,
       );
       await page.evaluate(() => window.__companionFloatingPanel.setOpen(false));
-      await page.evaluate(() => document.querySelector('nav').remove());
-      await page.locator('.csw-fab').waitFor({ state: 'visible' });
-      await page.locator('.csw-fab').click();
+      await page.evaluate(() => {
+        window.workbenchFixture.rail = document.querySelector('nav');
+        window.workbenchFixture.rail.remove();
+      });
+      await icon.waitFor({ state: 'hidden' });
+      assert.equal(
+        await page.locator('.csw-fab').isVisible(),
+        false,
+        'missing navigation never restores capsule',
+      );
+      assert.equal(await page.locator('.csw-popover').isVisible(), false);
+      await page.evaluate(() => document.body.append(window.workbenchFixture.rail));
+      await icon.click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
       await page.evaluate(() => window.__companionFloatingPanel.destroy());
       assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
@@ -552,8 +554,10 @@ const cases = [
       const slot = await box(page, slotSelector);
       assert.ok(content.x + content.width <= slot.x + 1);
       await page.locator('.csw-workbench-face').click();
-      await page.locator('.csw-fab').waitFor({ state: 'visible' });
-      await page.locator('.csw-fab').click();
+      await page
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       assert.equal(await page.locator(slotSelector).count(), 1);
     },
@@ -569,8 +573,10 @@ const cases = [
         document.querySelector('#fixture-dock-row > [data-codex-buddy-dock]'),
       );
       await page.locator('.csw-workbench-face').click();
-      await page.locator('.csw-fab').waitFor({ state: 'visible' });
-      await page.locator('.csw-fab').click();
+      await page
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.waitForFunction(() =>
         document.querySelector('#fixture-dock-row > [data-codex-buddy-dock][data-expanded="true"]'),
       );
@@ -584,7 +590,7 @@ const cases = [
   ...featureSurfaceCases({ mode, createPopout, settle, output, bundle }),
   ...independentFeatureCases({ mode, syncSettings }),
   [
-    'slim capsule restores either saved in-chat placement with neutral keyboard focus',
+    'rail entry restores either saved in-chat placement with neutral keyboard focus',
     async (page) => {
       for (const [index, placement] of ['capsule', 'workbench'].entries()) {
         await page.evaluate(
@@ -605,10 +611,12 @@ const cases = [
           { placement, revision: 100 + index },
         );
         await settle(page);
-        const chip = await box(page, '.csw-fab');
-        near(chip.width, 84, 'capsule width');
-        near(chip.height, 36, 'capsule height');
-        await page.locator('.csw-fab').press('Enter');
+        const chip = await page
+          .getByRole('button', { name: 'CodexBuddy', exact: true })
+          .boundingBox();
+        near(chip.width, 36, 'rail button width');
+        near(chip.height, 36, 'rail button height');
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.locator('.csw-workbench').waitFor({ state: 'visible' });
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
         assert.equal(await page.locator(slotSelector).count(), placement === 'workbench' ? 1 : 0);
@@ -627,7 +635,7 @@ const cases = [
             !window.__companionFloatingPanel.state.open &&
             !window.__companionFloatingPanel.state.morphAnimation,
         );
-        await page.locator('.csw-fab').press('Enter');
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.locator('.csw-workbench').waitFor({ state: 'visible' });
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
         await face.focus();
@@ -707,24 +715,24 @@ const cases = [
   ],
 
   [
-    'expression remains visible in both morph directions and slow dock double click restores origin',
+    'capsule stays hidden in both morph directions and slow dock double click restores origin',
     async (page) => {
       await mode(page, false);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.locator('.csw-fab').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.locator('.csw-popover[data-morphing=true]').waitFor();
       assert.equal(
         await page.locator('.csw-fab').isVisible(),
-        true,
-        'opening keeps expression visible',
+        false,
+        'opening keeps capsule hidden',
       );
       await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
       await page.locator('.csw-workbench-face').click();
       await page.locator('.csw-popover[data-morphing=true]').waitFor();
       assert.equal(
         await page.locator('.csw-fab').isVisible(),
-        true,
-        'closing keeps expression visible',
+        false,
+        'closing keeps capsule hidden',
       );
       await page.waitForFunction(
         () => document.querySelector('.csw-popover').dataset.morphing === 'false',
@@ -830,7 +838,7 @@ const cases = [
           !window.__companionFloatingPanel.state.open &&
           !window.__companionFloatingPanel.state.morphAnimation,
       );
-      await page.locator('.csw-fab').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
       const compact = await page.locator('.csw-fab').evaluate((node) => {
         const parent = node.parentElement.getBoundingClientRect();
@@ -859,7 +867,7 @@ const cases = [
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
-      await page.locator('.csw-fab').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       assert.equal(await requestCount(), before, 'UI changes must not generate suggestions');
       await page.screenshot({ path: resolve(output, 'unified-icons-dock.png') });
     },
@@ -888,9 +896,11 @@ const cases = [
       await host.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await host.locator('[data-placement=floating]').evaluate((node) => node.click());
       await host.locator('.csw-workbench-face').click();
-      await host.locator('.csw-fab').waitFor({ state: 'visible' });
+      await host
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
       await host.waitForFunction(() => !window.__companionFloatingPanel.state.open);
-      await host.locator('.csw-fab').dblclick();
+      await host.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick();
       assert.equal(await host.evaluate(() => window.workbenchFixture.detaches.at(-1).open), false);
       await host.evaluate(() => window.__companionFloatingPanel.setOpen(true));
       await host.locator('.csw-workbench-face').waitFor({ state: 'visible' });
@@ -1472,7 +1482,7 @@ const cases = [
         window.workbenchFixture.outlineBody = node;
       });
       await page.locator('.csw-workbench-face').press('Enter');
-      await page.locator('.csw-fab').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
       near((await reading(page)).panes.outline.scrollTop, 120, 'capsule reopen retains reading');
@@ -1604,7 +1614,7 @@ const cases = [
       );
       for (const key of ['dockOpen', 'dockWidth', 'splitRatio'])
         assert.equal(collapsed[key], preferences[key], `${key} retains user intent`);
-      await page.locator('.csw-fab').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
       await layout(page);
@@ -2159,7 +2169,7 @@ const cases = [
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
       const rail = page.locator(slotSelector);
-      const entry = page.locator('.csw-fab');
+      const entry = page.getByRole('button', { name: 'CodexBuddy', exact: true });
       assert.equal(await rail.locator(':scope > button:visible').count(), 0);
       near((await rail.boundingBox()).width, 0, 'no empty sidebar');
       assert.equal(await entry.isVisible(), true);
@@ -2214,7 +2224,7 @@ const cases = [
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'space',
       );
-      const entry = page.locator('.csw-fab');
+      const entry = page.getByRole('button', { name: 'CodexBuddy', exact: true });
       await entry.press('Enter');
       assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
       await page
@@ -2259,9 +2269,9 @@ const cases = [
       await settle(page);
       assert.equal(await page.locator(slotSelector).count(), 0);
       assert.equal(await page.locator('.csw-workbench').count(), 0);
-      await box(page, '.csw-fab');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).boundingBox();
       await hostUnchanged(page, baseline);
-      await page.locator('.csw-fab').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.waitForTimeout(150);
       assert.equal(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
@@ -2269,7 +2279,7 @@ const cases = [
         'opening an unavailable sidebar must not overwrite placement',
       );
       assert.equal(await page.locator('.csw-workbench').count(), 0);
-      await page.locator('.csw-fab').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.keyboard.press('Escape');
       assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
       assert.equal(await page.locator('.csw-workbench').count(), 0);
@@ -2277,7 +2287,7 @@ const cases = [
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
         'workbench',
       );
-      await box(page, '.csw-fab');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).boundingBox();
     },
   ],
   [
@@ -2291,7 +2301,7 @@ const cases = [
         () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
       );
       for (let i = 0; i < 3; i++) {
-        await page.locator('.csw-fab').press('Enter');
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         assert.equal(await page.locator('.csw-workbench').count(), 0);
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.state.layoutMode),
@@ -2345,7 +2355,7 @@ const cases = [
         'unsupported',
       );
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await box(page, '.csw-fab');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).boundingBox();
       const mounts = await page.evaluate(() => window.workbenchFixture.mounts);
       for (let i = 0; i < 10; i += 1) await settle(page);
       assert.equal(await page.evaluate(() => window.workbenchFixture.mounts), mounts);
@@ -2546,14 +2556,14 @@ const cases = [
           0,
           'collapsed slot has zero width',
         );
-        const entry = page.locator('.csw-fab');
+        const entry = page.getByRole('button', { name: 'CodexBuddy', exact: true });
         assert.doesNotMatch(await entry.getAttribute('title'), /空间不足|选择打开方式/);
         const anchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
         );
         assert.ok(anchor, 'collapsed rail has a window anchor');
-        near(anchor.width, 84, 'space collapse returns to the shared capsule');
-        near(anchor.height, 36, 'shared capsule height');
+        near(anchor.width, 36, 'space collapse returns to the rail');
+        near(anchor.height, 36, 'rail button height');
         await page.evaluate(() => window.__companionFloatingPanel.setDetached(true));
         const detachedAnchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
@@ -2659,6 +2669,33 @@ const cases = [
     },
   ],
   [
+    'sidebar reload removes orphan slots and restores the full chat width',
+    async (page, baseline) => {
+      await mode(page, true);
+      for (let reload = 0; reload < 3; reload++) {
+        await page.evaluate(() => {
+          const row = document.querySelector('#fixture-dock-row');
+          for (let i = 0; i < 3; i++) {
+            const stale = document.createElement('aside');
+            stale.dataset.codexBuddyDock = 'true';
+            stale.style.cssText = 'width:100px;flex:none;padding:0;border:0';
+            row.append(stale);
+          }
+        });
+        await page.evaluate(bundle);
+        await page.waitForFunction(() => window.__companionFloatingPanel?.state.runtimeActive);
+        await mode(page, true);
+        await settle(page);
+        assert.equal(await page.locator(slotSelector).count(), 1);
+        assert.equal(await page.locator('[data-companion-stepwise-root]').count(), 1);
+        const slot = await page.locator(slotSelector).boundingBox();
+        const chat = await page.locator('#fixture-host-content').boundingBox();
+        near(chat.width + slot.width, baseline.width, 'no empty slot consumes chat width');
+        assert.equal(await page.locator('.csw-fab').isVisible(), false);
+      }
+    },
+  ],
+  [
     'destroy removes slot and resize/mutations cannot resurrect it',
     async (page, baseline) => {
       await mode(page, true);
@@ -2667,6 +2704,37 @@ const cases = [
       assert.equal(await page.locator(slotSelector).count(), 0);
       assert.equal(await page.locator('[data-companion-stepwise-root]').count(), 0);
       await hostUnchanged(page, baseline);
+      const { build } = await import('esbuild');
+      const result = await build({
+        stdin: {
+          contents: "export { createDock } from './ui/surfaces/embedded/dock.js';",
+          resolveDir: root,
+        },
+        bundle: true,
+        write: false,
+        format: 'iife',
+        globalName: 'dockFixture',
+      });
+      await page.addScriptTag({ content: result.outputFiles[0].text });
+      await page.evaluate(() => {
+        const dock = window.dockFixture.createDock(() => {});
+        const root = document.createElement('div');
+        dock.attachRoot(root);
+        dock.update({ width: 340, open: true, detached: false });
+        window.dispatchEvent(new Event('resize'));
+        dock.destroy();
+        dock.update({ width: 340, open: true, detached: false });
+        dock.attachRoot(root);
+        dock.reopen();
+        dock.destroy();
+        root.remove();
+      });
+      await settle(page);
+      assert.equal(
+        await page.locator(slotSelector).count(),
+        0,
+        'late calls cannot revive destroyed dock',
+      );
       const requests = await page.evaluate(() => window.workbenchFixture.requests.length);
       await page.setViewportSize({ width: 1500, height: 1000 });
       await page.evaluate(() => {

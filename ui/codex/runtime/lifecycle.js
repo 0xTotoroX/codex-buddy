@@ -504,6 +504,7 @@ function install() {
     Boolean(previous?.state?.observer) &&
     document.querySelectorAll?.(`[${ROOT_ATTR}="true"]`).length === 1 &&
     document.querySelectorAll?.(`#${STYLE_ID}`).length === 1 &&
+    document.querySelectorAll('[data-codex-buddy-dock]').length <= 1 &&
     document.getElementById(STYLE_ID)?.dataset.codexStepwiseStyleVersion === SCRIPT_VERSION;
   if (
     previous?.version === SCRIPT_VERSION &&
@@ -516,6 +517,8 @@ function install() {
   }
   if (previous && typeof previous.destroy === 'function') previous.destroy();
   document.querySelectorAll?.(`[${ROOT_ATTR}="true"]`).forEach((node) => node.remove());
+  // Older runtimes could leave empty layout slots after replacing their root.
+  document.querySelectorAll('[data-codex-buddy-dock]').forEach((node) => node.remove());
   document.getElementById(STYLE_ID)?.remove();
 
   initializeState({
