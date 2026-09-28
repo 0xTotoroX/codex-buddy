@@ -51,7 +51,9 @@ export function mountFeature(
     handoff: () => Promise<unknown>;
     failed?: (pendingOwner: string) => void;
   },
-  headerActions?: HTMLElement,
+  headerActions: HTMLElement | undefined = ['outline', 'next'].includes(initial.id)
+    ? document.createElement('span')
+    : undefined,
 ) {
   const css =
     boardStyles.replaceAll(':root', ':host').replace(/\bbody\s*\{/g, '.board-app {') +
@@ -110,10 +112,12 @@ export function mountFeature(
   render(initial);
   return {
     update: render,
+    headerActions,
     dispose() {
       stopped = true;
       reloaders.delete(element);
       root.unmount();
+      headerActions?.remove();
       element.remove();
     },
   };

@@ -1,8 +1,9 @@
-/* [INPUT]: A Codex projection, transient reading state and guarded actions.
+/* [INPUT]: A Codex projection, transient reading state, guarded actions and a surface header slot.
  * [OUTPUT]: Shared outline/next content inside an isolated mount, preserving DOM and preview reading.
  * [POS]: Mount adapter; feature modules own content and gestures, containers own arrangement.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { PanelSnapshot, PanelCommand } from '../shared/contracts';
 import type { Reading } from '../shared/features';
 import { outlineHtml, alignOutlineNestedText, attachOutlineEvents } from './outline/view.js';
@@ -15,7 +16,9 @@ export function ProjectedContent({
   reading,
   disabled,
   command,
+  headerActions,
 }: {
+  headerActions?: HTMLElement;
   id: 'outline' | 'next';
   snapshot: PanelSnapshot;
   reading: Reading;
@@ -94,21 +97,26 @@ export function ProjectedContent({
     },
     [],
   );
+  const refresh = (
+    <button
+      data-refresh={id}
+      aria-label={id === 'outline' ? '刷新大纲' : '重新生成建议'}
+      title={id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}
+      disabled={
+        disabled || snapshot.scanBusy || (id === 'next' && snapshot.bridgeStatus === 'pending')
+      }
+      onClick={() => void command(id === 'outline' ? 'outline-refresh' : 'generate')}
+    >
+      <span dangerouslySetInnerHTML={{ __html: iconSvg('refresh') }} />
+    </button>
+  );
   return (
     <>
-      <header className="feature-pane-head">
-        <button
-          data-refresh={id}
-          aria-label={id === 'outline' ? '刷新大纲' : '重新生成建议'}
-          title={id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}
-          disabled={
-            disabled || snapshot.scanBusy || (id === 'next' && snapshot.bridgeStatus === 'pending')
-          }
-          onClick={() => void command(id === 'outline' ? 'outline-refresh' : 'generate')}
-        >
-          <span dangerouslySetInnerHTML={{ __html: iconSvg('refresh') }} />
-        </button>
-      </header>
+      {headerActions ? (
+        createPortal(refresh, headerActions)
+      ) : (
+        <header className="feature-pane-head">{refresh}</header>
+      )}
       <div
         className="feature-projection"
         role={id === 'outline' ? 'navigation' : undefined}

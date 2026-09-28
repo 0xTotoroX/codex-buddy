@@ -214,11 +214,19 @@ export function independentFeatureCases({ mode, syncSettings }) {
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
-        const refresh = outline.getByRole('button', { name: '刷新大纲', exact: true });
+        const refresh = page.getByRole('button', { name: '刷新大纲', exact: true });
+        const refreshBox = await refresh.boundingBox();
+        const titleBox = await page.getByRole('tab', { name: '大纲', exact: true }).boundingBox();
+        assert.ok(
+          Math.abs(refreshBox.y + refreshBox.height / 2 - titleBox.y - titleBox.height / 2) < 2,
+          'outline refresh shares the tab row',
+        );
+        assert.equal(await outline.locator('.feature-pane-head').count(), 0);
         const waitRefresh = (opacity) =>
           page.waitForFunction((opacity) => {
-            const root = document.querySelector('[data-codex-buddy-features-root]');
-            const button = root?.shadowRoot?.querySelector('[data-refresh="outline"]');
+            const button = document.querySelector(
+              '.csw-feature-header-actions [data-refresh="outline"]',
+            );
             return button && getComputedStyle(button).opacity === opacity;
           }, opacity);
         await page.mouse.move(10, 10);
@@ -408,20 +416,32 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
         await openFeature('next');
         const next = page.locator('[data-feature="next"]');
-        await next.getByRole('button', { name: '重新生成建议', exact: true }).waitFor();
+        await page.getByRole('button', { name: '重新生成建议', exact: true }).waitFor();
         await page.mouse.move(10, 10);
         const waitNextRefresh = (opacity) =>
           page.waitForFunction(
             (opacity) =>
-              [...document.querySelectorAll('[data-codex-buddy-features-root]')].some((root) => {
-                const button = root.shadowRoot?.querySelector('[data-refresh="next"]');
-                return button && getComputedStyle(button).opacity === opacity;
-              }),
+              [
+                ...document.querySelectorAll('.csw-feature-header-actions [data-refresh="next"]'),
+              ].some((button) => getComputedStyle(button).opacity === opacity),
             opacity,
           );
         await waitNextRefresh('0');
         await page.locator('.csw-workbench-head').hover();
         await waitNextRefresh('1');
+        const nextRefreshBox = await page
+          .getByRole('button', { name: '重新生成建议', exact: true })
+          .boundingBox();
+        const nextTabBox = await page
+          .getByRole('tab', { name: '下一步', exact: true })
+          .boundingBox();
+        assert.ok(
+          Math.abs(
+            nextRefreshBox.y + nextRefreshBox.height / 2 - nextTabBox.y - nextTabBox.height / 2,
+          ) < 2,
+          'next refresh shares the tab row',
+        );
+        assert.equal(await next.locator('.feature-pane-head').count(), 0);
         await page.mouse.move(10, 10);
         await waitNextRefresh('0');
         await page.evaluate(() => {
@@ -510,7 +530,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await syncSettings(page, { enabled: false });
         await next.getByText('功能已停用，可在设置中重新开启。').waitFor();
         assert.equal(
-          await next.getByRole('button', { name: '重新生成建议', exact: true }).isDisabled(),
+          await page.getByRole('button', { name: '重新生成建议', exact: true }).isDisabled(),
           true,
         );
         assert.equal(await next.locator('.feature-projection button:enabled').count(), 0);
@@ -518,7 +538,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await openFeature('outline');
         await outline.getByText('功能已停用，可在设置中重新开启。').waitFor();
         assert.equal(
-          await outline.getByRole('button', { name: '刷新大纲', exact: true }).isDisabled(),
+          await page.getByRole('button', { name: '刷新大纲', exact: true }).isDisabled(),
           true,
         );
         await syncSettings(page, { answerOutlineEnabled: true });

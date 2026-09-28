@@ -74,6 +74,19 @@ try {
     },
     status: '本地看板',
   };
+  const projection = {
+    settings: {
+      enabled: true,
+      answerOutlineEnabled: true,
+      generationMode: 'manual',
+      quickPrompts: [],
+    },
+    outlineItems: [{ id: 'outline-fixture', text: '用于验证顶部按钮的大纲', displayLevel: 0 }],
+    outlineStatus: 'ok',
+    prompts: [{ label: '用于验证顶部按钮的建议', prompt: 'SYNTHETIC' }],
+    scanBusy: false,
+    bridgeStatus: 'ready',
+  };
   const actions = [];
   const settingsRequests = [];
   const layouts = {};
@@ -134,7 +147,7 @@ try {
       } else if (p.op === 'main-anchor') value = { anchor: null };
       else if (p.op === 'read')
         value = {
-          ...(p.id === 'board' ? tasks : model),
+          ...(p.id === 'board' ? tasks : p.id === 'model' ? model : { snapshot: projection }),
           appearance: {
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
@@ -147,6 +160,10 @@ try {
           Object.assign(task.fields, p.data.fields);
           tasks.store.revision++;
           return route.fulfill({ json: tasks });
+        }
+        if (['outline', 'next'].includes(p.id)) {
+          actions.push(p);
+          return route.fulfill({ json: { ok: true } });
         }
         assert.equal(p.id, 'model');
         actions.push(p);
@@ -643,6 +660,64 @@ try {
   record(
     'desktop black theme restores host colors; failed return cancels motion and permits retry',
   );
+  entries.splice(
+    0,
+    entries.length,
+    ...['outline', 'next'].map((id) => ({
+      id,
+      owner: id + '-owner',
+      placement: 'desktop',
+      open: true,
+      view: {},
+      size: [840, 620],
+      reveal: 1,
+      pending: null,
+    })),
+  );
+  pendingPlacement = null;
+  layouts.desktop = {
+    axis: 'horizontal',
+    groups: entries.map((e) => ({ ids: [e.id], active: e.id, weight: 1 })),
+  };
+  await page.goto(
+    'http://127.0.0.1:47991/feature.html#token=fixture&feature=main&lease=main-owner',
+  );
+  for (const [id, name, label, kind] of [
+    ['outline', '大纲', '刷新大纲', 'outline-refresh'],
+    ['next', '下一步', '重新生成建议', 'generate'],
+  ]) {
+    const button = page.getByRole('button', { name: label, exact: true });
+    await button.waitFor();
+    const box = await button.boundingBox();
+    const tab = await page.getByRole('tab', { name, exact: true }).boundingBox();
+    assert.ok(Math.abs(box.y + box.height / 2 - tab.y - tab.height / 2) < 2);
+    assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);
+    await button.click();
+    assert.equal(actions.at(-1).id, id);
+    assert.equal(actions.at(-1).data.kind, kind);
+  }
+  record('desktop split refresh buttons share their own tab row and dispatch the matching action');
+  for (const entry of entries) entry.placement = 'edge';
+  await page.setViewportSize({ width: 500, height: 700 });
+  await page.goto('http://127.0.0.1:47991/feature.html?surface=edge#token=fixture');
+  for (const [id, name, label] of [
+    ['outline', '大纲', '刷新大纲'],
+    ['next', '下一步', '重新生成建议'],
+  ]) {
+    await page
+      .locator('#edge-panel > header nav')
+      .getByRole('button', { name, exact: true })
+      .click();
+    const button = page.getByRole('button', { name: label, exact: true });
+    await button.waitFor();
+    const box = await button.boundingBox();
+    const settingsBox = await page.getByRole('button', { name: '设置', exact: true }).boundingBox();
+    assert.ok(Math.abs(box.y + box.height / 2 - settingsBox.y - settingsBox.height / 2) < 2);
+    assert.equal(await page.locator('#edge-panel > header [data-refresh]:visible').count(), 1);
+    assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);
+  }
+  record('edge outline/next refresh follows the active tab in the top row');
+  assert.deepEqual(errors, []);
   report.passed = true;
 } finally {
   writeFileSync(join(output, 'report.json'), JSON.stringify(report, null, 2));

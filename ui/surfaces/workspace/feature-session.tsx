@@ -165,7 +165,7 @@ export function FeatureView({
     };
   }, []);
   async function operation<T>(fn: () => Promise<T>, propagate = false) {
-    if (gate.current || !active) {
+    if (gate.current || !active || document.documentElement.dataset.buddyReloading === 'true') {
       if (propagate) throw Error('功能正在交接，请稍后重试');
       return null;
     }

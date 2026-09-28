@@ -108,6 +108,7 @@ export function FeatureContent({
     <>
       {!enabled && <p role="status">功能已停用，可在设置中重新开启。</p>}
       <ProjectedContent
+        headerActions={headerActions}
         id={id}
         snapshot={snapshot}
         reading={reading}

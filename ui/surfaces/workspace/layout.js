@@ -1,4 +1,4 @@
-/* [INPUT]: Live feature mounts, per-surface layout and authenticated save callback.
+/* [INPUT]: Live feature mounts with header actions, per-surface layout and authenticated save callback.
  * [OUTPUT]: Shared layout interpretation, tabs, split/merge, focus and resizing with checked saves; views stay mounted.
  * [POS]: Presentation-only composition; reuses the workbench gestures and styles.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
@@ -213,7 +213,12 @@ export function installFeatureLayout(root, { save, error }) {
         }
         const body = document.createElement('div');
         body.className = 'csw-feature-content';
-        section.append(tabs, body);
+        const head = document.createElement('div');
+        head.className = 'csw-feature-pane-head';
+        const actions = document.createElement('div');
+        actions.className = 'csw-feature-header-actions';
+        head.append(tabs, actions);
+        section.append(head, body);
         fragments.push(section);
       });
       // Move the mounted roots before removing their old containers: preserve drafts and scroll.
@@ -244,6 +249,12 @@ export function installFeatureLayout(root, { save, error }) {
       for (const item of items.filter((entry) => group.ids.includes(entry.id))) {
         if (item.node.parentNode !== body) body.append(item.node);
         item.node.hidden = !item.active || item.id !== (focused || active);
+        const actions = item.mount?.headerActions;
+        if (actions) {
+          const slot = section.querySelector('.csw-feature-header-actions');
+          if (actions.parentNode !== slot) slot.append(actions);
+          actions.hidden = item.node.hidden;
+        }
       }
       for (const tab of /** @type {NodeListOf<HTMLButtonElement>} */ (
         section.querySelectorAll('button[data-pane-tab]')
@@ -323,7 +334,11 @@ export function installFeatureLayout(root, { save, error }) {
         !items.some((item) => item.active && item.id === arrangement.focused)
       )
         arrangement.command(arrangement.focused, 'focus');
-      for (const item of items) if (!item.active) item.node.hidden = true;
+      for (const item of items)
+        if (!item.active) {
+          item.node.hidden = true;
+          if (item.mount?.headerActions) item.mount.headerActions.hidden = true;
+        }
       render();
     },
     destroy() {
