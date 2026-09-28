@@ -26,6 +26,11 @@ export type Entry = {
   pending: { placement: Placement; owner: string; ready: boolean } | null;
 };
 export type FeatureState = {
+  layouts?: Record<
+    string,
+    { axis: string; groups: { ids: string[]; active: string; weight: number }[] }
+  >;
+  legacyLayouts?: Record<string, import('../contracts').WorkbenchLayout>;
   activeFeature?: string;
   mainPlacement?: Placement;
   returnPlacement?: Placement;

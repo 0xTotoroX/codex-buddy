@@ -8,6 +8,12 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct Development {
     pub revision: String,
+    #[serde(default, rename = "featureRevision")]
+    pub feature_revision: String,
+    #[serde(default, rename = "featureScript")]
+    pub feature_script: String,
+    #[serde(default, rename = "featureHtml")]
+    pub feature_html: String,
     pub page: String,
     pub script: String,
     pub html: String,

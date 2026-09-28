@@ -3,7 +3,7 @@
  * [POS]: Desktop surface adapter; all task/model actions stay in FeatureView.
  * [PROTOCOL]: Keep features/AGENTS.md in sync. */
 import { mountFeature } from './mount';
-import { titles } from './types';
+import { installFeatureLayout } from './layout';
 import { installStyle } from '../panel/core/install-styles.js';
 import { workbenchHeadHtml, workbenchSettingsHtml } from '../panel/workbench/chrome.js';
 import { iconSvg } from '../panel/icons/index.js';
@@ -16,12 +16,13 @@ export function startDesktop(request, lease) {
   root.dataset.workbench = 'true';
   root.style.cssText =
     '--csw-default-chip-width:84px;--csw-default-chip-height:36px;--csw-default-panel-radius:24px;position:fixed;inset:12px;width:auto;height:auto;pointer-events:auto;';
-  root.innerHTML = `<div class="csw-popover" data-open="true" data-morphing="false" style="position:absolute;inset:0;width:100%;height:100%"><div class="csw-glass" style="inset:0;width:100%;height:100%;border-radius:24px"></div><section class="csw-panel" style="inset:0;width:100%;height:100%;border-radius:24px"><div class="csw-workbench">${workbenchHeadHtml(true)}<nav class="csw-workbench-tabs" role="tablist" aria-label="工作台面板"></nav><div class="csw-feature-content"></div></div></section><div class="csw-resize-handle" style="position:absolute;right:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="调整窗口大小"></div></div>`;
+  root.innerHTML = `<div class="csw-popover" data-open="true" data-morphing="false" style="position:absolute;inset:0;width:100%;height:100%"><div class="csw-glass" style="inset:0;width:100%;height:100%;border-radius:24px"></div><section class="csw-panel" style="inset:0;width:100%;height:100%;border-radius:24px"><div class="csw-workbench">${workbenchHeadHtml(true)}</div></section><div class="csw-resize-handle" data-corner="bl" style="position:absolute;left:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="从左下角调整窗口大小"></div><div class="csw-resize-handle" data-corner="br" style="position:absolute;right:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="从右下角调整窗口大小"></div></div>`;
   root.querySelector('.csw-workbench-controls').innerHTML =
     `<button class="csw-icon" data-pin aria-label="取消窗口置顶" aria-pressed="true">${iconSvg('pin')}</button>${workbenchSettingsHtml()}`;
   const mounts = new Map();
   let state,
     selected = '',
+    pinned,
     sized = false,
     showing = null,
     returnMotion = null;
@@ -145,15 +146,27 @@ export function startDesktop(request, lease) {
     window.addEventListener('pointerup', cleanup, { once: true });
   });
   root
-    .querySelector('.csw-resize-handle')
-    .addEventListener('pointerdown', () => native({ kind: 'resize', corner: 'br' }));
+    .querySelectorAll('.csw-resize-handle')
+    .forEach((handle) =>
+      handle.addEventListener('pointerdown', () =>
+        native({ kind: 'resize', corner: handle.dataset.corner }),
+      ),
+    );
   head
     .querySelector('[data-workbench-settings]')
     .addEventListener('click', () => void call('settings').catch(error));
   head.querySelector('[data-pin]').addEventListener('click', (event) => {
     const button = event.currentTarget,
       value = button.getAttribute('aria-pressed') !== 'true';
-    native({ kind: 'pin', value });
+    button.disabled = true;
+    void call('pin', { value })
+      .then(() => {
+        native({ kind: 'pin', value });
+      })
+      .catch(error)
+      .finally(() => {
+        button.disabled = false;
+      });
     button.setAttribute('aria-pressed', String(value));
     button.setAttribute('aria-label', value ? '取消窗口置顶' : '窗口置顶');
   });
@@ -187,31 +200,26 @@ export function startDesktop(request, lease) {
       open: true,
     });
   }
+  const composition = installFeatureLayout(root.querySelector('.csw-workbench'), {
+    save: async (placement, layout) => {
+      const item = [...mounts.values()].find((item) => item.active);
+      if (item)
+        await request({ op: 'layout', id: item.id, owner: item.entry.owner, placement, layout });
+    },
+    error,
+  });
   function renderContent() {
-    const items = [...mounts.values()].filter((item) => item.active);
-    if (!items.some((item) => item.id === selected)) selected = items[0]?.id || '';
-    const tabs = root.querySelector('nav');
-    const key = items.map((item) => item.id).join(':') + selected;
-    if (tabs.dataset.key !== key) {
-      tabs.dataset.key = key;
-      tabs.replaceChildren();
-      tabs.hidden = items.length < 2;
-      for (const item of items) {
-        const button = document.createElement('button');
-        button.textContent = titles[item.id];
-        button.setAttribute('role', 'tab');
-        button.setAttribute('aria-selected', String(item.id === selected));
-        button.onclick = () => {
-          selected = item.id;
-          renderContent();
-        };
-        tabs.append(button);
-      }
-    }
-    for (const item of mounts.values()) {
-      item.node.hidden = !item.active || item.id !== selected;
-      item.node.inert = !item.active;
-    }
+    const items = [...mounts.values()];
+    for (const item of items)
+      item.node.inert = !item.active || document.documentElement.dataset.buddyReloading === 'true';
+    composition.update(
+      items,
+      'desktop',
+      state.layouts?.desktop,
+      state.legacyLayouts?.desktop,
+      selected,
+      state.features.find((entry) => entry.id === selected)?.reveal,
+    );
   }
   async function poll() {
     if (polling || stopped) return;
@@ -224,6 +232,7 @@ export function startDesktop(request, lease) {
       state = next;
       if (!windowState.valid) {
         stopped = true;
+        composition.destroy();
         for (const item of mounts.values()) item.mount.dispose();
         native({ kind: 'close' });
         return;
@@ -235,13 +244,22 @@ export function startDesktop(request, lease) {
       }
       if (state.appearance)
         appearance({ ...state.appearance, surface: state.appearance.themes.desktop });
+      const pin = head.querySelector('[data-pin]');
+      if (pinned !== (windowState.alwaysOnTop !== false)) {
+        pinned = windowState.alwaysOnTop !== false;
+        native({ kind: 'pin', value: pinned });
+      }
+      pin.setAttribute('aria-pressed', String(windowState.alwaysOnTop !== false));
+      pin.setAttribute(
+        'aria-label',
+        windowState.alwaysOnTop !== false ? '取消窗口置顶' : '窗口置顶',
+      );
       if (!sized) {
         const size = state.mainWindow?.size || [840, 620];
         native({ kind: 'size', width: size[0] + 24, height: size[1] + 24, id: 0 });
         sized = true;
       }
       const wanted = new Set();
-      const body = root.querySelector('.csw-feature-content');
       for (const entry of state.features) {
         const candidates = [
           ...(entry.open && entry.placement === 'desktop' ? [{ owner: entry.owner }] : []),
@@ -255,7 +273,6 @@ export function startDesktop(request, lease) {
           if (!item) {
             const node = document.createElement('div');
             node.style.cssText = 'height:100%;min-height:0';
-            body.append(node);
             item = { node, id: entry.id, entry, mount: null, active: false, reveal: entry.reveal };
             mounts.set(key, item);
             item.mount = mountFeature(node, entry, owner, 'desktop', request, () => void poll(), {

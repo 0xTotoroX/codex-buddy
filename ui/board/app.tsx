@@ -26,6 +26,7 @@ export type BoardView = {
   stage: string;
   tab: string;
   gridLeft?: number;
+  renaming?: { id: string; title: string } | null;
   editor?: BoardEditor | null;
   quickAdd?: { column: string; title: string } | null;
 };
@@ -57,15 +58,17 @@ export function Board({
   const [search, setSearch] = useState(view?.search ?? '');
   const [searchOpen, setSearchOpen] = useState(!!view?.search);
   const [quickAdd, setQuickAdd] = useState(view?.quickAdd ?? null);
-  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(
+    view?.renaming ?? null,
+  );
   const [dropTab, setDropTab] = useState('');
   const columns = state?.store.columns ?? defaults;
   useEffect(() => {
     if (!columns.some((c) => c.id === stage)) setStage('todo');
   }, [columns, stage]);
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd });
-  }, [view, search, stage, tab, editor, quickAdd]);
+    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd, renaming });
+  }, [view, search, stage, tab, editor, quickAdd, renaming]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(

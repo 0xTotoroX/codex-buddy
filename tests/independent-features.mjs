@@ -197,6 +197,17 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         await page.locator('.csw-fab').click();
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        const widthHandle = page.getByRole('separator', { name: '调整工作台宽度' });
+        const beforeWidth = Number(await widthHandle.getAttribute('aria-valuenow'));
+        await widthHandle.press('ArrowLeft');
+        assert.equal(
+          Number(await widthHandle.getAttribute('aria-valuenow')),
+          Math.min(460, beforeWidth + 16),
+        );
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
+          Math.min(460, beforeWidth + 16),
+        );
         await openFeature('board');
         const capsule = page.locator('.csw-fab');
         assert.equal(await capsule.locator('.csw-status-stage').count(), 1);

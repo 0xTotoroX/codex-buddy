@@ -5,6 +5,35 @@ import { FeatureView } from './view';
 import type { Entry, Request } from './types';
 import styles from './styles.css?inline';
 import boardStyles from '../board/styles.css?inline';
+const reloaders = new Map<HTMLElement, () => Promise<boolean>>();
+Object.assign(window, {
+  __buddyFeatureFlush: async () => {
+    if (
+      document.querySelector(
+        '[data-arranging="true"],[data-resizing="true"],[data-layout-saving="true"]',
+      )
+    )
+      return false;
+    const nodes = [...reloaders.keys()].flatMap((node) => [
+      node,
+      ...node.shadowRoot!.querySelectorAll<HTMLDialogElement>('dialog'),
+    ]);
+    const inert = nodes.map((node) => node.inert);
+    document.documentElement.dataset.buddyReloading = 'true';
+    nodes.forEach((node) => {
+      node.inert = true;
+    });
+    try {
+      for (const flush of reloaders.values()) if (!(await flush())) return false;
+      return true;
+    } finally {
+      nodes.forEach((node, index) => {
+        node.inert = inert[index];
+      });
+      delete document.documentElement.dataset.buddyReloading;
+    }
+  },
+});
 export function mountFeature(
   element: HTMLElement,
   initial: Entry,
@@ -28,6 +57,9 @@ export function mountFeature(
   content.style.height = '100%';
   shadow.append(style, content);
   const root = createRoot(content);
+  let prepareReload: (() => Promise<boolean>) | undefined;
+  const flush = () => prepareReload?.() ?? Promise.resolve(false);
+  reloaders.set(element, flush);
   let stopped = false;
   let ready = initial.pending?.owner !== owner;
   let readying = false;
@@ -51,6 +83,9 @@ export function mountFeature(
     root.render(
       <>
         <FeatureView
+          registerReload={(handler) => {
+            prepareReload = handler;
+          }}
           onReady={confirmReady}
           beforeHandoff={motion?.handoff}
           onHandoffError={motion?.failed}
@@ -67,6 +102,7 @@ export function mountFeature(
     update: render,
     dispose() {
       stopped = true;
+      reloaders.delete(element);
       root.unmount();
       element.remove();
     },

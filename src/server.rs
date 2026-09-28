@@ -357,7 +357,12 @@ async fn development_report(State(service): State<Service>, Json(value): Json<Va
     if crate::assets::development().is_none() {
         return StatusCode::NOT_FOUND.into_response();
     }
+    let surface = value["surface"]
+        .as_str()
+        .filter(|s| ["desktop", "edge"].contains(s));
     let report = json!({
+        "updatedAt":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        "board":value["board"].as_array().map(|rows| rows.iter().take(4).map(|row| row.as_array().map(|values| values.iter().take(4).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
         "revision": value["revision"].as_str().unwrap_or("").chars().take(64).collect::<String>(),
         "instance": value["instance"].as_str().unwrap_or("").chars().take(128).collect::<String>(),
         "roots": value["roots"].as_u64(), "styles": value["styles"].as_u64(),
@@ -367,7 +372,11 @@ async fn development_report(State(service): State<Service>, Json(value): Json<Va
         "layout": value["layout"].as_array().map(|rows| rows.iter().take(7).map(|row| row.as_array().map(|values| values.iter().take(6).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
     });
     match write_private(
-        &service.app.paths.root.join("development.json"),
+        &service.app.paths.root.join(
+            surface
+                .map(|s| format!("development-{s}.json"))
+                .unwrap_or("development.json".into()),
+        ),
         &serde_json::to_vec(&report).unwrap(),
     ) {
         Ok(()) => Json(json!({"ok":true})).into_response(),
@@ -379,11 +388,26 @@ async fn development_status(State(service): State<Service>) -> Response {
         return StatusCode::NOT_FOUND.into_response();
     };
     if !service.app.appearance().await.detached {
-        let report = if let Some(client) = service.app.desktop_client().await {
+        let mut report = if let Some(client) = service.app.desktop_client().await {
             client.evaluate(dev.probe).await.unwrap_or(Value::Null)
         } else {
             Value::Null
         };
+        if report.is_object() {
+            for surface in ["desktop", "edge"] {
+                let value = std::fs::read(
+                    service
+                        .app
+                        .paths
+                        .root
+                        .join(format!("development-{surface}.json")),
+                )
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                .unwrap_or(Value::Null);
+                report[surface] = value;
+            }
+        }
         return Json(report).into_response();
     }
     let report = std::fs::read(service.app.paths.root.join("development.json"))
@@ -475,13 +499,20 @@ async fn index() -> Response {
 async fn asset(Path(path): Path<String>) -> Response {
     if let Some(dev) = crate::assets::development() {
         let resource = match path.as_str() {
+            "feature.html" if !dev.feature_html.is_empty() => {
+                Some(("text/html; charset=utf-8", dev.feature_html))
+            }
+            "feature-dev.js" if !dev.feature_script.is_empty() => {
+                Some(("text/javascript; charset=utf-8", dev.feature_script))
+            }
             "panel" => Some(("text/html; charset=utf-8", dev.html)),
             "panel.js" => Some(("text/javascript; charset=utf-8", dev.script)),
             "panel-boot.js" => Some(("text/javascript; charset=utf-8", dev.boot)),
             "dev-client.js" => Some(("text/javascript; charset=utf-8", dev.client)),
             "dev-state.json" => Some((
                 "application/json",
-                json!({"revision":dev.revision,"page":dev.page}).to_string(),
+                json!({"revision":dev.revision,"page":dev.page,"feature":dev.feature_revision})
+                    .to_string(),
             )),
             _ => None,
         };

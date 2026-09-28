@@ -6,7 +6,18 @@
  */
 import { arrangeWorkbench } from './model.js';
 
-export function installArrangement(root, { read, write, update, enabled }) {
+export function installArrangement(
+  root,
+  {
+    read,
+    write,
+    update,
+    enabled,
+    arrange = (value, pane, action, width, height, _target) =>
+      arrangeWorkbench(value, pane, action, width, height),
+    targetAt = null,
+  },
+) {
   const events = new AbortController();
   const panes = root.querySelector('.csw-workbench-panes');
   const preview = document.createElement('div');
@@ -25,7 +36,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
       height: panes.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom),
     };
   };
-  function command(pane, action) {
+  function command(pane, action, target) {
     if (focused && action !== 'focus') return false;
     if (action === 'focus') {
       cancel();
@@ -34,7 +45,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
       return true;
     }
     const { width, height } = bounds();
-    const next = arrangeWorkbench(read(), pane, action, width, height);
+    const next = arrange(read(), pane, action, width, height, target);
     if (!next) return false;
     write(next);
     return true;
@@ -166,6 +177,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
       event.clientY > rect.bottom
     )
       return null;
+    if (targetAt) return targetAt(event, drag.pane, bounds());
     const other = drag.pane === 'outline' ? 'next' : 'outline';
     if (!enabled(drag.pane) || !enabled(other)) return null;
     const target = read().group === 'tabs' ? panes : panes.querySelector(`[data-pane="${other}"]`);
@@ -244,7 +256,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
           suppressClick = false;
         }, 0);
       }
-      if (target) command(pane, target.action);
+      if (target) command(pane, target.action, target.id);
     },
     { signal: events.signal },
   );
@@ -269,7 +281,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
         (!root.isConnected ||
           root.closest('[data-dock-visible="false"]') ||
           !enabled(drag.pane) ||
-          !enabled(drag.pane === 'outline' ? 'next' : 'outline') ||
+          (!targetAt && !enabled(drag.pane === 'outline' ? 'next' : 'outline')) ||
           panes.hidden)
       )
         cancel();
@@ -278,7 +290,7 @@ export function installArrangement(root, { read, write, update, enabled }) {
         const { width, height } = bounds();
         for (const option of menu.options)
           if (option.value)
-            option.disabled = !arrangeWorkbench(
+            option.disabled = !arrange(
               read(),
               menu.dataset.paneArrange,
               option.value,

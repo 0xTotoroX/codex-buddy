@@ -17,7 +17,7 @@ use std::{
 
 #[path = "features/main_surface.rs"]
 mod main_surface;
-use main_surface::{MainSurface, SavedFeatures};
+use main_surface::{FeatureLayout, MainSurface, SavedFeatures};
 
 pub const IDS: [&str; 4] = ["outline", "board", "next", "model"];
 #[derive(Clone, Serialize, Deserialize)]
@@ -66,6 +66,9 @@ impl Features {
         if !["sidebar", "overlay", "desktop"].contains(&main.placement.as_str()) {
             main.placement = "sidebar".into();
         }
+        main.layouts.retain(|placement, layout| {
+            ["sidebar", "overlay", "desktop"].contains(&placement.as_str()) && layout.valid()
+        });
         // Old mixed placements become one main surface; task data and open state stay intact.
         for pref in prefs.values_mut() {
             if pref.placement != "edge" {
@@ -125,7 +128,7 @@ impl Features {
         )
     }
     fn snapshot(&self) -> Value {
-        json!({"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
+        json!({"layouts":self.main.pref.layouts,"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
     }
     fn validate(&self, id: &str, owner: &str) -> Result<()> {
         let e = self.entries.get(id).context("功能尚未打开")?;
@@ -151,9 +154,23 @@ fn spawn(paths: &Paths, id: &str, owner: &str) -> Result<Child> {
         .context("无法打开功能窗口")
 }
 impl App {
+    pub(crate) async fn reset_feature_layouts(&self, dock: bool, desktop: bool) -> Result<()> {
+        let mut f = self.features.lock().await;
+        let mut changed = false;
+        for surface in ["sidebar", "overlay", "desktop"] {
+            if if surface == "desktop" { desktop } else { dock } {
+                changed |= f.main.pref.layouts.remove(surface).is_some();
+            }
+        }
+        if changed {
+            f.save(&self.paths)?;
+        }
+        Ok(())
+    }
     pub async fn feature_state(&self) -> Value {
         let mut state = self.features.lock().await.snapshot();
         let view = self.view();
+        state["legacyLayouts"] = json!({"sidebar":view.panel_preferences.ui.dock_layout,"overlay":view.panel_preferences.ui.dock_layout,"desktop":view.panel_preferences.ui.popout_layout});
         state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"themes":self.surfaces.lock().await.preferences.themes});
         state
     }
@@ -200,6 +217,32 @@ impl App {
         let id = input["id"].as_str().context("缺少功能")?;
         ensure!(IDS.contains(&id), "未知功能");
         let owner = input["owner"].as_str().unwrap_or("");
+        if op == "layout" {
+            let _operation = self.feature_operation.lock().await;
+            let mut f = self.features.lock().await;
+            f.validate(id, owner)?;
+            let placement = input["placement"].as_str().context("缺少布局位置")?;
+            ensure!(
+                ["sidebar", "overlay", "desktop"].contains(&placement),
+                "布局位置无效"
+            );
+            ensure!(
+                f.entries[id].pref.placement == placement && f.main.target.is_none(),
+                "功能正在交接"
+            );
+            let layout: FeatureLayout = serde_json::from_value(input["layout"].clone())?;
+            ensure!(layout.valid(), "分栏布局无效");
+            let previous = f.main.pref.layouts.insert(placement.into(), layout);
+            if let Err(error) = f.save(&self.paths) {
+                if let Some(previous) = previous {
+                    f.main.pref.layouts.insert(placement.into(), previous);
+                } else {
+                    f.main.pref.layouts.remove(placement);
+                }
+                return Err(error);
+            }
+            return Ok(f.snapshot());
+        }
         if op == "anchor" || op == "settings" {
             let f = self.features.lock().await;
             let e = f.entries.get(id).context("功能已关闭")?;
@@ -630,6 +673,23 @@ mod tests {
             .unwrap();
         owner
     }
+    #[tokio::test]
+    async fn layout_survives_reload_rejects_stale_owner_and_resets_from_settings() {
+        let (_dir, app) = app().await;
+        let owner = open(&app, "outline").await;
+        let layout = json!({"axis":"vertical","groups":[{"ids":["outline","board"],"active":"outline","weight":1.0}]});
+        app.feature_request(json!({"op":"layout","id":"outline","owner":owner,"placement":"sidebar","layout":layout})).await.unwrap();
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            layout
+        );
+        assert!(app.feature_request(json!({"op":"layout","id":"outline","owner":"old","placement":"sidebar","layout":layout})).await.is_err());
+        let prefs = app.appearance().await;
+        app.save_appearance(json!({"expectedRevision":prefs.revision,"ui":{"dockLayout":{"group":"tabs","active":"outline","mode":"auto","first":"outline","verticalRatio":0.45,"horizontalRatio":0.4}}})).await.unwrap();
+        assert!(app.feature_state().await["layouts"]["sidebar"].is_null());
+        assert!(Features::load(&app.paths).snapshot()["layouts"]["sidebar"].is_null());
+    }
+
     #[tokio::test]
     async fn independent_owners_reject_late_actions_and_preserve_transient_drafts() {
         let (_dir, app) = app().await;

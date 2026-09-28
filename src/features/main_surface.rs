@@ -5,11 +5,43 @@
 use super::*;
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct LayoutGroup {
+    pub ids: Vec<String>,
+    pub active: String,
+    pub weight: f64,
+}
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct FeatureLayout {
+    pub axis: String,
+    pub groups: Vec<LayoutGroup>,
+}
+impl FeatureLayout {
+    pub fn valid(&self) -> bool {
+        let mut ids = std::collections::BTreeSet::new();
+        ["auto", "vertical", "horizontal"].contains(&self.axis.as_str())
+            && (1..=4).contains(&self.groups.len())
+            && self.groups.iter().all(|group| {
+                !group.ids.is_empty()
+                    && group.ids.contains(&group.active)
+                    && group.weight.is_finite()
+                    && (0.01..=100.0).contains(&group.weight)
+                    && group
+                        .ids
+                        .iter()
+                        .all(|id| IDS.contains(&id.as_str()) && ids.insert(id))
+            })
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub(super) struct MainPreference {
     pub placement: String,
     pub return_placement: String,
     pub size: [u32; 2],
+    pub layouts: BTreeMap<String, FeatureLayout>,
 }
 impl Default for MainPreference {
     fn default() -> Self {
@@ -17,6 +49,7 @@ impl Default for MainPreference {
             placement: "sidebar".into(),
             return_placement: "sidebar".into(),
             size: [840, 620],
+            layouts: BTreeMap::new(),
         }
     }
 }
@@ -43,6 +76,7 @@ impl SavedFeatures {
                         placement: p.placement.clone(),
                         return_placement: p.return_placement.clone(),
                         size: p.size,
+                        ..Default::default()
                     })
                     .unwrap_or_default();
                 (main, features)
@@ -207,9 +241,22 @@ impl App {
         let valid =
             !f.main.lease.is_empty() && input["lease"] == f.main.lease && f.desktop_active();
         if op == "main-window" {
-            return Ok(json!({"valid":valid,"pid":f.main.child.as_ref().map(|c|c.id())}));
+            let pid = f.main.child.as_ref().map(|c| c.id());
+            drop(f);
+            let prefs = self.appearance().await;
+            return Ok(json!({"valid":valid,"pid":pid,"alwaysOnTop":prefs.always_on_top}));
         }
         ensure!(valid, "主窗口归属已变化");
+        if op == "main-pin" {
+            drop(f);
+            let prefs = self.appearance().await;
+            let saved = self
+                .save_appearance(
+                    json!({"expectedRevision":prefs.revision,"alwaysOnTop":input["value"]}),
+                )
+                .await?;
+            return Ok(json!({"alwaysOnTop":saved.always_on_top}));
+        }
         if op == "main-size" {
             let size: [u32; 2] = serde_json::from_value(input["size"].clone())?;
             ensure!(
@@ -222,8 +269,11 @@ impl App {
         }
         if op == "main-settings" {
             drop(f);
-            webbrowser::open(&crate::lifecycle::Runtime::read(&self.paths)?.url())
-                .context("无法打开设置")?;
+            webbrowser::open(
+                &crate::assets::settings_url()
+                    .unwrap_or(crate::lifecycle::Runtime::read(&self.paths)?.url()),
+            )
+            .context("无法打开设置")?;
             return Ok(json!({"ok":true}));
         }
         ensure!(op == "main-anchor", "未知主窗口操作");

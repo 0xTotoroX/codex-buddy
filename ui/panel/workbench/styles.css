@@ -604,3 +604,17 @@
   color: #eee;
   color-scheme: dark;
 }
+
+.csw-feature-panes .csw-workbench-tabs {
+  overflow-x: auto;
+  padding-right: 8px;
+  flex: 0 0 auto;
+  min-height: 36px;
+}
+.csw-feature-panes .csw-workbench-tabs button {
+  font-size: 15px;
+  touch-action: none;
+}
+.csw-feature-panes .csw-feature-content {
+  overflow: hidden;
+}

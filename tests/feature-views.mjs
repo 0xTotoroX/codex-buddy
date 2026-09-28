@@ -75,6 +75,8 @@ try {
     status: '本地看板',
   };
   const actions = [];
+  const layouts = {};
+  let pinned = false;
   let surfaceTheme = 'matte';
   let rejectHandoff = true;
   let handoffs = 0;
@@ -120,8 +122,12 @@ try {
     if (url.pathname === '/api/features') {
       const p = route.request().postDataJSON();
       let value;
-      if (p.op === 'main-window') value = { valid: true };
-      else if (p.op === 'main-anchor') value = { anchor: null };
+      if (p.op === 'main-window') value = { valid: true, alwaysOnTop: pinned };
+      else if (p.op === 'main-pin') value = { alwaysOnTop: (pinned = p.value) };
+      else if (p.op === 'layout') {
+        layouts[p.placement] = p.layout;
+        value = { layouts };
+      } else if (p.op === 'main-anchor') value = { anchor: null };
       else if (p.op === 'read')
         value = {
           ...(p.id === 'board' ? tasks : model),
@@ -177,6 +183,7 @@ try {
           e.pending.ready = true;
         }
         value = {
+          layouts,
           features: entries,
           mainPlacement: 'desktop',
           returnPlacement: 'sidebar',
@@ -307,6 +314,52 @@ try {
   await page.screenshot({ path: join(output, 'desktop-model.png') });
   assert.deepEqual(errors, []);
   record('desktop reuses original eyes/header and shows content without a placement selector');
+  const tab = page.getByRole('tab', { name: '看板', exact: true });
+  const tabBox = await tab.boundingBox();
+  const paneBox = await page.locator('.csw-feature-panes').boundingBox();
+  await page.mouse.move(tabBox.x + tabBox.width / 2, tabBox.y + tabBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(paneBox.x + paneBox.width / 2, paneBox.y + paneBox.height - 20, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await page.getByRole('separator', { name: '调整分栏比例' }).waitFor();
+  assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 2);
+  const separator = page.getByRole('separator', { name: '调整分栏比例' });
+  await separator.focus();
+  await separator.press('ArrowDown');
+  await page.waitForFunction(
+    () => Number(document.querySelector('.csw-workbench-split').getAttribute('aria-valuenow')) > 50,
+  );
+  await tab.dblclick();
+  assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 1);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 2);
+  await page.reload();
+  await page.getByRole('separator', { name: '调整分栏比例' }).waitFor();
+  assert.equal(layouts.desktop.groups.length, 2);
+  const from = await page.getByRole('tab', { name: '看板', exact: true }).boundingBox();
+  const to = await page.locator('[data-pane="model"]').boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForFunction(
+    () => document.querySelectorAll('.csw-feature-panes > section').length === 1,
+  );
+  await page.setViewportSize({ width: 1200, height: 700 });
+  await board.getByRole('button', { name: '新增分组' }).waitFor();
+  const tools = await board.locator('.board-tools').boundingBox();
+  const heading = await board.locator('.column-heading').last().boundingBox();
+  assert.ok(Math.abs(tools.y + tools.height / 2 - heading.y - heading.height / 2) < 2);
+  await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
+  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
+  await page.getByLabel('窗口置顶', { exact: true }).click();
+  await page.getByLabel('取消窗口置顶', { exact: true }).waitFor();
+  assert.equal(pinned, true);
+  record(
+    'shared layout restores drag split/merge, ratio, focus, persistence and aligned board tools',
+  );
   surfaceTheme = 'black';
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',

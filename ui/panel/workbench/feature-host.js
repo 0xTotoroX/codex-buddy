@@ -3,9 +3,10 @@
  * [POS]: Host content adapter. Geometry and gestures remain in core.
  * [PROTOCOL]: Keep workbench/AGENTS.md in sync. */
 import { mountFeature } from '../../features/mount';
-import { titles } from '../../features/types';
+import { installFeatureLayout } from '../../features/layout';
+import { bindSeparator } from './separator.js';
 import { createDock } from '../host/dock.js';
-import { bridgeCall, shellState, runtimeState } from '../runtime/state.js';
+import { bridgeCall, shellState, runtimeState, clamp } from '../runtime/state.js';
 import { IS_POPOUT } from '../runtime/constants.js';
 import { emitSignal } from '../runtime/signals.js';
 import { stopWorkbench } from './layout.js';
@@ -18,6 +19,7 @@ let timer = 0,
   independent = false;
 let state = null,
   dock = null;
+let composition = null;
 let dockValue = { status: '', rect: null };
 let primary = 'overlay';
 let selected = '';
@@ -76,43 +78,53 @@ function frame(container, faceClick) {
   if (root) return root;
   root = document.createElement('div');
   root.className = 'csw-workbench';
-  root.innerHTML = `${workbenchHeadHtml()}<nav class="csw-workbench-tabs" role="tablist" aria-label="工作台面板"></nav><p data-feature-error role="alert" hidden></p><div class="csw-feature-content"></div>`;
+  root.innerHTML = `${workbenchHeadHtml()}<p data-feature-error role="alert" hidden></p><div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>`;
   root.querySelector('.csw-workbench-controls').innerHTML = workbenchSettingsHtml();
   root.querySelector('.csw-workbench-face').addEventListener('click', faceClick);
   root
     .querySelector('[data-workbench-settings]')
     .addEventListener('click', () => void openSettings());
+  composition?.destroy();
+  composition = installFeatureLayout(root, {
+    save: async (placement, layout) => {
+      const entry = state.features.find((entry) => entry.open && entry.placement === placement);
+      if (entry)
+        await request({ op: 'layout', id: entry.id, owner: entry.owner, placement, layout });
+    },
+    error: showError,
+  });
+  const handle = root.querySelector('.csw-workbench-resize');
+  bindSeparator(
+    handle,
+    'x',
+    () => shellState.dockWidth,
+    (width, dx) => {
+      shellState.dockWidth = clamp(width - dx, 300, 460);
+      updateDock();
+      emitSignal('render', undefined);
+    },
+  );
   container.replaceChildren(root);
   return root;
 }
 function content(root, placement) {
   const entries = group(placement).filter((entry) => entry.open || entry.pending);
   if (!entries.some((e) => e.id === selected)) selected = entries[0]?.id || '';
-  const tabs = root.querySelector('nav');
-  const key = entries.map((e) => e.id).join(':') + selected;
-  if (tabs.dataset.key !== key) {
-    tabs.dataset.key = key;
-    tabs.replaceChildren();
-    tabs.hidden = entries.length < 2;
-    for (const entry of entries) {
-      const button = document.createElement('button');
-      button.textContent = titles[entry.id];
-      button.setAttribute('role', 'tab');
-      button.setAttribute('aria-selected', String(selected === entry.id));
-      button.onclick = () => {
-        selected = entry.id;
-        content(root, placement);
-      };
-      tabs.append(button);
-    }
-  }
   root.querySelector('.csw-workbench-face').dataset.expression = resolveFabExpression();
-  const body = root.querySelector('.csw-feature-content');
-  for (const item of mounts.values()) {
-    if (item.node.parentNode !== body) body.append(item.node);
-    item.node.hidden = item.placement !== placement || item.id !== selected || !item.active;
-    item.node.inert = !item.active;
-  }
+  const handle = root.querySelector('.csw-workbench-resize');
+  handle.hidden = placement !== 'sidebar';
+  handle.setAttribute('aria-valuenow', String(shellState.dockWidth));
+  const items = [...mounts.values()].filter((item) => item.placement === placement);
+  for (const item of items)
+    item.node.inert = !item.active || document.documentElement.dataset.buddyReloading === 'true';
+  composition.update(
+    items,
+    placement,
+    state.layouts?.[placement],
+    state.legacyLayouts?.[placement],
+    selected,
+    state.features.find((entry) => entry.id === selected)?.reveal,
+  );
 }
 // Called after the original shell has installed its DOM. Never replace live mounts on collapse.
 export function renderFeatureShell(faceClick) {
@@ -161,7 +173,7 @@ function updateDock() {
 function render(next) {
   if (!next.features.length) return;
   const previous = state;
-  state = next;
+  state = { ...previous, ...next };
   if (!independent) {
     stopWorkbench();
     independent = true;
@@ -247,6 +259,8 @@ export function stopFeatureHost() {
   epoch++;
   clearInterval(timer);
   timer = 0;
+  composition?.destroy();
+  composition = null;
   for (const item of mounts.values()) item.mount.dispose();
   mounts.clear();
   dock?.destroy();

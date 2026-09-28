@@ -16,6 +16,7 @@ export function FeatureView({
   request,
   onState,
   onReady,
+  registerReload,
   beforeHandoff,
   onHandoffError,
 }: {
@@ -24,6 +25,7 @@ export function FeatureView({
   request: Request;
   onState: () => void;
   onReady?: () => Promise<void>;
+  registerReload?: (handler: () => Promise<boolean>) => void;
   beforeHandoff?: () => Promise<unknown>;
   onHandoffError?: (pendingOwner: string) => void;
 }) {
@@ -53,6 +55,13 @@ export function FeatureView({
     }
     return reading.current;
   }, []);
+  useEffect(() => {
+    registerReload?.(async () => {
+      if (gate.current || entry.pending) return false;
+      if (active) await call('save', { view: capture() });
+      return true;
+    });
+  }, [registerReload, active, entry.pending, call, capture]);
   useEffect(() => {
     if (wasMoving.current && !entry.pending && entry.owner === owner) {
       onHandoffError?.(wasMoving.current);

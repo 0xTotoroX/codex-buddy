@@ -54,7 +54,10 @@ export function startEdge(request: Request) {
   function visibility() {
     for (const item of mounts.values()) {
       item.node.hidden = item.id !== selected;
-      item.node.inert = !expanded || item.id !== selected;
+      item.node.inert =
+        !expanded ||
+        item.id !== selected ||
+        document.documentElement.dataset.buddyReloading === 'true';
     }
     panel.inert = !expanded;
   }

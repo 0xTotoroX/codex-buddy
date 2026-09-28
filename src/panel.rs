@@ -694,13 +694,21 @@ impl App {
         if next.detached {
             next.ui.open = true;
         }
+        let dock_changed = next.ui.dock_layout != panel.prefs.ui.dock_layout;
+        let desktop_changed = next.ui.popout_layout != panel.prefs.ui.popout_layout;
         if next != panel.prefs {
             next.revision += 1;
             next.web_revision += 1;
             next.save(&self.paths)?;
             panel.prefs = next;
         }
-        Ok(panel.prefs.clone())
+        let saved = panel.prefs.clone();
+        drop(panel);
+        if dock_changed || desktop_changed {
+            self.reset_feature_layouts(dock_changed, desktop_changed)
+                .await?;
+        }
+        Ok(saved)
     }
 
     pub async fn close_panel(&self) -> Result<Value> {
