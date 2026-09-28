@@ -100,7 +100,7 @@ export function SurfaceSettings({
       className="settings-section"
     >
       <FeatureSettings live={live} desktopSupported={desktopSupported} onPlacement={setPrimary} />
-      <section className="settings-section">
+      <section className="settings-section settings-surface-group">
         <h2>主题</h2>
         <div className="space-y-3">
           {Object.entries(labels).map(([placement, label]) => {
@@ -156,8 +156,8 @@ export function SurfaceSettings({
         </div>
       </section>
       <PanelSettings value={appearance} fontBase={fontBase} />
-      <details id="edge-position" className="settings-section">
-        <summary className="cursor-pointer text-sm">贴边 / 刘海位置</summary>
+      <details id="edge-position" className="settings-section settings-surface-group">
+        <summary className="settings-group-title">贴边 / 刘海位置</summary>
         <div className="mt-3 space-y-3">
           <label className="settings-field text-sm">
             <span className="whitespace-nowrap">屏幕</span>

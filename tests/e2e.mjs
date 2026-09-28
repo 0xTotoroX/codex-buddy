@@ -326,6 +326,15 @@ try {
   writeFileSync(join(dataDir, 'secrets.json'), JSON.stringify({ apiKey: 'fixture-key' }), {
     mode: 0o600,
   });
+  if (settingsOnly) {
+    writeFileSync(
+      join(dataDir, 'features.json'),
+      JSON.stringify({
+        main: { placement: 'sidebar' },
+        features: { model: { placement: 'sidebar', open: false } },
+      }),
+    );
+  }
   const env = { ...process.env, CODEX_BUDDY_PANEL_TEST: '1' };
   for (const key of [
     'CODEX_BUDDY_PROVIDER',
@@ -415,6 +424,96 @@ try {
     page.on('pageerror', (error) => errors.push(`settings: ${error.message}`));
     await page.goto(`${base}/#token=${runtime.token}`);
     await checkSettingsNavigation(page, context, base, runtime);
+    const nav = page.getByRole('navigation', { name: '设置分类' });
+    const featureFlags = async () => {
+      const value = await settings();
+      return {
+        outline: value.answerOutlineEnabled,
+        next: value.enabled,
+        board: value.taskBoardEnabled,
+        model: value.modelControlEnabled,
+      };
+    };
+    for (const [id, name] of [
+      ['outline', '大纲'],
+      ['next', '下一步'],
+      ['board', '看板'],
+      ['model', '模型快切'],
+    ]) {
+      await nav.getByRole('link', { name, exact: true }).click();
+      const control = page.getByRole('switch', { name: `启用${name}`, exact: true });
+      await waitFor(() => control.isEnabled(), `${name} switch unavailable`);
+      if (!(await featureFlags())[id]) {
+        await control.click();
+        await waitFor(async () => (await featureFlags())[id], `${name} did not enable`);
+      }
+      const entry = (await api('features', { op: 'state' })).body.features.find((e) => e.id === id);
+      if (!entry?.pending) {
+        const result = await api('features', { op: 'reveal', id });
+        assert.equal(result.status, 200, `${name}: ${JSON.stringify(result.body)}`);
+      }
+      await waitFor(
+        async () =>
+          (await api('features', { op: 'state' })).body.features.some(
+            (e) => e.id === id && e.open && !e.pending,
+          ),
+        `${name} did not appear`,
+      );
+      const before = await featureFlags();
+      const tasks = (await api('tasks/state')).body.store;
+      await control.click();
+      await waitFor(async () => !(await featureFlags())[id], `${name} did not disable`);
+      assert.deepEqual(
+        await featureFlags(),
+        { ...before, [id]: false },
+        `${name} must not change other switches`,
+      );
+      await waitFor(
+        async () =>
+          (await api('features', { op: 'state' })).body.features.every(
+            (e) => e.id !== id || (!e.open && !e.pending),
+          ),
+        `${name} left an open entry`,
+      );
+      const afterTasks = (await api('tasks/state')).body.store;
+      assert.deepEqual(afterTasks.tasks, tasks.tasks);
+      assert.equal(afterTasks.syncEnabled, tasks.syncEnabled);
+      await control.click();
+      await waitFor(async () => (await featureFlags())[id], `${name} did not re-enable`);
+      await waitFor(
+        async () =>
+          (await api('features', { op: 'state' })).body.features.some(
+            (e) => e.id === id && e.open && !e.pending,
+          ),
+        `${name} did not return`,
+      );
+    }
+    await nav.getByRole('link', { name: '下一步', exact: true }).click();
+    await page.goto(`${base}/#settings-next/max-output`);
+    const limit = page.getByLabel('输出 token 上限', { exact: true });
+    await limit.fill('1');
+    await nav.getByRole('link', { name: '大纲', exact: true }).click();
+    await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
+    await waitFor(
+      async () => !(await settings()).answerOutlineEnabled,
+      'outline disable blocked by unrelated draft',
+    );
+    await nav.getByRole('link', { name: '下一步', exact: true }).click();
+    assert.equal(
+      await limit.inputValue(),
+      '1',
+      'invalid draft must survive the independent toggle',
+    );
+    await limit.fill(String((await settings()).maxOutputTokens));
+    await limit.blur();
+    await nav.getByRole('link', { name: '大纲', exact: true }).click();
+    await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
+    await waitFor(async () => (await settings()).answerOutlineEnabled, 'outline did not restore');
+    await waitFor(
+      async () => (await api('features', { op: 'state' })).body.features.every((e) => !e.pending),
+      'feature reopen did not settle',
+    );
+    record('四功能独立启停、原位置恢复、看板数据与同步保留、开关不提交无效草稿');
     await page.getByRole('link', { name: '显示与布局', exact: true }).click();
     const before = (await api('features', { op: 'state' })).body;
     for (const axis of ['vertical', 'horizontal', 'tabs']) {
@@ -424,7 +523,18 @@ try {
         return axis === 'tabs' ? layout?.groups.length === 1 : layout?.axis === axis;
       }, `layout ${axis} did not save`);
     }
-    assert.deepEqual((await api('features', { op: 'state' })).body.features, before.features);
+    const membership = (features) =>
+      features.map(({ id, placement, returnPlacement, open, size }) => ({
+        id,
+        placement,
+        returnPlacement,
+        open,
+        size,
+      }));
+    assert.deepEqual(
+      membership((await api('features', { op: 'state' })).body.features),
+      membership(before.features),
+    );
     await page.getByRole('link', { name: '总览', exact: true }).click();
     await page.locator('.settings-overview').getByText('标签组', { exact: true }).waitFor();
     const boardSummary = page.getByRole('region', { name: '看板配置', exact: true });

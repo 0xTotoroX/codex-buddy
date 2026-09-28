@@ -790,10 +790,18 @@ async fn tasks_command(
         ));
     }
     let modules_changed = command["op"] == "modules";
-    let result = service.app.tasks.command(command).await?;
+    let board_before = service.app.tasks.board_enabled().await;
+    let mut result = service.app.tasks.command(command).await?;
     if modules_changed {
         let settings = service.app.settings().await;
         service.app.sync_desktop_settings(&settings).await;
+        let enabled = service.app.tasks.board_enabled().await;
+        if enabled != board_before {
+            if let Err(error) = service.app.set_feature_enabled("board", enabled).await {
+                result["presentationError"] =
+                    json!(format!("看板开关已保存，窗口更新失败：{error}"));
+            }
+        }
     }
     Ok(Json(result))
 }

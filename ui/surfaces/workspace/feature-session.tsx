@@ -1,8 +1,15 @@
 /* [INPUT]: Owner lease, business projection, request function and optional surface header slot.
- * [OUTPUT]: Business content with per-feature fonts, guarded actions and draft/reading handoff; the surface owns chrome.
+ * [OUTPUT]: Business content with per-feature fonts, guarded actions and draft/reading handoff with close acknowledgement; the surface owns chrome.
  * [POS]: Shared by native windows and host Shadow DOM surfaces; no host parsing.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { readWorkbenchScroll, writeWorkbenchScroll } from './reading.js';
 import { FeatureContent, contentToken, type FeatureData } from '../../features/content';
 import type { PanelSnapshot } from '../../shared/contracts';
@@ -41,7 +48,7 @@ export function FeatureView({
   const [connected, setConnected] = useState(true);
   const [appearance, setAppearance] = useState<Appearance>({});
   const active = entry.owner === owner && entry.open && !entry.pending;
-  const locked = !active || busy;
+  const locked = !active || !!entry.closing || busy;
   const call = useCallback(
     <T,>(op: string, data: Record<string, unknown> = {}) =>
       request<T>({ op, id: entry.id, owner, ...data }),
@@ -54,6 +61,20 @@ export function FeatureView({
     }
     return reading.current;
   }, []);
+  useEffect(() => {
+    if (entry.closing && active) {
+      void call('disable-ready', { view: capture() })
+        .then(onState)
+        .catch((e) => setError(String(e)));
+    }
+  }, [entry.closing, active, call, capture, onState]);
+  useLayoutEffect(
+    () => () => {
+      // Capture before React removes the DOM; the owner guard rejects stale handoffs.
+      void call('save', { view: capture() }).catch(() => {});
+    },
+    [call, capture],
+  );
   useEffect(() => {
     registerReload?.(async () => {
       if (gate.current || entry.pending) return false;

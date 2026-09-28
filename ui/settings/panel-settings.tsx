@@ -162,7 +162,7 @@ export function PanelSettings({
         </>
       ) : (
         <>
-          <section className="settings-section" id="settings-fonts">
+          <section className="settings-section settings-surface-group" id="settings-fonts">
             <div className="settings-row settings-font-heading">
               <h2>内容字号</h2>
               <Button
@@ -195,7 +195,7 @@ export function PanelSettings({
               </div>
             ))}
           </section>
-          <section className="settings-section">
+          <section className="settings-section settings-surface-group">
             <h2>尺寸与窗口</h2>
             {number('dock-width', '侧栏宽度（px）', ui.dockWidth, 300, 460, (n) =>
               change('dockWidth', n),

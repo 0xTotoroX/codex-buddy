@@ -9,15 +9,15 @@
 - [main.tsx](main.tsx)：页面入口、服务状态、分类容器及大纲开关；组合各设置模块，不持有任务或模型业务。
 - [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
 - [settings-outline.tsx](settings-outline.tsx)：总览为首次打开的默认分类，分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
-- [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
+- [settings-controls.tsx](settings-controls.tsx)：共用设置行、各功能页顶部的独立开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步开关、生成方式、生成模型、常用提示词与高级生成限制；模型读取/连接测试仅由显式操作触发。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
-- [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；导出 SettingsEditor 供展示模块组合。
+- [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
 - [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示/点击行为、四功能独立内容字号（步进 1px，手填保留一位小数）及全部字号重置、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
-- [surface-settings.tsx](surface-settings.tsx)：组合形式设置，管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
-- [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关与打开操作，不持有位置或主题。
+- [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
+- [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关与打开操作，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；不持有位置或主题。
 - [task-settings.tsx](task-settings.tsx)：看板分组管理、看板/同步独立开关、显式授权、唯一 iCloud 列表及旧同步配置恢复；不修改同步规则。
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。

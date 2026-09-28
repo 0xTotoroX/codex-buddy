@@ -149,6 +149,10 @@ function scan(generation = runtimeState.runtimeGeneration, timerId = 0) {
   installFloat();
   const stepwiseActive = stepwiseEnabled();
   const outlineActive = outlineEnabled();
+  if (!stepwiseActive && !outlineActive) {
+    renderFloat();
+    return;
+  }
 
   if (!bindingSourceReady()) {
     setScanStatus('source-unavailable', {});

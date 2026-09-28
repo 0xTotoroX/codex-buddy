@@ -52,6 +52,7 @@ struct Entry {
     view: Value,
     pending: Option<Pending>,
     reveal: u64,
+    closing: Option<Instant>,
 }
 pub struct Features {
     entries: BTreeMap<String, Entry>,
@@ -113,6 +114,7 @@ impl Features {
                                     view: json!({}),
                                     pending: None,
                                     reveal: 1,
+                                    closing: None,
                                 },
                             )
                         })
@@ -121,14 +123,26 @@ impl Features {
         }
     }
     fn save(&self, paths: &Paths) -> Result<()> {
-        let prefs: BTreeMap<_, _> = self.entries.iter().map(|(id, e)| (id, &e.pref)).collect();
+        let prefs: BTreeMap<_, _> = self
+            .entries
+            .iter()
+            .map(|(id, e)| {
+                (
+                    id,
+                    Preference {
+                        open: e.pref.open && e.closing.is_none(),
+                        ..e.pref.clone()
+                    },
+                )
+            })
+            .collect();
         write_private(
             &paths.root.join("features.json"),
             &serde_json::to_vec_pretty(&json!({"main":self.main.pref,"features":prefs}))?,
         )
     }
     fn snapshot(&self) -> Value {
-        json!({"layouts":self.main.pref.layouts,"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
+        json!({"layouts":self.main.pref.layouts,"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"closing":e.closing.is_some(),"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
     }
     fn validate(&self, id: &str, owner: &str) -> Result<()> {
         let e = self.entries.get(id).context("功能尚未打开")?;
@@ -180,12 +194,21 @@ impl App {
                 || e.pending.as_ref().is_some_and(|p| p.placement == "edge")
         })
     }
+    pub async fn set_feature_enabled(&self, id: &str, enabled: bool) -> Result<()> {
+        if enabled && self.feature_managed(id).await {
+            self.feature_request(json!({"op":"reveal", "id":id}))
+                .await?;
+        } else if !enabled {
+            self.close_feature(id).await?;
+        }
+        Ok(())
+    }
     pub async fn close_feature(&self, id: &str) -> Result<()> {
         let _operation = self.feature_operation.lock().await;
         let mut f = self.features.lock().await;
         f.cancel_group();
         if let Some(e) = f.entries.get_mut(id) {
-            e.pref.open = false;
+            e.closing = e.pref.open.then(Instant::now);
             e.pending = None;
         }
         f.save(&self.paths)?;
@@ -385,6 +408,15 @@ impl App {
             if placement == "desktop" {
                 ensure!(crate::panel::popout_supported(), "当前系统不支持桌面窗口");
             }
+            if id == "outline" || id == "next" {
+                let model = self.model.read().await;
+                let enabled = if id == "outline" {
+                    model.options.answer_outline_enabled
+                } else {
+                    model.options.enabled
+                };
+                ensure!(enabled, "请先在设置页开启该功能");
+            }
             if id == "model" {
                 ensure!(
                     self.model_control.lock().await.preferences.enabled,
@@ -416,11 +448,13 @@ impl App {
                 view: json!({}),
                 pending: None,
                 reveal: 0,
+                closing: None,
             });
             ensure!(e.pending.is_none(), "功能正在交接");
             if !owner.is_empty() {
                 ensure!(owner == e.owner, "功能归属已变化");
             }
+            let was_closing = e.closing.take().is_some();
             if placement != "edge" && placement != primary {
                 if let Some(view) = input.get("view") {
                     ensure!(view.to_string().len() < 128 * 1024, "阅读状态过大");
@@ -432,6 +466,9 @@ impl App {
             if e.pref.open && (op == "reveal" || placement == e.pref.placement) {
                 e.reveal += 1;
                 let edge = e.pref.placement == "edge";
+                if was_closing {
+                    f.save(&self.paths)?;
+                }
                 let result = f.snapshot();
                 drop(f);
                 if edge {
@@ -507,13 +544,29 @@ impl App {
         }
         {
             let mut f = self.features.lock().await;
-            f.validate(id, owner)?;
+            let closing = op == "disable-ready";
+            if closing {
+                let e = f.entries.get(id).context("功能尚未打开")?;
+                ensure!(e.owner == owner && e.closing.is_some(), "关闭请求已过期");
+            }
+            if op == "save" {
+                let e = f.entries.get(id).context("功能尚未打开")?;
+                ensure!(
+                    !owner.is_empty()
+                        && e.owner == owner
+                        && e.pending.is_none()
+                        && (e.pref.open || input.get("size").is_none()),
+                    "功能归属已变化"
+                );
+            } else {
+                f.validate(id, owner)?;
+            }
             let e = f.entries.get_mut(id).unwrap();
             if let Some(view) = input.get("view") {
                 ensure!(view.to_string().len() < 128 * 1024, "阅读状态过大");
                 e.view = view.clone();
             }
-            if op == "save" || op == "close" {
+            if op == "save" || op == "close" || closing {
                 if let Some(size) = input.get("size") {
                     let s: [u32; 2] = serde_json::from_value(size.clone())?;
                     ensure!(
@@ -522,10 +575,11 @@ impl App {
                     );
                     e.pref.size = s;
                 }
-                if op == "close" {
+                if op == "close" || closing {
+                    e.closing = None;
                     e.pref.open = false;
                 }
-                if op == "close" || input.get("size").is_some() {
+                if op == "close" || closing || input.get("size").is_some() {
                     f.save(&self.paths)?;
                 }
                 f.retire_desktop();
@@ -629,6 +683,12 @@ impl App {
             f.cancel_group();
         }
         for e in f.entries.values_mut() {
+            if e.closing
+                .is_some_and(|started| started.elapsed() > Duration::from_secs(5))
+            {
+                e.closing = None;
+                e.pref.open = false;
+            }
             if e.pending
                 .as_ref()
                 .is_some_and(|p| p.started.elapsed() > Duration::from_secs(15))
@@ -971,6 +1031,11 @@ mod tests {
             .contains("停用")
         );
         for (id, kind) in [("next", "quick-fill"), ("outline", "outline-refresh")] {
+            {
+                let mut model = app.model.write().await;
+                model.options.enabled = true;
+                model.options.answer_outline_enabled = true;
+            }
             let owner = open(&app, id).await;
             {
                 let mut model = app.model.write().await;
@@ -988,6 +1053,114 @@ mod tests {
                 .unwrap();
             assert_eq!(app.features.lock().await.entries[id].view["top"], 42);
         }
+    }
+    #[tokio::test]
+    async fn feature_switch_closes_only_its_view_and_reopens_saved_placement() {
+        let (_dir, app) = app().await;
+        let owner = open(&app, "outline").await;
+        let next_owner = open(&app, "next").await;
+        app.close_feature("outline").await.unwrap();
+        assert!(!Features::load(&app.paths).entries["outline"].pref.open);
+        app.set_feature_enabled("outline", true).await.unwrap();
+        assert!(Features::load(&app.paths).entries["outline"].pref.open);
+        assert!(
+            app.feature_request(
+                json!({"op":"disable-ready","id":"outline","owner":owner,"view":{}})
+            )
+            .await
+            .is_err()
+        );
+        let generation = app.settings().await["generationRevision"].clone();
+        app.save_settings(serde_json::from_value(json!({"answerOutlineEnabled":false})).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(app.settings().await["generationRevision"], generation);
+        assert!(
+            app.features.lock().await.entries["outline"]
+                .closing
+                .is_some()
+        );
+        app.feature_request(
+            json!({"op":"disable-ready","id":"outline","owner":owner,"view":{"top":42}}),
+        )
+        .await
+        .unwrap();
+        {
+            let f = app.features.lock().await;
+            assert!(!f.entries["outline"].pref.open);
+            assert!(f.entries["next"].pref.open);
+            assert_eq!(f.entries["next"].owner, next_owner);
+        }
+        assert!(
+            app.feature_request(json!({"op":"reveal","id":"outline"}))
+                .await
+                .is_err()
+        );
+        app.feature_request(json!({"op":"save","id":"outline","owner":owner,"view":{"top":42}}))
+            .await
+            .unwrap();
+        assert!(
+            app.feature_request(json!({"op":"save","id":"outline","owner":"stale","view":{}}))
+                .await
+                .is_err()
+        );
+        app.save_settings(serde_json::from_value(json!({"answerOutlineEnabled":true})).unwrap())
+            .await
+            .unwrap();
+        let f = app.features.lock().await;
+        assert_eq!(f.entries["outline"].view["top"], 42);
+        assert_eq!(
+            f.entries["outline"].pending.as_ref().unwrap().placement,
+            "sidebar"
+        );
+        assert!(f.entries["next"].pref.open);
+    }
+    #[tokio::test]
+    async fn disable_captures_desktop_draft_before_exit_and_reports_reopen_failure() {
+        let (_dir, app) = app().await;
+        let owner = open(&app, "outline").await;
+        {
+            let mut f = app.features.lock().await;
+            f.entries.get_mut("outline").unwrap().pref.placement = "desktop".into();
+            f.main.child = Some(Command::new("/bin/sleep").arg("60").spawn().unwrap());
+        }
+        app.save_settings(serde_json::from_value(json!({"answerOutlineEnabled":false})).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            app.features
+                .lock()
+                .await
+                .main
+                .child
+                .as_mut()
+                .unwrap()
+                .try_wait()
+                .unwrap()
+                .is_none()
+        );
+        app.feature_request(json!({"op":"disable-ready","id":"outline","owner":owner,"view":{"draft":"latest unsaved input"}})).await.unwrap();
+        {
+            let mut f = app.features.lock().await;
+            assert!(f.main.child.is_none());
+            assert_eq!(f.entries["outline"].view["draft"], "latest unsaved input");
+            f.main.target = Some("overlay".into());
+        }
+        let result = app
+            .save_settings(serde_json::from_value(json!({"answerOutlineEnabled":true})).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(result["answerOutlineEnabled"], true);
+        assert!(
+            result["presentationError"]
+                .as_str()
+                .unwrap()
+                .contains("窗口更新失败")
+        );
+        assert_eq!(
+            result["configurationRevision"],
+            app.settings().await["configurationRevision"]
+        );
     }
     #[tokio::test]
     async fn placement_validation_and_feature_scopes_do_not_enable_business() {
@@ -1040,6 +1213,7 @@ mod tests {
                     view: json!({"modelSearch":"kept"}),
                     pending: None,
                     reveal: 1,
+                    closing: None,
                 },
             );
             f.entries.insert(
@@ -1050,6 +1224,7 @@ mod tests {
                     view: json!({"draft":"kept"}),
                     pending: None,
                     reveal: 1,
+                    closing: None,
                 },
             );
         }

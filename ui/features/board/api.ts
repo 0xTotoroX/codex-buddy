@@ -114,7 +114,12 @@ export function useTasks(poll = false, request: TaskRequest = localRequest) {
     setBusy(true);
     setError('');
     try {
-      return await request<T>('tasks/command', { revision: state?.store.revision, ...data });
+      const result = await request<T & { presentationError?: string }>('tasks/command', {
+        revision: state?.store.revision,
+        ...data,
+      });
+      if (result.presentationError) setError(result.presentationError);
+      return result;
     } catch (e) {
       setError(String(e));
       return null;

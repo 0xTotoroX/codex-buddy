@@ -151,6 +151,19 @@
   font-weight: 600;
   margin-bottom: 20px;
 }
+/* Separate major appearance groups; individual fields stay unruled. */
+.settings-surface-group {
+  border-top: 1px solid var(--buddy-border);
+  padding-top: 28px;
+}
+.settings-surface-group > .settings-group-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+.settings-feature-switch > label {
+  cursor: pointer;
+  font-weight: 550;
+}
 .settings-section h3 {
   font-size: 15px;
   font-weight: 550;

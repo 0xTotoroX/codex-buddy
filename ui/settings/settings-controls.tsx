@@ -2,7 +2,7 @@
  * [OUTPUT]: 统一设置行、功能开关/唤起、反馈及表单保存状态。
  * [POS]: 设置页组合组件，不持有业务数据或新增保存服务。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { Button } from './components/ui/button';
 import { Switch } from './components/ui/switch';
 import { request, type Settings } from './api';
@@ -59,14 +59,16 @@ export function FeatureSwitch({
   onChange: (value: boolean) => void;
   onOpen: () => void;
 }) {
+  const id = useId();
   return (
-    <div className="settings-row">
-      <span>启用{name}</span>
+    <div className="settings-row settings-feature-switch">
+      <label htmlFor={id}>启用{name}</label>
       <div className="flex shrink-0 items-center gap-4">
-        <Button type="button" variant="outline" disabled={disabled || !checked} onClick={onOpen}>
+        <Button type="button" variant="ghost" disabled={disabled || !checked} onClick={onOpen}>
           打开{name}
         </Button>
         <Switch
+          id={id}
           aria-label={`启用${name}`}
           checked={checked}
           disabled={disabled}

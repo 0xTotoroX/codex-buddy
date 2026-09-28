@@ -37,6 +37,7 @@ export type Entry = {
   placement: Placement;
   returnPlacement?: Placement;
   open: boolean;
+  closing?: boolean;
   owner: string;
   size: [number, number];
   reveal: number;

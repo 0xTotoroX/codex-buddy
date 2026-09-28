@@ -32,6 +32,7 @@ export interface EditableSettings {
   timeoutMs: number;
 }
 export interface Settings extends EditableSettings {
+  presentationError?: string;
   taskBoardEnabled?: boolean;
   modelControlEnabled?: boolean;
   popoutSupported: boolean;
