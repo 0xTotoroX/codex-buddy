@@ -6,7 +6,7 @@
  */
 import { createDock } from './dock.js';
 import { IS_POPOUT, POPOUT } from '../../shared/constants.js';
-import { clamp, shellState } from '../../codex/runtime/state.js';
+import { shellState } from '../../codex/runtime/state.js';
 import { emitSignal } from '../../codex/runtime/signals.js';
 import { cancelMorphAnimations, settleMorph } from './shell/geometry.js';
 import { cancelViewAnimation } from './shell/shell.js';
@@ -74,7 +74,7 @@ export function syncWorkbench() {
       },
     );
   dock.update({
-    width: clamp(shellState.dockWidth, 300, 460),
+    width: shellState.dockWidth,
     open: shellState.dockOpen,
     detached: shellState.detached,
   });

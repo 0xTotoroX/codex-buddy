@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
-- `view.js`：createNextView 创建实例级建议列表、预览、快捷词与悬停/焦点计时器；沿用 direct、hybrid、fill 点击规则，销毁时清理计时器。
+- `view.js`：createNextView 创建实例级建议列表、预览、快捷词与悬停/焦点计时器；快捷词与推荐指令共用 direct、hybrid、fill 点击规则、延迟与双击取消，销毁时清理计时器。
 
 只读取投影与临时选中项，通过 command 回调提交操作意图。生成、缓存与输入框草稿保护位于 ui/codex/next.js，模型请求由既有后台执行。共享投影视图和旧工作台适配器复用本模块。
 

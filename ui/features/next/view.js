@@ -1,5 +1,5 @@
 /* [INPUT]: Suggestion projection, display preferences and guarded action callback.
- * [OUTPUT]: Original list/preview, quick prompts, hover/focus and single/double-click actions.
+ * [OUTPUT]: Original list/preview and hover/focus; quick prompts share suggestion single/double-click rules.
  * [POS]: Content interaction only; generation and input validation stay in Codex/backend services.
  * [PROTOCOL]: Keep features/next/AGENTS.md in sync. */
 import { escapeAttr, escapeHtml, normalizeText, clamp } from '../../shared/text.js';
@@ -48,7 +48,7 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
     const buttons = (read().settings?.quickPrompts || [])
       .map(
         (item, index) =>
-          `<button type="button" class="csw-quick-prompt" data-quick-prompt="${index}" title="${escapeAttr('填入：' + item.prompt)}">${escapeHtml(item.label)}</button>`,
+          `<button type="button" class="csw-quick-prompt" data-quick-prompt="${index}" title="${escapeAttr(item.prompt)}">${escapeHtml(item.label)}</button>`,
       )
       .join('');
     return `<div class="csw-next-content">${buttons ? `<div class="csw-quick-prompts" aria-label="常用提示词">${buttons}</div>` : ''}${nextSuggestionsHtml()}</div>`;
@@ -128,23 +128,30 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
 
   function attachNextEvents(root) {
     container = root;
-    root.querySelectorAll('[data-quick-prompt]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const item = read().settings?.quickPrompts?.[Number(button.dataset.quickPrompt)];
-        if (item?.prompt) command('quick-fill', { index: Number(button.dataset.quickPrompt) });
-      });
-    });
-    root.querySelectorAll('.csw-row').forEach((button) => {
-      button.addEventListener('pointerenter', () => schedulePromptPreview(button));
-      button.addEventListener('pointerleave', cancelScheduledPromptPreview);
-      button.addEventListener('focus', () => showPromptPreview(button, true));
+    root.querySelectorAll('[data-quick-prompt], .csw-row').forEach((button) => {
+      const quick = button.hasAttribute('data-quick-prompt');
+      const select = (detail) => {
+        const submit = promptClickSubmits(detail);
+        if (quick) {
+          const index = Number(button.dataset.quickPrompt);
+          if (read().settings?.quickPrompts?.[index]?.prompt)
+            command('quick-fill', { index, submit });
+        } else {
+          showPromptPreview(button, true);
+          selectPrompt(button, submit);
+        }
+      };
+      if (!quick) {
+        button.addEventListener('pointerenter', () => schedulePromptPreview(button));
+        button.addEventListener('pointerleave', cancelScheduledPromptPreview);
+        button.addEventListener('focus', () => showPromptPreview(button, true));
+      }
       button.addEventListener('click', (event) => {
         if (event.detail >= 2) {
           event.preventDefault();
           if (clickTimer) window.clearTimeout(clickTimer);
           clickTimer = 0;
-          showPromptPreview(button, true);
-          selectPrompt(button, promptClickSubmits(event.detail));
+          select(event.detail);
           return;
         }
 
@@ -153,8 +160,7 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
         clickTimer = window.setTimeout(() => {
           clickTimer = 0;
           if (generation !== read().promptToken || !button.isConnected) return;
-          showPromptPreview(button, true);
-          selectPrompt(button, promptClickSubmits(1));
+          select(1);
         }, PROMPT_CLICK_DELAY_MS);
       });
       button.addEventListener('dblclick', (event) => event.preventDefault());

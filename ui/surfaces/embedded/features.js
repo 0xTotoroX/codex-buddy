@@ -4,9 +4,9 @@
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { mountFeature } from '../workspace/mount';
 import { installFeatureLayout } from '../workspace/layout';
-import { bindSeparator } from '../workspace/separator.js';
-import { createDock } from './dock.js';
-import { bridgeCall, shellState, runtimeState, clamp } from '../../codex/runtime/state.js';
+import { bindDockResize } from './width.js';
+import { createDock, dockWidthLimit } from './dock.js';
+import { bridgeCall, shellState, runtimeState } from '../../codex/runtime/state.js';
 import { IS_POPOUT } from '../../shared/constants.js';
 import { emitSignal } from '../../codex/runtime/signals.js';
 import { stopWorkbench } from './legacy.js';
@@ -91,7 +91,7 @@ function frame(container, faceClick) {
   if (root) return root;
   root = document.createElement('div');
   root.className = 'csw-workbench';
-  root.innerHTML = `${workbenchHeadHtml()}<p data-feature-error role="alert" hidden></p><div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>`;
+  root.innerHTML = `${workbenchHeadHtml()}<p data-feature-error role="alert" hidden></p><div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical"></div>`;
   root.querySelector('.csw-workbench-face').addEventListener('click', faceClick);
   composition?.destroy();
   composition = installFeatureLayout(root, {
@@ -110,12 +110,16 @@ function frame(container, faceClick) {
     error: showError,
   });
   const handle = root.querySelector('.csw-workbench-resize');
-  bindSeparator(
+  bindDockResize(
     handle,
-    'x',
-    () => shellState.dockWidth,
-    (width, dx) => {
-      shellState.dockWidth = clamp(width - dx, 300, 460);
+    () => ({
+      width: dockValue.rect?.width || shellState.dockWidth,
+      saved: shellState.dockWidth,
+      maximum: dockWidthLimit(),
+    }),
+    (width, open) => {
+      shellState.dockWidth = width;
+      shellState.dockOpen = open;
       updateDock();
       emitSignal('render', undefined);
     },
@@ -129,7 +133,8 @@ function content(root, placement) {
   root.querySelector('.csw-workbench-face').dataset.expression = resolveFabExpression();
   const handle = root.querySelector('.csw-workbench-resize');
   handle.hidden = placement !== 'sidebar';
-  handle.setAttribute('aria-valuenow', String(shellState.dockWidth));
+  handle.setAttribute('aria-valuenow', String(dockValue.rect?.width || shellState.dockWidth));
+  handle.setAttribute('aria-valuemax', String(dockWidthLimit()));
   const items = [...mounts.values()].filter((item) => item.placement === placement);
   for (const item of items)
     item.node.inert = !item.active || document.documentElement.dataset.buddyReloading === 'true';

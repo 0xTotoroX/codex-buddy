@@ -42,7 +42,7 @@ const next = createNextView({
         ? runtimeState.settings?.quickPrompts?.[data.index]
         : stepwiseState.prompts[data.index];
     if (item?.prompt)
-      fillComposer(item.prompt, kind === 'quick-fill' ? false : data.submit, {
+      fillComposer(item.prompt, data.submit, {
         quick: kind === 'quick-fill',
       });
   },
