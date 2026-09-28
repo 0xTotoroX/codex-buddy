@@ -36,8 +36,36 @@ export function startEdge(request: Request) {
   let native: Record<string, any> = {},
     scene = -1,
     enter = 0,
-    leave = 0;
+    leave = 0,
+    measureFrame = 0,
+    measured = '';
   const ipc = (value: object) => window.ipc?.postMessage(JSON.stringify(value));
+  const measure = () => {
+    if (stopped || measureFrame || native.animating) return;
+    measureFrame = requestAnimationFrame(() => {
+      measureFrame = 0;
+      if (native.animating) return;
+      const item = [...mounts.values()].find(
+        ({ id, node }) => id === selected && node.dataset.active === 'true',
+      );
+      const size = item?.mount.measure();
+      if (!size) return;
+      const style = getComputedStyle(panel);
+      const width = size.width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+      const height =
+        size.height +
+        panel.querySelector('header')!.getBoundingClientRect().height +
+        parseFloat(style.paddingTop) +
+        parseFloat(style.paddingBottom);
+      const key = `${Math.ceil(width)}:${Math.ceil(height)}`;
+      if (key === measured) return;
+      measured = key;
+      ipc({ action: 'content-size', width: Math.ceil(width), height: Math.ceil(height) });
+    });
+  };
+  const contentChanges = new MutationObserver(measure);
+  const contentResize = new ResizeObserver(measure);
+
   const held = () =>
     [...mounts.values()].some(({ node }) => {
       const shadow = node.shadowRoot;
@@ -112,6 +140,13 @@ export function startEdge(request: Request) {
               reveal: entry.reveal,
             };
             mounts.set(key, item);
+            contentChanges.observe(node.shadowRoot!, {
+              subtree: true,
+              childList: true,
+              characterData: true,
+              attributes: true,
+            });
+            contentResize.observe(node);
           } else item.mount.update(entry);
           const active = entry.owner === candidate.owner && entry.open;
           item.node.dataset.active = String(active);
@@ -124,6 +159,7 @@ export function startEdge(request: Request) {
       }
       for (const [key, item] of mounts)
         if (!wanted.has(key)) {
+          contentResize.unobserve(item.node);
           item.mount.dispose();
           item.headerActions.remove();
           mounts.delete(key);
@@ -145,6 +181,7 @@ export function startEdge(request: Request) {
         }
       }
       visibility();
+      measure();
       for (const item of mounts.values())
         if (item.node.dataset.active !== 'true') item.node.hidden = true;
     } catch {
@@ -177,6 +214,7 @@ export function startEdge(request: Request) {
     Object.assign(panel.style, surfaceStyle(appearance, true));
     Object.assign(handle.style, surfaceStyle(appearance, true));
     visibility();
+    measure();
     if (native.sceneRevision !== scene) {
       scene = native.sceneRevision;
       const revision = scene;
@@ -210,11 +248,13 @@ export function startEdge(request: Request) {
     () => {
       stopped = true;
       clearInterval(timer);
+      cancelAnimationFrame(measureFrame);
+      contentChanges.disconnect();
+      contentResize.disconnect();
       clearTimeout(enter);
       clearTimeout(leave);
     },
     { once: true },
   );
   ipc({ action: 'ready' });
-  ipc({ action: 'content-size', height: 600 });
 }

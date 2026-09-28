@@ -214,6 +214,29 @@ export function independentFeatureCases({ mode, syncSettings }) {
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
+        await page.evaluate(() => {
+          const fixture = window.workbenchFixture;
+          fixture.populatedOutline = fixture.outlineProjection;
+          fixture.outlineProjection = { outlineItems: [], outlineStatus: 'ok' };
+        });
+        await outline.getByText('暂无大纲', { exact: true }).waitFor();
+        const emptyTitle = await outline.locator('.csw-empty-title').boundingBox();
+        const emptyArea = await outline.locator('.feature-projection').boundingBox();
+        const emptyBody = await outline.locator('.feature-body').boundingBox();
+        assert.ok(
+          emptyArea.height > emptyBody.height - 65,
+          'outline empty state fills remaining content',
+        );
+        assert.ok(
+          Math.abs(emptyTitle.y + emptyTitle.height / 2 - emptyArea.y - emptyArea.height / 2) < 2,
+        );
+        assert.ok(
+          Math.abs(emptyTitle.x + emptyTitle.width / 2 - emptyArea.x - emptyArea.width / 2) < 2,
+        );
+        await page.evaluate(() => {
+          window.workbenchFixture.outlineProjection = window.workbenchFixture.populatedOutline;
+        });
+        await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
         const refresh = page.getByRole('button', { name: '刷新大纲', exact: true });
         const refreshBox = await refresh.boundingBox();
         const titleBox = await page.getByRole('tab', { name: '大纲', exact: true }).boundingBox();

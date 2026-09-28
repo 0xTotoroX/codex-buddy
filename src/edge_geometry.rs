@@ -194,13 +194,14 @@ pub fn hover_area(
     edge: Edge,
     position: f64,
     expanded: bool,
+    width: f64,
     height: f64,
 ) -> HoverArea {
     let wake = layout(screen, edge, position, false);
     HoverArea {
         wake,
         hold: if expanded {
-            layout_height(screen, edge, position, true, height)
+            layout_size(screen, edge, position, true, width, height)
         } else {
             wake
         },
@@ -238,6 +239,18 @@ pub fn layout_height(
     expanded: bool,
     content_height: f64,
 ) -> Rect {
+    layout_size(screen, edge, position, expanded, 480., content_height)
+}
+
+pub fn layout_size(
+    screen: &Screen,
+    edge: Edge,
+    position: f64,
+    expanded: bool,
+    content_width: f64,
+    content_height: f64,
+) -> Rect {
+    let expanded_width = content_width.clamp(280., 1000.);
     let area = screen.usable;
     let expanded_height =
         content_height.clamp(144., 2000.) + content_offset(screen, edge, expanded);
@@ -251,7 +264,7 @@ pub fn layout_height(
             screen.frame
         };
         let width = if expanded {
-            480.
+            expanded_width
         } else {
             screen.notch_width + 2. * NOTCH_FLANK
         }
@@ -271,7 +284,7 @@ pub fn layout_height(
         };
     }
     let (width, height): (f64, f64) = if expanded {
-        (480., expanded_height)
+        (expanded_width, expanded_height)
     } else if edge == Edge::Top {
         (COMPACT_LENGTH, COMPACT_DEPTH)
     } else {
@@ -456,8 +469,8 @@ mod tests {
         let s = screen("main", 0., 0., 1440., 900.);
         for edge in [Edge::Left, Edge::Right, Edge::Top] {
             for position in [0., 0.1, 0.5, 0.9, 1.] {
-                let closed = hover_area(&s, edge, position, false, 274.);
-                let open = hover_area(&s, edge, position, true, 274.);
+                let closed = hover_area(&s, edge, position, false, 480., 274.);
+                let open = hover_area(&s, edge, position, true, 480., 274.);
                 let wake = layout(&s, edge, position, false);
                 for xi in 0..wake.width as usize {
                     for yi in 0..wake.height as usize {
@@ -473,7 +486,7 @@ mod tests {
     #[test]
     fn hover_exit_tolerance_and_frozen_area_do_not_expand_click_targets() {
         let s = screen("main", 0., 0., 1440., 900.);
-        let open = hover_area(&s, Edge::Right, 0.5, true, 274.);
+        let open = hover_area(&s, Edge::Right, 0.5, true, 480., 274.);
         let bounds = layout(&s, Edge::Right, 0.5, true);
         let y = bounds.y + bounds.height / 2.;
         // Small hand jitter cannot leave the hold or frozen suppression area.
@@ -488,7 +501,7 @@ mod tests {
             })
             .contains(bounds.x - 3., y)
         );
-        let closed = hover_area(&s, Edge::Right, 0.5, false, 274.);
+        let closed = hover_area(&s, Edge::Right, 0.5, false, 480., 274.);
         assert!(!closed.contains(bounds.x, y));
         assert!(open.contains(bounds.x, y)); // Frozen until the pointer actually exits.
     }
@@ -501,7 +514,7 @@ mod tests {
         s.notch_x = 666.;
         s.usable.height -= 32.;
         for expanded in [false, true] {
-            let area = hover_area(&s, Edge::Top, 0.5, expanded, 274.);
+            let area = hover_area(&s, Edge::Top, 0.5, expanded, 480., 274.);
             assert!(area.contains(661., 965.));
             assert!(area.contains(851., 965.));
             assert!(!area.contains(756., 965.));
@@ -675,5 +688,26 @@ mod tests {
             assert_eq!(Edge::parse(edge.as_str()), Some(edge));
         }
         assert_eq!(Edge::parse("bottom"), None);
+    }
+    #[test]
+    fn content_size_controls_layout_and_hover_within_screen_bounds() {
+        let mut display = screen("main", 0., 0., 1440., 900.);
+        for notched in [false, true] {
+            display.notch_width = if notched { 200. } else { 0. };
+            display.notch_height = if notched { 32. } else { 0. };
+            display.notch_x = 620.;
+            for edge in [Edge::Left, Edge::Right, Edge::Top] {
+                for (width, height) in [(320., 180.), (680., 520.), (1800., 2500.)] {
+                    let rect = layout_size(&display, edge, 0.5, true, width, height);
+                    assert_eq!(rect.width, width.clamp(280., 1000.));
+                    assert!(rect.height <= display.frame.height);
+                    assert!(
+                        rect.x >= display.frame.x && rect.x + rect.width <= display.frame.width
+                    );
+                    let hover = hover_area(&display, edge, 0.5, true, width, height);
+                    assert_eq!(hover.hold, rect);
+                }
+            }
+        }
     }
 }

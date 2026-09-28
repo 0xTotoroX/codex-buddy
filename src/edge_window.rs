@@ -292,6 +292,7 @@ struct Surface {
     // Drop WebView before its retained parent and panel.
     webview: WebView,
     backdrop: crate::native_backdrop::Backdrop,
+    content_width: f64,
     content_height: f64,
     pointer_state: Option<Value>,
     hover_suppressed: Option<geometry::HoverArea>,
@@ -341,11 +342,12 @@ impl Surface {
         let size = self.panel.frame().size;
         let target = screen
             .map(|s| {
-                geometry::layout_height(
+                geometry::layout_size(
                     s,
                     self.prefs.edge,
                     self.prefs.position,
                     true,
+                    self.content_width,
                     self.content_height,
                 )
             })
@@ -390,7 +392,7 @@ impl Surface {
         });
         let mut detail = json!({
             "expanded": self.expanded, "unfold": self.unfold.value.clamp(0.,1.), "animating": self.unfold.active(self.expanded),
-            "layoutWidth": screen.map_or(480., |s| geometry::layout(s,self.prefs.edge,self.prefs.position,true).width),
+            "layoutWidth": target.width,
             "keyboard": self.keyboard, "edge": self.prefs.edge.as_str(),
             "position": self.prefs.position, "screen": screen.map(|s| &s.id),
             "allSpaces": self.panel.collectionBehavior().contains(NSWindowCollectionBehavior::CanJoinAllSpaces),
@@ -448,11 +450,12 @@ impl Surface {
             self.panel.orderOut(None);
             return Ok(());
         };
-        let target = geometry::layout_height(
+        let target = geometry::layout_size(
             screen,
             self.prefs.edge,
             self.prefs.position,
             true,
+            self.content_width,
             self.content_height,
         );
         let compact = geometry::layout(screen, self.prefs.edge, self.prefs.position, false);
@@ -544,6 +547,7 @@ impl Surface {
                 self.prefs.edge,
                 self.prefs.position,
                 self.expanded,
+                self.content_width,
                 self.content_height,
             )
         })
@@ -683,12 +687,22 @@ impl Surface {
                 self.reflow(mtm)?;
             }
             "content-size" => {
-                if let Some(height) = value["height"].as_f64().filter(|v| v.is_finite()) {
-                    let height = height.clamp(144., 2000.);
-                    if (height - self.content_height).abs() >= 1. {
-                        self.content_height = height;
-                        self.reflow(mtm)?;
-                    }
+                let width = value["width"]
+                    .as_f64()
+                    .filter(|v| v.is_finite())
+                    .unwrap_or(self.content_width)
+                    .clamp(280., 1000.);
+                let height = value["height"]
+                    .as_f64()
+                    .filter(|v| v.is_finite())
+                    .unwrap_or(self.content_height)
+                    .clamp(144., 2000.);
+                if (width - self.content_width).abs() >= 1.
+                    || (height - self.content_height).abs() >= 1.
+                {
+                    self.content_width = width;
+                    self.content_height = height;
+                    self.reflow(mtm)?;
                 }
             }
             "hide" => {
@@ -819,7 +833,8 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
     let mut surface = Surface {
         webview,
         backdrop,
-        content_height: 600.,
+        content_width: 480.,
+        content_height: 144.,
         pointer_state: None,
         hover_suppressed: None,
         _parent: parent,

@@ -113,6 +113,38 @@ export function mountFeature(
   return {
     update: render,
     headerActions,
+    measure() {
+      const body = element.shadowRoot?.querySelector<HTMLElement>('.feature-body');
+      if (!body?.firstElementChild) return null;
+      const intrinsic = body.querySelector<HTMLElement>('[data-intrinsic-width]');
+      const bodyStyle = getComputedStyle(body);
+      const padding = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
+      // Features may expose their minimum readable width; text/list views keep the existing width.
+      const width = Math.ceil(
+        Math.min(
+          696,
+          Math.max(
+            296,
+            intrinsic ? parseFloat(getComputedStyle(intrinsic).minWidth) + padding : 456,
+          ),
+        ),
+      );
+      element.style.setProperty('--feature-measure-width', `${width}px`);
+      const reading = [...body.querySelectorAll<HTMLElement>('*'), body]
+        .filter((node) => node.scrollTop || node.scrollLeft)
+        .map((node) => ({ node, top: node.scrollTop, left: node.scrollLeft }));
+      element.dataset.measuring = 'true';
+      try {
+        const view = body.closest('.feature-view')!;
+        return { width, height: Math.ceil(view.getBoundingClientRect().height) };
+      } finally {
+        delete element.dataset.measuring;
+        for (const { node, top, left } of reading) {
+          node.scrollTop = top;
+          node.scrollLeft = left;
+        }
+      }
+    },
     dispose() {
       stopped = true;
       reloaders.delete(element);

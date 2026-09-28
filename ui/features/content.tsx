@@ -79,10 +79,17 @@ export function FeatureContent({
         }
       />
     ) : (
-      <p>正在读取模型…</p>
+      <p className="feature-placeholder" role="status">
+        正在读取模型…
+      </p>
     );
   const snapshot = value?.snapshot as PanelSnapshot | undefined;
-  if (!snapshot) return <p>等待 Codex 连接…</p>;
+  if (!snapshot)
+    return (
+      <p className="feature-placeholder" role="status">
+        等待 Codex 连接…
+      </p>
+    );
   const enabled =
     id === 'outline' ? snapshot.settings.answerOutlineEnabled : snapshot.settings.enabled;
   async function command(kind: PanelCommand['kind'], extra: Partial<PanelCommand> = {}) {

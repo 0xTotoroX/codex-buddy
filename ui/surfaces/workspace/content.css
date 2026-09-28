@@ -150,3 +150,34 @@ input:focus-visible {
     transition: none;
   }
 }
+
+/* Measure natural content without the current window's stretched height. Restored before paint. */
+:host([data-measuring='true']) {
+  width: var(--feature-measure-width) !important;
+  height: auto !important;
+}
+:host([data-measuring='true'])
+  :is(
+    .feature-view,
+    .feature-body,
+    .feature-projection,
+    .csw-outline-view,
+    .csw-next-content,
+    .board-app
+  ) {
+  height: auto !important;
+  min-height: 0 !important;
+  flex: none !important;
+}
+
+.feature-placeholder {
+  display: grid;
+  place-content: center;
+  min-height: 100%;
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+}
+:host([data-measuring='true']) .feature-placeholder {
+  min-height: 0;
+}

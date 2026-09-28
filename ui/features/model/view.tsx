@@ -364,7 +364,7 @@ export function ModelView({
               void saveWidth(width);
             }}
           />
-          <div className="model-matrix-head">
+          <div className="model-matrix-head" data-intrinsic-width>
             <span>模型</span>
             <div>
               {columns.map((c) => (

@@ -98,6 +98,8 @@ try {
   let pendingPlacement = null;
   await page.addInitScript(() => {
     window.nativeMessages = [];
+    let edgeSize = { width: 480, height: 650 },
+      expanded = true;
     window.ipc = {
       postMessage(raw) {
         const m = JSON.parse(raw);
@@ -108,15 +110,17 @@ try {
             window.__companionPopout.presented();
             window.__companionPopout.motionFinished();
           });
-        if (['ready', 'expand', 'collapse', 'focus'].includes(m.action)) {
-          const expanded = m.action !== 'collapse';
+        if (['ready', 'expand', 'collapse', 'focus', 'content-size'].includes(m.action)) {
+          if (m.action === 'content-size')
+            edgeSize = { width: Math.min(480, m.width), height: Math.min(650, m.height) };
+          else expanded = m.action !== 'collapse';
           window.dispatchEvent(
             new CustomEvent('edge-native', {
               detail: {
                 expanded,
                 unfold: expanded ? 1 : 0,
-                layoutWidth: 480,
-                layoutHeight: 650,
+                layoutWidth: edgeSize.width,
+                layoutHeight: edgeSize.height,
                 layoutX: 0,
                 layoutY: 0,
                 compactWidth: 10,
@@ -423,6 +427,10 @@ try {
   await view.getByRole('button', { name: /其他模型/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  const compactModelHeight = await page
+    .locator('#edge-panel')
+    .evaluate((node) => node.getBoundingClientRect().height);
+  assert.ok(compactModelHeight < 350, 'few model rows shrink the edge panel');
   const refreshBox = await page.getByRole('button', { name: '刷新可用模型' }).boundingBox();
   assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
   const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
@@ -500,6 +508,10 @@ try {
   assert.equal(model.preferences.modelColumnWidth, 174);
   record(
     'model search and width slider removed; divider previews, saves on release and supports Escape/keyboard',
+  );
+  await page.waitForFunction(
+    (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
+    compactModelHeight,
   );
   await view.getByLabel('删除预设 日常').click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
