@@ -2,12 +2,13 @@
 
 > L2 | 父级：[AGENTS.md](../../AGENTS.md)
 
-设置按大纲、下一步、看板、模型快切、显示与布局、启动与连接分类，Dev 另有开发来源。分类切换隐藏而不卸载内容，保留草稿和阅读位置；窄屏用顶部横向导航。功能设置调用各自后台服务，形式、主题和布局分别写入 features/surfaces/appearance，不在设置页实现业务。模型表单失焦或选项切换自动保存，失败保留草稿；串行队列及 configurationRevision 沿用 use-settings-form。
+设置包含只读总览，并按大纲、下一步、看板、模型快切、显示与布局、启动与连接分类，Dev 另有开发来源。分类切换隐藏而不卸载内容，保留草稿和阅读位置；窄屏用顶部横向导航。功能设置调用各自后台服务，形式、主题和布局分别写入 features/surfaces/appearance，不在设置页实现业务。模型表单失焦或选项切换自动保存，失败保留草稿；串行队列及 configurationRevision 沿用 use-settings-form。
 
 成员清单：
 
 - [main.tsx](main.tsx)：页面入口、服务状态、分类容器及大纲开关；组合各设置模块，不持有任务或模型业务。
-- [settings-outline.tsx](settings-outline.tsx)：分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；旧深链接等待异步表单就绪再定位；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
+- [settings-overview.tsx](settings-overview.tsx)：将保留的内嵌设置页主信息/摘要布局适配为只读总览；显示已保存的功能归属、承载主题与布局、生成/看板/模型选项，分类可见时读取现有 API，不提供修改、测试或打开功能的控件。
+- [settings-outline.tsx](settings-outline.tsx)：总览为首次打开的默认分类，分类导航、浏览器历史、旧锚点兼容、阅读位置保存及 Dev 来源挂载；旧深链接等待异步表单就绪再定位；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
 - [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步开关、生成方式、生成模型、常用提示词与高级生成限制；模型读取/连接测试仅由显式操作触发。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。

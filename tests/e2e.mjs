@@ -54,8 +54,38 @@ async function waitFor(check, message, timeout = 12000) {
 }
 async function checkSettingsNavigation(page, context, base, runtime) {
   const nav = page.getByRole('navigation', { name: '设置分类' });
-  const names = ['大纲', '下一步', '看板', '模型快切', '显示与布局', '启动与连接'];
+  const names = ['总览', '大纲', '下一步', '看板', '模型快切', '显示与布局', '启动与连接'];
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  await nav.getByRole('link', { name: '总览', exact: true }).click();
+  const overview = page.locator('.settings-overview');
+  await overview.getByRole('region', { name: '下一步配置', exact: true }).waitFor();
+  assert.equal(
+    await overview
+      .locator('button,input,select,textarea,a,[role="switch"],[contenteditable="true"]')
+      .count(),
+    0,
+    'overview is display only',
+  );
+  const savedSettings = await page.evaluate(async () =>
+    (
+      await fetch('/api/settings', {
+        headers: { Authorization: 'Bearer ' + sessionStorage.getItem('companion-token') },
+      })
+    ).json(),
+  );
+  const writes = [];
+  const recordWrite = (req) => {
+    if (req.method() !== 'POST') return;
+    const path = new URL(req.url()).pathname;
+    if (['/api/features', '/api/surfaces'].includes(path) && req.postDataJSON()?.op === 'state')
+      return;
+    writes.push(path);
+  };
+  page.on('request', recordWrite);
+  await overview
+    .getByRole('region', { name: '下一步配置' })
+    .getByText(savedSettings.model, { exact: true })
+    .waitFor();
   for (const width of [1280, 780, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const name of names) {
@@ -71,9 +101,14 @@ async function checkSettingsNavigation(page, context, base, runtime) {
         `${name} overflow at ${width}`,
       );
     }
+    await nav.getByRole('link', { name: '总览', exact: true }).click();
+    await overview.getByRole('region', { name: '下一步配置' }).waitFor();
+    await page.screenshot({ path: join(output, `settings-overview-${width}.png`), fullPage: true });
     await nav.getByRole('link', { name: '显示与布局', exact: true }).click();
     await page.screenshot({ path: join(output, `settings-layout-${width}.png`), fullPage: true });
   }
+  page.off('request', recordWrite);
+  assert.deepEqual(writes, [], 'viewing overview does not write configuration or execute actions');
   await page.setViewportSize({ width: 1280, height: 900 });
   await nav.getByRole('link', { name: '看板', exact: true }).focus();
   await page.keyboard.press('Enter');
@@ -81,7 +116,12 @@ async function checkSettingsNavigation(page, context, base, runtime) {
   await page.getByText('看板分组', { exact: true }).click();
   const groupName = page.getByLabel('分组名称：待办', { exact: true });
   await groupName.fill('尚未保存的分组名称');
-  await nav.getByRole('link', { name: '大纲', exact: true }).click();
+  await nav.getByRole('link', { name: '总览', exact: true }).click();
+  assert.equal(
+    await overview.getByText('尚未保存的分组名称', { exact: true }).count(),
+    0,
+    'overview shows saved values, not form drafts',
+  );
   await nav.getByRole('link', { name: '看板', exact: true }).click();
   assert.equal(await groupName.inputValue(), '尚未保存的分组名称');
   await page.goto(`${base}/#settings-limits`);
@@ -385,10 +425,38 @@ try {
       }, `layout ${axis} did not save`);
     }
     assert.deepEqual((await api('features', { op: 'state' })).body.features, before.features);
+    await page.getByRole('link', { name: '总览', exact: true }).click();
+    await page.locator('.settings-overview').getByText('标签组', { exact: true }).waitFor();
     await page.emulateMedia({ colorScheme: 'dark' });
+    await page.screenshot({ path: join(output, 'settings-overview-dark.png'), fullPage: true });
+    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
     await page.screenshot({ path: join(output, 'settings-dark.png'), fullPage: true });
+    const longModel = 'custom-provider/project-planning-and-implementation-model-long-name';
+    await page.route('**/api/settings', async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, json: { ...(await response.json()), model: longModel } });
+    });
+    await page.route('**/api/tasks/state', async (route) => {
+      const response = await route.fetch(),
+        state = await response.json();
+      state.store.columns = [
+        { id: 'todo', title: '待办：整理资料并确认本周项目交付范围' },
+        { id: 'doing', title: '正在进行的跨设备界面核验' },
+        { id: 'done', title: '完成' },
+      ];
+      await route.fulfill({ response, json: state });
+    });
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.getByRole('link', { name: '总览', exact: true }).click();
+    await page.locator('.settings-overview').getByText(longModel, { exact: true }).waitFor();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+      'long saved values wrap in narrow overview',
+    );
+    await page.screenshot({ path: join(output, 'settings-overview-long.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    record('真实 Rust 服务连续布局保存，不启用功能；深色设置页面');
+    record('只读总览宽窄与长文本、草稿隔离、保存后更新；真实 Rust 服务布局保存与深色设置页面');
     writeFileSync(
       join(output, 'e2e-report.json'),
       JSON.stringify({ artifact, scope: 'settings', reports, pageErrors: errors }, null, 2),

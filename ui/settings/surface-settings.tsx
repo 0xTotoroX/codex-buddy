@@ -10,7 +10,7 @@ import type { AppearanceSettings } from '../shared/contracts';
 import type { SurfaceTheme } from '../surfaces/theme/appearance';
 const labels = { sidebar: '侧栏', overlay: '页面浮层', desktop: '桌面窗口', edge: '贴边 / 刘海' };
 type Edge = { edge: string; screen: string; position: number; keepOpen: boolean };
-type State = {
+export type SurfaceState = {
   revision: number;
   preferences: { themes: Record<string, SurfaceTheme>; edge: Edge };
   error?: string;
@@ -27,7 +27,7 @@ export function SurfaceSettings({
   appearance?: AppearanceSettings;
   fontBase?: number;
 }) {
-  const [state, setState] = useState<State | null>(null),
+  const [state, setState] = useState<SurfaceState | null>(null),
     [displays, setDisplays] = useState<Displays>({ screens: [], nativeGlassAvailable: false }),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState(''),
@@ -43,7 +43,7 @@ export function SurfaceSettings({
       const current = ++generation.current;
       try {
         const [value, screens] = await Promise.all([
-          request<State>('surfaces', { op: 'state' }),
+          request<SurfaceState>('surfaces', { op: 'state' }),
           request<Displays>('surfaces/displays'),
         ]);
         if (!disposed && current === generation.current) {
@@ -69,7 +69,7 @@ export function SurfaceSettings({
     setBusy(true);
     setMessage('');
     try {
-      const next = await request<State>('surfaces', {
+      const next = await request<SurfaceState>('surfaces', {
         op: 'save',
         revision: state.revision,
         ...patch,
@@ -79,7 +79,7 @@ export function SurfaceSettings({
     } catch (error) {
       setMessage(String(error));
       try {
-        const next = await request<State>('surfaces', { op: 'state' });
+        const next = await request<SurfaceState>('surfaces', { op: 'state' });
         setState(next);
         setPosition(next.preferences.edge.position * 100);
       } catch {

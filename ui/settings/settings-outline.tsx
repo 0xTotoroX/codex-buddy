@@ -4,6 +4,7 @@
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 export const pageTitles = {
+  overview: '总览',
   outline: '大纲',
   next: '下一步',
   board: '看板',
@@ -34,7 +35,7 @@ export function useSettingsPage(ready: boolean) {
   const [selection, setSelection] = useState(() => {
     const saved = sessionStorage.getItem('buddy-settings-page') || '';
     return {
-      page: fromHash() || (saved in pageTitles ? (saved as SettingsPage) : ('outline' as const)),
+      page: fromHash() || (saved in pageTitles ? (saved as SettingsPage) : ('overview' as const)),
       hash: location.hash,
     };
   });
@@ -122,7 +123,6 @@ export function SettingsOutline({
 }) {
   return (
     <nav aria-label="设置分类" className="settings-nav">
-      <span className="settings-nav-label">功能</span>
       {(Object.keys(pageTitles) as SettingsPage[])
         .filter((id) => id !== 'dev' || dev)
         .map((id) => (
@@ -133,7 +133,7 @@ export function SettingsOutline({
               event.preventDefault();
               navigate(id, event.currentTarget.hash);
             }}
-            className={id === 'surfaces' ? 'settings-nav-divider' : ''}
+            className={id === 'surfaces' || id === 'outline' ? 'settings-nav-divider' : ''}
             href={`#settings-${id === 'model' ? 'model-control' : id}`}
             aria-current={page === id ? 'page' : undefined}
           >

@@ -15,6 +15,7 @@ import { TaskSettings } from './task-settings';
 import { ModelControlSettings } from './model-control-settings';
 import { SurfaceSettings } from './surface-settings';
 import { NextSettings } from './next-settings';
+import { SettingsOverview } from './settings-overview';
 import { ConnectionSettings } from './connection-settings';
 function editable(value: Settings): EditableSettings {
   const {
@@ -72,7 +73,7 @@ function App() {
   return (
     <div className="settings-app">
       <header className="settings-header">
-        <a href="#settings-outline" className="flex items-center gap-3 font-semibold">
+        <a href="#settings-overview" className="flex items-center gap-3 font-semibold">
           <img src={icon} alt="" className="size-9 rounded-xl" />
           CodexBuddy{import.meta.env.DEV ? ' · 开发版' : ''}
         </a>
@@ -85,8 +86,13 @@ function App() {
         <main className="min-w-0">
           <h1 className="settings-title">{pageTitles[page]}</h1>
           {error && <Feedback text={error} failed />}
-          {!editor.form && !error && !notice.failed && <p role="status">正在读取设置…</p>}
+          {page !== 'overview' && !editor.form && !error && !notice.failed && (
+            <p role="status">正在读取设置…</p>
+          )}
           <Feedback text={notice.text} failed={notice.failed} />
+          <div hidden={page !== 'overview'}>
+            <SettingsOverview active={page === 'overview'} live={live} view={view} />
+          </div>
           <SettingsForm
             editor={editor}
             notify={notify}
