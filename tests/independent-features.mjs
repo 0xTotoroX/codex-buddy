@@ -554,18 +554,16 @@ export function independentFeatureCases({ mode, syncSettings }) {
           () => document.querySelector('[data-codex-buddy-dock]')?.dataset.reason === 'space',
         );
         await page.locator('.csw-fab').click();
-        await page.getByRole('button', { name: '在聊天内展开', exact: true }).click();
-        await page.waitForFunction(
-          () =>
-            window.workbenchFixture.features.get('model').placement === 'overlay' &&
-            !window.workbenchFixture.features.get('model').pending,
-        );
-        await model.locator('[data-model="a"][data-reasoning="low"]').waitFor();
+        await page.waitForTimeout(150);
+        assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
         assert.equal(
-          await model.isVisible(),
-          true,
-          'narrow sidebar offers an accessible alternate placement',
+          await page.evaluate(() => window.workbenchFixture.features.get('model').placement),
+          'sidebar',
         );
+        assert.equal(await model.isVisible(), false);
+        await page.setViewportSize({ width: 1500, height: 1000 });
+        await page.locator('.csw-fab').press('Enter');
+        await model.locator('[data-model="a"][data-reasoning="low"]').waitFor();
         await page.evaluate(() => {
           window.workbenchFixture.modelState.preferences.enabled = false;
         });
@@ -588,14 +586,14 @@ export function independentFeatureCases({ mode, syncSettings }) {
           () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
         );
         await page.locator('.csw-fab').click();
-        await page.getByRole('button', { name: '在聊天内展开', exact: true }).waitFor();
-        assert.match(await page.locator('.csw-dock-reason').innerText(), /暂不支持侧栏/);
+        await page.waitForTimeout(150);
+        assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
           'workbench',
         );
         await page.keyboard.press('Escape');
-        assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+        assert.equal(await page.locator('.csw-dock-menu').count(), 0);
         await page.evaluate(() => window.__companionFloatingPanel.destroy());
         assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 0);

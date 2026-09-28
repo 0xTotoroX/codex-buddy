@@ -51,6 +51,24 @@ body {
 #edge-handle {
   padding: 0;
 }
+#edge-settings {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+}
+#edge-settings svg {
+  width: 18px;
+  height: 18px;
+}
+#edge-settings:hover {
+  color: var(--muted);
+}
+#edge-error {
+  margin: 8px 0;
+  color: var(--error, inherit);
+}
 #edge-views {
   min-height: 0;
   flex: 1;

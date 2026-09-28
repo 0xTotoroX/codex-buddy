@@ -70,8 +70,6 @@ export function toggleFeatureDock(open) {
   shellState.dockOpen = open;
   dock?.reopen();
   emitSignal('render', undefined);
-  if (open && ['space', 'unsupported'].includes(shellState.dockStatus))
-    dock?.showOptions(shellState.fab?.getBoundingClientRect());
 }
 function frame(container, faceClick) {
   let root = container.querySelector(':scope > .csw-workbench');
@@ -149,19 +147,15 @@ function updateDock() {
     dockValue = { status: '', rect: null };
   }
   if (!dock && entries.length)
-    dock = createDock(
-      (value) => {
-        dockValue = value;
-        if (primary === 'sidebar') {
-          const changed = shellState.dockStatus !== value.status;
-          shellState.dockStatus = value.status;
-          shellState.dockRect = value.rect;
-          if (changed) emitSignal('render', undefined);
-        }
-      },
-      () => void revealFeature(selected, 'desktop').catch(showError),
-      () => void revealFeature(selected, 'overlay').catch(showError),
-    );
+    dock = createDock((value) => {
+      dockValue = value;
+      if (primary === 'sidebar') {
+        const changed = shellState.dockStatus !== value.status;
+        shellState.dockStatus = value.status;
+        shellState.dockRect = value.rect;
+        if (changed) emitSignal('render', undefined);
+      }
+    });
   if (!dock) return;
   if (primary !== 'sidebar') {
     delete shellState.root.dataset.dockMounted;
@@ -173,7 +167,6 @@ function updateDock() {
     width: shellState.dockWidth,
     open: entries.length > 0 && shellState.dockOpen,
     detached: false,
-    popoutSupported: runtimeState.settings?.popoutSupported === true,
   });
 }
 /** @param {import('../../shared/features').FeatureState} next */

@@ -75,6 +75,7 @@ try {
     status: '本地看板',
   };
   const actions = [];
+  const settingsRequests = [];
   const layouts = {};
   let pinned = false;
   let surfaceTheme = 'matte';
@@ -123,7 +124,10 @@ try {
       const p = route.request().postDataJSON();
       let value;
       if (p.op === 'main-window') value = { valid: true, alwaysOnTop: pinned };
-      else if (p.op === 'main-pin') value = { alwaysOnTop: (pinned = p.value) };
+      else if (p.op === 'settings') {
+        settingsRequests.push(p);
+        value = { ok: true };
+      } else if (p.op === 'main-pin') value = { alwaysOnTop: (pinned = p.value) };
       else if (p.op === 'layout') {
         layouts[p.placement] = p.layout;
         value = { layouts };
@@ -256,7 +260,11 @@ try {
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })
     .click();
-  await page.getByLabel('收起面板').click();
+  assert.equal(await page.getByLabel('收起面板').count(), 0);
+  assert.equal(await page.getByLabel('展开功能面板').textContent(), '');
+  await page.getByRole('button', { name: '设置', exact: true }).click();
+  assert.deepEqual(settingsRequests, [{ op: 'settings', id: 'model', owner: 'model-owner' }]);
+  await page.keyboard.press('Escape');
   await page.getByLabel('展开功能面板').click();
   await page
     .getByRole('navigation', { name: '功能' })
@@ -266,7 +274,7 @@ try {
   assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
   await board.getByRole('button', { name: '保留草稿并返回' }).click();
   assert.equal(task.fields.title, '隔离任务');
-  record('edge tab switch and collapse preserve live unsaved editor without task writes');
+  record('edge settings uses the active owner; blank handle and Escape preserve tab drafts');
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })

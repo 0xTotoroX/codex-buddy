@@ -1978,7 +1978,7 @@ const cases = [
     },
   ],
   [
-    'collapsed capsule frees the sidebar and offers explicit alternatives only when space is insufficient',
+    'collapsed capsule frees the sidebar without prompts when space is insufficient',
     async (page, baseline) => {
       await mode(page, true);
       await page.locator('.csw-workbench-face').press('Enter');
@@ -2005,28 +2005,20 @@ const cases = [
         () => window.__companionFloatingPanel.state.dockStatus === 'space',
       );
       await entry.press('Enter');
-      assert.equal(await rail.getByRole('group', { name: '展开工作台' }).isVisible(), true);
-      assert.match(await rail.locator('.csw-dock-reason').innerText(), /聊天区域太窄/);
-      assert.equal(
-        await rail.getByRole('button', { name: '移到独立窗口', exact: true }).isVisible(),
-        true,
-      );
+      for (let i = 0; i < 3; i++) {
+        await entry.press('Enter');
+        assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
+        assert.equal(await page.locator('.csw-workbench').isVisible(), false);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.state.layoutMode),
+          'workbench',
+        );
+      }
       assert.equal(
         await page.evaluate(() => window.workbenchFixture.unexpected.includes('/panel/detach')),
         false,
       );
-      await page.keyboard.press('Escape');
-      assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
-      await entry.press('Enter');
-      await entry.press('Enter');
-      assert.equal(await rail.locator('.csw-dock-menu').evaluate((node) => node.open), false);
-      await entry.press('Enter');
-      await page.evaluate(() => document.documentElement.classList.add('dark'));
-      await page.screenshot({ path: resolve(output, 'space-open-options.png') });
-      await rail.getByRole('button', { name: '在聊天内展开', exact: true }).click();
-      await page.locator('.csw-workbench').waitFor({ state: 'visible' });
-      assert.equal(await page.locator(slotSelector).count(), 0);
-      assert.equal(await page.evaluate(() => window.__companionFloatingPanel.state.open), true);
+      await page.screenshot({ path: resolve(output, 'space-collapsed.png') });
       await page.setViewportSize(wide);
       await settle(page);
       await hostUnchanged(page, baseline);
@@ -2051,14 +2043,14 @@ const cases = [
       );
       const entry = page.locator('.csw-fab');
       await entry.press('Enter');
-      assert.equal(await page.locator('.csw-dock-reason').isVisible(), true);
+      assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
       await page
         .locator('#fixture-file-panel')
         .evaluate((node) => (node.style.flexBasis = '325px'));
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
-      assert.equal(await page.locator('.csw-dock-reason').isVisible(), false);
+      assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
       await entry.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       near(
@@ -2082,7 +2074,7 @@ const cases = [
     },
   ],
   [
-    'unsupported host preserves sidebar preference until an explicit placement choice',
+    'unsupported host stays compact without prompts on click or keyboard activation',
     async (page, baseline) => {
       await page
         .locator('.workspace')
@@ -2104,22 +2096,14 @@ const cases = [
         'opening an unavailable sidebar must not overwrite placement',
       );
       assert.equal(await page.locator('.csw-workbench').count(), 0);
-      assert.match(await page.locator('.csw-dock-reason').innerText(), /暂不支持侧栏/);
-      await page.keyboard.press('Escape');
-      assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
       await page.locator('.csw-fab').press('Enter');
-      await page.getByRole('button', { name: '在聊天内展开', exact: true }).click();
-      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
-      assert.equal(await page.locator('.csw-workbench').count(), 1);
-      assert.equal(await page.locator(slotSelector).count(), 0);
-      assert.equal(await page.locator('.csw-dock-menu').count(), 0);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
+      assert.equal(await page.locator('.csw-workbench').count(), 0);
       assert.equal(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
-        'capsule',
+        'workbench',
       );
-      await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-      await page.locator('.csw-workbench-face').press('Enter');
-      await page.locator('.csw-fab').waitFor({ state: 'visible' });
       await box(page, '.csw-fab');
     },
   ],
@@ -2160,8 +2144,7 @@ const cases = [
         .evaluate((node) => node.classList.add('app-shell-main-content-frame'));
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await layout(page);
-      assert.equal(await page.locator('.csw-dock-menu').count(), 1);
-      assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
+      assert.equal(await page.locator('.csw-dock-menu').count(), 0);
       assert.equal(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
         'workbench',
@@ -2391,7 +2374,7 @@ const cases = [
           'collapsed slot has zero width',
         );
         const entry = page.locator('.csw-fab');
-        assert.match(await entry.getAttribute('title'), /空间不足/);
+        assert.doesNotMatch(await entry.getAttribute('title'), /空间不足|选择打开方式/);
         const anchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
         );

@@ -278,7 +278,6 @@ function renderFloat(options = {}) {
   }
   shellState.activeTab = normalizeActiveTab();
   syncWorkbench();
-  const unsupportedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'unsupported';
   const suspendedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'suspended';
   if (suspendedDock && shellState.root) {
     shellState.root.dataset.dockSuspended = 'true';
@@ -389,7 +388,6 @@ function renderFloat(options = {}) {
           <button class="csw-icon" type="button" data-view="settings" data-active="${shellState.activeTab === 'settings'}" aria-pressed="${shellState.activeTab === 'settings'}" title="设置" aria-label="设置">${iconSvg('settings')}</button>
         </div>
       </div>
-      ${isWorkbench() ? '<p class="csw-dock-warning" role="status">当前页面暂不支持停靠，请切回胶囊或弹出。</p>' : ''}
       <div class="csw-body" data-view-body="${shellState.activeTab}">
         <div class="csw-mouth-stage" data-mouth-stage="${shellState.activeTab}">${shellState.activeTab === 'settings' ? settingsHtml() : shellState.activeTab === 'outline' ? outlineHtml() : nextHtml()}</div>
       </div>
@@ -436,11 +434,7 @@ function renderFloat(options = {}) {
   installPanelDrag();
   syncEyeTracking();
   if (!options.preserveMorph && !shellState.morphAnimation) settleMorph(shellState.open ? 1 : 0);
-  if (compactDock && !unsupportedDock)
-    shellState.fab.title =
-      shellState.dockStatus === 'space'
-        ? '空间不足；单击选择打开方式，双击移到独立窗口'
-        : '单击展开侧栏；双击移到独立窗口';
+  if (compactDock) shellState.fab.title = '单击展开侧栏；双击移到独立窗口';
 }
 
 function installFloat() {

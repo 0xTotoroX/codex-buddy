@@ -1,12 +1,12 @@
 /*
  * [INPUT]: 已识别的 Codex 主内容与前景聊天布局、期望侧栏宽度和开合状态。
- * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，替代菜单锚定共用胶囊，宿主不可用时独立挂载并随适配器清理。
+ * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时保留紧凑入口，不创建提示或替代菜单。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { foregroundSurface } from '../../codex/page-context.js';
 const SLOT = 'data-codex-buddy-dock';
-const OWN_UI = `[${SLOT}],[data-codex-buddy-dock-menu],[data-companion-stepwise-root],[data-codex-buddy-features-root]`;
+const OWN_UI = `[${SLOT}],[data-companion-stepwise-root],[data-codex-buddy-features-root]`;
 const visible = (node) =>
   node && node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility === 'visible';
 
@@ -33,13 +33,12 @@ export function findDockHost() {
   return null;
 }
 
-export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
+export function createDock(onChange, beforeMove = () => {}) {
   let host = null,
     slot = null,
-    menu = null,
     frame = 0,
     fingerprint = '';
-  let options = { width: 340, open: true, detached: false, popoutSupported: false };
+  let options = { width: 340, open: true, detached: false };
   let blocked = false;
   let observer = null;
   let attachedRoot = null;
@@ -93,50 +92,8 @@ export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
   });
   window.addEventListener('resize', schedule);
   document.addEventListener('focusin', schedule);
-  const closeMenu = (event) => {
-    if (menu && !menu.contains(event.target) && !event.target.closest('.csw-fab'))
-      menu.removeAttribute('open');
-  };
-  const escapeMenu = (event) => {
-    if (event.key !== 'Escape' || !menu?.open) return;
-    menu.open = false;
-    attachedRoot?.querySelector('.csw-fab')?.focus();
-    event.preventDefault();
-    event.stopPropagation();
-  };
-  document.addEventListener('pointerdown', closeMenu);
-  window.addEventListener('keydown', escapeMenu, true);
-
-  function updateMenu(parent, hidden, reason) {
-    if (!menu) {
-      menu = document.createElement('details');
-      menu.className = 'csw-dock-menu';
-      menu.setAttribute('data-codex-buddy-dock-menu', 'true');
-      menu.innerHTML = `<summary hidden>展开工作台</summary><div role="group" aria-label="展开工作台"><p role="status" class="csw-dock-reason"></p><button data-dock-popout>移到独立窗口</button><button data-dock-floating>在聊天内展开</button></div>`;
-      menu.querySelector('[data-dock-popout]').addEventListener('click', () => {
-        menu.open = false;
-        onPopout();
-      });
-      menu.querySelector('[data-dock-floating]').addEventListener('click', () => {
-        menu.open = false;
-        onExit();
-      });
-    }
-    if (menu.parentElement !== parent) parent.append(menu);
-    menu.hidden = hidden;
-    if (hidden) menu.open = false;
-    const popout = /** @type {HTMLButtonElement} */ (menu.querySelector('[data-dock-popout]'));
-    popout.disabled = !options.popoutSupported;
-    popout.title = options.popoutSupported ? '移到独立窗口' : '当前系统不支持独立窗口';
-    menu.querySelector('.csw-dock-reason').textContent = reason;
-  }
   function unavailable(suspended) {
     removeSlot();
-    updateMenu(
-      document.body,
-      suspended || options.detached,
-      '当前聊天界面暂不支持侧栏。回到聊天后可恢复侧栏，或选择其他展开方式。',
-    );
     publish({ status: suspended ? 'suspended' : 'unsupported', rect: null });
   }
   function removeSlot() {
@@ -200,13 +157,6 @@ export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
     placeRoot();
     const width = expanded ? requestedWidth : 0;
     if (slot.style.width !== `${width}px`) slot.style.width = `${width}px`;
-    updateMenu(
-      slot,
-      expanded || options.detached || enough,
-      availableWidth < 560 + requestedWidth
-        ? '聊天区域太窄。收起右侧面板或加宽聊天后，可重新打开侧栏。'
-        : '聊天区域太矮。增高窗口后，可重新打开侧栏。',
-    );
     slot.dataset.reason = enough ? '' : 'space';
     const rect = slot.getBoundingClientRect();
     slot.style.setProperty('--csw-dock-inset', `${Math.max(0, 48 - rect.top)}px`);
@@ -261,16 +211,6 @@ export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
       attachedRoot = root;
       placeRoot();
     },
-    showOptions(anchor) {
-      if (!menu || menu.hidden || !anchor) return;
-      menu.style.position = 'fixed';
-      menu.style.right = 'auto';
-      menu.style.width = '230px';
-      menu.style.left = `${Math.max(12, Math.min(innerWidth - 242, anchor.right - 230))}px`;
-      menu.style.top = `${Math.max(12, Math.min(innerHeight - 170, anchor.bottom + 8))}px`;
-      menu.style.zIndex = '2147483647';
-      menu.open = !menu.open;
-    },
     reopen() {
       blocked = false;
       update({ ...options, open: true });
@@ -280,12 +220,8 @@ export function createDock(onChange, onPopout, onExit, beforeMove = () => {}) {
       observer?.disconnect();
       window.removeEventListener('resize', schedule);
       document.removeEventListener('focusin', schedule);
-      document.removeEventListener('pointerdown', closeMenu);
-      window.removeEventListener('keydown', escapeMenu, true);
       cancelAnimationFrame(frame);
       removeSlot();
-      menu?.remove();
-      menu = null;
     },
   };
 }

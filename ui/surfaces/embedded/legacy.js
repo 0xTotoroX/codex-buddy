@@ -6,7 +6,7 @@
  */
 import { createDock } from './dock.js';
 import { IS_POPOUT, POPOUT } from '../../shared/constants.js';
-import { clamp, shellState, runtimeState } from '../../codex/runtime/state.js';
+import { clamp, shellState } from '../../codex/runtime/state.js';
 import { emitSignal } from '../../codex/runtime/signals.js';
 import { cancelMorphAnimations, settleMorph } from './shell/geometry.js';
 import { cancelViewAnimation } from './shell/shell.js';
@@ -42,8 +42,6 @@ export function openWorkbench() {
   shellState.dockOpen = true;
   dock?.reopen();
   emitSignal('render', undefined);
-  if (['space', 'unsupported'].includes(shellState.dockStatus))
-    dock?.showOptions(shellState.fab?.getBoundingClientRect());
   saveWorkbench();
 }
 export function closeWorkbench() {
@@ -66,10 +64,6 @@ export function syncWorkbench() {
         if (!syncing) emitSignal('render', undefined);
       },
       () => {
-        emitSignal('windowToggle', undefined);
-      },
-      () => setWorkbench(false, { expanded: true }),
-      () => {
         rememberWorkbenchReading(shellState.panel);
         if (shellState.dockStatus === 'open') {
           const face = shellState.panel
@@ -83,7 +77,6 @@ export function syncWorkbench() {
     width: clamp(shellState.dockWidth, 300, 460),
     open: shellState.dockOpen,
     detached: shellState.detached,
-    popoutSupported: runtimeState.settings?.popoutSupported === true,
   });
   syncing = false;
 }
