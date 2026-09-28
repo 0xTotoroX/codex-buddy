@@ -427,6 +427,19 @@ try {
     assert.deepEqual((await api('features', { op: 'state' })).body.features, before.features);
     await page.getByRole('link', { name: '总览', exact: true }).click();
     await page.locator('.settings-overview').getByText('标签组', { exact: true }).waitFor();
+    const boardSummary = page.getByRole('region', { name: '看板配置', exact: true });
+    await boardSummary.getByText('待办', { exact: true }).waitFor();
+    await page
+      .getByRole('region', { name: '模型快切配置', exact: true })
+      .getByRole('heading', { name: '常用模型', exact: true })
+      .waitFor();
+    const overviewFont = await page
+      .locator('.settings-overview .overview-metrics > div')
+      .filter({ has: page.getByText('字号', { exact: true }) })
+      .locator('dd')
+      .innerText();
+    assert.match(overviewFont, /^\d+\.\d px$/);
+
     await page.emulateMedia({ colorScheme: 'dark' });
     await page.screenshot({ path: join(output, 'settings-overview-dark.png'), fullPage: true });
     await page.getByRole('link', { name: '显示与布局', exact: true }).click();
@@ -444,11 +457,62 @@ try {
         { id: 'doing', title: '正在进行的跨设备界面核验' },
         { id: 'done', title: '完成' },
       ];
+      state.store.tasks = state.store.columns.flatMap((column, index) =>
+        Array.from({ length: index + 1 }, (_, i) => ({
+          id: `${column.id}-${i}`,
+          archived: false,
+          deleteRequested: false,
+          remote: null,
+          remoteMissing: false,
+          conflict: null,
+          fields: {
+            title: `合成任务 ${i}`,
+            notes: '',
+            due: null,
+            priority: 0,
+            column: column.id,
+            completed: column.id === 'done',
+          },
+        })),
+      );
+      await route.fulfill({ response, json: state });
+    });
+    await page.route('**/api/model-control/state', async (route) => {
+      const response = await route.fetch();
+      const state = await response.json();
+      state.preferences.pinned = ['test-model'];
+      state.preferences.presets = [
+        {
+          id: 'preset-test',
+          name: '日常开发与长文本评审组合',
+          selection: { model: 'test-model', reasoning: 'high', speed: 'fast' },
+        },
+      ];
+      state.snapshot.models = [
+        {
+          id: 'test-model',
+          label: '用于确认长模型名称正确换行的开发模型',
+          reasoning: ['high'],
+          fast: true,
+        },
+      ];
+      state.snapshot.current = { model: 'test-model', reasoning: 'high', speed: 'fast' };
+      state.snapshot.status = 'ready';
+      state.snapshot.message = '';
       await route.fulfill({ response, json: state });
     });
     await page.setViewportSize({ width: 390, height: 900 });
     await page.getByRole('link', { name: '总览', exact: true }).click();
     await page.locator('.settings-overview').getByText(longModel, { exact: true }).waitFor();
+    await page
+      .getByRole('region', { name: '看板配置' })
+      .getByText('3项', { exact: true })
+      .waitFor();
+    await page
+      .getByRole('region', { name: '模型快切配置' })
+      .getByText('日常开发与长文本评审组合', { exact: true })
+      .waitFor();
+
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
       true,
@@ -1087,8 +1151,8 @@ try {
     });
     assert.notEqual(staleAppearance.status, 200);
     await page.getByRole('link', { name: '显示与布局', exact: true }).click();
-    await page.getByLabel('字号（px）', { exact: true }).fill('16');
-    await page.getByLabel('字号（px）', { exact: true }).blur();
+    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).fill('16');
+    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).blur();
     await waitFor(
       async () =>
         await desktop.evaluate(() => {

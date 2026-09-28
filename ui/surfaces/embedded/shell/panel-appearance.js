@@ -84,7 +84,7 @@ function readPanelHeight() {
 function clampFontSize(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return DEFAULT_FONT;
-  return Math.round(clamp(parsed, MIN_FONT, MAX_FONT));
+  return Math.round(clamp(parsed, MIN_FONT, MAX_FONT) * 10) / 10;
 }
 
 function clampFontOffset(value, baseItemFontSize = DEFAULT_FONT) {

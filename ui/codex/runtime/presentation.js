@@ -52,6 +52,7 @@ import {
 import { foregroundSurface } from '../page-context.js';
 import {
   clampFontOffset,
+  effectiveFontSize,
   clampPanelWidth,
   clampPanelHeight,
   normalizeMaterial,
@@ -427,7 +428,11 @@ function exportPanelState() {
   const panelReading = readingState(viewToken);
   return {
     instanceId: INSTANCE_ID,
-    display: { labelOnly: shellState.labelOnly, promptClickMode: shellState.promptClickMode },
+    display: {
+      labelOnly: shellState.labelOnly,
+      promptClickMode: shellState.promptClickMode,
+      fontSize: effectiveFontSize(),
+    },
     context,
     answerHash: contextState.lastAssistantHash,
     viewToken,

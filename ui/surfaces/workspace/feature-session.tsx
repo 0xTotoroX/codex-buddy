@@ -210,7 +210,10 @@ export function FeatureView({
     ...appearance,
     theme: projection?.theme || appearance.theme,
     colors: projection?.colors || appearance.colors,
-    fontSize: projection?.hostTypography?.baseItemFontSize || appearance.fontSize,
+    fontSize:
+      projection?.display?.fontSize ??
+      projection?.hostTypography?.baseItemFontSize ??
+      appearance.fontSize,
   });
   return (
     <section

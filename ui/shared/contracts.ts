@@ -85,7 +85,7 @@ export interface ChatAssociation {
   selectedSessionId: string;
 }
 export interface PanelSnapshot {
-  display?: { labelOnly: boolean; promptClickMode: string };
+  display?: { labelOnly: boolean; promptClickMode: string; fontSize?: number };
   instanceId: string;
   context: ContextSnapshot;
   answerHash: string;

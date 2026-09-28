@@ -703,6 +703,32 @@ try {
     assert.equal(actions.at(-1).data.kind, kind);
   }
   record('desktop split refresh buttons share their own tab row and dispatch the matching action');
+  projection.hostTypography = { baseItemFontSize: 13 };
+  projection.display = { labelOnly: false, promptClickMode: 'fill', fontSize: 19.4 };
+  for (const size of [19.4, 23.1]) {
+    projection.display.fontSize = size;
+    await page.waitForFunction(
+      (size) =>
+        ['outline', 'next'].every((id) => {
+          const host = [...document.querySelectorAll('.csw-feature-content > div')].find((node) =>
+            node.shadowRoot?.querySelector(`[data-feature="${id}"]`),
+          );
+          const label = host?.shadowRoot.querySelector(
+            id === 'outline' ? '.csw-outline-label' : '.csw-row-label',
+          );
+          return label && Math.abs(parseFloat(getComputedStyle(label).fontSize) - size) < 0.01;
+        }),
+      size,
+    );
+  }
+  assert.equal(
+    await page
+      .getByRole('tab', { name: '大纲', exact: true })
+      .evaluate((node) => getComputedStyle(node).fontSize),
+    '15px',
+  );
+  record('saved content font updates outline and next labels without resizing the tab chrome');
+
   // Build the user's T-shaped layout through the same pointer gestures as the UI.
   entries.push({
     id: 'board',
@@ -828,7 +854,15 @@ try {
     assert.equal(await page.locator('#edge-panel > header [data-refresh]:visible').count(), 1);
     assert.equal(await page.locator(`[data-feature="${id}"] .feature-pane-head`).count(), 0);
   }
-  record('edge outline/next refresh follows the active tab in the top row');
+  assert.equal(
+    await page
+      .locator('[data-feature="next"] .csw-row-label')
+      .evaluate((node) => getComputedStyle(node).fontSize),
+    '23.1px',
+  );
+  record(
+    'edge outline/next refresh follows the active tab in the top row and preserves the content font',
+  );
   assert.deepEqual(errors, []);
   report.passed = true;
 } finally {

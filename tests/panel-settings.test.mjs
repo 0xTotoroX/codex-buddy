@@ -49,7 +49,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
         dockOpen: true,
         material: 'frosted',
         liquidVariant: 'regular',
-        fontOffset: 0,
+        fontOffset: 10.130000000000003,
         labelOnly: false,
         promptClickMode: 'fill',
         viewOrder: ['next', 'outline'],
@@ -79,12 +79,15 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
+    const font = page.getByLabel('大纲与下一步字号（px）', { exact: true });
+    assert.equal(await font.inputValue(), '23.1');
+    assert.equal(await font.getAttribute('step'), '0.1');
     const width = page.getByLabel('侧栏宽度（px）', { exact: true });
     await width.fill('400');
     await width.press('Tab');
     await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '400');
-    await page.getByLabel('字号（px）', { exact: true }).fill('16');
-    await page.getByLabel('字号（px）', { exact: true }).press('Tab');
+    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).fill('16.34');
+    await page.getByLabel('大纲与下一步字号（px）', { exact: true }).press('Tab');
     await page.waitForFunction(() =>
       [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
     );
@@ -99,7 +102,8 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       () => document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true',
     );
     assert.equal(prefs.ui.dockWidth, 400);
-    assert.equal(prefs.ui.fontOffset, 3);
+    assert.ok(Math.abs(prefs.ui.fontOffset - 3.3) < 0.0001);
+    assert.equal(await font.inputValue(), '16.3');
     assert.equal(prefs.ui.labelOnly, true);
     assert.equal(prefs.ui.promptClickMode, 'hybrid');
     assert.equal(prefs.alwaysOnTop, true);

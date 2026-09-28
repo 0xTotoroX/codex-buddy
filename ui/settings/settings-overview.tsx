@@ -1,12 +1,12 @@
 /* [INPUT]: 已保存的功能、承载、任务和模型配置，以及当前连接与外观状态。
- * [OUTPUT]: 沿用旧内嵌设置页布局的只读总览，不包含业务操作或配置控件。
+ * [OUTPUT]: 按承载和功能组织的只读总览，展示任务分组数量和模型配置，不包含操作控件。
  * [POS]: 设置展示层；仅在总览可见时读取现有服务，不创建新配置。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useState, type ReactNode } from 'react';
 import { request, type Settings, type View } from './api';
 import type { SurfaceState } from './surface-settings';
 import { titles, type FeatureId, type FeatureState, type Placement } from '../shared/features';
-import { columns, type TaskState } from '../features/board/api';
+import { columns, taskGroup, type TaskState } from '../features/board/api';
 import type { ModelState } from '../features/model/view';
 import { resolveFeatureLayout } from '../surfaces/workspace/layout';
 import type { SurfaceTheme } from '../surfaces/theme/appearance';
@@ -121,6 +121,22 @@ export function SettingsOverview({
   const current = models.snapshot.current;
   const modelName =
     current && (models.snapshot.models.find((m) => m.id === current.model)?.label || current.model);
+  const boardColumns = tasks.store.columns ?? columns;
+  const modelLabel = (id: string) => models.snapshot.models.find((m) => m.id === id)?.label || id;
+  const favorites = [
+    ...new Set([...(models.preferences.modelOrder ?? []), ...models.preferences.pinned]),
+  ].filter((id) => models.preferences.pinned.includes(id));
+  const reasoningLabel = (value: string) =>
+    ({
+      none: '无',
+      minimal: '最低',
+      low: '低',
+      medium: '中',
+      high: '高',
+      xhigh: '很高',
+      max: '最高',
+      ultra: '极高',
+    })[value] || value;
   const featureList = (placement: Placement) => (
     <ul className="overview-features">
       {(Object.keys(titles) as FeatureId[])
@@ -148,7 +164,7 @@ export function SettingsOverview({
             <Metric label="布局">{layoutLabel}</Metric>
             <Metric label="字号">
               {ui
-                ? `${Math.max(10, Math.min(24, ui.fontOffset + (view?.panelFontBase ?? 13)))} px`
+                ? `${Math.max(10, Math.min(24, ui.fontOffset + (view?.panelFontBase ?? 13))).toFixed(1)} px`
                 : '未读取'}
             </Metric>
             {primary === 'sidebar' && ui && <Metric label="宽度">{ui.dockWidth} px</Metric>}
@@ -211,35 +227,76 @@ export function SettingsOverview({
           <Metric label="数量">最多 {settings.maxItems} 条</Metric>
         </dl>
       </section>
-      <dl className="overview-details">
-        <div>
-          <dt>看板</dt>
-          <dd>
-            <p>{(tasks.store.columns ?? columns).map((col) => col.title).join(' → ')}</p>
-            <p className="overview-muted">
-              {tasks.store.syncEnabled ? 'Apple 提醒事项同步已开启' : '本地保存'}
-            </p>
-          </dd>
-        </div>
-        <div>
-          <dt>模型快切</dt>
-          <dd>
-            <p>
-              {modelName
-                ? `${modelName}${current?.reasoning ? ` · ${current.reasoning}` : ''}${current?.speed === 'fast' ? ' · Fast' : ''}`
-                : '尚未读取当前模型'}
-            </p>
-            {models.preferences.pinned.length > 0 && (
+      <section className="overview-surface overview-board" aria-label="看板配置">
+        <header className="overview-section-head">
+          <h2>看板</h2>
+          <span className="overview-muted">
+            {!enabled.board && '已停用 · '}
+            {tasks.store.syncEnabled ? 'Apple 提醒事项同步' : '本地保存'}
+          </span>
+        </header>
+        <dl className="overview-board-columns">
+          {boardColumns.map((column) => (
+            <div key={column.id}>
+              <dt>{column.title}</dt>
+              <dd>
+                {tasks.store.tasks.filter((task) => taskGroup(task) === column.id).length}
+                <span>项</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <section className="overview-surface overview-model" aria-label="模型快切配置">
+        <header className="overview-section-head">
+          <h2>模型快切</h2>
+          {!enabled.model && <span className="overview-muted">已停用</span>}
+        </header>
+        <div className="overview-model-content">
+          <div className="overview-model-current">
+            <h3>当前模型</h3>
+            <strong>{modelName || '未读取'}</strong>
+            {current && (
               <p className="overview-muted">
-                常用：
-                {models.preferences.pinned
-                  .map((id) => models.snapshot.models.find((m) => m.id === id)?.label || id)
-                  .join('、')}
+                {[
+                  current.reasoning && `推理：${reasoningLabel(current.reasoning)}`,
+                  current.speed === 'fast' && '快速模式',
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
             )}
-          </dd>
+            {models.snapshot.message && !['ready', 'waiting'].includes(models.snapshot.status) && (
+              <p role="status">{models.snapshot.message}</p>
+            )}
+          </div>
+          <div className="overview-model-favorites">
+            <h3>常用模型</h3>
+            {favorites.length ? (
+              <ul>
+                {favorites.map((id) => (
+                  <li key={id}>{modelLabel(id)}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="overview-muted">未设置</p>
+            )}
+          </div>
         </div>
-      </dl>
+        {models.preferences.presets.length > 0 && (
+          <div className="overview-model-presets">
+            <h3>预设</h3>
+            <ul>
+              {models.preferences.presets.map((preset) => (
+                <li key={preset.id}>
+                  <span>{preset.name}</span>
+                  <span className="overview-muted">{modelLabel(preset.selection.model)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

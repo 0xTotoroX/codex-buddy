@@ -55,6 +55,7 @@ export function PanelSettings({
     min: number,
     max: number,
     commit: (n: number) => void,
+    step = 1,
   ) => (
     <Field id={id} label={label}>
       <Input
@@ -64,6 +65,7 @@ export function PanelSettings({
         defaultValue={value}
         min={min}
         max={max}
+        step={step}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -71,8 +73,10 @@ export function PanelSettings({
           }
         }}
         onBlur={(e) => {
-          const n = e.currentTarget.valueAsNumber;
+          const entered = e.currentTarget.valueAsNumber;
+          const n = step === 0.1 ? Math.round(entered * 10) / 10 : entered;
           if (Number.isFinite(n) && n >= min && n <= max) {
+            e.currentTarget.value = String(n);
             if (n !== value) commit(n);
           } else {
             e.currentTarget.value = String(value);
@@ -127,11 +131,12 @@ export function PanelSettings({
             )}
             {number(
               'surface-font',
-              '字号（px）',
-              Math.max(10, Math.min(24, ui.fontOffset + fontBase)),
+              '大纲与下一步字号（px）',
+              Number(Math.max(10, Math.min(24, ui.fontOffset + fontBase)).toFixed(1)),
               10,
               24,
               (n) => change('fontOffset', n - fontBase),
+              0.1,
             )}
             <Toggle
               label="桌面窗口置顶"
