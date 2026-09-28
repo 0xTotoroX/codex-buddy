@@ -1,4 +1,4 @@
-/* [INPUT]: 入口偏好、主界面开合状态及原有打开动作。
+/* [INPUT]: 主界面开合状态及共用表情手势。
  * [OUTPUT]: 左侧导航栏中的唯一 Buddy 图标；导航重建后重新挂载，缺少导航时保留胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
@@ -27,13 +27,13 @@ export function stopLauncher() {
   current = null;
 }
 
-/** @param {{mode:string,open:boolean,root:HTMLElement|null,toggle:()=>void}} options */
+export function launcherButton() {
+  return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
+}
+
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void}} options */
 export function syncLauncher(options) {
   current = options;
-  if (options.mode !== 'rail') {
-    stopLauncher();
-    return;
-  }
   if (!observer) {
     observer = new MutationObserver((records) => {
       if (records.some((record) => !entry?.contains(record.target))) schedule();
@@ -61,16 +61,27 @@ export function syncLauncher(options) {
       .divider { width:24px;border-top:1px solid color-mix(in srgb,currentColor 16%,transparent); }
       button { appearance:none;display:grid;place-items:center;width:36px;height:36px;
         border:0;border-radius:10px;padding:0;background:transparent;color:inherit;cursor:pointer; }
-      button:hover,button[aria-pressed="true"] { background:color-mix(in srgb,currentColor 10%,transparent); }
+      button:hover { background:color-mix(in srgb,currentColor 10%,transparent); }
       button:focus-visible { outline:2px solid currentColor;outline-offset:2px; }
       svg { width:20px;height:20px;fill:currentColor; }
     </style><div class="entry"><div class="divider" aria-hidden="true"></div>
-      <button type="button" aria-label="CodexBuddy" title="CodexBuddy">
+      <button type="button" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter" title="单击收放 · 双击窗口往返 · 右键设置">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg>
       </button></div>`;
-    shadow.querySelector('button').addEventListener('click', () => current?.toggle());
+    const button = shadow.querySelector('button');
+    button.addEventListener('pointerdown', (event) => current?.pointerDown(event));
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      current?.click(event);
+    });
+    button.addEventListener('keydown', (event) => current?.keyDown(event));
+    button.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      current?.settings();
+    });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
-  entry.shadowRoot.querySelector('button').setAttribute('aria-pressed', String(options.open));
+  entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
   if (options.root) options.root.dataset.launcher = 'rail';
 }

@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、胶囊/左侧图标入口偏好、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化，收回偏好按版本校验并保存。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -59,7 +59,6 @@ pub struct Ui {
     pub width: f64,
     pub height: f64,
     pub layout_mode: String,
-    pub launcher: String,
     pub feature: String,
     #[serde(deserialize_with = "deserialize_dock_width")]
     pub dock_width: f64,
@@ -83,7 +82,6 @@ impl Default for Ui {
             width: 404.,
             height: 420.,
             layout_mode: "capsule".into(),
-            launcher: "capsule".into(),
             feature: "workbench".into(),
             dock_width: 340.,
             split_ratio: 0.45,
@@ -110,7 +108,6 @@ impl Ui {
             || !self.height.is_finite()
             || self.height < 340.
             || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
-            || !["capsule", "rail"].contains(&self.launcher.as_str())
             || !["workbench", "outline", "board"].contains(&self.feature.as_str())
             || !(300. ..=460.).contains(&self.dock_width)
             || !(0.2..=0.8).contains(&self.split_ratio)
@@ -964,7 +961,6 @@ mod tests {
         .unwrap();
         let legacy = Preferences::read(&paths);
         assert_eq!(legacy.ui.layout_mode, "capsule");
-        assert_eq!(legacy.ui.launcher, "capsule");
         assert_eq!(legacy.ui.dock_width, 340.);
         assert_eq!(legacy.ui.split_ratio, 0.45);
         assert!(legacy.ui.dock_open);
@@ -993,11 +989,8 @@ mod tests {
             assert_eq!(Preferences::read(&paths), prefs);
             assert_eq!((prefs.ui.width, prefs.ui.height), (510., 600.));
             assert!(!prefs.ui.dock_open);
-            assert_eq!(prefs.ui.launcher, "rail");
         }
         let invalid: Ui = serde_json::from_value(json!({"layoutMode":"unknown"})).unwrap();
-        assert!(invalid.validate().is_err());
-        let invalid: Ui = serde_json::from_value(json!({"launcher":"unknown"})).unwrap();
         assert!(invalid.validate().is_err());
         for patch in [
             json!({"dockWidth":"340"}),

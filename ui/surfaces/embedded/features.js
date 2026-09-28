@@ -1,5 +1,5 @@
 /* [INPUT]: Feature owners, saved placements, checked layout snapshots and the existing capsule/dock.
- * [OUTPUT]: Business views inside the original workbench shell and reveal of the existing main window; no launcher menu.
+ * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, and reveal of the existing main window.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { mountFeature } from '../workspace/mount';
@@ -23,6 +23,7 @@ let composition = null;
 let dockValue = { status: '', rect: null };
 let primary = 'overlay';
 let selected = '';
+let returnState = null;
 const mounts = new Map();
 /** @type {import('../../shared/features').Request} */
 const request = async (input) => {
@@ -71,7 +72,12 @@ export async function popoutSelectedFeature() {
   const id = selected || group(primary)[0]?.id;
   if (!id) return;
   try {
-    render(await request({ op: 'main-placement', placement: 'desktop' }));
+    render(
+      await request({
+        op: 'main-placement',
+        placement: primary === 'desktop' ? state.returnPlacement || 'sidebar' : 'desktop',
+      }),
+    );
   } catch (e) {
     showError(e);
   }
@@ -183,6 +189,14 @@ function updateDock() {
 function render(next) {
   if (!next.features.length) return;
   const previous = state;
+  if (
+    previous &&
+    primary !== 'desktop' &&
+    previous.pendingPlacement !== 'desktop' &&
+    (next.pendingPlacement === 'desktop' || next.mainPlacement === 'desktop')
+  )
+    returnState = { placement: primary, open: shellState.open, dockOpen: shellState.dockOpen };
+  const returning = primary === 'desktop' && next.mainPlacement !== 'desktop';
   state = { ...previous, ...next };
   if (!independent) {
     stopWorkbench();
@@ -245,6 +259,13 @@ function render(next) {
       item.mount.dispose();
       mounts.delete(key);
     }
+  if (returning) {
+    if (returnState?.placement === primary) {
+      shellState.open = returnState.open;
+      shellState.dockOpen = returnState.dockOpen;
+    }
+    returnState = null;
+  }
   emitSignal('render', undefined);
 }
 async function poll() {
@@ -276,5 +297,6 @@ export function stopFeatureHost() {
   dock?.destroy();
   dock = null;
   state = null;
+  returnState = null;
   independent = false;
 }

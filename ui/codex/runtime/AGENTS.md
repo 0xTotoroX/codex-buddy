@@ -29,4 +29,4 @@ lifecycle 同时安装/销毁独立功能嵌入适配器；扫描忽略自有功
 
 独立功能保留同一 windowToggle/workbenchToggle 通知：lifecycle 按当前模式路由功能 owner 交接或旧工作台，避免绕过原表情手势。
 
-入口位置由 presentation 读取 panel 偏好并经 transport 保留；lifecycle 同步 embedded/launcher 的可见性与开合状态，停用时回收导航入口。
+lifecycle 为 embedded/launcher 接入共用表情手势与设置操作，停用时回收导航入口；presentation 在收起态使用左栏图标作为窗口往返锚点。不再读取旧 launcher 选择字段。

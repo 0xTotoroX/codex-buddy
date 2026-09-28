@@ -1,7 +1,7 @@
 import { normalizeText, clamp, escapeHtml, escapeAttr } from '../../shared/text.js';
 /*
  * [INPUT]: 工作台纯布局模型的默认偏好； 稳定常量、初始化偏好与页面桥接。
- * [OUTPUT]: 五组状态（含入口位置）与宿主本地聊天锁定元数据（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、完整输入采集、自选位置数量和能力判断（字符预算仅在后台应用）。
+ * [OUTPUT]: 五组状态与宿主本地聊天锁定元数据（弹出初始化展开）、窗口交接动画与表情点击记录与单击计时状态、兼容调试投影、完整输入采集、自选位置数量和能力判断（字符预算仅在后台应用）。
  * [POS]: 无上层依赖的状态基础层，初始化由 lifecycle 显式调用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -249,7 +249,6 @@ function createShellState(preferences) {
     focusAfterMorph: '',
     activeTab: 'next',
     layoutMode: /** @type {'capsule'|'workbench'} */ ('capsule'),
-    launcher: /** @type {'capsule'|'rail'} */ ('capsule'),
     dockWidth: 340,
     feature: /** @type {'workbench'|'outline'|'board'} */ ('workbench'),
     taskView: { search: '', stage: 'todo', tab: 'board' },

@@ -1,5 +1,5 @@
 /* [INPUT]: 版本化外观偏好与认证 API。
- * [OUTPUT]: 下一步的显示/点击设置，及入口位置、容器字号、宽度和置顶设置。
+ * [OUTPUT]: 下一步的显示/点击设置，及容器字号、宽度和置顶设置。
  * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useState } from 'react';
@@ -120,19 +120,6 @@ export function PanelSettings({
         </>
       ) : (
         <>
-          <section className="settings-section">
-            <h2>入口</h2>
-            <Field id="surface-launcher" label="入口位置">
-              <NativeSelect
-                id="surface-launcher"
-                value={ui.launcher || 'capsule'}
-                onChange={(e) => change('launcher', e.target.value)}
-              >
-                <option value="capsule">胶囊</option>
-                <option value="rail">左侧图标</option>
-              </NativeSelect>
-            </Field>
-          </section>
           <section className="settings-section">
             <h2>尺寸与窗口</h2>
             {number('dock-width', '侧栏宽度（px）', ui.dockWidth, 300, 460, (n) =>

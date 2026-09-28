@@ -1,10 +1,11 @@
 /*
  * [INPUT]: 胶囊状态、DOM 尺寸、滚动容器与原生窗口偏好。
- * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换；保留胶囊位置与原生尺寸同步，停靠开合始终交由通知协调，临时不可用不改变位置偏好。
+ * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换，收起后键盘焦点回到左栏入口；保留胶囊位置与原生尺寸同步，停靠开合始终交由通知协调，临时不可用不改变位置偏好。
  * [POS]: 交互与视图共用的空间计算层。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { launcherButton } from '../launcher.js';
 import {
   CHIP_HEIGHT,
   CHIP_RADIUS,
@@ -473,7 +474,8 @@ function settleMorph(progress, focusTarget = '') {
   }
   if (focusTarget === 'chip' && !expanded) {
     window.requestAnimationFrame(() => {
-      if (isCurrentRuntime(runtimeGeneration)) shellState.fab?.focus({ preventScroll: true });
+      if (isCurrentRuntime(runtimeGeneration))
+        (launcherButton() || shellState.fab)?.focus({ preventScroll: true });
     });
   }
   if (!flushDeferredRender()) syncEyeTracking();

@@ -88,6 +88,7 @@ import {
   ensureSettings,
   loadSettings,
   reloadSettings,
+  openSettings,
   scheduleSettingsSync,
   syncSettings,
 } from './settings-sync.js';
@@ -112,7 +113,13 @@ import {
   resetOutlineFeature,
 } from '../outline.js';
 import { nativeGestureEnded, panelPreferences } from '../../surfaces/desktop/legacy/transport.js';
-import { cancelFaceClick, onResize } from '../../surfaces/embedded/shell/interaction.js';
+import {
+  cancelFaceClick,
+  onResize,
+  onLauncherClick,
+  onLauncherPointerDown,
+  onLauncherKeyDown,
+} from '../../surfaces/embedded/shell/interaction.js';
 import {
   stopWorkbench,
   setWorkbench,
@@ -525,16 +532,21 @@ function install() {
       renderFloat(options);
       if (IS_POPOUT || !runtimeState.runtimeActive) return;
       syncLauncher({
-        mode: shellState.launcher,
         open:
           shellState.open ||
           shellState.detached ||
           (independentFeatures() && featurePlacement() === 'desktop'),
         root: shellState.root,
-        toggle: () => {
-          if (independentFeatures() && featurePlacement() === 'desktop') void revealMainFeature();
-          else if (shellState.detached) void togglePanelWindow();
-          else setOpen(!shellState.open);
+        click: (event) =>
+          onLauncherClick(event, (expanded) => {
+            if (independentFeatures() && featurePlacement() === 'desktop') void revealMainFeature();
+            else if (!shellState.detached) setOpen(expanded);
+          }),
+        pointerDown: onLauncherPointerDown,
+        keyDown: onLauncherKeyDown,
+        settings: () => {
+          cancelFaceClick();
+          void openSettings();
         },
       });
     }),

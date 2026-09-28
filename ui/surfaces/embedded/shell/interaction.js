@@ -492,7 +492,7 @@ function consumeFaceDoubleClick(event) {
   return true;
 }
 
-function onFaceClick(event, source) {
+function onFaceClick(event, source, activate = null) {
   const suppressed = source === 'fab' ? 'suppressFabClick' : 'suppressHeadFaceClick';
   if (shellState[suppressed] || shellState.drag?.moved) {
     cancelFaceClick();
@@ -511,13 +511,20 @@ function onFaceClick(event, source) {
       docked: shellState.layoutMode === 'workbench',
       dockOpen: shellState.dockOpen,
     };
-    window.addEventListener('blur', cancelFaceClick, { once: true });
+    // 左栏首击可能唤起桌面窗口；焦点交接不能吃掉随后的第二击。
+    if (source !== 'launcher') window.addEventListener('blur', cancelFaceClick, { once: true });
   }
 
-  const expanded = source === 'fab' ? !shellState.open : false;
+  const expanded = source === 'fab' || source === 'launcher' ? !shellState.open : false;
   const singleClick = () => {
     shellState.faceClickTimer = 0;
-    if (!IS_POPOUT && isCurrentRuntime() && !shellState.detached && !shellState.detachPending) {
+    if (activate && isCurrentRuntime() && !shellState.detachPending) activate(expanded);
+    else if (
+      !IS_POPOUT &&
+      isCurrentRuntime() &&
+      !shellState.detached &&
+      !shellState.detachPending
+    ) {
       if (source === 'workbench' && shellState.layoutMode === 'workbench') {
         shellState.dockOpen = false;
         emitSignal('render', undefined);
@@ -560,6 +567,31 @@ function onFaceDoubleClick(event) {
 
 function onFabClick(event) {
   onFaceClick(event, 'fab');
+}
+
+export function onLauncherClick(event, activate) {
+  onFaceClick(event, 'launcher', activate);
+}
+
+export function onLauncherPointerDown(event) {
+  if (event.button !== 0) return;
+  shellState.suppressFabClick = shellState.suppressHeadFaceClick = false;
+  event.currentTarget.blur();
+  event.preventDefault();
+  onFaceSecondPress(event);
+}
+
+export function onLauncherKeyDown(event) {
+  if (
+    event.altKey &&
+    event.key === 'Enter' &&
+    (IS_POPOUT || runtimeState.settings?.popoutSupported === true)
+  ) {
+    event.preventDefault();
+    event.stopPropagation();
+    cancelFaceClick();
+    emitSignal('windowToggle', undefined);
+  }
 }
 
 function onWorkbenchFaceClick(event) {

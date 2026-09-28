@@ -412,16 +412,20 @@ const cases = [
           'position:fixed;left:0;top:0;width:52px;height:100vh;display:flex;flex-direction:column;z-index:100';
         rail.innerHTML = '<div style="flex:1"></div><div data-footer>帮助</div>';
         document.body.append(rail);
-        const api = window.__companionFloatingPanel;
-        api.syncPanelPreferences({ ...api.panelPreferences(), launcher: 'rail' }, 101, false);
       });
       const icon = page.getByRole('button', { name: 'CodexBuddy', exact: true });
       await icon.waitFor();
-      assert.equal(await icon.getAttribute('aria-pressed'), 'true');
+      assert.equal(await icon.getAttribute('aria-expanded'), 'true');
+      assert.equal(await icon.getAttribute('aria-pressed'), null);
+      await page.mouse.move(200, 0);
+      assert.equal(
+        await icon.evaluate((node) => getComputedStyle(node).backgroundColor),
+        'rgba(0, 0, 0, 0)',
+      );
       await icon.click();
       await page.waitForFunction(() => !window.__companionFloatingPanel.state.open);
       assert.equal(await page.locator('.csw-fab').isVisible(), false);
-      assert.equal(await icon.getAttribute('aria-pressed'), 'false');
+      assert.equal(await icon.getAttribute('aria-expanded'), 'false');
       await icon.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       assert.equal(await page.locator('[data-companion-stepwise-root]').count(), 1);
@@ -436,18 +440,44 @@ const cases = [
       await icon.click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await icon.click();
+      await icon.press('Space');
       await page.locator('.csw-workbench-face').waitFor({ state: 'hidden' });
+      await page.evaluate(() => {
+        const original = window.__companionHostRequest;
+        window.workbenchFixture.detaches = [];
+        window.__companionHostRequest = (raw) => {
+          const input = JSON.parse(raw);
+          if (input.path !== '/panel/detach') return original(raw);
+          window.workbenchFixture.detaches.push(input.payload.ui);
+          queueMicrotask(() => window.__companionDesktop.complete(input.id, { ok: true }));
+        };
+      });
+      await mode(page, true);
+      for (const expanded of [false, true]) {
+        await page.evaluate((open) => window.__companionFloatingPanel.setOpen(open), expanded);
+        const count = await page.evaluate(() => window.workbenchFixture.detaches.length);
+        await icon.dblclick({ delay: 180 });
+        assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), count + 1);
+        assert.equal(
+          await page.evaluate(() => window.workbenchFixture.detaches.at(-1).dockOpen),
+          expanded,
+        );
+      }
+      await icon.press('Alt+Enter');
+      assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), 3);
+      const settingsCount = await page.evaluate(
+        () => window.workbenchFixture.requests.filter((r) => r.path === '/settings/open').length,
+      );
+      await icon.click({ button: 'right' });
+      await page.waitForFunction(
+        (count) =>
+          window.workbenchFixture.requests.filter((r) => r.path === '/settings/open').length ===
+          count + 1,
+        settingsCount,
+      );
+      await page.evaluate(() => window.__companionFloatingPanel.setOpen(false));
       await page.evaluate(() => document.querySelector('nav').remove());
       await page.locator('.csw-fab').waitFor({ state: 'visible' });
-      assert.equal(
-        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().launcher),
-        'rail',
-      );
-      await page.evaluate(() => {
-        const api = window.__companionFloatingPanel;
-        api.syncPanelPreferences({ ...api.panelPreferences(), launcher: 'capsule' }, 102, false);
-      });
       await page.locator('.csw-fab').click();
       await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
       await page.evaluate(() => window.__companionFloatingPanel.destroy());

@@ -1,10 +1,11 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 入口位置偏好同步、宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，侧栏收起后回程使用共用胶囊锚点，桌面置顶按钮串行保存目标值。
+ * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，侧栏收起后回程优先使用左栏图标锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { panelAppearance, syncTheme } from '../../surfaces/embedded/shell/panel-appearance.js';
+import { launcherButton } from '../../surfaces/embedded/launcher.js';
 
 import { iconSvg } from '../../shared/icons/index.js';
 import { readWorkbenchScroll, writeWorkbenchScroll } from '../../surfaces/workspace/reading.js';
@@ -67,38 +68,41 @@ let preferencesRevision = -1;
 function panelWindowAnchor() {
   if (IS_POPOUT || !shellState.glass?.isConnected) return null;
   const layout = shellLayout();
+  const rail = !shellState.open ? launcherButton()?.getBoundingClientRect() : null;
   // 弹出后玻璃背景层 display:none；从同一套布局计算收回位置，不能读取零尺寸 DOM。
   const dock =
     shellState.layoutMode === 'workbench' && shellState.dockRect?.anchor?.width > 0
       ? shellState.dockRect
       : null;
-  const rect = dock
-    ? dock.anchor
-    : !shellState.open
-      ? {
-          left: layout.anchor.x,
-          top: layout.anchor.y,
-          width: layout.chip.width,
-          height: layout.chip.height,
-          right: layout.anchor.x + layout.chip.width,
-          bottom: layout.anchor.y + layout.chip.height,
-        }
-      : shellState.detached || document.hidden
+  const rect =
+    rail ||
+    (dock
+      ? dock.anchor
+      : !shellState.open
         ? {
-            left: layout.left,
-            top: layout.top,
-            width: layout.width,
-            height: layout.height,
-            right: layout.left + layout.width,
-            bottom: layout.top + layout.height,
+            left: layout.anchor.x,
+            top: layout.anchor.y,
+            width: layout.chip.width,
+            height: layout.chip.height,
+            right: layout.anchor.x + layout.chip.width,
+            bottom: layout.anchor.y + layout.chip.height,
           }
-        : shellState.glass.getBoundingClientRect();
+        : shellState.detached || document.hidden
+          ? {
+              left: layout.left,
+              top: layout.top,
+              width: layout.width,
+              height: layout.height,
+              right: layout.left + layout.width,
+              bottom: layout.top + layout.height,
+            }
+          : shellState.glass.getBoundingClientRect());
   const border = Math.max(0, (window.outerWidth - window.innerWidth) / 2);
   const titlebar = Math.max(0, window.outerHeight - window.innerHeight - border);
   if (
     border > 20 ||
     titlebar > 140 ||
-    rect.width < 40 ||
+    rect.width < (rail ? 24 : 40) ||
     rect.height < 20 ||
     rect.left < 0 ||
     rect.top < 0 ||
@@ -129,7 +133,6 @@ function blinkHandoff() {
 }
 
 function applyWorkbenchPreferences(ui) {
-  shellState.launcher = ui.launcher === 'rail' ? 'rail' : 'capsule';
   shellState.layoutMode = ui.layoutMode === 'workbench' ? 'workbench' : 'capsule';
   shellState.feature =
     ui.feature === 'outline' || ui.feature === 'board' ? ui.feature : 'workbench';

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 本机设置 API、宿主上下文和弹出窗口协议。
- * [OUTPUT]: 三种方向来源、方向库/位置、Jev 同意及凭据状态、常用提示词配置与 quick-fill 命令、完整上下文哨兵 maxInputChars=0、启动策略 ask/force、入口位置及独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份、工作台聊天关联投影及模式命令的共享类型。
+ * [OUTPUT]: 三种方向来源、方向库/位置、Jev 同意及凭据状态、常用提示词配置与 quick-fill 命令、完整上下文哨兵 maxInputChars=0、启动策略 ask/force、独立胶囊/工作台偏好、停靠与浮窗各自的排列/顺序/双轴比例、字体、含分栏阅读位置的投影、呈现确认及操作身份、工作台聊天关联投影及模式命令的共享类型。
  * [POS]: 界面边界契约；不产生运行时依赖。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -168,7 +168,6 @@ export interface PanelPreferences {
   width: number;
   height: number;
   layoutMode: 'capsule' | 'workbench';
-  launcher?: 'capsule' | 'rail';
   feature?: 'workbench' | 'outline' | 'board';
   dockWidth: number;
   splitRatio: number; // Legacy dock vertical ratio.
