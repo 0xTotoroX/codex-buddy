@@ -52,6 +52,33 @@ if (['cargo', 'npm'].includes(basename(process.argv[1]))) {
     settingsUrl: process.env.CODEX_BUDDY_DEV_SETTINGS,
     version: 'fixture',
     configurationRevision: 1,
+    panelFontBase: 13,
+    panelTheme: null,
+    panelPreferences: {
+      revision: 1,
+      webRevision: 1,
+      detached: false,
+      alwaysOnTop: true,
+      position: null,
+      ui: {
+        open: true,
+        activeTab: 'outline',
+        width: 400,
+        height: 600,
+        layoutMode: 'workbench',
+        dockWidth: 460,
+        splitRatio: 0.5,
+        dockLayout: null,
+        popoutLayout: null,
+        dockOpen: true,
+        material: 'matte',
+        liquidVariant: 'regular',
+        fontOffset: 0,
+        labelOnly: true,
+        promptClickMode: 'fill',
+        viewOrder: ['outline', 'next'],
+      },
+    },
     connection: {
       status: 'connected',
       endpoint: config.cdpEndpoint,
@@ -111,7 +138,18 @@ if (['cargo', 'npm'].includes(basename(process.argv[1]))) {
     }
     if (req.url === '/api/model-control/state') {
       res.end(
-        JSON.stringify({ revision: 1, preferences: { edge: 'left', position: 0.5, screen: '' } }),
+        JSON.stringify({
+          revision: 1,
+          preferences: { enabled: false, pinned: [], presets: [] },
+          snapshot: {
+            target: null,
+            revision: 'fixture',
+            status: 'waiting',
+            message: '',
+            current: null,
+            models: [],
+          },
+        }),
       );
       return;
     }

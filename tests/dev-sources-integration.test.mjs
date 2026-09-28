@@ -49,6 +49,7 @@ test(
     let dev,
       browser,
       logs = '';
+    const errors = [];
     const host = createServer((req, res) =>
       res.end(
         JSON.stringify([
@@ -230,35 +231,40 @@ test(
           process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
       });
       const page = await browser.newPage();
-      const errors = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
         if (message.type() === 'error' && !message.text().startsWith('WebSocket connection to'))
           errors.push(message.text());
       });
       await page.goto(`${session.url}/#token=${session.token}`);
+      const navigation = page.getByRole('navigation', { name: '设置分类' });
+      await page.getByRole('heading', { name: '总览', exact: true }).waitFor();
+      await page.getByLabel('当前配置总览', { exact: true }).waitFor();
+      await navigation.getByRole('link', { name: '大纲', exact: true }).click();
+      const outlineSwitch = page.getByRole('switch', { name: '启用大纲', exact: true });
+      await outlineSwitch.waitFor();
+      assert.equal(await outlineSwitch.isEnabled(), true, 'settings controls must be usable');
+      await navigation.getByRole('link', { name: '开发', exact: true }).click();
       await page.getByText(/开发来源 · Stepwise/).waitFor();
-      await page.getByRole('switch').first().waitFor();
-      await page.getByRole('heading', { name: '模型快切', exact: true }).waitFor();
       assert.deepEqual(errors, [], 'complete settings page must render without React errors');
       const alignment = await page.evaluate(() => ({
         source: document
           .querySelector('#buddy-dev-sources')
           .shadowRoot.querySelector('details')
           .getBoundingClientRect().left,
-        settings: document.querySelector('#root header').getBoundingClientRect().left,
+        settings: document.querySelector('#root main h1').getBoundingClientRect().left,
       }));
       assert.ok(
         Math.abs(alignment.source - alignment.settings) <= 1,
         'source and settings share the same content edge',
       );
-      await page.locator('summary').filter({ hasText: '开发来源' }).click();
       await page.getByLabel('调试 worktree').selectOption(main);
       await page.getByRole('button', { name: '切换来源' }).click();
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
-      await page.locator('summary').filter({ hasText: '开发来源' }).click();
       await page.getByText(/界面资源已确认/).waitFor();
-      await page.getByRole('switch').first().waitFor();
+      await navigation.getByRole('link', { name: '大纲', exact: true }).click();
+      await outlineSwitch.waitFor();
+      assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
       assert.deepEqual(errors, [], 'settings must still render after switching source');
       assert.equal(
         await page.evaluate(
@@ -277,16 +283,21 @@ test(
         200,
         'current page automatically includes its source identity',
       );
+      await navigation.getByRole('link', { name: '开发', exact: true }).click();
       mkdirSync(join(project, 'target/reports'), { recursive: true });
       await page.screenshot({ path: join(project, 'target/reports/dev-source-selector.png') });
       const unauthenticated = await browser.newPage();
-      await unauthenticated.goto(session.url);
+      await unauthenticated.goto(`${session.url}/#settings-dev`);
       await unauthenticated.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
       await unauthenticated.getByRole('alert').filter({ hasText: '缺少连接凭据' }).waitFor();
       assert.equal(await unauthenticated.getByText('等待本地服务…', { exact: true }).count(), 0);
       await unauthenticated.close();
       const expired = await browser.newPage();
       await expired.goto(`${session.url}/#token=expired`);
+      await expired
+        .getByRole('navigation', { name: '设置分类' })
+        .getByRole('link', { name: '开发', exact: true })
+        .click();
       await expired.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
       await expired.getByRole('alert').filter({ hasText: '连接凭据已过期' }).waitFor();
       await expired.close();
@@ -320,8 +331,9 @@ test(
       assert.equal(existsSync(join(main, 'target/dev/owner.json')), false);
       assert.equal(existsSync(join(other, 'target/dev/owner.json')), false);
     } catch (error) {
-      error.message += `\nSupervisor log:\n${logs}`;
-      throw error;
+      throw new Error(`Browser errors: ${errors.join('\n')}\nSupervisor log:\n${logs}`, {
+        cause: error,
+      });
     } finally {
       await browser?.close();
       await stopChild(dev);
