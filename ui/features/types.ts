@@ -17,6 +17,7 @@ export type Entry = {
   id: FeatureId;
   desktopSupported?: boolean;
   placement: Placement;
+  returnPlacement?: Placement;
   open: boolean;
   owner: string;
   size: [number, number];
@@ -29,6 +30,7 @@ export type FeatureState = {
   appearance?: {
     theme?: string | null;
     fontSize?: number;
+    colors?: Record<string, string>;
     themes: Record<string, import('./surface').SurfaceTheme>;
   };
 };

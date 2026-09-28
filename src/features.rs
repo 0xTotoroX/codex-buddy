@@ -20,6 +20,7 @@ pub const IDS: [&str; 4] = ["outline", "board", "next", "model"];
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Preference {
     pub placement: String,
+    pub return_placement: String,
     pub open: bool,
     pub size: [u32; 2],
 }
@@ -27,6 +28,7 @@ impl Default for Preference {
     fn default() -> Self {
         Self {
             placement: "sidebar".into(),
+            return_placement: "overlay".into(),
             open: false,
             size: [840, 620],
         }
@@ -109,7 +111,7 @@ impl Features {
         )
     }
     fn snapshot(&self) -> Value {
-        json!({"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
+        json!({"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
     }
     fn validate(&self, id: &str, owner: &str) -> Result<()> {
         let e = self.entries.get(id).context("功能尚未打开")?;
@@ -138,7 +140,7 @@ impl App {
     pub async fn feature_state(&self) -> Value {
         let mut state = self.features.lock().await.snapshot();
         let view = self.view();
-        state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"themes":self.surfaces.lock().await.preferences.themes});
+        state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"themes":self.surfaces.lock().await.preferences.themes});
         state
     }
     pub async fn edge_features_active(&self) -> bool {
@@ -170,6 +172,29 @@ impl App {
         let id = input["id"].as_str().context("缺少功能")?;
         ensure!(IDS.contains(&id), "未知功能");
         let owner = input["owner"].as_str().unwrap_or("");
+        if op == "anchor" || op == "settings" {
+            let f = self.features.lock().await;
+            let e = f.entries.get(id).context("功能已关闭")?;
+            ensure!(
+                e.owner == owner || e.pending.as_ref().is_some_and(|p| p.owner == owner),
+                "功能归属已变化"
+            );
+            drop(f);
+            if op == "settings" {
+                let runtime = crate::lifecycle::Runtime::read(&self.paths)?;
+                webbrowser::open(&runtime.url()).context("无法打开设置")?;
+                return Ok(json!({"ok":true}));
+            }
+            let anchor = if let Some(client) = self.desktop_client().await {
+                client
+                    .evaluate("window.__companionFloatingPanel?.panelWindowAnchor() ?? null".into())
+                    .await
+                    .unwrap_or(Value::Null)
+            } else {
+                Value::Null
+            };
+            return Ok(json!({"anchor":anchor}));
+        }
         if op == "window" {
             let f = self.features.lock().await;
             let e = f.entries.get(id).context("功能已关闭")?;
@@ -337,6 +362,13 @@ impl App {
             }
             return Ok(result);
         }
+        if op == "cancel-move" {
+            let mut f = self.features.lock().await;
+            let e = f.entries.get_mut(id).context("功能已关闭")?;
+            ensure!(e.owner == owner, "功能归属已变化");
+            e.pending = None;
+            return Ok(f.snapshot());
+        }
         if op == "handoff" {
             let mut f = self.features.lock().await;
             let e = f.entries.get_mut(id).context("功能已关闭")?;
@@ -435,6 +467,9 @@ impl App {
         let p = e.pending.as_ref().context("交接已取消")?;
         ensure!(p.owner == owner && p.source_ready, "交接尚未就绪或已过期");
         let previous = e.pref.clone();
+        if p.placement == "desktop" && e.pref.placement != "desktop" {
+            e.pref.return_placement = e.pref.placement.clone();
+        }
         e.pref.placement = p.placement.clone();
         e.pref.open = true;
         if let Err(error) = f.save(&self.paths) {

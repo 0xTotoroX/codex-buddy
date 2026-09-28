@@ -4,7 +4,13 @@
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
-import { startFeatureHost, stopFeatureHost } from '../workbench/feature-host.js';
+import {
+  startFeatureHost,
+  stopFeatureHost,
+  independentFeatures,
+  popoutSelectedFeature,
+  toggleFeatureDock,
+} from '../workbench/feature-host.js';
 import { panelAppearance } from '../core/panel-appearance.js';
 
 import {
@@ -527,8 +533,18 @@ function install() {
     onSignal('generationControl', ({ mode, busy }) => updateGenerationModeControl(mode, busy)),
     onSignal('verify', () => scan()),
     onSignal('theme', () => syncTheme()),
-    onSignal('windowToggle', (options) => void togglePanelWindow(options)),
-    onSignal('workbenchToggle', (expanded) => (expanded ? openWorkbench() : closeWorkbench())),
+    onSignal(
+      'windowToggle',
+      (options) =>
+        void (independentFeatures() ? popoutSelectedFeature() : togglePanelWindow(options)),
+    ),
+    onSignal('workbenchToggle', (expanded) =>
+      independentFeatures()
+        ? toggleFeatureDock(expanded)
+        : expanded
+          ? openWorkbench()
+          : closeWorkbench(),
+    ),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
   window[API_KEY] = {

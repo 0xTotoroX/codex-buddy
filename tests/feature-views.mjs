@@ -75,10 +75,21 @@ try {
     status: '本地看板',
   };
   const actions = [];
+  let surfaceTheme = 'matte';
+  let rejectHandoff = true;
+  let handoffs = 0;
   await page.addInitScript(() => {
+    window.nativeMessages = [];
     window.ipc = {
       postMessage(raw) {
         const m = JSON.parse(raw);
+        window.nativeMessages.push(m);
+        if (m.kind === 'return') queueMicrotask(() => window.__companionPopout.returned(true));
+        if (m.kind === 'show')
+          queueMicrotask(() => {
+            window.__companionPopout.presented();
+            window.__companionPopout.motionFinished();
+          });
         if (['ready', 'expand', 'collapse', 'focus'].includes(m.action)) {
           const expanded = m.action !== 'collapse';
           window.dispatchEvent(
@@ -111,7 +122,11 @@ try {
       if (p.op === 'read')
         value = {
           ...(p.id === 'board' ? tasks : model),
-          appearance: { theme: 'light', surface: { theme: 'matte', liquidVariant: 'regular' } },
+          appearance: {
+            theme: 'light',
+            colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
+            surface: { theme: surfaceTheme, liquidVariant: 'regular' },
+          },
         };
       else if (p.op === 'action') {
         assert.equal(p.id, 'model');
@@ -131,7 +146,26 @@ try {
       } else {
         const e = entries.find((e) => e.id === p.id);
         if (p.op === 'save') e.view = p.view;
-        value = { features: entries };
+        if (p.op === 'move')
+          e.pending = { owner: 'next-owner', placement: p.placement, ready: false };
+        if (p.op === 'cancel-move') e.pending = null;
+        if (p.op === 'handoff') {
+          handoffs++;
+          if (rejectHandoff)
+            return route.fulfill({
+              status: 409,
+              json: { ok: false, code: 'handoff_failed', message: '模拟交接失败' },
+            });
+          e.pending.ready = true;
+        }
+        value = {
+          features: entries,
+          appearance: {
+            theme: 'light',
+            colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
+            themes: { desktop: { theme: surfaceTheme, liquidVariant: 'regular' } },
+          },
+        };
       }
       return route.fulfill({ json: value });
     }
@@ -173,21 +207,77 @@ try {
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
-  await view.getByRole('button', { name: 'low', exact: true }).click();
-  await view.locator('button[aria-pressed="true"]').filter({ hasText: /^low$/ }).waitFor();
+  await view.locator('[data-model="a"][data-reasoning="low"]').click();
+  await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
+  assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
   assert.equal(actions[0].data.expectedRevision, 'v1');
+  await view.getByLabel('模型 Model B 菜单').click();
   await view.getByLabel('置顶 Model B').click();
   await view.locator('[aria-label="置顶 Model B"][aria-pressed="true"]').waitFor();
   assert.deepEqual(model.preferences.pinned, ['b']);
   page.once('dialog', (dialog) => dialog.accept('日常'));
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();
+  await view.getByLabel('模型工具').click();
   await view.getByLabel('删除预设 日常').click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
   record('shared model view uses readback, preserves speed, pins models and saves/removes presets');
   assert.deepEqual(errors, []);
+  await view.getByLabel('模型工具').click();
+  await view.getByLabel('模型 Model B 菜单').click();
   await page.screenshot({ path: join(output, 'edge-model.png') });
+  entries.find((entry) => entry.id === 'model').placement = 'desktop';
+  await page.goto(
+    'http://127.0.0.1:47991/feature.html?feature=model&lease=model-owner#token=fixture',
+  );
+  await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
+  assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
+  assert.equal(await page.getByLabel('模型快切显示位置').count(), 0);
+  await page.screenshot({ path: join(output, 'desktop-model.png') });
+  assert.deepEqual(errors, []);
+  record('desktop reuses original eyes/header and shows content without a placement selector');
+  surfaceTheme = 'black';
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',
+  );
+  await page.waitForFunction(() => {
+    const host = document.querySelector('.csw-feature-content').shadowRoot;
+    return (
+      getComputedStyle(host.querySelector('[data-feature="model"]')).color === 'rgb(238, 238, 238)'
+    );
+  });
+  assert.equal(
+    await page
+      .locator('#root')
+      .evaluate((node) => getComputedStyle(node).getPropertyValue('--csw-surface-opaque').trim()),
+    '#000',
+  );
+  surfaceTheme = 'matte';
+  await page.waitForFunction(
+    () =>
+      getComputedStyle(document.querySelector('#root')).getPropertyValue('--csw-text').trim() ===
+      'rgb(30, 35, 40)',
+  );
+  await page.locator('.csw-workbench-face').dblclick();
+  await page.waitForFunction(() => window.nativeMessages.some((m) => m.kind === 'cancel-return'));
+  await page.waitForFunction(
+    () =>
+      !document.querySelector('.csw-feature-content').shadowRoot.querySelector('[data-model="a"]')
+        .disabled,
+  );
+  assert.equal(handoffs, 1);
+  rejectHandoff = false;
+  await page.locator('.csw-workbench-face').dblclick();
+  await page.waitForFunction(
+    () => window.nativeMessages.filter((m) => m.kind === 'return').length === 2,
+  );
+  await page.waitForTimeout(500);
+  assert.equal(handoffs, 2);
+  assert.equal(entries.find((e) => e.id === 'model').pending.ready, true);
+  record(
+    'desktop black theme restores host colors; failed return cancels motion and permits retry',
+  );
   report.passed = true;
 } finally {
   writeFileSync(join(output, 'report.json'), JSON.stringify(report, null, 2));

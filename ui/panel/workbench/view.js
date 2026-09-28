@@ -4,6 +4,7 @@
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { workbenchHeadHtml } from './chrome.js';
 import { IS_POPOUT, POPOUT } from '../runtime/constants.js';
 import {
   clamp,
@@ -155,7 +156,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (!panel.querySelector('.csw-workbench')) {
     shellState.workbenchLayoutCleanup?.();
     panel.innerHTML = `<div class="csw-workbench">
-      <header class="csw-head csw-workbench-head"><button type="button" class="csw-head-face csw-workbench-face" aria-label="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}" title="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}">${statusStageHtml()}</button><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
+      ${workbenchHeadHtml(IS_POPOUT)}
       <div class="csw-workbench-panes">
         <div class="csw-workbench-tabs" role="tablist" aria-label="工作台面板" hidden>${registry.map((pane) => `<button type="button" role="tab" id="csw-tab-${pane.id}" data-pane-tab="${pane.id}" aria-controls="csw-pane-${pane.id}">${pane.title}</button>`).join('')}</div>
         ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong data-pane-focus="${pane.id}" role="button" tabindex="0" title="拖动调整位置；双击放大">${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" title="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><span class="csw-pane-menu" hidden>${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}

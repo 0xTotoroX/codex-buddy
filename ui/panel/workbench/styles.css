@@ -585,3 +585,22 @@
 .csw-workbench[data-feature='outline'] [data-pane-focus] {
   cursor: default;
 }
+
+/* Business mounts occupy the existing shell's content area. */
+.csw-feature-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.csw-feature-content > [hidden] {
+  display: none;
+}
+
+[data-surface-theme='black'] :is(.csw-popover, .csw-workbench) {
+  --csw-surface-opaque: #000;
+  --csw-text: #eee;
+  --csw-muted: #999;
+  --csw-accent: #75a7ff;
+  color: #eee;
+  color-scheme: dark;
+}

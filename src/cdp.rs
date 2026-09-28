@@ -241,7 +241,7 @@ impl Client {
             }
         }
         let expression = format!(
-            "(() => {{const p=window.__companionFloatingPanel; if (!window.__companionDesktop || !p || p.state.destroyed) return null; p.syncPanelPreferences({ui}, {revision}, {detached}); return {{desktop:p.desktopStatus(),ui:p.panelPreferences(),theme:p.state.theme,fontBase:p.state.hostTypography.baseItemFontSize}};}})()"
+            "(() => {{const p=window.__companionFloatingPanel; if (!window.__companionDesktop || !p || p.state.destroyed) return null; p.syncPanelPreferences({ui}, {revision}, {detached}); return {{desktop:p.desktopStatus(),ui:p.panelPreferences(),theme:p.state.theme,colors:p.panelAppearance().colors,fontBase:p.state.hostTypography.baseItemFontSize}};}})()"
         );
         let mut value = self.evaluate(expression.clone()).await?;
         if value.is_null() {

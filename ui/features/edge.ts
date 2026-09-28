@@ -150,6 +150,7 @@ export function startEdge(request: Request) {
     handle.inert = expanded;
     const appearance = {
       theme: native.appearance?.hostTheme?.theme || (native.nativeDark ? 'dark' : 'light'),
+      colors: native.appearance?.hostTheme?.colors,
       surface: { theme: native.theme, liquidVariant: native.liquidVariant },
     };
     Object.assign(panel.style, surfaceStyle(appearance, true));

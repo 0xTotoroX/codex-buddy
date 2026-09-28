@@ -5,6 +5,8 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { independentFeatures, openConfiguredFeatures } from '../workbench/feature-host.js';
+
 import {
   HEIGHT_KEY,
   IS_POPOUT,
@@ -555,6 +557,7 @@ function onFaceDoubleClick(event) {
 }
 
 function onFabClick(event) {
+  if (independentFeatures() && !shellState.open) void openConfiguredFeatures();
   onFaceClick(event, 'fab');
 }
 

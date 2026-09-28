@@ -1,8 +1,9 @@
-/* [INPUT]: Authenticated feature state and shared host dock adapter.
- * [OUTPUT]: Independent feature surfaces and one shared sidebar slot.
- * [POS]: Host presentation lifecycle; business authority stays in runtime.
+/* [INPUT]: Feature owners, saved placements and the existing capsule/dock.
+ * [OUTPUT]: Business views inside the original workbench shell; no launcher menu.
+ * [POS]: Host content adapter. Geometry and gestures remain in core.
  * [PROTOCOL]: Keep workbench/AGENTS.md in sync. */
 import { surfaceStyle } from '../../features/surface';
+import { createSvgGlass } from '../glass/svg.js';
 import { mountFeature } from '../../features/mount';
 import { titles } from '../../features/types';
 import { createDock } from '../host/dock.js';
@@ -10,15 +11,22 @@ import { bridgeCall, shellState, runtimeState } from '../runtime/state.js';
 import { IS_POPOUT } from '../runtime/constants.js';
 import { emitSignal } from '../runtime/signals.js';
 import { stopWorkbench } from './layout.js';
+import { resolveFabExpression } from '../core/shell.js';
+import { workbenchHeadHtml, workbenchSettingsHtml } from './chrome.js';
+import { openSettings } from '../runtime/settings-sync.js';
 let timer = 0,
   epoch = 0,
   polling = false,
-  dock = null,
-  sidebar = null,
-  launcher = null,
-  dockStatus = '',
-  selected = '',
   independent = false;
+let state = null,
+  dock = null,
+  secondary = null;
+let secondaryGlass = null;
+let secondaryFaceCleanup = () => {};
+let dockValue = { status: '', rect: null };
+let primary = 'overlay',
+  opening = false;
+const selected = { overlay: '', sidebar: '' };
 const mounts = new Map();
 /** @type {import('../../features/types').Request} */
 const request = async (input) => {
@@ -29,125 +37,229 @@ const request = async (input) => {
 export const independentFeatures = () => !IS_POPOUT && independent;
 export async function revealFeature(id, placement) {
   const result = await request({ op: placement ? 'move' : 'reveal', id, placement });
+  selected[placement || result.features.find((e) => e.id === id)?.placement] = id;
   if (!timer) startFeatureHost();
   render(result);
-  dock?.reopen();
-  if (dockStatus === 'space') dock?.showOptions(launcher?.getBoundingClientRect());
 }
-function element() {
-  const node = document.createElement('div');
-  node.setAttribute('data-codex-buddy-features-root', 'true');
-  document.body.append(node);
-  return node;
+export function featurePlacement() {
+  return primary;
 }
-function install() {
-  stopWorkbench();
-  sidebar = element();
-  sidebar.style.cssText =
-    'position:absolute;inset:8px 0 0;height:calc(100% - 8px);display:flex;flex-direction:column;z-index:20;';
-  const tabs = document.createElement('nav');
-  tabs.style.cssText = 'display:flex;gap:6px;padding:8px;flex-wrap:wrap;';
-  sidebar.append(tabs);
-  dock = createDock(
-    (value) => {
-      dockStatus = value.status;
-      sidebar.hidden = value.status !== 'open';
-      sidebar.style.display = value.status === 'open' ? 'flex' : 'none';
-    },
-    () => {
-      if (selected) void revealFeature(selected, 'desktop').catch((e) => alert(String(e)));
-    },
-    () => {
-      if (selected) void revealFeature(selected, 'overlay').catch((e) => alert(String(e)));
-    },
+export function featureTheme() {
+  return state?.appearance?.themes[primary];
+}
+function group(placement) {
+  return (
+    state?.features.filter(
+      (e) => e.placement === placement || e.pending?.placement === placement,
+    ) || []
   );
-  dock.attachRoot(sidebar);
-  launcher = element();
-  launcher.style.cssText =
-    'position:fixed;right:18px;bottom:18px;z-index:2147483645;font:13px -apple-system,sans-serif;';
-  const select = document.createElement('select');
-  select.setAttribute('aria-label', '打开功能');
-  select.style.cssText =
-    'padding:8px 10px;border:1px solid #8885;border-radius:8px;background:light-dark(#faf9f6,#242520);color:light-dark(#343630,#dfdfd8);color-scheme:light dark;';
-  select.innerHTML =
-    '<option value="">CodexBuddy</option>' +
-    Object.entries(titles)
-      .map(([id, title]) => `<option value="${id}">${title}</option>`)
-      .join('');
-  select.onchange = () => {
-    const id = select.value;
-    select.value = '';
-    if (id)
-      void revealFeature(id).catch((e) => {
-        select.title = String(e);
-      });
-  };
-  launcher.append(select);
 }
-function overlayControls(node, entry, owner) {
-  let dragging = null,
-    timer = 0;
-  const down = (event) => {
-    if (
-      !event
-        .composedPath()
-        .some((n) => n instanceof Element && n.classList.contains('feature-head')) ||
-      event.composedPath().some((n) => n instanceof Element && n.matches('button,select,input')) ||
-      event.button !== 0
-    )
-      return;
-    const rect = node.getBoundingClientRect();
-    dragging = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
-    node.setPointerCapture(event.pointerId);
-    event.preventDefault();
-  };
-  const move = (event) => {
-    if (!dragging) return;
-    node.style.right = 'auto';
-    node.style.left = `${Math.max(0, Math.min(innerWidth - 100, dragging.left + event.clientX - dragging.x))}px`;
-    node.style.top = `${Math.max(0, Math.min(innerHeight - 48, dragging.top + event.clientY - dragging.y))}px`;
-  };
-  const up = () => {
-    dragging = null;
-  };
-  node.addEventListener('pointerdown', down);
-  node.addEventListener('pointermove', move);
-  node.addEventListener('pointerup', up);
-  node.addEventListener('lostpointercapture', up);
-  const observer = new ResizeObserver(() => {
-    clearTimeout(timer);
-    timer = window.setTimeout(() => {
-      const rect = node.getBoundingClientRect();
-      if (rect.width >= 320 && rect.height >= 280)
-        void request({
-          op: 'save',
-          id: entry.id,
-          owner,
-          size: [Math.round(rect.width), Math.round(rect.height)],
-        }).catch(() => {});
-    }, 500);
-  });
-  observer.observe(node);
-  return () => {
-    clearTimeout(timer);
-    observer.disconnect();
-    node.removeEventListener('pointerdown', down);
-    node.removeEventListener('pointermove', move);
-    node.removeEventListener('pointerup', up);
-    node.removeEventListener('lostpointercapture', up);
-  };
-}
-/** @param {import('../../features/types').FeatureState} state */
-function render(state) {
-  if (!state.features.length) return;
-  if (!independent) {
-    independent = true;
-    install();
-    emitSignal('render', undefined);
+export async function openConfiguredFeatures() {
+  if (opening || !state) return;
+  opening = true;
+  if (secondary && !shellState.dockOpen) {
+    shellState.dockOpen = true;
+    dock?.reopen();
   }
-  const wanted = new Set(),
-    sidebarIds = [];
-  for (const entry of state.features) {
+  try {
+    for (const entry of group(primary)) {
+      if (!entry.open && !entry.pending) render(await request({ op: 'reveal', id: entry.id }));
+    }
+  } catch (e) {
+    showError(e);
+  } finally {
+    opening = false;
+  }
+}
+function showError(error) {
+  const node = shellState.panel?.querySelector('[data-feature-error]');
+  if (node) {
+    node.textContent = String(error);
+    node.hidden = false;
+  }
+}
+export async function popoutSelectedFeature() {
+  const id = selected[primary] || group(primary)[0]?.id;
+  if (!id) return;
+  try {
+    await revealFeature(id, 'desktop');
+  } catch (e) {
+    showError(e);
+  }
+}
+export function toggleFeatureDock(open) {
+  shellState.dockOpen = open;
+  if (open) void openConfiguredFeatures();
+  dock?.reopen();
+  emitSignal('render', undefined);
+  if (open && shellState.dockStatus === 'space')
+    dock?.showOptions(shellState.fab?.getBoundingClientRect());
+}
+function frame(container, faceClick) {
+  let root = container.querySelector(':scope > .csw-workbench');
+  if (root) return root;
+  root = document.createElement('div');
+  root.className = 'csw-workbench';
+  root.innerHTML = `${workbenchHeadHtml()}<nav class="csw-workbench-tabs" role="tablist" aria-label="工作台面板"></nav><p data-feature-error role="alert" hidden></p><div class="csw-feature-content"></div>`;
+  root.querySelector('.csw-workbench-controls').innerHTML = workbenchSettingsHtml();
+  root.querySelector('.csw-workbench-face').addEventListener('click', faceClick);
+  root
+    .querySelector('[data-workbench-settings]')
+    .addEventListener('click', () => void openSettings());
+  container.replaceChildren(root);
+  return root;
+}
+function content(root, placement) {
+  const entries = group(placement).filter((entry) => entry.open || entry.pending);
+  if (!entries.some((e) => e.id === selected[placement]))
+    selected[placement] = entries[0]?.id || '';
+  const tabs = root.querySelector('nav');
+  const key = entries.map((e) => e.id).join(':') + selected[placement];
+  if (tabs.dataset.key !== key) {
+    tabs.dataset.key = key;
+    tabs.replaceChildren();
+    tabs.hidden = entries.length < 2;
+    for (const entry of entries) {
+      const button = document.createElement('button');
+      button.textContent = titles[entry.id];
+      button.setAttribute('role', 'tab');
+      button.setAttribute('aria-selected', String(selected[placement] === entry.id));
+      button.onclick = () => {
+        selected[placement] = entry.id;
+        content(root, placement);
+      };
+      tabs.append(button);
+    }
+  }
+  root.querySelector('.csw-workbench-face').dataset.expression = resolveFabExpression();
+  const body = root.querySelector('.csw-feature-content');
+  for (const item of mounts.values()) {
+    if (item.placement !== placement) continue;
+    if (item.node.parentNode !== body) body.append(item.node);
+    item.node.hidden = item.id !== selected[placement] || !item.active;
+    item.node.inert = !item.active;
+  }
+}
+// Called after the original shell has installed its DOM. Never replace live mounts on collapse.
+export function renderFeatureShell(faceClick) {
+  if (!state || !shellState.panel) return;
+  const root = frame(shellState.panel, faceClick);
+  content(root, primary);
+  if (primary === 'overlay' && group('sidebar').length) {
+    if (!secondary) {
+      secondary = document.createElement('div');
+      secondary.setAttribute('data-companion-stepwise-root', 'true');
+      secondary.setAttribute('data-codex-buddy-features-root', 'true');
+      secondary.style.cssText = 'position:absolute;inset:0;pointer-events:auto;';
+      const other = frame(secondary, (event) => {
+        secondaryFaceCleanup();
+        const first = { x: event.clientX, y: event.clientY, time: performance.now() };
+        const collapse = window.setTimeout(
+          () => {
+            shellState.dockOpen = false;
+            updateDock();
+          },
+          event.detail === 0 ? 0 : 100,
+        );
+        const second = (next) => {
+          if (
+            performance.now() - first.time > 500 ||
+            Math.hypot(next.clientX - first.x, next.clientY - first.y) > 6
+          )
+            return;
+          secondaryFaceCleanup();
+          next.preventDefault();
+          next.stopImmediatePropagation();
+          const id = selected.sidebar;
+          if (id) void revealFeature(id, 'desktop').catch(showError);
+        };
+        document.addEventListener('click', second, true);
+        const expires = window.setTimeout(() => secondaryFaceCleanup(), 500);
+        secondaryFaceCleanup = () => {
+          clearTimeout(collapse);
+          clearTimeout(expires);
+          document.removeEventListener('click', second, true);
+        };
+      });
+      other.style.height = '100%';
+    }
+    content(secondary.firstElementChild, 'sidebar');
+    const appearance = state.appearance;
+    if (appearance) {
+      secondary.dataset.surfaceTheme = appearance.themes.sidebar.theme;
+      Object.assign(
+        secondary.style,
+        surfaceStyle({ ...appearance, surface: appearance.themes.sidebar }),
+      );
+      for (const [key, value] of Object.entries(appearance.colors || {}))
+        secondary.style.setProperty(`--csw-${key}`, value);
+      if (appearance.themes.sidebar.theme === 'native-glass') {
+        try {
+          secondaryGlass ||= createSvgGlass(secondary);
+          secondaryGlass.refresh(appearance.themes.sidebar.liquidVariant);
+        } catch {
+          /* Existing CSS material fallback remains visible. */
+        }
+      } else {
+        secondaryGlass?.destroy();
+        secondaryGlass = null;
+      }
+    }
+  } else if (secondary) {
+    secondaryGlass?.destroy();
+    secondaryGlass = null;
+    secondary.remove();
+    secondary = null;
+  }
+  updateDock();
+}
+function updateDock() {
+  if (!state || !shellState.root) return;
+  const entries = group('sidebar');
+  if (!dock && entries.length)
+    dock = createDock(
+      (value) => {
+        dockValue = value;
+        if (primary === 'sidebar') {
+          const changed = shellState.dockStatus !== value.status;
+          shellState.dockStatus = value.status;
+          shellState.dockRect = value.rect;
+          if (changed) emitSignal('render', undefined);
+        } else if (secondary) secondary.hidden = value.status !== 'open';
+      },
+      () => void revealFeature(selected.sidebar, 'desktop').catch(showError),
+      () => void revealFeature(selected.sidebar, 'overlay').catch(showError),
+    );
+  if (!dock) return;
+  if (primary !== 'sidebar') {
+    delete shellState.root.dataset.dockMounted;
+    shellState.dockRect = null;
+    shellState.dockStatus = '';
+  }
+  dock.attachRoot(primary === 'sidebar' ? shellState.root : secondary);
+  dock.update({
+    width: shellState.dockWidth,
+    open: entries.length > 0 && shellState.dockOpen,
+    detached: false,
+    popoutSupported: runtimeState.settings?.popoutSupported === true,
+  });
+}
+/** @param {import('../../features/types').FeatureState} next */
+function render(next) {
+  if (!next.features.length) return;
+  const previous = state;
+  state = next;
+  if (!independent) {
+    stopWorkbench();
+    independent = true;
+    shellState.open = false;
+  }
+  primary = group('overlay').length ? 'overlay' : group('sidebar').length ? 'sidebar' : 'overlay';
+  shellState.layoutMode = primary === 'sidebar' ? 'workbench' : 'capsule';
+  shellState.dockStatus = primary === 'sidebar' ? dockValue.status : '';
+  shellState.dockRect = primary === 'sidebar' ? dockValue.rect : null;
+  const wanted = new Set();
+  for (const entry of next.features) {
     const candidates = [
       ...(entry.open ? [{ owner: entry.owner, placement: entry.placement }] : []),
       ...(entry.pending?.ready ? [entry.pending] : []),
@@ -158,16 +270,14 @@ function render(state) {
       wanted.add(key);
       let item = mounts.get(key);
       if (!item) {
-        const node = element();
-        if (candidate.placement === 'sidebar') {
-          node.style.cssText = 'flex:1;min-height:0;';
-          sidebar.append(node);
-        } else
-          node.style.cssText = `position:fixed;right:${24 + mounts.size * 28}px;top:${64 + mounts.size * 24}px;width:min(${entry.size[0]}px,calc(100vw - 48px));height:min(${entry.size[1]}px,calc(100vh - 100px));min-width:320px;min-height:280px;resize:both;overflow:hidden;z-index:2147483640;box-shadow:0 8px 32px #0002;border:1px solid #8884;border-radius:8px;`;
+        const node = document.createElement('div');
+        node.setAttribute('data-codex-buddy-features-root', 'true');
+        node.style.cssText = 'height:100%;min-height:0;';
         item = {
           node,
           id: entry.id,
           placement: candidate.placement,
+          active: false,
           mount: mountFeature(
             node,
             entry,
@@ -176,73 +286,37 @@ function render(state) {
             request,
             () => void poll(),
           ),
-          cleanup:
-            candidate.placement === 'overlay'
-              ? overlayControls(node, entry, candidate.owner)
-              : () => {},
-          reveal: entry.reveal,
         };
         mounts.set(key, item);
       } else item.mount.update(entry);
-      const active = entry.owner === candidate.owner && entry.open;
-      item.node.hidden = !active;
-      item.node.inert = !active || !!entry.pending;
-      if (active && candidate.placement === 'sidebar') sidebarIds.push(entry.id);
-      if (item.reveal !== entry.reveal) {
-        item.reveal = entry.reveal;
-        if (candidate.placement === 'sidebar') selected = entry.id;
-        else item.node.style.zIndex = String(2147483641);
+      item.active = entry.owner === candidate.owner && entry.open;
+      if (
+        item.active &&
+        previous &&
+        previous.features.find((e) => e.id === entry.id)?.reveal !== entry.reveal
+      ) {
+        selected[candidate.placement] = entry.id;
+        if (candidate.placement === 'sidebar') shellState.dockOpen = true;
+        else shellState.open = true;
       }
     }
   }
   for (const [key, item] of mounts)
     if (!wanted.has(key)) {
-      item.cleanup();
       item.mount.dispose();
       mounts.delete(key);
     }
-  if (!sidebarIds.includes(selected)) selected = sidebarIds[0] || '';
-  const tabs = sidebar.querySelector('nav');
-  Object.assign(
-    tabs.style,
-    surfaceStyle({ ...state.appearance, surface: state.appearance?.themes.sidebar }),
-  );
-  if (tabs.dataset.key !== sidebarIds.join(':') + selected) {
-    tabs.replaceChildren();
-    tabs.dataset.key = sidebarIds.join(':') + selected;
-    for (const id of sidebarIds) {
-      const button = document.createElement('button');
-      button.textContent = titles[id];
-      button.style.cssText =
-        'font:inherit;border:0;background:transparent;padding:6px;cursor:pointer;color:inherit;';
-      button.setAttribute('aria-pressed', String(selected === id));
-      button.onclick = () => {
-        selected = id;
-        render(state);
-      };
-      tabs.append(button);
-    }
-  }
-  for (const item of mounts.values())
-    if (item.placement === 'sidebar')
-      item.node.hidden = item.id !== selected || !sidebarIds.includes(item.id);
-  dock.update({
-    width: Math.max(320, shellState.dockWidth),
-    open: sidebarIds.length > 0,
-    detached: false,
-    popoutSupported: runtimeState.settings?.popoutSupported === true,
-  });
-  if (shellState.root) shellState.root.style.setProperty('display', 'none', 'important');
+  emitSignal('render', undefined);
 }
 async function poll() {
   if (polling) return;
   polling = true;
   const current = epoch;
   try {
-    const state = await request({ op: 'state' });
-    if (current === epoch) render(state);
+    const next = await request({ op: 'state' });
+    if (current === epoch) render(next);
   } catch {
-    /* Keep current surfaces; actions still validate their lease. */
+    /* Keep live content until its owner changes. */
   } finally {
     polling = false;
   }
@@ -253,20 +327,18 @@ export function startFeatureHost() {
   timer = window.setInterval(() => void poll(), 700);
 }
 export function stopFeatureHost() {
+  secondaryFaceCleanup();
   epoch++;
   clearInterval(timer);
   timer = 0;
-  for (const item of mounts.values()) {
-    item.cleanup();
-    item.mount.dispose();
-  }
+  for (const item of mounts.values()) item.mount.dispose();
   mounts.clear();
   dock?.destroy();
   dock = null;
-  sidebar?.remove();
-  sidebar = null;
-  launcher?.remove();
-  launcher = null;
+  secondaryGlass?.destroy();
+  secondaryGlass = null;
+  secondary?.remove();
+  secondary = null;
+  state = null;
   independent = false;
-  dockStatus = '';
 }

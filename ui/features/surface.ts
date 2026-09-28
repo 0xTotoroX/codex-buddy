@@ -5,7 +5,12 @@ export type SurfaceTheme = {
   theme: 'black' | 'matte' | 'frosted' | 'native-glass';
   liquidVariant: 'regular' | 'clear';
 };
-export type Appearance = { theme?: string | null; fontSize?: number; surface?: SurfaceTheme };
+export type Appearance = {
+  theme?: string | null;
+  fontSize?: number;
+  colors?: Record<string, string>;
+  surface?: SurfaceTheme;
+};
 declare global {
   interface Window {
     ipc?: { postMessage: (message: string) => void };
@@ -22,27 +27,27 @@ export function surfaceStyle(appearance: Appearance, native = false): CSSPropert
     (!appearance.theme && matchMedia('(prefers-color-scheme: dark)').matches);
   const glass = material === 'native-glass';
   const translucent = material === 'frosted' || (glass && (!native || window.__buddyNativeGlass));
-  const ink = dark ? '#e8e8e1' : '#2c2e2b';
-  const paper = black ? '#090909' : dark ? '#232420' : '#faf9f6';
+  const colors = black ? {} : appearance.colors || {};
+  const ink = black ? '#eee' : colors.text || (dark ? '#f3f3f3' : '#202020');
+  const paper = black ? '#000' : colors['surface-opaque'] || (dark ? '#2b2b2b' : '#fafafa');
   const tint =
-    appearance.surface?.liquidVariant === 'clear'
-      ? dark
-        ? '#12121210'
-        : '#ffffff10'
-      : dark
-        ? '#23242070'
-        : '#faf9f680';
+    material === 'frosted'
+      ? `color-mix(in srgb, ${dark ? '#252525' : '#ededed'} 72%, transparent)`
+      : 'transparent';
   return {
     colorScheme: dark ? 'dark' : 'light',
     color: ink,
     background: translucent ? (native ? 'transparent' : tint) : paper,
-    backdropFilter: translucent && !native ? `blur(${glass ? 4 : 18}px)` : undefined,
+    backdropFilter:
+      translucent && !native ? (glass ? undefined : 'blur(24px) saturate(110%)') : undefined,
     '--paper': paper,
     '--board-bg': 'transparent',
-    '--surface': translucent ? (dark ? '#25272070' : '#fffefb80') : paper,
+    '--surface': translucent ? `color-mix(in srgb, ${paper} 28%, transparent)` : paper,
     '--ink': ink,
-    '--muted': dark ? '#a3a59a' : '#777b73',
-    '--line': dark ? '#ffffff20' : '#00000018',
+    '--muted': black ? '#999' : colors.muted || (dark ? '#aaa' : '#6f6f6f'),
+    '--accent': black ? '#75a7ff' : colors.accent || '#4d8dff',
+    '--hover': colors.hover || `color-mix(in srgb, ${ink} 6%, transparent)`,
+    '--line': colors.divider || `color-mix(in srgb, ${ink} 9%, transparent)`,
     fontSize: appearance.fontSize ? `${appearance.fontSize}px` : undefined,
   } as CSSProperties;
 }

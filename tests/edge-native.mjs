@@ -673,7 +673,7 @@ try {
       telemetry.native.nativeDark,
       theme === 'black' || appearance.hostTheme.theme === 'dark',
     );
-    if (theme === 'black') assert.equal(telemetry.background, 'rgb(9, 9, 9)');
+    if (theme === 'black') assert.equal(telemetry.background, 'rgb(0, 0, 0)');
     else if (effective === 'frosted') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
     else if (effective === 'native-glass') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
     assert.ok(telemetry.viewport[1] >= 280);

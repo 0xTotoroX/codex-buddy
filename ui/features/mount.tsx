@@ -13,6 +13,7 @@ export function mountFeature(
   placement: string,
   request: Request,
   onState: () => void,
+  motion?: { ready: () => Promise<unknown>; handoff: () => Promise<unknown>; failed?: () => void },
 ) {
   const shadow = element.attachShadow({ mode: 'open' }),
     style = document.createElement('style'),
@@ -29,11 +30,11 @@ export function mountFeature(
     useEffect(() => {
       if (initial.pending?.owner === owner)
         void request({ op: 'read', id: initial.id, owner })
-          .then(() => request({ op: 'ready', id: initial.id, owner }))
+          .then(() => (motion ? motion.ready() : request({ op: 'ready', id: initial.id, owner })))
           .then(() => {
             if (!stopped) onState();
           })
-          .catch(() => {});
+          .catch(() => motion?.failed?.());
     }, []);
     return null;
   }
@@ -42,9 +43,10 @@ export function mountFeature(
       <>
         <Ready />
         <FeatureView
+          beforeHandoff={motion?.handoff}
+          onHandoffError={motion?.failed}
           entry={entry}
           owner={owner}
-          placement={placement}
           request={request}
           onState={onState}
         />

@@ -1,33 +1,36 @@
 /* [INPUT]: Owner lease, business projection and a container-independent request function.
- * [OUTPUT]: Feature view with guarded actions, draft/reading handoff and placement controls.
+ * [OUTPUT]: Business content with guarded actions and draft/reading handoff; the surface owns chrome.
  * [POS]: Shared by native windows and host Shadow DOM surfaces; no host parsing.
  * [PROTOCOL]: Keep features/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Board } from '../board/app';
 import type { TaskRequest } from '../board/api';
 import type { PanelSnapshot, CommandResult, PanelCommand } from '../contracts';
+import { iconSvg } from '../panel/icons/index.js';
 import { ModelView, type ModelState } from './model';
 import { surfaceStyle, type Appearance } from './surface';
-import { createSvgGlass } from '../panel/glass/svg.js';
-import { titles, type Entry, type Request, type Reading } from './types';
+import { type Entry, type Request, type Reading } from './types';
 export function FeatureView({
   entry,
   owner,
   request,
-  placement,
   onState,
+  beforeHandoff,
+  onHandoffError,
 }: {
   entry: Entry;
   owner: string;
   request: Request;
-  placement: string;
   onState: () => void;
+  beforeHandoff?: () => Promise<unknown>;
+  onHandoffError?: () => void;
 }) {
   const reading = useRef<Reading>(structuredClone(entry.view || {}));
   const body = useRef<HTMLDivElement>(null);
   const gate = useRef(false);
   const restored = useRef(false);
   const wasMoving = useRef(false);
+  const handoffOwner = useRef('');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
   const [projection, setProjection] = useState<PanelSnapshot | null>(null),
@@ -49,15 +52,31 @@ export function FeatureView({
     return reading.current;
   }, []);
   useEffect(() => {
-    if (wasMoving.current && !entry.pending && entry.owner === owner)
+    if (wasMoving.current && !entry.pending && entry.owner === owner) {
+      onHandoffError?.();
       setError('切换未完成，已保留原位置。请检查目标窗口后重试。');
+    }
     wasMoving.current = entry.owner === owner && !!entry.pending;
   }, [entry.pending, entry.owner, owner]);
   useEffect(() => {
-    if (entry.owner === owner && entry.pending && !entry.pending.ready && !gate.current)
-      void call('handoff', { view: capture() })
+    if (!entry.pending) handoffOwner.current = '';
+    if (
+      entry.owner === owner &&
+      entry.pending &&
+      !entry.pending.ready &&
+      !gate.current &&
+      handoffOwner.current !== entry.pending.owner
+    ) {
+      handoffOwner.current = entry.pending.owner;
+      void Promise.resolve()
+        .then(() => beforeHandoff?.())
+        .then(() => call('handoff', { view: capture() }))
         .then(onState)
-        .catch(() => {});
+        .catch((e) => {
+          onHandoffError?.();
+          setError(String(e));
+        });
+    }
   }, [entry.pending, entry.owner, owner, call, capture, onState]);
   useEffect(() => {
     let stopped = false;
@@ -165,8 +184,6 @@ export function FeatureView({
     },
     [call, active],
   );
-  const move = (next: string) =>
-    operation(() => call('move', { placement: next, view: capture() }));
   const close = () => operation(() => call('close', { view: capture() }));
   useEffect(() => {
     const closing = () => void close();
@@ -215,72 +232,22 @@ export function FeatureView({
         ? projection?.settings.enabled
         : true;
   const disabled = locked || !connected || !enabled || projection?.association?.available === false;
-  const native = !!window.__buddyNativeSurface;
-  const surface = useRef<HTMLDivElement>(null);
-  const material = appearance.surface?.theme;
-  const variant = appearance.surface?.liquidVariant;
-  useEffect(() => {
-    if (native || material !== 'native-glass' || !surface.current) return;
-    let glass: { refresh: (variant?: string) => void; destroy: () => void } | undefined;
-    try {
-      glass = createSvgGlass(surface.current);
-    } catch {
-      return;
-    }
-    const refresh = () => glass?.refresh(variant);
-    refresh();
-    const resize = new ResizeObserver(refresh);
-    resize.observe(surface.current);
-    return () => {
-      resize.disconnect();
-      glass?.destroy();
-    };
-  }, [native, material, variant]);
   const style = surfaceStyle(
     {
       ...appearance,
       theme: projection?.theme || appearance.theme,
+      colors: projection?.colors || appearance.colors,
       fontSize: projection?.hostTypography?.baseItemFontSize || appearance.fontSize,
     },
-    native,
+    true,
   );
   return (
     <section
       className="feature-view"
       data-feature={entry.id}
       data-busy={busy}
-      data-material={material || 'matte'}
       style={{ ...style, background: 'transparent', backdropFilter: undefined }}
     >
-      <div
-        className="feature-material"
-        ref={surface}
-        style={{ background: style.background, backdropFilter: style.backdropFilter }}
-        aria-hidden="true"
-      />
-      <header className="feature-head">
-        <strong>{titles[entry.id]}</strong>
-        <select
-          aria-label={`${titles[entry.id]}显示位置`}
-          value={placement}
-          disabled={locked}
-          onChange={(e) => void move(e.target.value)}
-        >
-          <option value="sidebar">侧栏</option>
-          <option value="overlay">页面浮层</option>
-          <option value="desktop" disabled={entry.desktopSupported === false}>
-            桌面窗口
-          </option>
-          <option value="edge">贴边 / 刘海</option>
-        </select>
-        <button
-          aria-label={`关闭${titles[entry.id]}`}
-          disabled={locked}
-          onClick={() => void close()}
-        >
-          关闭
-        </button>
-      </header>
       {entry.pending && <p role="status">正在移到新位置…</p>}
       {error && <p role="alert">{error}</p>}
       {!connected && entry.id !== 'board' && <p role="status">宿主连接暂不可用，保留上次内容。</p>}
@@ -319,15 +286,22 @@ export function FeatureView({
           )
         ) : projection ? (
           <>
-            <p className="feature-source">{projection.sourceLabel}</p>
+            <p className="feature-source" hidden>
+              {projection.sourceLabel}
+            </p>
             {entry.id === 'outline' ? (
               <>
-                <button
-                  disabled={disabled || projection.scanBusy}
-                  onClick={() => void command('outline-refresh')}
-                >
-                  刷新大纲
-                </button>
+                <header className="feature-pane-head">
+                  <strong>大纲</strong>
+                  <button
+                    aria-label="刷新大纲"
+                    title="刷新大纲（本地）"
+                    disabled={disabled || projection.scanBusy}
+                    onClick={() => void command('outline-refresh')}
+                  >
+                    <span dangerouslySetInnerHTML={{ __html: iconSvg('refresh') }} />
+                  </button>
+                </header>
                 <nav aria-label="大纲">
                   {projection.outlineItems.map((item) => (
                     <button

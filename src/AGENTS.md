@@ -41,7 +41,7 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [panel_window.rs](panel_window.rs)：窗口子进程实现，被 main.rs 调用；系统窗口事件循环、只允许展开尺寸的 WebView IPC、位置恢复、原生 resize 同事务更新玻璃与 WebView、拒绝过期网页尺寸、只读宿主主题对应的窗口外观及 macOS 原生手势；通过共享 native_backdrop 按材质实时切换传统磨砂 NSVisualEffectView HUDWindow/BehindWindow/Active 与系统液态 NSGlassEffectView（始终展开，由 liquidVariant 选择 Regular/Clear），回读实际状态；应用侧圆角父视图限制外溢绘制，液态通过 contentView 承载 WebView，磨砂位于透明 WebView 下方；哑光关闭原生背景，macOS 15–25 的弹出液态回退哑光；弹出进程禁止后台任务暂停以维持浮窗投影和租约。
 - [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
 - [settings.rs](settings.rs)：分开维护保存版本与生成版本，大纲切换不取消生成；外部读取只返回密钥配置状态；Options、QuickPrompt、方向库/位置/来源与 Jev 同意和独立凭据、Update 及设置读取、校验和保存（maxInputChars 默认 0 表示完整最近一问一答，兼容旧正数上限）；快捷词持久化但不改变生成版本；返回后台检测的只读 popoutSupported。
-- [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
+- [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要（包含宿主语义色）；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
@@ -50,9 +50,9 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
 
 独立功能呈现：
-- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、内存阅读状态及独立窗口监督；不复制业务服务。
-- [feature_window.rs](feature_window.rs)：自有认证 feature.html 的可缩放 Wry 窗口；按活动 lease 显示、唤起与退出，关闭前经网页保留草稿。
+- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态及独立窗口监督；不复制业务服务。
+- [feature_window.rs](feature_window.rs)：独立 feature lease 的轻量入口，复用 panel_window::run_surface 的原生材质、几何与往返动效。
 
 App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 与 CDP 白名单，/surfaces 只管理呈现偏好/贴边租约。所有功能写入验 owner；旧模型窗口租约写入拒绝。
 
-- [surfaces.rs](surfaces.rs)：四形式独立主题、旧模型视觉偏好一次迁移、版本保护与共享贴边窗口租约/监督。
+- [surfaces.rs](surfaces.rs)：四形式独立主题、旧面板/模型视觉偏好一次迁移、宿主语义色投影、版本保护与共享贴边窗口租约/监督。

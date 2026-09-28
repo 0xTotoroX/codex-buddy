@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -46,6 +46,7 @@ pub struct View {
     pub panel_preferences: crate::panel::Preferences,
     pub panel_theme: Option<String>,
     pub panel_font_base: f64,
+    pub panel_colors: Value,
 }
 
 #[derive(Clone)]
@@ -116,6 +117,7 @@ impl App {
             panel_preferences: crate::panel::Preferences::read(&paths),
             panel_theme: None,
             panel_font_base: 13.,
+            panel_colors: json!({}),
         });
         Arc::new(Self {
             surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
@@ -353,17 +355,20 @@ impl App {
             .await?;
         let desktop = serde_json::from_value(result["desktop"].clone())?;
         let theme = result["theme"].as_str().map(String::from);
+        let colors = result["colors"].clone();
         let font_base = result["fontBase"].as_f64().unwrap_or(13.);
         self.views.send_if_modified(|view| {
             if view.desktop == desktop
                 && view.panel_theme == theme
                 && view.panel_font_base == font_base
+                && view.panel_colors == colors
             {
                 return false;
             }
             view.desktop = desktop;
             view.panel_theme = theme;
             view.panel_font_base = font_base;
+            view.panel_colors = colors;
             view.updated_at = now();
             true
         });

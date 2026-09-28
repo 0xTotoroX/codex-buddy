@@ -120,6 +120,23 @@ impl Surfaces {
                 }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 let mut p = Preferences::default();
+                let previous = crate::panel::Preferences::read(paths);
+                for placement in ["overlay", "desktop"] {
+                    p.themes.insert(
+                        placement.into(),
+                        Theme {
+                            theme: previous.ui.material.clone(),
+                            liquid_variant: previous.ui.liquid_variant.clone(),
+                        },
+                    );
+                }
+                p.themes.insert(
+                    "sidebar".into(),
+                    Theme {
+                        theme: "native-glass".into(),
+                        liquid_variant: "clear".into(),
+                    },
+                );
                 // Import visual preferences once; the old model file remains untouched.
                 if let Ok(bytes) = std::fs::read(paths.root.join("model-control.json"))
                     && let Ok(old) = serde_json::from_slice::<Value>(&bytes)
@@ -220,7 +237,7 @@ impl App {
     pub async fn surface_appearance(&self, placement: &str) -> Value {
         let theme = self.surfaces.lock().await.theme(placement);
         let view = self.view();
-        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"surface":theme})
+        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"surface":theme})
     }
     pub async fn surface_request(&self, input: Value) -> Result<Value> {
         let op = input["op"].as_str().unwrap_or("state");
@@ -236,7 +253,7 @@ impl App {
                     .clone(),
             );
             return Ok(
-                json!({"valid":active && !s.lease.is_empty() && input["lease"]==s.lease,"preferences":preferences,"reveal":s.reveal,"pid":s.child.as_ref().map(|c|c.id()),"appearance":{"hostTheme":{"theme":appearance["theme"]},"fontOffset":appearance["fontSize"].as_f64().unwrap_or(13.)-13.}}),
+                json!({"valid":active && !s.lease.is_empty() && input["lease"]==s.lease,"preferences":preferences,"reveal":s.reveal,"pid":s.child.as_ref().map(|c|c.id()),"appearance":{"hostTheme":{"theme":appearance["theme"],"colors":appearance["colors"]},"fontOffset":appearance["fontSize"].as_f64().unwrap_or(13.)-13.}}),
             );
         }
         let mut s = self.surfaces.lock().await;

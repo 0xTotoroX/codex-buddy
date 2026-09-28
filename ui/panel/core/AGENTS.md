@@ -22,4 +22,4 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 
 看板的 Shadow DOM 键盘由任务组件处理，外壳快捷键通过 composedPath 避让；仅看板开启时仍保留空闲表情入口。收起/销毁工作台必须卸载功能 root 与轮询。
 
-views 在独立呈现时保留业务根与主题但隐藏旧壳；interaction 通过 composedPath 排除功能 Shadow DOM 输入，避免截获编辑快捷键。
+views 在独立呈现时复用原壳和 geometry 动效，只由 feature-host 替换内容；currentAppearance 接收当前形式的材质覆盖，不改写历史本地偏好。interaction 保留原单击/双击识别，通过 composedPath 避让功能输入。

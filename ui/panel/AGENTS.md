@@ -23,4 +23,4 @@ workbench/association 提供共享聊天关联入口，策略由 host/context �
 
 功能组合由 workbench/features.js 选择旧双面板、大纲或看板；承载形式复用原占位/浮层/桌面交接。看板依赖 ui/board 的视图与注入任务传输，不依赖聊天内容或 Stepwise。
 
-独立模式由 workbench/feature-host 组合 ui/features；无独立位置配置时保留旧展示。core/views 保留业务根/主题并隐藏旧视觉壳，lifecycle 统一启停新视图和轮询。
+独立模式由 workbench/feature-host 组合 ui/features；无独立位置配置时保留旧展示。core/views 保留原胶囊外壳、主题和 geometry 收放动效，功能挂载到原工作台内容区；chrome 提供共用头部，lifecycle 路由独立窗口与停靠手势。
