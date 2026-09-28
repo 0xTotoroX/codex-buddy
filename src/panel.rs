@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化，收回偏好按版本校验并保存。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -281,6 +281,10 @@ pub struct Input {
 pub struct TaskView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub editor: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quick_add: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grid_left: Option<f64>,
     pub search: String,
     pub tab: String,
     pub stage: String,
@@ -324,9 +328,19 @@ impl ReadingState {
                 .editor
                 .as_ref()
                 .is_some_and(|v| v.to_string().len() > 128 * 1024)
+                || view
+                    .quick_add
+                    .as_ref()
+                    .is_some_and(|v| v.to_string().len() > 8192)
+                || view.grid_left.is_some_and(|x| !x.is_finite() || x < 0.)
                 || view.search.len() > 4000
                 || !["board", "archive", "attention"].contains(&view.tab.as_str())
-                || !["todo", "doing", "waiting", "done"].contains(&view.stage.as_str()))
+                || view.stage.is_empty()
+                || view.stage.len() > 64
+                || !view
+                    .stage
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'-'))
         {
             bail!("任务视图状态无效");
         }
@@ -1098,6 +1112,8 @@ mod tests {
         assert!(old.validate().is_ok());
         assert_eq!(json!(old), legacy);
         let mut value = legacy;
+        value["taskView"] = json!({"search":"task","tab":"board","stage":"group-custom",
+            "quickAdd":{"column":"group-custom","title":"未保存任务"},"gridLeft":240.});
         value["panes"] = json!({
             "outline":{"contentToken":"outline-content","scrollTop":320.},
             "next":{"contentToken":"prompt-content","scrollTop":120.}

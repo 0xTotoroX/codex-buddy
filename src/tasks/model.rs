@@ -1,5 +1,5 @@
 // [INPUT]: JSON task fields and complete EventKit snapshots.
-// [OUTPUT]: Durable tasks and local groups, list bindings and three-way field merge.
+// [OUTPUT]: Durable tasks, removed reminder identities, local groups and three-way field merge.
 // [POS]: Pure task domain; no native objects, host connection or model calls.
 // [PROTOCOL]: Keep tasks/AGENTS.md in sync when changing the contract.
 use serde::{Deserialize, Serialize};
@@ -97,6 +97,29 @@ pub struct Remote {
     pub marker: Option<String>,
     pub fields: Fields,
     pub recurring: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReminderIdentity {
+    pub id: String,
+    pub external_id: Option<String>,
+    pub marker: Option<String>,
+}
+impl From<&Remote> for ReminderIdentity {
+    fn from(remote: &Remote) -> Self {
+        Self {
+            id: remote.id.clone(),
+            external_id: remote.external_id.clone(),
+            marker: remote.marker.clone(),
+        }
+    }
+}
+impl ReminderIdentity {
+    fn matches(&self, remote: &Remote) -> bool {
+        self.id == remote.id
+            || (self.external_id.is_some() && self.external_id == remote.external_id)
+            || (self.marker.is_some() && self.marker == remote.marker)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -237,6 +260,8 @@ pub struct Store {
     #[serde(default = "default_columns")]
     pub columns: Vec<BoardColumn>,
     pub tasks: Vec<Task>,
+    #[serde(default)]
+    pub deleted_reminders: Vec<ReminderIdentity>,
     pub inflight: Option<Intent>,
     pub window_size: [u32; 2],
 }
@@ -251,6 +276,7 @@ impl Default for Store {
             binding_source: None,
             columns: default_columns(),
             tasks: vec![],
+            deleted_reminders: vec![],
             inflight: None,
             window_size: [1120, 740],
         }
@@ -327,6 +353,7 @@ pub fn reconcile(store: &mut Store, snapshot: &Snapshot) {
     }
     for remote in &snapshot.reminders {
         if used.contains(&remote.id)
+            || store.deleted_reminders.iter().any(|id| id.matches(remote))
             || store.tasks.iter().any(|t| {
                 t.remote.as_ref().is_some_and(|r| {
                     r.id == remote.id

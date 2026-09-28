@@ -4,7 +4,7 @@
 
 四种功能共用内容实现，只消费业务投影和受限操作。任务拖放、建议预览及模型选择属于功能；外层窗口、位置、分栏、主题与交接由 surfaces 管理。任务保存和提醒事项同步保留在 Rust，必须读取或操作 Codex DOM 的逻辑保留在 codex。
 
-- [board/AGENTS.md](board/AGENTS.md)：卡片、组内创建、任务编辑与跨组拖动。
+- [board/AGENTS.md](board/AGENTS.md)：卡片、组内创建、悬停删除、同步异常处理与跨组拖动。
 - [outline/AGENTS.md](outline/AGENTS.md)：大纲列表、编号对齐及定位操作。
 - [next/AGENTS.md](next/AGENTS.md)：建议列表、预览与点击规则。
 - [model/AGENTS.md](model/AGENTS.md)：模型矩阵、预设和选择操作。

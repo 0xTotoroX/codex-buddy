@@ -1,5 +1,5 @@
 /* [INPUT]: Task API, native window events and drag/drop components.
- * [OUTPUT]: Editable task groups, inline creation and compact tabs or wide columns.
+ * [OUTPUT]: Task groups, inline creation/removal and compact tabs or wide columns.
  * [POS]: Task-only application entry; no Codex/model dependencies.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,23 +10,14 @@ import {
   taskGroup,
   useTasks,
   type Task,
-  type Fields,
   type TaskRequest,
 } from './api';
 import { Column, TaskCard, taskDragOver, taskDrop } from './card';
-import { Editor } from './editor';
-export type BoardEditor = {
-  task: Task | null;
-  revision: number;
-  draft?: Fields;
-  suspended?: boolean;
-};
 export type BoardView = {
   search: string;
   stage: string;
   tab: string;
   gridLeft?: number;
-  editor?: BoardEditor | null;
   quickAdd?: { column: string; title: string } | null;
 };
 export function Board({
@@ -53,7 +44,6 @@ export function Board({
     return () => observer.disconnect();
   }, [!!state]);
   const tab = 'board';
-  const [editor, setEditor] = useState<BoardEditor | null>(view?.editor ?? null);
   const [search, setSearch] = useState(view?.search ?? '');
   const [searchOpen, setSearchOpen] = useState(!!view?.search);
   const [quickAdd, setQuickAdd] = useState(view?.quickAdd ?? null);
@@ -63,8 +53,8 @@ export function Board({
     if (!columns.some((c) => c.id === stage)) setStage('todo');
   }, [columns, stage]);
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd });
-  }, [view, search, stage, tab, editor, quickAdd]);
+    if (view) Object.assign(view, { search, stage, tab, quickAdd });
+  }, [view, search, stage, tab, quickAdd]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(
@@ -109,7 +99,7 @@ export function Board({
       key={task.id}
       task={task}
       disabled={busy || !state.store.boardEnabled || state.store.inflight?.taskId === task.id}
-      edit={() => setEditor({ task, revision: state.store.revision })}
+      command={command}
       before={(id) => move(id, taskGroup(task), task.id)}
     />
   );
@@ -222,14 +212,6 @@ export function Board({
             </nav>
           </div>
         )}
-        {editor?.suspended && (
-          <button
-            className="resume-draft"
-            onClick={() => setEditor({ ...editor, suspended: false })}
-          >
-            继续编辑草稿
-          </button>
-        )}
         {error && (
           <p role="alert" className="error">
             {error}
@@ -294,23 +276,6 @@ export function Board({
           {boardTools}
         </footer>
       </main>
-      {editor && !editor.suspended && (
-        <Editor
-          key={`${editor.task?.id ?? 'new'}-${editor.revision}`}
-          columns={columns}
-          task={editor.task}
-          draft={editor.draft}
-          onDraft={(draft) => {
-            editor.draft = draft;
-            if (view) view.editor = editor;
-          }}
-          suspend={() => setEditor({ ...editor, suspended: true })}
-          busy={busy}
-          error={error}
-          close={() => setEditor(null)}
-          command={command}
-        />
-      )}
     </div>
   );
 }

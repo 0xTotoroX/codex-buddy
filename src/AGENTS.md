@@ -47,7 +47,7 @@ ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模�
 
 - [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、单列表三共享字段合并与旧数据安全升级、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
 
-工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
+工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token，接续自定义分组、快速新建草稿与横向位置；旧 editor 字段仅为旧客户端往返保留，新界面不呈现。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
 
 独立功能呈现：
 - [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态与主窗口监督；不复制业务服务。

@@ -1,4 +1,4 @@
-/* [INPUT]: Shared semantic tokens. [OUTPUT]: Responsive board and editor presentation.
+/* [INPUT]: Shared semantic tokens. [OUTPUT]: Responsive board, hover removal and inline recovery presentation.
  * [POS]: Standalone scoped page styling. [PROTOCOL]: Keep board/AGENTS.md in sync. */
 :root {
   font:
@@ -110,9 +110,6 @@ h1 {
   min-height: 0;
   padding: 16px 24px 24px;
 }
-.board-main > .resume-draft {
-  align-self: flex-start;
-}
 .board-toolbar {
   display: flex;
   align-items: center;
@@ -200,7 +197,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--surface);
-  padding: 12px 14px;
+  padding: 12px 44px 12px 14px;
   box-shadow: none;
 }
 .task-card[draggable='true'],
@@ -223,6 +220,50 @@ h1 {
 .drop-column {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+.board-app .card-delete {
+  position: absolute;
+  top: 9px;
+  right: 7px;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.task-card:hover .card-delete,
+.task-card:focus-within .card-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+.board-app .card-delete:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.task-recovery {
+  margin-top: 8px;
+  margin-right: -30px;
+}
+.task-recovery summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  cursor: pointer;
+}
+.task-recovery .recovery {
+  margin: 8px 0 0;
+}
+@media (hover: none) {
+  .board-app .card-delete {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .board-app .card-title {
   display: block;
@@ -278,9 +319,6 @@ h1 {
   font-size: 15px;
   border-radius: 10px;
 }
-.resume-draft {
-  margin-bottom: 12px;
-}
 .stage-tabs {
   display: flex;
   gap: 4px;
@@ -313,6 +351,9 @@ h1 {
 .embedded .board-main {
   padding: 12px;
 }
+.embedded .board-footer {
+  padding-right: 4px;
+}
 .embedded button.primary {
   color: var(--paper, var(--surface));
 }
@@ -329,68 +370,10 @@ h1 {
 .danger {
   color: var(--danger);
 }
-.task-editor {
-  width: min(560px, calc(100vw - 40px));
-  max-height: calc(100vh - 48px);
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  padding: 24px;
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow: 0 20px 80px #0003;
-}
-.task-editor::backdrop {
-  background: #0005;
-}
-.task-editor header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.task-editor h2 {
-  font-size: 18px;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
-.task-editor header button {
-  border: 0;
-  font-size: 22px;
-  padding: 0 8px;
-}
-.task-editor label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 16px;
-  font-size: 15px;
-  color: var(--muted);
-}
-.task-editor input,
-.task-editor textarea,
-.task-editor select {
-  color: var(--ink);
-  width: 100%;
-}
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-.task-editor footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 24px;
-}
 .actions {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-}
-.hint {
-  font-size: 14px;
-  color: var(--muted);
 }
 .recovery {
   margin-bottom: 18px;
@@ -431,6 +414,9 @@ h1 {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .board-app .card-delete {
+    transition: none;
+  }
   button:active {
     transform: none;
   }

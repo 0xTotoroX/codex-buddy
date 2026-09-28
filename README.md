@@ -66,10 +66,10 @@ Task content stays local and is never sent to a model. An internal **CodexBuddy 
 In Web settings, use **显示与布局 → 主界面** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
 
 The settings **总览** (overview) reuses the former embedded settings summary layout to display saved feature placement, themes, layout, generation options, board groups and model selection. Edit options in their respective categories.
-The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Open a card for notes; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
+The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Hover over a card to reveal its trash button and remove it from Buddy immediately. The Apple reminder stays intact and is not imported again. Cards do not open details; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
 
 
-Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
+Return an existing desktop workbench before entering independent mode. Moving preserves reading state and inline creation drafts for the current service session without leaving the form. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
 
 Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 

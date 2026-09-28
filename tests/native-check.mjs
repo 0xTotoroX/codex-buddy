@@ -290,11 +290,19 @@ function probePage() {
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
         if (cmd.kind === 'board-stage') {
-          const select = document
-            .querySelector('.csw-board-mount')
-            .shadowRoot.querySelector('select[aria-label="移动 原生试点任务"]');
-          select.value = 'doing';
-          select.dispatchEvent(new Event('change', { bubbles: true }));
+          const board = document.querySelector('.csw-board-mount').shadowRoot;
+          const target =
+            [...board.querySelectorAll('.stage-tabs button')].find(
+              (node) => node.textContent === '进行中',
+            ) || board.querySelector('[aria-label="进行中"]');
+          const dataTransfer = new DataTransfer();
+          board
+            .querySelector('.task-card')
+            .dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer }));
+          target.dispatchEvent(new DragEvent('drop', { bubbles: true, dataTransfer }));
+          board
+            .querySelector('.task-card')
+            .dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer }));
         }
         if (cmd.kind === 'workbench-layout')
           document

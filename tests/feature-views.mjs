@@ -233,29 +233,30 @@ try {
   await page.screenshot({ path: join(output, 'board-liquid.png') });
   const stageTabs = board.getByRole('navigation', { name: '任务阶段' });
   await board
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .dragTo(stageTabs.getByRole('button', { name: '进行中', exact: true }));
   await board
     .getByRole('region', { name: '进行中', exact: true })
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .waitFor();
   assert.equal(task.fields.column, 'doing');
   await board
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .dragTo(stageTabs.getByRole('button', { name: '待办', exact: true }));
   await board
     .getByRole('region', { name: '待办', exact: true })
-    .getByRole('button', { name: '隔离任务', exact: true })
+    .getByText('隔离任务', { exact: true })
     .waitFor();
   assert.equal(task.fields.column, 'todo');
   record('real mouse drag moves a card across compact group tabs inside Shadow DOM');
   surfaceTheme = 'matte';
-  await board.getByRole('button', { name: '隔离任务', exact: true }).click();
-  await board.getByLabel('标题', { exact: true }).fill('还未保存');
+  if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))
+    await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('还未保存');
   await page.evaluate(() => window.ipc.postMessage(JSON.stringify({ action: 'collapse' })));
   await page.evaluate(() => window.ipc.postMessage(JSON.stringify({ action: 'expand' })));
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   await page
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '模型快切' })
@@ -270,9 +271,9 @@ try {
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '看板', exact: true })
     .click();
-  await board.getByRole('button', { name: '继续编辑草稿' }).click();
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   assert.equal(task.fields.title, '隔离任务');
   record('edge settings uses the active owner; blank handle and Escape preserve tab drafts');
   await page
@@ -484,14 +485,15 @@ try {
   record('model tools, expanded rows and horizontal reading survive remount');
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
-  await board.getByRole('button', { name: '隔离任务', exact: true }).click();
-  await board.getByLabel('标题', { exact: true }).fill('还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))
+    await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('还未保存');
+
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByRole('tab', { name: '看板', exact: true }).click();
-  await board.getByRole('button', { name: '继续编辑草稿' }).click();
-  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
-  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
+  assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
+
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   assert.equal(await page.getByLabel('模型快切显示位置').count(), 0);
   entries.find((e) => e.id === 'model').reveal++;
@@ -550,9 +552,9 @@ try {
   const searchBox = await board.getByRole('searchbox', { name: '搜索任务' }).boundingBox();
   assert.ok(Math.abs(searchBox.y + searchBox.height / 2 - tools.y - tools.height / 2) < 6);
   await board.getByRole('searchbox', { name: '搜索任务' }).fill('没有匹配任务');
-  assert.equal(await board.getByRole('button', { name: '隔离任务', exact: true }).count(), 0);
+  assert.equal(await board.getByText('隔离任务', { exact: true }).count(), 0);
   await board.getByRole('button', { name: '搜索任务', exact: true }).click();
-  await board.getByRole('button', { name: '隔离任务', exact: true }).waitFor();
+  await board.getByText('隔离任务', { exact: true }).waitFor();
   await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByLabel('窗口置顶', { exact: true }).click();

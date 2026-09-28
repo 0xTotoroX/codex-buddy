@@ -23,7 +23,7 @@ state 从独立宿主存储恢复聊天关联元数据；presentation 投影来�
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
-state 的 feature 仅决定活动视图，runtimeEnabled 依据真实功能开关；taskView 保存任务搜索/阶段/页签，与聊天 token 无关。presentation 独立接续 taskView，大纲仍检查原阅读 token。windowToggle 的可选 expand 只用于显式选择返回承载形式，旧手势保持原行为。
+state 的 feature 仅决定活动视图，runtimeEnabled 依据真实功能开关；taskView 保存任务搜索/自定义阶段/页签/快速新建草稿/横向位置，与聊天 token 无关。presentation 独立接续 taskView，大纲仍检查原阅读 token。windowToggle 的可选 expand 只用于显式选择返回承载形式，旧手势保持原行为。
 
 lifecycle 同时安装/销毁独立功能嵌入适配器；扫描忽略自有功能节点，settings 的 modelControlEnabled 允许只开模型时保留入口。独立呈现不复制生成、识别或写入逻辑。
 

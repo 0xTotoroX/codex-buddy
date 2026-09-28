@@ -78,14 +78,14 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 
 形态边界回归覆盖宿主不支持侧栏时鼠标/键盘展开不改位置、显式替代选择、宿主恢复和运行时重载；菜单销毁与 Escape 取消。popout-preferences 与 Rust panel 单测覆盖收回动画期间外部修改位置的冲突拒绝、最后防抖偏好保存及失败后的窗口保留。
 
-- [board.mjs](board.mjs)：隔离任务服务的认证、创建编辑、键盘阶段选择、拖拽、归档、重启恢复、修订冲突和删除接口拒绝；渲染浅色/深色/窄窗口证据到 target/reports/board，绝不授权或写入真实提醒事项。
+- [board.mjs](board.mjs)：隔离任务服务的认证、组内创建、悬停/聚焦删除、拖拽、归档、重启恢复、修订冲突和双端删除接口拒绝；渲染浅色/深色/窄窗口证据到 target/reports/board，绝不授权或写入真实提醒事项。
 
 - [feature-surfaces.mjs](feature-surfaces.mjs)：由 workbench.mjs 执行的功能/容器试点，验证状态接续、任务唯一性、独立开关、轮询回收、Shadow DOM 键盘及宿主断连后任务编辑；使用合成任务，不访问 EventKit。
 - native-check.mjs 的 --features-only 在真实 Wry/AppKit 窗口中验证大纲/看板选择、任务更新及宽窄布局，报告位于 target/reports/native-features；不连接用户聊天或提醒事项。
 
 `independent-features.mjs`：唯一主界面的十轮侧栏/浮层交接、关闭状态与草稿保留、模型回读及无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的整组位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、共享 PID、恰好一个可见主窗口、返回后旧租约立即回收及往返。
 
-看板简化验收：board.mjs 覆盖组内创建、宽跨列/窄标签真实拖放、分组改名新增与重启保留、旧 waiting/日期及归档记录保留、删除接口拒绝；feature-surfaces 保持搜索与草稿跨容器接续。
+看板简化验收：board.mjs 覆盖组内创建、宽跨列/窄标签真实拖放、分组改名新增与重启保留、旧 waiting/日期及归档记录保留、本地删除持久化与双端删除拒绝；feature-surfaces 保持搜索与草稿跨容器接续。
 
 independent-features 的配置操作模拟设置 API；十轮往返保留草稿，并验证桥繁忙后的 ready/handoff 重试、侧栏收起再开，实际采样胶囊展开/收回中的 morphing 状态及 84×36 收起尺寸，检查没有新增功能菜单或位置选择器。
 

@@ -301,12 +301,11 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.equal(await capsule.locator('.csw-status-stage').count(), 1);
         assert.equal(await page.locator('select[aria-label="打开功能"]').count(), 0);
         const board = page.locator('[data-feature="board"]');
-        await board.getByRole('button', { name: '保留原任务', exact: true }).waitFor();
+        await board.getByText('保留原任务', { exact: true }).waitFor();
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
-        await board.getByRole('button', { name: '保留原任务', exact: true }).click();
-        await board.getByLabel('标题', { exact: true }).fill('尚未保存的标题');
-        await board.getByLabel('备注', { exact: true }).fill('切换位置仍保留');
-        await board.getByRole('button', { name: '保留草稿并返回' }).click();
+        await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+        await board.getByLabel('新任务标题', { exact: true }).fill('尚未保存的标题');
+
         for (let i = 0; i < 10; i++) {
           await configureFeature('board', 'overlay');
           await page.waitForFunction(
@@ -314,7 +313,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               window.workbenchFixture.features.get('board').placement === 'overlay' &&
               !window.workbenchFixture.features.get('board').pending,
           );
-          await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+          await board.getByLabel('新任务标题', { exact: true }).waitFor();
           assert.equal(await outline.count(), 1);
           if (i === 0) {
             await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -346,7 +345,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               await page.locator('.csw-feature-menu,select[aria-label="打开功能"]').count(),
               0,
             );
-            await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+            await board.getByLabel('新任务标题', { exact: true }).waitFor();
             assert.equal(
               await page.locator('[data-companion-stepwise-root]').count(),
               1,
@@ -366,22 +365,18 @@ export function independentFeatureCases({ mode, syncSettings }) {
               window.workbenchFixture.features.get('board').placement === 'sidebar' &&
               !window.workbenchFixture.features.get('board').pending,
           );
-          await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+          await board.getByLabel('新任务标题', { exact: true }).waitFor();
           assert.equal(await page.locator('[data-feature="board"]').count(), 1);
           assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
         }
-        await board.getByRole('button', { name: '继续编辑草稿' }).click();
+
         assert.equal(
-          await board.getByLabel('标题', { exact: true }).inputValue(),
+          await board.getByLabel('新任务标题', { exact: true }).inputValue(),
           '尚未保存的标题',
         );
-        assert.equal(
-          await board.getByLabel('备注', { exact: true }).inputValue(),
-          '切换位置仍保留',
-        );
-        await board.getByRole('button', { name: '保留草稿并返回' }).click();
+
         await page.waitForFunction(
-          () => window.workbenchFixture.features.get('board').view.board?.editor?.draft,
+          () => window.workbenchFixture.features.get('board').view.board?.quickAdd,
         );
         await page.evaluate(() => {
           const e = window.workbenchFixture.features.get('board');
@@ -405,7 +400,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
 
         await openFeature('board');
-        await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+        await board.getByLabel('新任务标题', { exact: true }).waitFor();
         assert.equal(
           await page.evaluate(() => window.workbenchFixture.featureActions.length),
           0,

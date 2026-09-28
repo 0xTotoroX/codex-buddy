@@ -1,9 +1,10 @@
-/* [INPUT]: Task DTO and edit/move handlers. [OUTPUT]: Draggable title cards and column drop areas.
+/* [INPUT]: Task DTO and command/move handlers. [OUTPUT]: Draggable cards with hover removal and recovery.
  * [POS]: Native drag events stay inside the board Shadow DOM; no document-level retargeting.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useState, type DragEvent, type ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { Task } from './api';
+import { Recovery } from './recovery';
 const taskType = 'application/x-codex-buddy-task';
 export function taskDragOver(event: DragEvent) {
   if (!event.dataTransfer.types.includes(taskType)) return false;
@@ -20,12 +21,12 @@ export function taskDrop(event: DragEvent, move: (id: string) => void) {
 export function TaskCard({
   task,
   disabled,
-  edit,
+  command,
   before,
 }: {
   task: Task;
   disabled: boolean;
-  edit: () => void;
+  command: (data: Record<string, unknown>) => Promise<unknown>;
   before: (id: string) => void;
 }) {
   const [dragging, setDragging] = useState(false);
@@ -62,19 +63,29 @@ export function TaskCard({
       }}
       className={`task-card ${dragging ? 'dragging' : ''} ${over ? 'drop-before' : ''}`}
     >
-      <button className="card-title" onClick={edit}>
-        {task.fields.title}
+      <span className="card-title">{task.fields.title}</span>
+      <button
+        type="button"
+        className="card-delete"
+        aria-label={`删除任务：${task.fields.title}`}
+        title="删除任务"
+        disabled={disabled}
+        draggable={false}
+        onPointerDown={(event) => event.stopPropagation()}
+        onDragStart={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        onClick={(event) => {
+          event.stopPropagation();
+          void command({ op: 'remove', id: task.id, expectedTask: task });
+        }}
+      >
+        <Trash2 size={18} aria-hidden="true" />
       </button>
-      {(task.conflict || task.remoteMissing || task.remote?.recurring) && (
-        <div className="card-meta">
-          {(task.conflict || task.remoteMissing) && (
-            <span className="attention">
-              <AlertCircle size={12} />
-              需要处理
-            </span>
-          )}
-          {task.remote?.recurring && <span>重复 · 只读</span>}
-        </div>
+      {task.remote?.recurring && <div className="card-meta">重复 · 只读</div>}
+      {(task.conflict || task.remoteMissing) && (
+        <Recovery task={task} busy={disabled} command={command} />
       )}
     </article>
   );
