@@ -8,6 +8,7 @@ import { Field, Feedback } from './settings-controls';
 import { NativeSelect } from './components/ui/native-select';
 import { titles, type FeatureState } from '../shared/features';
 import { resolveFeatureLayout } from '../surfaces/workspace/layout';
+import { layoutGroups } from '../surfaces/workspace/layout-tree';
 export function FeatureSettings({
   live,
   desktopSupported,
@@ -91,11 +92,11 @@ export function FeatureSettings({
   const mode =
     layout.groups.length === 1
       ? 'tabs'
-      : layout.groups.some((g) => g.ids.length > 1)
+      : layout.groups.some((g) => 'groups' in g || g.ids.length > 1)
         ? 'custom'
         : layout.axis;
   function arrange(mode: string) {
-    const ordered = [...new Set([...layout.groups.flatMap((g) => g.ids), ...ids])];
+    const ordered = [...new Set([...layoutGroups(layout).flatMap((g) => g.ids), ...ids])];
     if (!ordered.length) return;
     void change({
       op: 'main-layout',

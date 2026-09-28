@@ -13,8 +13,14 @@ export function installArrangement(
     write,
     update,
     enabled,
-    arrange = (value, pane, action, width, height, _target) =>
-      arrangeWorkbench(value, pane, action, width, height),
+    arrange = /** @returns {import('../../shared/features').FeatureLayout | import('../../shared/contracts').WorkbenchLayout} */ (
+      value,
+      pane,
+      action,
+      width,
+      height,
+      _target,
+    ) => arrangeWorkbench(value, pane, action, width, height),
     targetAt = null,
   },
 ) {

@@ -163,10 +163,11 @@
   display: none !important;
 }
 
-.csw-workbench-panes[data-axis='horizontal'] .csw-workbench-split {
+:is(.csw-workbench-panes, .csw-feature-split)[data-axis='horizontal'] > .csw-workbench-split {
   cursor: col-resize;
 }
-.csw-workbench-panes[data-axis='horizontal'] .csw-workbench-split::after {
+:is(.csw-workbench-panes, .csw-feature-split)[data-axis='horizontal']
+  > .csw-workbench-split::after {
   inset: 10px auto 10px 3px;
   width: 1px;
   height: auto;
@@ -604,4 +605,12 @@
   .csw-feature-header-actions button {
     transition: none;
   }
+}
+
+/* Nested splits own their axis; they share the existing separator and pane styling. */
+.csw-feature-split {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
 }

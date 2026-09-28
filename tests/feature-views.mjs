@@ -703,6 +703,111 @@ try {
     assert.equal(actions.at(-1).data.kind, kind);
   }
   record('desktop split refresh buttons share their own tab row and dispatch the matching action');
+  // Build the user's T-shaped layout through the same pointer gestures as the UI.
+  entries.push({
+    id: 'board',
+    owner: 'board-owner',
+    placement: 'desktop',
+    open: true,
+    view: {},
+    size: [840, 620],
+    reveal: 1,
+    pending: null,
+  });
+  projection.outlineItems = Array.from({ length: 50 }, (_, i) => ({
+    id: `long-${i}`,
+    text: `有实际内容的长大纲条目 ${i + 1}，用于检查分栏后的阅读区域`,
+    displayLevel: i % 3,
+  }));
+  layouts.desktop = {
+    axis: 'auto',
+    groups: [{ ids: ['outline', 'next', 'board'], active: 'board', weight: 1 }],
+  };
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.reload();
+  await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
+  await board.getByLabel('新任务标题', { exact: true }).fill('嵌套分栏中保留的草稿');
+  const dragTab = async (name, destination, edge) => {
+    const source = await page.getByRole('tab', { name, exact: true }).boundingBox();
+    const target = await page.locator(destination).boundingBox();
+    await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(
+      target.x + (edge === 'right' ? target.width - 15 : target.width / 2),
+      target.y + (edge === 'bottom' ? target.height - 15 : target.height / 2),
+      { steps: 12 },
+    );
+    await page.locator('.csw-drop-preview:not([hidden])').waitFor();
+    await page.mouse.up();
+    await page.waitForFunction(() => !document.querySelector('[data-layout-saving="true"]'));
+  };
+  await dragTab('看板', '.csw-feature-panes > section', 'bottom');
+  const topBefore = await page.locator('.csw-feature-panes > section').first().boundingBox();
+  await dragTab('下一步', '[data-pane="board"]', 'right');
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 3);
+  assert.equal(await page.locator('.csw-feature-split').count(), 1);
+  const upper = await page.locator('[data-pane="outline"]').boundingBox();
+  const lowerLeft = await page.locator('[data-pane="board"]').boundingBox();
+  const lowerRight = await page.locator('[data-pane="next"]').boundingBox();
+  assert.ok(
+    Math.abs(upper.height - topBefore.height) < 2,
+    'splitting the bottom keeps the top allocation',
+  );
+  assert.ok(Math.abs(upper.height - lowerLeft.height) < 2, 'top and bottom start at half');
+  assert.ok(Math.abs(lowerLeft.width - lowerRight.width) < 2, 'bottom children start at half');
+  assert.ok(Math.abs(lowerLeft.y - lowerRight.y) < 2 && lowerLeft.y > upper.y + upper.height);
+  assert.ok(Math.abs(upper.width - lowerLeft.width - lowerRight.width - 8) < 2);
+  const outer = page.locator('.csw-feature-panes > [role="separator"]');
+  const inner = page.locator('.csw-feature-split > [role="separator"]');
+  assert.equal(await outer.getAttribute('aria-orientation'), 'horizontal');
+  assert.equal(await inner.getAttribute('aria-orientation'), 'vertical');
+  await inner.focus();
+  await inner.press('ArrowRight');
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  assert.equal(await outer.getAttribute('aria-valuenow'), '50');
+  await outer.focus();
+  await outer.press('ArrowDown');
+  assert.ok(Number(await outer.getAttribute('aria-valuenow')) > 50);
+  await page.getByRole('tab', { name: '下一步', exact: true }).dblclick();
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 1);
+  assert.equal(await page.getByRole('separator', { name: '调整分栏比例' }).count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 3);
+  assert.equal(
+    await board.getByLabel('新任务标题', { exact: true }).inputValue(),
+    '嵌套分栏中保留的草稿',
+  );
+  await page.screenshot({ path: join(output, 'nested-split-wide.png') });
+  const savedNested = structuredClone(layouts.desktop);
+  await page.reload();
+  await inner.waitFor();
+  assert.deepEqual(layouts.desktop, savedNested);
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  await page.setViewportSize({ width: 360, height: 900 });
+  await page.waitForFunction(
+    () => document.querySelector('.csw-feature-split')?.dataset.axis === 'vertical',
+  );
+  assert.deepEqual(
+    layouts.desktop,
+    savedNested,
+    'narrow fallback does not rewrite saved directions',
+  );
+  await page.screenshot({ path: join(output, 'nested-split-narrow.png') });
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.waitForFunction(
+    () => document.querySelector('.csw-feature-split')?.dataset.axis === 'horizontal',
+  );
+  await dragTab('下一步', '[data-pane="board"]', 'merge');
+  assert.equal(
+    await page.locator('.csw-feature-split').count(),
+    0,
+    'merging removes the empty nested branch',
+  );
+  assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 2);
+  record(
+    'nested half splits preserve parent geometry, independent ratios, draft, focus, reload and narrow fallback',
+  );
+  entries.pop();
   for (const entry of entries) entry.placement = 'edge';
   await page.setViewportSize({ width: 500, height: 700 });
   await page.goto('http://127.0.0.1:47991/feature.html?surface=edge#token=fixture');

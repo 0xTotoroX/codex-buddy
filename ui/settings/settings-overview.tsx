@@ -115,7 +115,7 @@ export function SettingsOverview({
   const layoutLabel =
     layout.groups.length === 1
       ? '标签组'
-      : layout.groups.some((group: { ids: string[] }) => group.ids.length > 1)
+      : layout.groups.some((group) => 'groups' in group || group.ids.length > 1)
         ? '自定义分栏'
         : axes[layout.axis];
   const current = models.snapshot.current;

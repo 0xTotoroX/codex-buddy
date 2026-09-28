@@ -99,3 +99,32 @@ test('arrangement commands preserve group order and ratios while rejecting impos
   assert.equal(arrangeWorkbench({ ...tabs, mode: 'vertical' }, 'outline', 'split', 800, 200), null);
   assert.equal(arrangeWorkbench(tabs, 'outline', 'split', 800, 200).group, 'split');
 });
+
+test('nested split geometry ignores hidden features without deleting their preferences', async () => {
+  const { arrangeFeatureLayout, layoutGroups } =
+    await import('../ui/surfaces/workspace/layout-tree.js');
+  const saved = {
+    axis: 'vertical',
+    groups: ['outline', 'next', 'board', 'model'].map((id) => ({
+      ids: [id],
+      active: id,
+      weight: 1,
+    })),
+  };
+  const result = arrangeFeatureLayout(saved, 'next', 'right', 500, 500, 'outline', [
+    'outline',
+    'next',
+  ]);
+  assert.ok(result);
+  assert.deepEqual(
+    layoutGroups(result)
+      .flatMap((group) => group.ids)
+      .sort(),
+    ['board', 'model', 'next', 'outline'],
+  );
+  assert.equal(result.groups[0].axis, 'horizontal');
+  assert.equal(
+    arrangeFeatureLayout(saved, 'next', 'right', 300, 500, 'outline', ['outline', 'next']),
+    null,
+  );
+});

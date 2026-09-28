@@ -1,12 +1,14 @@
 /* [INPUT]: Live feature mounts with header actions, per-surface layout and authenticated save callback.
- * [OUTPUT]: Shared layout interpretation, tabs, split/merge, focus and resizing with checked saves; views stay mounted.
+ * [OUTPUT]: Flat/nested layout interpretation, tabs, local split/merge, focus and resizing with checked saves; views stay mounted.
  * [POS]: Presentation-only composition; reuses the workbench gestures and styles.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { titles } from '../../shared/features';
 import { installArrangement } from './arrangement.js';
 import { bindSeparator } from './separator.js';
+import { layoutGroups, layoutMinimum, arrangeFeatureLayout } from './layout-tree.js';
 
 // Settings and the workspace must interpret an old two-feature layout identically.
+/** @returns {import('../../shared/features').FeatureLayout} */
 export function resolveFeatureLayout(saved, legacy, ids) {
   if (saved) return structuredClone(saved);
   const first = legacy?.first || 'outline';
@@ -40,24 +42,27 @@ export function installFeatureLayout(root, { save, error }) {
   const panes = document.createElement('div');
   panes.className = 'csw-workbench-panes csw-feature-panes';
   root.append(panes);
-  let layout,
-    placement,
+  /** @type {import('../../shared/features').FeatureLayout} */
+  let layout;
+  let placement,
     items = [],
     shape = null,
-    selected = '',
-    activeAxis = 'vertical';
+    selected = '';
+  const containers = new WeakMap();
   let dirty = false,
     saving = false,
     revision = 0;
   const cache = new Map();
   const inputs = new Map();
   const persisted = new Map();
-  const visible = () => {
-    const ids = new Set(items.filter((item) => item.active).map((item) => item.id));
-    return layout.groups
-      .map((group) => ({ ...group, ids: group.ids.filter((id) => ids.has(id)) }))
-      .filter((group) => group.ids.length);
-  };
+  function visible(node) {
+    if (!node.groups) {
+      const ids = node.ids.filter((id) => items.some((item) => item.id === id && item.active));
+      return ids.length ? { ...node, ids, original: node } : null;
+    }
+    const groups = node.groups.map(visible).filter(Boolean);
+    return groups.length ? { ...node, groups, original: node } : null;
+  }
   async function persist() {
     dirty = true;
     revision++;
@@ -85,37 +90,16 @@ export function installFeatureLayout(root, { save, error }) {
       delete root.dataset.layoutSaving;
     }
   }
-  function arrange(value, id, action, width, height, target) {
-    const next = structuredClone(value);
-    const source = next.groups.find((group) => group.ids.includes(id));
-    if (!source) return null;
-    if (action === 'activate') {
-      source.active = id;
-      return next;
-    }
-    if (!['left', 'right', 'top', 'bottom', 'merge'].includes(action)) return null;
-    const destination = next.groups.find((group) => group.ids.includes(target));
-    if (!destination || (source === destination && source.ids.length === 1)) return null;
-    const horizontal = ['left', 'right'].includes(action);
-    if (action !== 'merge') {
-      const count = visible().length + (source.ids.length > 1 ? 1 : 0);
-      if ((horizontal ? width : height) < count * (horizontal ? 260 : 180) + (count - 1) * 8)
-        return null;
-    }
-    source.ids = source.ids.filter((entry) => entry !== id);
-    if (source.active === id) source.active = source.ids[0];
-    if (action === 'merge') {
-      destination.ids.push(id);
-      destination.active = id;
-    } else {
-      const index =
-        next.groups.indexOf(destination) + (['right', 'bottom'].includes(action) ? 1 : 0);
-      next.groups.splice(index, 0, { ids: [id], active: id, weight: 1 });
-      next.axis = horizontal ? 'horizontal' : 'vertical';
-    }
-    next.groups = next.groups.filter((group) => group.ids.length);
-    return next;
-  }
+  const arrange = (value, id, action, width, height, target) =>
+    arrangeFeatureLayout(
+      value,
+      id,
+      action,
+      width,
+      height,
+      target,
+      items.filter((item) => item.active).map((item) => item.id),
+    );
   const arrangement = installArrangement(root, {
     read: () => layout,
     write: (next) => {
@@ -129,7 +113,7 @@ export function installFeatureLayout(root, { save, error }) {
     arrange,
     targetAt(event, id, { width, height }) {
       for (const section of /** @type {NodeListOf<HTMLElement>} */ (
-        panes.querySelectorAll(':scope > section[data-pane]')
+        panes.querySelectorAll('section[data-pane]')
       )) {
         const box = section.getBoundingClientRect();
         const x = (event.clientX - box.left) / box.width,
@@ -152,142 +136,168 @@ export function installFeatureLayout(root, { save, error }) {
       return null;
     },
   });
-  function render() {
-    if (!layout) return;
-    const groups = visible();
-    const nextShape = groups.map((group) => group.ids.join(',')).join('|');
-    if (shape !== nextShape) {
-      shape = nextShape;
-      const fragments = [];
-      groups.forEach((group, index) => {
-        if (index) {
-          const separator = document.createElement('div');
-          separator.className = 'csw-workbench-split';
-          separator.setAttribute('role', 'separator');
-          separator.tabIndex = 0;
-          separator.setAttribute('aria-label', '调整分栏比例');
-          bindSeparator(
-            separator,
-            () => (activeAxis === 'horizontal' ? 'x' : 'y'),
-            () => {
-              const sections = [
-                .../** @type {NodeListOf<HTMLElement>} */ (
-                  panes.querySelectorAll(':scope > section')
-                ),
-              ];
-              const size = activeAxis === 'horizontal' ? 'width' : 'height';
-              return {
-                first: sections[index - 1].getBoundingClientRect()[size],
-                second: sections[index].getBoundingClientRect()[size],
-                axis: activeAxis,
-              };
-            },
-            (start, delta) => {
-              if (start.axis !== activeAxis) return;
-              const left = layout.groups.find((g) => g.ids.includes(group.ids[0]));
-              const previous = layout.groups.find((g) => g.ids.includes(groups[index - 1].ids[0]));
-              const total = start.first + start.second,
-                minimum = activeAxis === 'horizontal' ? 260 : 180;
-              if (total < minimum * 2) return;
-              const ratio =
-                Math.max(minimum, Math.min(total - minimum, start.first + delta)) / total;
-              const weight = previous.weight + left.weight;
-              previous.weight = weight * ratio;
-              left.weight = weight * (1 - ratio);
-              render();
-            },
-            () => void persist(),
-          );
-          fragments.push(separator);
-        }
-        const section = document.createElement('section');
-        section.className = 'csw-workbench-pane';
-        const tabs = document.createElement('nav');
-        tabs.className = 'csw-workbench-tabs';
-        tabs.setAttribute('role', 'tablist');
-        tabs.setAttribute('aria-label', '工作台面板');
-        for (const id of group.ids) {
-          const tab = document.createElement('button');
-          tab.type = 'button';
-          tab.dataset.paneTab = id;
-          tab.setAttribute('role', 'tab');
-          tab.textContent = titles[id];
-          tab.title = '拖动分栏或合并；双击放大';
-          tabs.append(tab);
-        }
-        const body = document.createElement('div');
-        body.className = 'csw-feature-content';
-        const head = document.createElement('div');
-        head.className = 'csw-feature-pane-head';
-        const actions = document.createElement('div');
-        actions.className = 'csw-feature-header-actions';
-        head.append(tabs, actions);
-        section.append(head, body);
-        fragments.push(section);
-      });
-      // Move the mounted roots before removing their old containers: preserve drafts and scroll.
-      const sections = fragments.filter((node) => node.tagName === 'SECTION');
-      for (const item of items) {
-        const index = groups.findIndex((group) => group.ids.includes(item.id));
-        if (index >= 0) sections[index].querySelector('.csw-feature-content').append(item.node);
-      }
-      panes.replaceChildren(...fragments);
+  function createSection(group) {
+    const section = document.createElement('section');
+    section.className = 'csw-workbench-pane';
+    const tabs = document.createElement('nav');
+    tabs.className = 'csw-workbench-tabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', '工作台面板');
+    for (const id of group.ids) {
+      const tab = document.createElement('button');
+      tab.type = 'button';
+      tab.dataset.paneTab = id;
+      tab.setAttribute('role', 'tab');
+      tab.textContent = titles[id];
+      tab.title = '拖动分栏或合并；双击放大';
+      tabs.append(tab);
     }
-    const focused = arrangement.focused;
-    const count = groups.length;
-    activeAxis =
-      layout.axis !== 'vertical' && panes.clientWidth >= count * 260 + (count - 1) * 8
+    const body = document.createElement('div');
+    body.className = 'csw-feature-content';
+    const head = document.createElement('div');
+    head.className = 'csw-feature-pane-head';
+    const actions = document.createElement('div');
+    actions.className = 'csw-feature-header-actions';
+    head.append(tabs, actions);
+    section.append(head, body);
+    // Move the mounted roots before removing their old containers: preserve drafts and scroll.
+    for (const item of items) if (group.ids.includes(item.id)) body.append(item.node);
+    return section;
+  }
+  function createSeparator(container, index) {
+    const separator = document.createElement('div');
+    separator.className = 'csw-workbench-split';
+    separator.setAttribute('role', 'separator');
+    separator.tabIndex = 0;
+    separator.setAttribute('aria-label', '调整分栏比例');
+    bindSeparator(
+      separator,
+      () => (container.dataset.axis === 'horizontal' ? 'x' : 'y'),
+      () => {
+        const { groups } = containers.get(container);
+        const axis = container.dataset.axis;
+        const size = axis === 'horizontal' ? 'width' : 'height';
+        return {
+          first: container.children[(index - 1) * 2].getBoundingClientRect()[size],
+          second: container.children[index * 2].getBoundingClientRect()[size],
+          previous: groups[index - 1].original,
+          next: groups[index].original,
+          minimumFirst: layoutMinimum(groups[index - 1])[size],
+          minimumSecond: layoutMinimum(groups[index])[size],
+          axis,
+        };
+      },
+      (start, delta) => {
+        if (start.axis !== container.dataset.axis) return;
+        const total = start.first + start.second;
+        if (total < start.minimumFirst + start.minimumSecond) return;
+        const ratio =
+          Math.max(start.minimumFirst, Math.min(total - start.minimumSecond, start.first + delta)) /
+          total;
+        const weight = start.previous.weight + start.next.weight;
+        start.previous.weight = weight * ratio;
+        start.next.weight = weight * (1 - ratio);
+        render();
+      },
+      () => void persist(),
+    );
+    return separator;
+  }
+  function build(node, container) {
+    const fragments = [];
+    node.groups.forEach((group, index) => {
+      if (index) fragments.push(createSeparator(container, index));
+      if (group.groups) {
+        const branch = document.createElement('div');
+        branch.className = 'csw-feature-split';
+        build(group, branch);
+        fragments.push(branch);
+      } else fragments.push(createSection(group));
+    });
+    container.replaceChildren(...fragments);
+  }
+  function updateSection(section, group, focused) {
+    const active = group.ids.includes(group.active) ? group.active : group.ids[0];
+    section.dataset.pane = active;
+    section.setAttribute('aria-label', titles[active]);
+    const body = section.querySelector('.csw-feature-content');
+    for (const item of items.filter((entry) => group.ids.includes(entry.id))) {
+      if (item.node.parentNode !== body) body.append(item.node);
+      item.node.hidden = !item.active || item.id !== (focused || active);
+      const actions = item.mount?.headerActions;
+      if (actions) {
+        const slot = section.querySelector('.csw-feature-header-actions');
+        if (actions.parentNode !== slot) slot.append(actions);
+        actions.hidden = item.node.hidden;
+      }
+    }
+    for (const tab of section.querySelectorAll('button[data-pane-tab]')) {
+      const current = tab.dataset.paneTab === (focused || active);
+      tab.setAttribute('aria-selected', String(current));
+      tab.tabIndex = current ? 0 : -1;
+    }
+  }
+  function updateGrid(node, container, focused) {
+    containers.set(container, node);
+    const included = (group) =>
+      !focused ||
+      (group.groups
+        ? layoutGroups(group).some((g) => g.ids.includes(focused))
+        : group.ids.includes(focused));
+    const shown = node.groups.filter(included);
+    const horizontalMinimum = layoutMinimum({ ...node, axis: 'horizontal', groups: shown }).width;
+    const axis =
+      node.axis !== 'vertical' && container.clientWidth >= horizontalMinimum
         ? 'horizontal'
         : 'vertical';
-    panes.dataset.axis = activeAxis;
-    root.dataset.composition = focused ? 'focus' : count > 1 ? 'split' : 'tabs';
-    const sections = [
-      .../** @type {NodeListOf<HTMLElement>} */ (panes.querySelectorAll(':scope > section')),
-    ];
+    container.dataset.axis = axis;
     const tracks = [];
-    groups.forEach((group, index) => {
-      const active = group.ids.includes(group.active) ? group.active : group.ids[0];
-      const section = sections[index];
-      section.dataset.pane = active;
-      section.setAttribute('aria-label', titles[active]);
-      section.hidden = !!focused && !group.ids.includes(focused);
-      const body = section.querySelector('.csw-feature-content');
-      for (const item of items.filter((entry) => group.ids.includes(entry.id))) {
-        if (item.node.parentNode !== body) body.append(item.node);
-        item.node.hidden = !item.active || item.id !== (focused || active);
-        const actions = item.mount?.headerActions;
-        if (actions) {
-          const slot = section.querySelector('.csw-feature-header-actions');
-          if (actions.parentNode !== slot) slot.append(actions);
-          actions.hidden = item.node.hidden;
-        }
+    node.groups.forEach((group, index) => {
+      const element = container.children[index * 2];
+      element.hidden = !included(group);
+      if (index) {
+        const handle = container.children[index * 2 - 1];
+        handle.hidden = !!focused;
+        handle.setAttribute('aria-orientation', axis === 'horizontal' ? 'vertical' : 'horizontal');
+        const previous = node.groups[index - 1];
+        handle.setAttribute(
+          'aria-valuenow',
+          String(Math.round((previous.weight / (previous.weight + group.weight)) * 100)),
+        );
       }
-      for (const tab of /** @type {NodeListOf<HTMLButtonElement>} */ (
-        section.querySelectorAll('button[data-pane-tab]')
-      )) {
-        const current = tab.dataset.paneTab === (focused || active);
-        tab.setAttribute('aria-selected', String(current));
-        tab.tabIndex = current ? 0 : -1;
+      if (!element.hidden) {
+        if (tracks.length) tracks.push('8px');
+        // Narrow windows can scroll without rewriting the saved geometry.
+        const minimum = layoutMinimum(group)[axis === 'horizontal' ? 'width' : 'height'];
+        tracks.push(`minmax(${shown.length === 1 ? 0 : minimum}px, ${group.weight}fr)`);
       }
-      if (index) tracks.push('8px');
-      tracks.push(`minmax(${activeAxis === 'horizontal' ? 260 : 180}px, ${group.weight}fr)`);
     });
-    const single = !!focused || count < 2;
-    panes.style.gridTemplateColumns =
-      !single && activeAxis === 'horizontal' ? tracks.join(' ') : 'minmax(0,1fr)';
-    panes.style.gridTemplateRows =
-      !single && activeAxis === 'vertical' ? tracks.join(' ') : 'minmax(0,1fr)';
-    /** @type {NodeListOf<HTMLElement>} */ (
-      panes.querySelectorAll(':scope > div[role="separator"]')
-    ).forEach((handle, index) => {
-      handle.hidden = single;
-      handle.setAttribute(
-        'aria-orientation',
-        activeAxis === 'horizontal' ? 'vertical' : 'horizontal',
-      );
-      const ratio = groups[index].weight / (groups[index].weight + groups[index + 1].weight);
-      handle.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+    container.style.gridTemplateColumns =
+      axis === 'horizontal' ? tracks.join(' ') : 'minmax(0,1fr)';
+    container.style.gridTemplateRows = axis === 'vertical' ? tracks.join(' ') : 'minmax(0,1fr)';
+    node.groups.forEach((group, index) => {
+      const element = container.children[index * 2];
+      if (group.groups) updateGrid(group, element, focused);
+      else updateSection(element, group, focused);
     });
+  }
+  function render() {
+    if (!layout) return;
+    const tree = visible(layout);
+    if (!tree) {
+      panes.replaceChildren();
+      shape = null;
+      return;
+    }
+    const signature = (node) => (node.groups ? [node.axis, node.groups.map(signature)] : node.ids);
+    const nextShape = JSON.stringify(signature(tree));
+    if (shape !== nextShape) {
+      shape = nextShape;
+      build(tree, panes);
+    }
+    const focused = arrangement.focused;
+    root.dataset.composition = focused ? 'focus' : layoutGroups(tree).length > 1 ? 'split' : 'tabs';
+    updateGrid(tree, panes, focused);
     arrangement.sync();
   }
   const observer = new ResizeObserver(render);
@@ -297,7 +307,15 @@ export function installFeatureLayout(root, { save, error }) {
       items = nextItems;
       const changedSurface = placement !== surface;
       const incoming = JSON.stringify([saved, legacy]);
-      if (!dirty && !saving && inputs.has(surface) && inputs.get(surface) !== incoming) {
+      if (
+        !dirty &&
+        !saving &&
+        inputs.has(surface) &&
+        inputs.get(surface) !== incoming &&
+        (JSON.stringify(saved ?? null) !== JSON.stringify(persisted.get(surface) ?? null) ||
+          (!saved &&
+            JSON.stringify(JSON.parse(inputs.get(surface))[1]) !== JSON.stringify(legacy ?? null)))
+      ) {
         cache.delete(surface);
         if (placement === surface) placement = null;
       }
@@ -316,10 +334,10 @@ export function installFeatureLayout(root, { save, error }) {
           layout = resolveFeatureLayout(null, legacy, ids);
         }
       }
-      const known = new Set(layout.groups.flatMap((group) => group.ids));
+      const known = new Set(layoutGroups(layout).flatMap((group) => group.ids));
       for (const item of items)
         if (item.active && !known.has(item.id)) {
-          layout.groups[0].ids.push(item.id);
+          layoutGroups(layout)[0].ids.push(item.id);
           known.add(item.id);
         }
       const selection = `${reveal}:${revealVersion}`;
@@ -328,7 +346,7 @@ export function installFeatureLayout(root, { save, error }) {
         selection !== selected &&
         items.some((item) => item.id === reveal && item.active)
       ) {
-        const group = layout.groups.find((group) => group.ids.includes(reveal));
+        const group = layoutGroups(layout).find((group) => group.ids.includes(reveal));
         if (group) {
           group.active = reveal;
           selected = selection;

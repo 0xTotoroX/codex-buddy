@@ -777,6 +777,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn nested_layout_round_trips_and_rejects_duplicate_leaves() {
+        let (_dir, app) = app().await;
+        let layout = json!({"axis":"vertical","groups":[
+            {"ids":["outline"],"active":"outline","weight":1.0},
+            {"axis":"horizontal","weight":1.0,"groups":[
+                {"ids":["board"],"active":"board","weight":1.0},
+                {"ids":["next","model"],"active":"next","weight":1.0}
+            ]}
+        ]});
+        app.feature_request(
+            json!({"op":"main-layout","placement":"sidebar","expectedLayout":null,"layout":layout}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            layout
+        );
+        let mut duplicate = layout.clone();
+        duplicate["groups"][1]["groups"][0]["ids"] = json!(["outline"]);
+        duplicate["groups"][1]["groups"][0]["active"] = json!("outline");
+        assert!(app.feature_request(json!({"op":"main-layout","placement":"sidebar","expectedLayout":layout,"layout":duplicate})).await.is_err());
+        let mut invalid = layout.clone();
+        invalid["groups"][1]["weight"] = json!(0);
+        assert!(app.feature_request(json!({"op":"main-layout","placement":"sidebar","expectedLayout":layout,"layout":invalid})).await.is_err());
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            layout
+        );
+        // Settings can still replace a nested layout with the original flat contract.
+        let flat = json!({"axis":"auto","groups":[{"ids":["outline","board","next","model"],"active":"outline","weight":1.0}]});
+        app.feature_request(
+            json!({"op":"main-layout","placement":"sidebar","expectedLayout":layout,"layout":flat}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            flat
+        );
+    }
+
+    #[tokio::test]
     async fn independent_owners_reject_late_actions_and_preserve_transient_drafts() {
         let (_dir, app) = app().await;
         let owner = open(&app, "outline").await;
