@@ -139,6 +139,7 @@
 }
 .csw-workbench-resize {
   position: absolute;
+  z-index: 3;
   left: 0;
   top: 48px;
   bottom: 0;

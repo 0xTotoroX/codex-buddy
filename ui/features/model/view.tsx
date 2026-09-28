@@ -1,5 +1,5 @@
 /* [INPUT]: Existing model control envelope and serialized actions.
- * [OUTPUT]: Original compact model matrix, presets and capability-driven selection.
+ * [OUTPUT]: Compact model matrix, favorites, persisted drag order, presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -20,6 +20,7 @@ export type ModelState = {
     enabled: boolean;
     modelColumnWidth?: number;
     pinned: string[];
+    modelOrder?: string[] | null;
     presets: { id: string; name: string; selection: Selection }[];
   };
 };
@@ -39,7 +40,7 @@ export function ModelView({
   const [search, setSearch] = useState(reading.modelSearch || ''),
     [tools, setTools] = useState(reading.modelTools || false),
     [others, setOthers] = useState(reading.modelOthers || false),
-    [menu, setMenu] = useState('');
+    [drop, setDrop] = useState('');
   const matrix = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
@@ -58,46 +59,91 @@ export function ModelView({
           (!m.reasoning.length && !selection.reasoning)) &&
         (selection.speed !== 'fast' || m.fast),
     );
-  const models = s.models.filter((m) =>
-    `${m.id} ${m.label}`.toLowerCase().includes(search.toLowerCase()),
-  );
-  const pinned = prefs.pinned.map((id) => models.find((m) => m.id === id)).filter((m) => !!m);
-  const current = models.find((m) => m.id === s.current?.model && !prefs.pinned.includes(m.id));
-  const visible = pinned.length ? [...pinned, ...(current ? [current] : [])] : models;
-  const remaining = models.filter((m) => !visible.includes(m));
+  const modelOrder = [
+    ...new Set([...(prefs.modelOrder || prefs.pinned), ...s.models.map((m) => m.id)]),
+  ];
+  const models = modelOrder.flatMap((id) => {
+    const model = s.models.find((m) => m.id === id);
+    return model && `${model.id} ${model.label}`.toLowerCase().includes(search.toLowerCase())
+      ? [model]
+      : [];
+  });
+  const visible = models.filter((m) => prefs.pinned.includes(m.id));
+  const remaining = models.filter((m) => !prefs.pinned.includes(m.id));
+  const dragType = 'application/x-codex-buddy-model';
   const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   const columns = [
     ...new Set(models.flatMap((m) => (m.reasoning.length ? m.reasoning : ['']))),
   ].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   const rows = (items: typeof models) =>
     items.map((m) => (
-      <div className="model-row" key={m.id}>
+      <div
+        className="model-row"
+        data-model-row={m.id}
+        data-drop={drop.startsWith(`${m.id}:`) ? drop.split(':').at(-1) : undefined}
+        key={m.id}
+        onDragOver={(event) => {
+          if (busy || !prefs.enabled || !event.dataTransfer.types.includes(dragType)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = 'move';
+          const rect = event.currentTarget.getBoundingClientRect();
+          setDrop(`${m.id}:${event.clientY < rect.y + rect.height / 2 ? 'before' : 'after'}`);
+        }}
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDrop('');
+        }}
+        onDrop={(event) => {
+          setDrop('');
+          if (busy || !prefs.enabled || !event.dataTransfer.types.includes(dragType)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          const id = event.dataTransfer.getData(dragType);
+          if (
+            id === m.id ||
+            !models.some((model) => model.id === id) ||
+            prefs.pinned.includes(id) !== prefs.pinned.includes(m.id)
+          )
+            return;
+          const next = modelOrder.filter((item) => item !== id);
+          const rect = event.currentTarget.getBoundingClientRect();
+          next.splice(
+            next.indexOf(m.id) + (event.clientY >= rect.y + rect.height / 2 ? 1 : 0),
+            0,
+            id,
+          );
+          void save({ modelOrder: next });
+        }}
+      >
         <div className="model-name">
-          <strong title={label(m.label)}>{label(m.label)}</strong>
-          <button
-            aria-label={`模型 ${label(m.label)} 菜单`}
-            onClick={() => setMenu(menu === m.id ? '' : m.id)}
+          <strong
+            title={`${label(m.label)} · 拖动排序`}
+            draggable={!busy && prefs.enabled}
+            onDragStart={(event) => {
+              event.stopPropagation();
+              event.dataTransfer.setData(dragType, m.id);
+              event.dataTransfer.effectAllowed = 'move';
+            }}
+            onDragEnd={() => setDrop('')}
           >
-            {icon('more')}
+            {label(m.label)}
+          </strong>
+          <button
+            className="model-visibility"
+            data-pinned={prefs.pinned.includes(m.id)}
+            disabled={busy || !prefs.enabled}
+            aria-label={`${prefs.pinned.includes(m.id) ? '隐藏' : '设为常用'} ${label(m.label)}`}
+            title={prefs.pinned.includes(m.id) ? '收进其他模型' : '移到常用模型'}
+            onClick={() =>
+              void save({
+                pinned: prefs.pinned.includes(m.id)
+                  ? prefs.pinned.filter((id) => id !== m.id)
+                  : [...prefs.pinned, m.id],
+              })
+            }
+          >
+            {icon('chevron-down')}
           </button>
-          {menu === m.id && (
-            <div className="model-menu">
-              <button
-                disabled={busy || !prefs.enabled}
-                aria-label={`置顶 ${m.label}`}
-                aria-pressed={prefs.pinned.includes(m.id)}
-                onClick={() =>
-                  void save({
-                    pinned: prefs.pinned.includes(m.id)
-                      ? prefs.pinned.filter((id) => id !== m.id)
-                      : [...prefs.pinned, m.id],
-                  })
-                }
-              >
-                {prefs.pinned.includes(m.id) ? '取消常用' : '设为常用'}
-              </button>
-            </div>
-          )}
         </div>
         <div className="model-choices">
           {columns.map((reasoning) => {
@@ -274,14 +320,11 @@ export function ModelView({
         {!models.length && <p>没有匹配的模型</p>}
       </div>
       <footer className="model-footer">
-        <span role="status">
-          {!prefs.enabled
-            ? '模型快切已停用，请在设置页开启。'
-            : s.message ||
-              (s.current
-                ? `${label(s.current.model)} · ${label(s.current.reasoning)} · ${s.current.speed === 'fast' ? 'Fast' : 'Standard'}`
-                : '等待识别当前模型')}
-        </span>
+        {(!prefs.enabled || s.message) && (
+          <span role="status">
+            {!prefs.enabled ? '模型快切已停用，请在设置页开启。' : s.message}
+          </span>
+        )}
         <button
           aria-label="刷新可用模型"
           title="刷新可用模型"

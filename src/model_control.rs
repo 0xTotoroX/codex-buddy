@@ -1,5 +1,5 @@
 // [INPUT]: 已连接的 CDP Client、宿主模型适配器及独立业务偏好。
-// [OUTPUT]: 模型状态、串行切换、预设保存与私有末次操作诊断；呈现交给 features。
+// [OUTPUT]: 模型状态、串行切换、常用与顺序/预设保存与私有末次操作诊断；呈现交给 features。
 // [POS]: 宿主模型控制服务；不读写建议生成配置或工作台的来源/布局。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -35,6 +35,7 @@ pub struct Preferences {
     pub enabled: bool,
     pub model_column_width: f64,
     pub pinned: Vec<String>,
+    pub model_order: Option<Vec<String>>,
     pub presets: Vec<Preset>,
 }
 
@@ -44,6 +45,7 @@ impl Default for Preferences {
             enabled: false,
             model_column_width: 140.,
             pinned: vec![],
+            model_order: None,
             presets: vec![],
         }
     }
@@ -79,13 +81,20 @@ impl Preferences {
             }
             preset.selection.validate()?;
         }
-        let mut pins = std::collections::HashSet::new();
-        if self
-            .pinned
-            .iter()
-            .any(|id| id.is_empty() || id.len() > 256 || !pins.insert(id))
-        {
-            bail!("置顶模型无效");
+        for (models, message) in [
+            (self.pinned.as_slice(), "常用模型无效"),
+            (
+                self.model_order.as_deref().unwrap_or_default(),
+                "模型顺序无效",
+            ),
+        ] {
+            let mut ids = std::collections::HashSet::new();
+            if models
+                .iter()
+                .any(|id| id.is_empty() || id.len() > 256 || !ids.insert(id))
+            {
+                bail!(message);
+            }
         }
         Ok(())
     }
@@ -346,11 +355,15 @@ mod tests {
         let next = prefs.patched(&json!({"pinned":["a"]})).unwrap();
         assert_eq!(next.presets, prefs.presets);
         assert_eq!(next.pinned, vec!["a"]);
+        let reordered = next.patched(&json!({"modelOrder":["b","a"]})).unwrap();
+        assert_eq!(reordered.pinned, next.pinned);
+        assert_eq!(reordered.presets, next.presets);
         for patch in [
             json!({"edge":"free"}),
             json!({"position":1.5}),
             json!({"body":"chat"}),
             json!({"pinned":["a","a"]}),
+            json!({"modelOrder":["a","a"]}),
             json!({"modelColumnWidth":0}),
         ] {
             assert!(prefs.patched(&patch).is_err());
@@ -369,7 +382,7 @@ mod tests {
                 .as_bool()
                 .unwrap()
         );
-        let result = app.model_control_preferences(json!({"revision":1,"patch":{"presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
+        let result = app.model_control_preferences(json!({"revision":1,"patch":{"modelOrder":["b","a"],"presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
         assert_eq!(result["revision"], 2);
         assert!(
             app.model_control_preferences(json!({"revision":1,"patch":{"presets":[]}}))
@@ -378,6 +391,10 @@ mod tests {
         );
         let loaded = Control::load(&paths);
         assert_eq!(loaded.preferences.presets.len(), 1);
+        assert_eq!(
+            loaded.preferences.model_order,
+            Some(vec!["b".into(), "a".into()])
+        );
         assert_eq!(before, app.appearance().await);
         assert!(!paths.config().exists());
         assert!(app.model_control_apply(json!({"target":{"id":"a"},"expectedRevision":"old","selection":{"model":"a","reasoning":"high","speed":"fast"}})).await.is_err());

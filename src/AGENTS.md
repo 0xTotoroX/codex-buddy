@@ -23,7 +23,7 @@ ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模�
 
 - [native_backdrop.rs](native_backdrop.rs)：NSWindow/NSPanel 共用的原生磨砂、液态 Regular/Clear、圆角/可选贴边凹角及刘海两翼裁切与网页承载；控制条单独在根视图同步裁切背景与网页；根据宿主 theme 设置自有窗口 NSAppearance，不写系统偏好，不持有业务或窗口生命周期。
 
-- [model_control.rs](model_control.rs)：模型能力、串行切换、实际回读、开关/置顶/预设及末次私有诊断；旧打开入口转到 features，不管理窗口。
+- [model_control.rs](model_control.rs)：模型能力、串行切换、实际回读、开关/常用/模型排序/预设及末次私有诊断；旧打开入口转到 features，不管理窗口。
 - [edge_window.rs](edge_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标精确点击边界、稳定悬停区域及8pt退出容错与冻结区域、非动画期按内容调高、整点承载包围盒与原生轮廓、scene-ready 首帧/键盘交接、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、掉帧按实际时间推进、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
 - [edge_geometry.rs](edge_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
 

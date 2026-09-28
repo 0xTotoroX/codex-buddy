@@ -272,32 +272,65 @@ try {
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
+  await view.getByRole('button', { name: /其他模型/ }).waitFor();
+  assert.equal(
+    await view.locator('.model-row').count(),
+    0,
+    'no favorites means all models stay hidden',
+  );
+  assert.equal(await view.locator('.model-footer [role="status"]').count(), 0);
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
   await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
   assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
-  assert.equal(actions[0].data.expectedRevision, 'v1');
-  await view.getByLabel('模型 Model B 菜单').click();
-  await view.getByLabel('置顶 Model B').click();
-  await view.locator('[aria-label="置顶 Model B"][aria-pressed="true"]').waitFor();
-  assert.deepEqual(model.preferences.pinned, ['b']);
+  assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model B', { exact: true }).click();
+  await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
+  assert.deepEqual(model.preferences.pinned, ['a', 'b']);
+  await view
+    .locator('[data-model-row="b"] strong')
+    .dragTo(view.locator('[data-model-row="a"]'), { targetPosition: { x: 40, y: 2 } });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.edge-view')].some(
+      (node) => node.shadowRoot?.querySelector('.model-row')?.dataset.modelRow === 'b',
+    ),
+  );
+  assert.deepEqual(model.preferences.modelOrder, ['b', 'a']);
+  await view.getByLabel('隐藏 Model A', { exact: true }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).waitFor();
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  assert.equal(
+    await view.locator('[data-model-row="a"]').count(),
+    0,
+    'current model also hides when removed from favorites',
+  );
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
   page.once('dialog', (dialog) => dialog.accept('日常'));
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();
   await view.getByLabel('模型工具').click();
   await view.getByLabel('删除预设 日常').click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
-  record('shared model view uses readback, preserves speed, pins models and saves/removes presets');
+  record(
+    'shared model view uses readback, preserves speed, hides/restores models, persists drag order and saves/removes presets',
+  );
   assert.deepEqual(errors, []);
   await view.getByLabel('模型工具').click();
-  await view.getByLabel('模型 Model B 菜单').click();
   await page.screenshot({ path: join(output, 'edge-model.png') });
   model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
   model.snapshot.models.push({ id: 'c', label: 'Model C', reasoning: ['high'], fast: false });
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
   await view.getByLabel('模型工具').click();
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /其他模型/, expanded: true }).waitFor();
   await view.locator('.model-scroll').evaluate((node) => {
     node.scrollLeft = 160;
   });
@@ -319,6 +352,7 @@ try {
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
   await view.getByLabel('模型名称列宽').waitFor();
+  assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
     await view.getByRole('button', { name: /其他模型/ }).getAttribute('aria-expanded'),
     'true',

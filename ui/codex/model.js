@@ -437,7 +437,6 @@
       message = '等待关联的官方 model/list 数据；可刷新官方模型菜单后重试，无需重启';
     } else if (!current) {
       status = 'waiting';
-      message = '点击模型组合即可同步并切换';
     }
     return clone({
       target: { id: target?.id || '', title: target?.title || '' },

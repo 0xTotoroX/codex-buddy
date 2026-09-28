@@ -104,21 +104,24 @@
   color: var(--accent);
   background: transparent;
 }
-.model-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 2;
-  border: 1px solid var(--line);
-  background: var(--paper);
-  padding: 4px;
-  border-radius: 6px;
+.model-name strong[draggable='true'] {
+  cursor: grab;
+}
+.model-visibility[data-pinned='false'] svg {
+  transform: rotate(180deg);
+}
+.model-row[data-drop='before'] {
+  box-shadow: inset 0 2px var(--accent);
+}
+.model-row[data-drop='after'] {
+  box-shadow: inset 0 -2px var(--accent);
 }
 .model-disclosure {
   color: var(--muted);
   margin: 4px 0;
 }
 .model-footer {
+  justify-content: flex-end;
   margin-top: 8px;
   color: var(--muted);
 }

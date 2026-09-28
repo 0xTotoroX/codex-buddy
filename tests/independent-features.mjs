@@ -40,7 +40,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
           };
           const modelState = {
             revision: 1,
-            preferences: { enabled: true, pinned: [], presets: [] },
+            preferences: { enabled: true, pinned: ['a'], presets: [] },
             snapshot: {
               target: { id: 'synthetic-chat' },
               revision: 'model-v1',
@@ -233,6 +233,35 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
           Math.min(460, beforeWidth + 16),
+        );
+        const dock = page.locator('[data-codex-buddy-dock]');
+        const dockBefore = await dock.boundingBox();
+        const handleBox = await widthHandle.boundingBox();
+        const savedBefore = Number(await widthHandle.getAttribute('aria-valuenow'));
+        const dx = savedBefore > 400 ? 50 : -50;
+        await page.mouse.move(
+          handleBox.x + handleBox.width / 2,
+          handleBox.y + handleBox.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          handleBox.x + handleBox.width / 2 + dx,
+          handleBox.y + handleBox.height / 2,
+          { steps: 10 },
+        );
+        await page.mouse.up();
+        await page.waitForFunction(
+          (expected) => window.__companionFloatingPanel.panelPreferences().dockWidth === expected,
+          savedBefore - dx,
+        );
+        await page.waitForFunction(
+          ({ before, dx }) =>
+            Math.abs(
+              document.querySelector('[data-codex-buddy-dock]').getBoundingClientRect().width -
+                before +
+                dx,
+            ) < 2,
+          { before: dockBefore.width, dx },
         );
         await outline.locator('.feature-body').evaluate((node) => {
           node.scrollTop = 150;
