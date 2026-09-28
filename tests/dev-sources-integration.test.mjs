@@ -232,7 +232,8 @@ test(
       });
       const page = await browser.newPage();
       const previousEpoch = readRecord(join(main, 'target/dev/session.json')).sourceEpoch;
-      let switchingSource = false;
+      let switchingSource = false,
+        switchStarted = false;
       const responseChecks = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
@@ -249,6 +250,18 @@ test(
         responseChecks.push(
           (async () => {
             const path = new URL(response.url()).pathname;
+            const oldSource =
+              response.request().headers()['x-codex-buddy-source'] === previousEpoch;
+            // Old-document responses can arrive after reload; its body may already be discarded.
+            // The earlier staleSave assertion verifies this guard; the current page must save below.
+            if (
+              switchStarted &&
+              oldSource &&
+              response.status() === 409 &&
+              !['GET', 'HEAD'].includes(response.request().method()) &&
+              path.startsWith('/api/')
+            )
+              return;
             if (duringSwitch && path.startsWith('/api/')) {
               const body = await response.json().catch(() => null);
               if (
@@ -256,14 +269,10 @@ test(
                 ['开发来源正在切换，请等待完成。', '开发后台正在重启'].includes(body?.message)
               )
                 return;
-              if (
-                response.status() === 409 &&
-                response.request().headers()['x-codex-buddy-source'] === previousEpoch &&
-                body?.message === '开发来源已改变，请刷新此设置页后再保存。'
-              )
-                return;
             }
-            errors.push(`HTTP ${response.status()} ${path}`);
+            errors.push(
+              `HTTP ${response.status()} ${path} (switching=${duringSwitch}, oldSource=${oldSource})`,
+            );
           })(),
         );
       });
@@ -292,13 +301,15 @@ test(
       );
       await page.getByLabel('调试 worktree').selectOption(main);
       switchingSource = true;
+      switchStarted = true;
       await Promise.all([
-        page.waitForEvent('domcontentloaded'),
+        page.waitForEvent('domcontentloaded', { timeout: 30000 }),
         page.getByRole('button', { name: '切换来源' }).click(),
       ]);
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
       await page.getByText(/界面资源已确认/).waitFor();
       switchingSource = false;
+      assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
       await navigation.getByRole('link', { name: '大纲', exact: true }).click();
       await outlineSwitch.waitFor();
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
