@@ -796,11 +796,10 @@ async fn tasks_command(
         let settings = service.app.settings().await;
         service.app.sync_desktop_settings(&settings).await;
         let enabled = service.app.tasks.board_enabled().await;
-        if enabled != board_before {
-            if let Err(error) = service.app.set_feature_enabled("board", enabled).await {
-                result["presentationError"] =
-                    json!(format!("看板开关已保存，窗口更新失败：{error}"));
-            }
+        if enabled != board_before
+            && let Err(error) = service.app.set_feature_enabled("board", enabled).await
+        {
+            result["presentationError"] = json!(format!("看板开关已保存，窗口更新失败：{error}"));
         }
     }
     Ok(Json(result))

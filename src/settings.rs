@@ -531,11 +531,11 @@ impl App {
         let mut settings = self.settings().await;
         self.sync_desktop_settings(&settings).await;
         for (id, enabled) in toggles {
-            if let Some(enabled) = enabled {
-                if let Err(error) = self.set_feature_enabled(id, enabled).await {
-                    settings["presentationError"] =
-                        json!(format!("功能开关已保存，窗口更新失败：{error}"));
-                }
+            if let Some(enabled) = enabled
+                && let Err(error) = self.set_feature_enabled(id, enabled).await
+            {
+                settings["presentationError"] =
+                    json!(format!("功能开关已保存，窗口更新失败：{error}"));
             }
         }
         Ok(settings)
