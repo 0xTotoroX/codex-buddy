@@ -153,6 +153,30 @@ export function Board({
         </button>
       </form>
     );
+  const boardTools = (
+    <div className="board-tools">
+      <button
+        title="新增分组"
+        aria-label="新增分组"
+        disabled={busy}
+        onClick={() => setRenaming({ id: '', title: '' })}
+      >
+        <Plus size={16} />
+        分组
+      </button>
+      <button
+        title="搜索任务"
+        aria-label="搜索任务"
+        aria-expanded={searchOpen}
+        onClick={() => {
+          setSearchOpen(!searchOpen);
+          if (searchOpen) setSearch('');
+        }}
+      >
+        <Search size={15} />
+      </button>
+    </div>
+  );
   const addTask = (column: string) =>
     quickAdd?.column === column ? (
       <form
@@ -219,8 +243,8 @@ export function Board({
         </header>
       )}
       <main className="board-main">
-        <div className="board-toolbar">
-          {narrow && (
+        {narrow && (
+          <div className="board-toolbar">
             <nav className="stage-tabs" aria-label="任务阶段">
               {columns.map((column) => (
                 <button
@@ -247,30 +271,9 @@ export function Board({
                 </button>
               ))}
             </nav>
-          )}
-          <div className="board-tools">
-            <button
-              title="新增分组"
-              aria-label="新增分组"
-              disabled={busy}
-              onClick={() => setRenaming({ id: '', title: '' })}
-            >
-              <Plus size={16} />
-              分组
-            </button>
-            <button
-              title="搜索任务"
-              aria-label="搜索任务"
-              aria-expanded={searchOpen}
-              onClick={() => {
-                setSearchOpen(!searchOpen);
-                if (searchOpen) setSearch('');
-              }}
-            >
-              <Search size={15} />
-            </button>
+            {boardTools}
           </div>
-        </div>
+        )}
         {searchOpen && (
           <input
             className="board-search"
@@ -328,21 +331,24 @@ export function Board({
                 disabled={busy}
                 move={move}
                 heading={
-                  !narrow && renaming?.id === column.id ? (
-                    nameInput()
-                  ) : (
-                    <>
-                      <button
-                        className="group-title"
-                        title="修改分组名称"
-                        disabled={busy}
-                        onClick={() => setRenaming({ ...column })}
-                      >
-                        {column.title}
-                      </button>
-                      <small>{group.length}</small>
-                    </>
-                  )
+                  <>
+                    {!narrow && renaming?.id === column.id ? (
+                      nameInput()
+                    ) : (
+                      <>
+                        <button
+                          className="group-title"
+                          title="修改分组名称"
+                          disabled={busy}
+                          onClick={() => setRenaming({ ...column })}
+                        >
+                          {column.title}
+                        </button>
+                        <small>{group.length}</small>
+                      </>
+                    )}
+                    {!narrow && column.id === columns.at(-1)?.id && boardTools}
+                  </>
                 }
               >
                 {group.map(card)}

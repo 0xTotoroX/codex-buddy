@@ -111,6 +111,13 @@ h1 {
   gap: 4px;
   flex: none;
 }
+.column-heading .board-tools {
+  margin-left: auto;
+}
+.column-heading .group-title,
+.column-heading .group-name-form {
+  min-width: 0;
+}
 .board-app .board-tools button {
   min-width: 32px;
   height: 32px;
