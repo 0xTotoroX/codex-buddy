@@ -90,4 +90,16 @@ body {
   #edge-panel:hover {
     --feature-refresh-opacity: 1;
   }
+  #edge-settings {
+    opacity: var(--feature-refresh-opacity, 0);
+    transition: opacity 140ms ease-out;
+  }
+  #edge-settings:focus-visible {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #edge-settings {
+    transition: none;
+  }
 }

@@ -317,6 +317,40 @@ try {
   await view.getByRole('button', { name: /其他模型/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  const visibility = view.getByLabel('隐藏 Model A', { exact: true });
+  const edgeSettings = page.getByRole('button', { name: '设置', exact: true });
+  const waitOpacity = async (locator, opacity) => {
+    await locator.evaluate(async (node, opacity) => {
+      const deadline = performance.now() + 5000;
+      while (getComputedStyle(node).opacity !== opacity) {
+        if (performance.now() > deadline) throw Error(`Expected opacity ${opacity}`);
+        await new Promise(requestAnimationFrame);
+      }
+    }, opacity);
+  };
+  await page.mouse.move(499, 699);
+  await Promise.all([
+    waitModelRefresh('0'),
+    waitOpacity(visibility, '0'),
+    waitOpacity(edgeSettings, '0'),
+  ]);
+  await page.locator('#edge-panel > header').hover();
+  await Promise.all([
+    waitModelRefresh('1'),
+    waitOpacity(visibility, '1'),
+    waitOpacity(edgeSettings, '1'),
+  ]);
+  await page.mouse.move(499, 699);
+  await page.keyboard.press('Tab');
+  await visibility.focus();
+  await waitOpacity(visibility, '1');
+  await edgeSettings.focus();
+  await waitOpacity(edgeSettings, '1');
+  await edgeSettings.evaluate((node) => node.blur());
+  await waitOpacity(edgeSettings, '0');
+  record(
+    'model arrows and edge settings follow refresh hover visibility and remain keyboard accessible',
+  );
   await view.getByRole('button', { name: /其他模型/ }).click();
   assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
@@ -352,19 +386,59 @@ try {
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();
   await view.getByLabel('模型工具').click();
+  assert.equal(await view.getByRole('searchbox').count(), 0);
+  assert.equal(await view.getByRole('slider').count(), 0);
+  const columnHandle = view.getByRole('separator', { name: '模型名称列宽' });
+  const handleBox = await columnHandle.boundingBox();
+  const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
+  const beforeResize = preferenceCount();
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
+  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
+  await page.mouse.up();
+  await page.waitForFunction(() => {
+    const host = document.querySelector('.edge-view:not([hidden])');
+    return (
+      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      'false'
+    );
+  });
+  assert.equal(model.preferences.modelColumnWidth, 190);
+  assert.equal(preferenceCount(), beforeResize + 1);
+  const cancelBox = await columnHandle.boundingBox();
+  await page.mouse.move(cancelBox.x + 4, cancelBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(cancelBox.x + 40, cancelBox.y + 10);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(preferenceCount(), beforeResize + 1, 'Escape cancels without saving');
+  await columnHandle.press('ArrowLeft');
+  await page.waitForFunction(() => {
+    const host = document.querySelector('.edge-view:not([hidden])');
+    return (
+      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      'false'
+    );
+  });
+  assert.equal(model.preferences.modelColumnWidth, 174);
+  record(
+    'model search and width slider removed; divider previews, saves on release and supports Escape/keyboard',
+  );
   await view.getByLabel('删除预设 日常').click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
   record(
     'shared model view uses readback, preserves speed, hides/restores models, persists drag order and saves/removes presets',
   );
   assert.deepEqual(errors, []);
-  await view.getByLabel('模型工具').click();
+  assert.equal(await view.getByLabel('模型工具').count(), 0, 'no empty preset tools');
   await page.screenshot({ path: join(output, 'edge-model.png') });
   model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
   model.snapshot.models.push({ id: 'c', label: 'Model C', reasoning: ['high'], fast: false });
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
-  await view.getByLabel('模型工具').click();
   await view.getByRole('button', { name: /其他模型/, expanded: true }).waitFor();
   await view.locator('.model-scroll').evaluate((node) => {
     node.scrollLeft = 160;
@@ -386,7 +460,7 @@ try {
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
-  await view.getByLabel('模型名称列宽').waitFor();
+  await view.getByRole('separator', { name: '模型名称列宽' }).waitFor();
   await page.mouse.move(1, 1);
   await waitModelRefresh('0');
   await page.locator('.csw-workbench-head').hover();

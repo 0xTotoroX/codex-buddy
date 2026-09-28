@@ -42,20 +42,39 @@
   display: grid;
   gap: 8px;
 }
-.model-tools input[type='search'] {
-  width: 100%;
-  padding: 6px 8px;
-  background: var(--hover);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.model-tools label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 .model-scroll {
   overflow-x: auto;
+}
+.model-matrix {
+  position: relative;
+  min-width: calc(var(--name-width) + 8px + var(--columns) * 48px);
+}
+.model-column-resize {
+  position: absolute;
+  z-index: 1;
+  left: var(--name-width);
+  top: 4px;
+  bottom: 4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+.model-column-resize::after {
+  content: '';
+  position: absolute;
+  inset: 0 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+.model-column-resize:hover::after,
+.model-column-resize:focus-visible::after,
+.model-column-resize[data-resizing='true']::after {
+  background: var(--muted);
+}
+.model-column-resize:focus-visible {
+  outline: 2px solid var(--accent);
+  border-radius: 4px;
 }
 .model-matrix-head,
 .model-row {

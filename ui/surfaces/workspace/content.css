@@ -134,19 +134,19 @@ input:focus-visible {
 
 /* The surface hover state inherits through feature Shadow DOM boundaries. */
 @media (hover: hover) and (pointer: fine) {
-  .feature-view [data-refresh] {
+  .feature-view :is([data-refresh], .model-visibility) {
     opacity: var(--feature-refresh-opacity, 0);
     transition: opacity 140ms ease-out;
   }
-  .feature-view [data-refresh]:disabled {
+  .feature-view :is([data-refresh], .model-visibility):disabled {
     opacity: calc(var(--feature-refresh-opacity, 0) * 0.45);
   }
-  .feature-view [data-refresh]:focus-visible {
+  .feature-view :is([data-refresh], .model-visibility):focus-visible {
     opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .feature-view [data-refresh] {
+  .feature-view :is([data-refresh], .model-visibility) {
     transition: none;
   }
 }

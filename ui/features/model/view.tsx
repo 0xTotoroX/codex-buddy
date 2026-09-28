@@ -37,11 +37,12 @@ export function ModelView({
   action: (data: unknown, action: string) => Promise<unknown>;
   busy: boolean;
 }) {
-  const [search, setSearch] = useState(reading.modelSearch || ''),
-    [tools, setTools] = useState(reading.modelTools || false),
+  const [tools, setTools] = useState(reading.modelTools || false),
     [others, setOthers] = useState(reading.modelOthers || false),
-    [drop, setDrop] = useState('');
+    [drop, setDrop] = useState(''),
+    [columnWidth, setColumnWidth] = useState<number | null>(null);
   const matrix = useRef<HTMLDivElement>(null);
+  const resize = useRef<{ pointer: number; x: number; width: number; value: number } | null>(null);
   useLayoutEffect(() => {
     if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
   }, []);
@@ -51,6 +52,15 @@ export function ModelView({
   const apply = (selection: Selection, preserveSpeed = false) =>
     action({ target: s.target, expectedRevision: s.revision, selection, preserveSpeed }, 'apply');
   const save = (patch: object) => action({ revision: state.revision, patch }, 'preferences');
+  const nameWidth = columnWidth ?? prefs.modelColumnWidth ?? 140;
+  const clampWidth = (width: number) => Math.max(100, Math.min(280, Math.round(width)));
+  const saveWidth = async (width: number) => {
+    try {
+      await save({ modelColumnWidth: width });
+    } finally {
+      setColumnWidth(null);
+    }
+  };
   const valid = (selection: Selection) =>
     s.models.some(
       (m) =>
@@ -64,9 +74,7 @@ export function ModelView({
   ];
   const models = modelOrder.flatMap((id) => {
     const model = s.models.find((m) => m.id === id);
-    return model && `${model.id} ${model.label}`.toLowerCase().includes(search.toLowerCase())
-      ? [model]
-      : [];
+    return model ? [model] : [];
   });
   const visible = models.filter((m) => prefs.pinned.includes(m.id));
   const remaining = models.filter((m) => !prefs.pinned.includes(m.id));
@@ -178,7 +186,7 @@ export function ModelView({
       className="feature-model"
       style={
         {
-          '--name-width': `${prefs.modelColumnWidth || 140}px`,
+          '--name-width': `${nameWidth}px`,
           '--columns': Math.max(1, columns.length),
         } as CSSProperties
       }
@@ -227,39 +235,19 @@ export function ModelView({
         >
           {icon('plus')}
         </button>
-        <button
-          aria-label="模型工具"
-          title="模型工具"
-          aria-expanded={tools}
-          onClick={() => setTools((reading.modelTools = !tools))}
-        >
-          {icon('more')}
-        </button>
+        {!!prefs.presets.length && (
+          <button
+            aria-label="模型工具"
+            title="模型工具"
+            aria-expanded={tools}
+            onClick={() => setTools((reading.modelTools = !tools))}
+          >
+            {icon('more')}
+          </button>
+        )}
       </header>
-      {tools && (
+      {tools && !!prefs.presets.length && (
         <div className="model-tools">
-          <input
-            type="search"
-            aria-label="搜索模型"
-            placeholder="搜索模型…"
-            value={search}
-            onChange={(e) => {
-              reading.modelSearch = e.target.value;
-              setSearch(e.target.value);
-            }}
-          />
-          <label>
-            模型名称列宽
-            <input
-              type="range"
-              aria-label="模型名称列宽"
-              min="100"
-              max="280"
-              defaultValue={prefs.modelColumnWidth || 140}
-              onPointerUp={(e) => void save({ modelColumnWidth: Number(e.currentTarget.value) })}
-              onKeyUp={(e) => void save({ modelColumnWidth: Number(e.currentTarget.value) })}
-            />
-          </label>
           {prefs.presets.map((p) => (
             <div className="model-preset" key={p.id}>
               <span>{p.name}</span>
@@ -298,26 +286,90 @@ export function ModelView({
           if (event.currentTarget.clientWidth) reading.modelLeft = event.currentTarget.scrollLeft;
         }}
       >
-        <div className="model-matrix-head">
-          <span>模型</span>
-          <div>
-            {columns.map((c) => (
-              <span key={c}>{label(c) || '选择'}</span>
-            ))}
+        <div className="model-matrix">
+          <div
+            className="model-column-resize"
+            role="separator"
+            aria-label="模型名称列宽"
+            aria-orientation="vertical"
+            aria-valuemin={100}
+            aria-valuemax={280}
+            aria-valuenow={nameWidth}
+            aria-disabled={busy}
+            tabIndex={busy ? -1 : 0}
+            data-resizing={!!resize.current}
+            onPointerDown={(event) => {
+              if (event.button !== 0 || busy) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.focus({ preventScroll: true });
+              resize.current = {
+                pointer: event.pointerId,
+                x: event.screenX,
+                width: nameWidth,
+                value: nameWidth,
+              };
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setColumnWidth(nameWidth);
+            }}
+            onPointerMove={(event) => {
+              const drag = resize.current;
+              if (!drag || drag.pointer !== event.pointerId) return;
+              drag.value = clampWidth(drag.width + event.screenX - drag.x);
+              setColumnWidth(drag.value);
+            }}
+            onPointerUp={(event) => {
+              const drag = resize.current;
+              if (!drag || drag.pointer !== event.pointerId) return;
+              resize.current = null;
+              event.currentTarget.releasePointerCapture(event.pointerId);
+              if (drag.value !== drag.width) void saveWidth(drag.value);
+              else setColumnWidth(null);
+            }}
+            onLostPointerCapture={() => {
+              if (!resize.current) return;
+              resize.current = null;
+              setColumnWidth(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && resize.current) {
+                event.stopPropagation();
+                event.currentTarget.releasePointerCapture(resize.current.pointer);
+                resize.current = null;
+                setColumnWidth(null);
+                return;
+              }
+              if (busy || resize.current || !['ArrowLeft', 'ArrowRight'].includes(event.key))
+                return;
+              event.preventDefault();
+              event.stopPropagation();
+              const width = clampWidth(nameWidth + (event.key === 'ArrowLeft' ? -16 : 16));
+              if (width === nameWidth) return;
+              setColumnWidth(width);
+              void saveWidth(width);
+            }}
+          />
+          <div className="model-matrix-head">
+            <span>模型</span>
+            <div>
+              {columns.map((c) => (
+                <span key={c}>{label(c) || '选择'}</span>
+              ))}
+            </div>
           </div>
+          {rows(visible)}
+          {!!remaining.length && (
+            <button
+              className="model-disclosure"
+              aria-expanded={others}
+              onClick={() => setOthers((reading.modelOthers = !others))}
+            >
+              其他模型 ({remaining.length})
+            </button>
+          )}
+          {others && rows(remaining)}
+          {!models.length && <p>暂无可用模型</p>}
         </div>
-        {rows(visible)}
-        {!!remaining.length && (
-          <button
-            className="model-disclosure"
-            aria-expanded={others || !!search}
-            onClick={() => setOthers((reading.modelOthers = !others))}
-          >
-            其他模型 ({remaining.length})
-          </button>
-        )}
-        {(others || search) && rows(remaining)}
-        {!models.length && <p>没有匹配的模型</p>}
       </div>
       <footer className="model-footer">
         {(!prefs.enabled || s.message) && (
