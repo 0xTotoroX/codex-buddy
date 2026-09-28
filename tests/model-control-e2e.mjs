@@ -440,6 +440,11 @@ try {
     return settingsPage.getByLabel(`${label}主题`, { exact: true });
   };
   const surfaceState = async () => (await request('surfaces', { op: 'state' })).body;
+  // The embedded sidebar reports its normalized layout asynchronously after injection.
+  await waitFor(
+    async () => (await request('state')).body.panelPreferences.ui.layoutMode === 'workbench',
+    'sidebar layout normalization reaches the backend before comparing appearance',
+  );
   const beforeAppearance = (await request('state')).body.panelPreferences;
   const beforeModel = (await api('state')).preferences;
   const chosen = { sidebar: 'black', overlay: 'frosted', desktop: 'matte', edge: 'native-glass' };
