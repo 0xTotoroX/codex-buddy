@@ -43,6 +43,8 @@ In Web settings, choose **下一步 → 高级生成设置 → 输入上下文 �
 
 Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
+Choose the capsule or left navigation icon under **显示与布局 → 入口**. The icon sits above Help, separated by a short divider, and toggles the existing workbench or reveals its desktop window. Hosts without a navigation rail temporarily keep the capsule without changing the saved choice.
+
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face for returning to the chat.
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Choose tabs, vertical, horizontal or automatic splits under **显示与布局 → 主界面布局** in Web settings. Press Esc during a drag to cancel it.

@@ -59,3 +59,5 @@ App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 
 - [surfaces.rs](surfaces.rs)：四形式独立主题、旧面板/模型视觉偏好一次迁移、宿主语义色投影、版本保护与共享贴边窗口租约/监督。
 
 设置页通过 features 的 main-layout 更新各主形式布局，校验 expectedLayout 并拒绝过期写入，不改变功能开关；工作台 layout 也带同一快照校验。旧窗口缺少该字段时暂保留兼容，全部旧资源退出后才移除此分支。
+
+panel::Ui.launcher 保存胶囊或左侧图标入口，旧配置默认 capsule；外观 API 沿用修订校验，不改变功能位置与数据。

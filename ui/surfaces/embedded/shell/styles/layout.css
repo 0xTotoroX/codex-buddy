@@ -177,6 +177,17 @@
   pointer-events: auto;
 }
 
+[data-companion-stepwise-root][data-launcher='rail']
+  .csw-popover[data-open='false'][data-morphing='false'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+[data-companion-stepwise-root][data-launcher='rail'] .csw-fab {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .csw-fab {
   align-items: center;
   appearance: none;

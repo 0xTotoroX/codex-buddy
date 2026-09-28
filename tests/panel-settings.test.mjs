@@ -103,6 +103,16 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.equal(prefs.ui.labelOnly, true);
     assert.equal(prefs.ui.promptClickMode, 'hybrid');
     assert.equal(prefs.alwaysOnTop, true);
+    await page.getByLabel('入口位置', { exact: true }).selectOption('rail');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
+    );
+    assert.equal(prefs.ui.launcher, 'rail');
+    await page.getByLabel('入口位置', { exact: true }).selectOption('capsule');
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
+    );
+    assert.equal(prefs.ui.launcher, 'capsule');
     for (const save of saves) {
       assert.equal('dockLayout' in (save.ui || {}), false);
       assert.equal('popoutLayout' in (save.ui || {}), false);

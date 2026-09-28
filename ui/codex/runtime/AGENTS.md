@@ -28,3 +28,5 @@ state 的 feature 仅决定活动视图，runtimeEnabled 依据真实功能开�
 lifecycle 同时安装/销毁独立功能嵌入适配器；扫描忽略自有功能节点，settings 的 modelControlEnabled 允许只开模型时保留入口。独立呈现不复制生成、识别或写入逻辑。
 
 独立功能保留同一 windowToggle/workbenchToggle 通知：lifecycle 按当前模式路由功能 owner 交接或旧工作台，避免绕过原表情手势。
+
+入口位置由 presentation 读取 panel 偏好并经 transport 保留；lifecycle 同步 embedded/launcher 的可见性与开合状态，停用时回收导航入口。

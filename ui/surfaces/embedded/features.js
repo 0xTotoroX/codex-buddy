@@ -1,5 +1,5 @@
 /* [INPUT]: Feature owners, saved placements, checked layout snapshots and the existing capsule/dock.
- * [OUTPUT]: Business views inside the original workbench shell; no launcher menu.
+ * [OUTPUT]: Business views inside the original workbench shell and reveal of the existing main window; no launcher menu.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { mountFeature } from '../workspace/mount';
@@ -39,6 +39,16 @@ export async function revealFeature(id, placement) {
 }
 export function featurePlacement() {
   return primary;
+}
+export async function revealMainFeature() {
+  const entries = group(primary).filter((entry) => entry.open);
+  const id = entries.find((entry) => entry.id === selected)?.id || entries[0]?.id;
+  if (!id) return;
+  try {
+    await revealFeature(id);
+  } catch (error) {
+    showError(error);
+  }
 }
 export function featureTheme() {
   return state?.appearance?.themes[primary];

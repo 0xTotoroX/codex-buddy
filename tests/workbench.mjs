@@ -401,6 +401,105 @@ async function chooseLayout(page, action) {
 }
 
 const cases = [
+  [
+    'rail launcher replaces capsule and survives navigation without duplicating the workspace',
+    async (page) => {
+      await mode(page, true);
+      await page.evaluate(() => {
+        const rail = document.createElement('nav');
+        rail.className = 'group/sidebar-rail';
+        rail.style.cssText =
+          'position:fixed;left:0;top:0;width:52px;height:100vh;display:flex;flex-direction:column;z-index:100';
+        rail.innerHTML = '<div style="flex:1"></div><div data-footer>帮助</div>';
+        document.body.append(rail);
+        const api = window.__companionFloatingPanel;
+        api.syncPanelPreferences({ ...api.panelPreferences(), launcher: 'rail' }, 101, false);
+      });
+      const icon = page.getByRole('button', { name: 'CodexBuddy', exact: true });
+      await icon.waitFor();
+      assert.equal(await icon.getAttribute('aria-pressed'), 'true');
+      await icon.click();
+      await page.waitForFunction(() => !window.__companionFloatingPanel.state.open);
+      assert.equal(await page.locator('.csw-fab').isVisible(), false);
+      assert.equal(await icon.getAttribute('aria-pressed'), 'false');
+      await icon.press('Enter');
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      assert.equal(await page.locator('[data-companion-stepwise-root]').count(), 1);
+      await page.evaluate(() => {
+        const rail = document.querySelector('nav');
+        rail.querySelector('[data-codex-buddy-launcher]').remove();
+        rail.replaceWith(rail.cloneNode(true));
+      });
+      await icon.waitFor();
+      assert.equal(await icon.count(), 1);
+      await mode(page, false);
+      await icon.click();
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
+      assert.equal(await page.locator(slotSelector).count(), 0);
+      await icon.click();
+      await page.locator('.csw-workbench-face').waitFor({ state: 'hidden' });
+      await page.evaluate(() => document.querySelector('nav').remove());
+      await page.locator('.csw-fab').waitFor({ state: 'visible' });
+      assert.equal(
+        await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().launcher),
+        'rail',
+      );
+      await page.evaluate(() => {
+        const api = window.__companionFloatingPanel;
+        api.syncPanelPreferences({ ...api.panelPreferences(), launcher: 'capsule' }, 102, false);
+      });
+      await page.locator('.csw-fab').click();
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
+      await page.evaluate(() => window.__companionFloatingPanel.destroy());
+      assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
+    },
+  ],
+  [
+    'sidebar recognizes the current tabbed chat container',
+    async (page) => {
+      await page.evaluate(() => {
+        const frame = document.querySelector('.app-shell-main-content-frame');
+        frame.classList.remove('app-shell-main-content-frame');
+        frame.setAttribute('data-app-shell-tabs', 'true');
+        document
+          .querySelector('#fixture-host-content')
+          .setAttribute('data-app-shell-tab-panel-controller', 'right');
+      });
+      await mode(page, true);
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      const content = await box(page, '#fixture-host-content');
+      const slot = await box(page, slotSelector);
+      assert.ok(content.x + content.width <= slot.x + 1);
+      await page.locator('.csw-workbench-face').click();
+      await page.locator('.csw-fab').waitFor({ state: 'visible' });
+      await page.locator('.csw-fab').click();
+      await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
+      assert.equal(await page.locator(slotSelector).count(), 1);
+    },
+  ],
+  [
+    'sidebar follows the last interacted chat while another floating chat stays open',
+    async (page) => {
+      await page.setViewportSize({ width: 1900, height: 1000 });
+      await mode(page, true);
+      await openChatSurface(page);
+      await page.locator('#fixture-host-content .ProseMirror').focus();
+      await page.waitForFunction(() =>
+        document.querySelector('#fixture-dock-row > [data-codex-buddy-dock]'),
+      );
+      await page.locator('.csw-workbench-face').click();
+      await page.locator('.csw-fab').waitFor({ state: 'visible' });
+      await page.locator('.csw-fab').click();
+      await page.waitForFunction(() =>
+        document.querySelector('#fixture-dock-row > [data-codex-buddy-dock][data-expanded="true"]'),
+      );
+      await page.locator('#foreground-composer .ProseMirror').focus();
+      await page.waitForFunction(() =>
+        document.querySelector('#foreground-chat [data-codex-buddy-dock][data-expanded="true"]'),
+      );
+      assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
+    },
+  ],
   ...featureSurfaceCases({ mode, createPopout, settle, output, bundle }),
   ...independentFeatureCases({ mode, syncSettings }),
   [

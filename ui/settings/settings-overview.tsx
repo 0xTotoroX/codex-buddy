@@ -144,6 +144,7 @@ export function SettingsOverview({
             {featureList(primary)}
           </div>
           <dl className="overview-metrics">
+            <Metric label="入口">{ui?.launcher === 'rail' ? '左侧图标' : '胶囊'}</Metric>
             <Metric label="主题">{themeLabel(surfaces.preferences.themes[primary])}</Metric>
             <Metric label="布局">{layoutLabel}</Metric>
             <Metric label="字号">

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
+ * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -10,7 +10,10 @@ import {
   independentFeatures,
   popoutSelectedFeature,
   toggleFeatureDock,
+  featurePlacement,
+  revealMainFeature,
 } from '../../surfaces/embedded/features.js';
+import { syncLauncher, stopLauncher } from '../../surfaces/embedded/launcher.js';
 import { panelAppearance } from '../../surfaces/embedded/shell/panel-appearance.js';
 
 import {
@@ -307,6 +310,7 @@ function installObserver() {
 }
 
 function stopRuntime() {
+  stopLauncher();
   stopFeatureHost();
   stopWorkbench();
   cancelFaceClick();
@@ -517,7 +521,23 @@ function install() {
     diagnostics: readDiagnostics(),
   });
   const stopSignals = [
-    onSignal('render', (options) => renderFloat(options)),
+    onSignal('render', (options) => {
+      renderFloat(options);
+      if (IS_POPOUT || !runtimeState.runtimeActive) return;
+      syncLauncher({
+        mode: shellState.launcher,
+        open:
+          shellState.open ||
+          shellState.detached ||
+          (independentFeatures() && featurePlacement() === 'desktop'),
+        root: shellState.root,
+        toggle: () => {
+          if (independentFeatures() && featurePlacement() === 'desktop') void revealMainFeature();
+          else if (shellState.detached) void togglePanelWindow();
+          else setOpen(!shellState.open);
+        },
+      });
+    }),
     onSignal('scan', (delay) => scheduleScan(delay)),
     onSignal('runtime', (enabled) => (enabled ? activateRuntime() : stopRuntime())),
     onSignal('bindingUnavailable', () => {

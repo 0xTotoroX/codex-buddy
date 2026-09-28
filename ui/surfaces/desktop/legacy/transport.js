@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 原生窗口桥接、窗口偏好与远端命令身份。
- * [OUTPUT]: 强制展开的偏好和窗口尺寸、受限远端操作；浮窗统一工作台最低高度，保留返回形态。
+ * [OUTPUT]: 保留入口位置的强制展开偏好和窗口尺寸、受限远端操作；浮窗统一工作台最低高度，保留返回形态。
  * [POS]: 窗口通信底层，不读取宿主正文或渲染业务视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -13,6 +13,7 @@ function panelPreferences() {
     open: IS_POPOUT || shellState.open,
     activeTab: shellState.activeTab,
     layoutMode: shellState.layoutMode,
+    launcher: shellState.launcher,
     feature: shellState.feature,
     dockWidth: shellState.dockWidth,
     splitRatio: shellState.dockLayout.verticalRatio,

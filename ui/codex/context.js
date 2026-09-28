@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主 DOM、上下文状态和基础可见性工具。
- * [OUTPUT]: 工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标、完整相邻问答及上下文变更通知。
+ * [OUTPUT]: 宿主交互目标记录、工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标、完整相邻问答及上下文变更通知。
  * [POS]: 宿主读取边界，不修改 Stepwise 或大纲的内部状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -28,7 +28,7 @@ import {
 import { emitSignal } from './runtime/signals.js';
 import { pushDiagnostic, rectSummary, visibleElement, visibleRect } from './runtime/diagnostics.js';
 
-import { foregroundSurface } from './page-context.js';
+import { foregroundSurface, rememberChatTarget } from './page-context.js';
 
 function roleFromElement(node) {
   if (!(node instanceof Element)) return '';
@@ -180,12 +180,14 @@ function resetContextContent() {
 function installContextTracking() {
   if (!contextState.pointerHandler) {
     contextState.pointerHandler = (event) => {
+      rememberChatTarget(event.target);
       if (pinThreadFromTarget(event.target, 'pointer')) emitSignal('scan', 0);
     };
     document.addEventListener('pointerdown', contextState.pointerHandler, true);
   }
   if (!contextState.focusHandler) {
     contextState.focusHandler = (event) => {
+      rememberChatTarget(event.target);
       if (pinThreadFromTarget(event.target, 'focus')) emitSignal('scan', 0);
     };
     document.addEventListener('focusin', contextState.focusHandler, true);
@@ -202,6 +204,7 @@ function installContextTracking() {
 }
 
 function removeContextTracking() {
+  rememberChatTarget(null);
   if (contextState.pointerHandler)
     document.removeEventListener('pointerdown', contextState.pointerHandler, true);
   if (contextState.focusHandler)

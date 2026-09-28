@@ -1,5 +1,5 @@
 /*
- * [INPUT]: 已识别的 Codex 主内容与前景聊天布局、期望侧栏宽度和开合状态。
+ * [INPUT]: 已识别的 Codex 主内容、标签页与前景聊天布局、期望侧栏宽度和开合状态。
  * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时保留紧凑入口，不创建提示或替代菜单。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -14,7 +14,7 @@ export function findDockHost() {
   const surface = foregroundSurface();
   if (surface) return surface.row ? surface : null;
   const frames = document.querySelectorAll(
-    '.app-shell-main-content-frame,[class*="_MainContentFrame_"]',
+    '.app-shell-main-content-frame,[class*="_MainContentFrame_"],[data-app-shell-tabs]',
   );
   for (const frame of frames) {
     if (!visible(frame)) continue;
@@ -75,7 +75,7 @@ export function createDock(onChange, beforeMove = () => {}) {
               (node) =>
                 node instanceof Element &&
                 (node.matches(
-                  '[role="dialog"],dialog,[class*="MainContent"],.app-shell-main-content-frame',
+                  '[role="dialog"],dialog,[class*="MainContent"],.app-shell-main-content-frame,[data-app-shell-tabs]',
                 ) ||
                   node.querySelector('[role="dialog"],dialog') ||
                   node.contains(host?.row)),
@@ -92,6 +92,7 @@ export function createDock(onChange, beforeMove = () => {}) {
   });
   window.addEventListener('resize', schedule);
   document.addEventListener('focusin', schedule);
+  document.addEventListener('pointerdown', schedule);
   function unavailable(suspended) {
     removeSlot();
     publish({ status: suspended ? 'suspended' : 'unsupported', rect: null });
@@ -220,6 +221,7 @@ export function createDock(onChange, beforeMove = () => {}) {
       observer?.disconnect();
       window.removeEventListener('resize', schedule);
       document.removeEventListener('focusin', schedule);
+      document.removeEventListener('pointerdown', schedule);
       cancelAnimationFrame(frame);
       removeSlot();
     },

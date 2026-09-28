@@ -96,3 +96,5 @@ independent-features 的配置操作模拟设置 API；十轮往返保留草稿�
 结构重构继续复用 workbench、independent-features、feature-views 与 dev-panel 检查；旧工作台验收通过 workspace/legacy-content 使用同一份大纲/下一步渲染。source 路径随目录变更更新，不为搬文件单独增加测试。真实 Dev 生效另核对当前来源、活动窗口和资源修订号，不能以合成验收替代。
 
 panel-settings 复用逐项保存检查，核对内容/容器字段不会写入旧布局与主题；startup-settings 覆盖切换分类期间的在途草稿、失败及并发保护，以及 Dev 来源组件跨卸载/重新挂载的节点和编辑状态保留。
+
+入口回归覆盖胶囊/左侧图标互斥、鼠标/键盘开合、导航替换后的唯一入口、导航缺失回退和销毁；侧栏识别新版标签页，并在主聊天与仍打开的独立聊天间跟随操作目标。
