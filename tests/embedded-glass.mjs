@@ -272,9 +272,11 @@ try {
   assert.equal((await state()).variant, 'regular');
   record('Release star selects Regular/Clear and survives reinjection; A/B control is retired');
   const alignment = [];
-  for (const fontSize of [13, 19]) {
-    while (Number.parseInt(await page.locator('.csw-step-value').innerText()) < fontSize)
+  const initialFontSize = Number.parseFloat(await page.locator('.csw-step-value').innerText());
+  for (const increase of [0, 6]) {
+    for (let step = 0; step < increase; step++)
       await page.locator('[data-action=font-inc]').click();
+    const fontSize = Math.round((initialFontSize + increase) * 10) / 10;
     assert.equal(await page.locator('.csw-step-value').innerText(), `${fontSize}px`);
     for (const material of ['matte', 'frosted', 'native-glass']) {
       await page.evaluate(
@@ -299,9 +301,12 @@ try {
       alignment.push({ material, fontSize, ...bounds });
     }
   }
-  record('Material and font controls align at 13px and 19px including the visible star', {
-    alignment,
-  });
+  record(
+    'Material and font controls align at default and enlarged sizes including the visible star',
+    {
+      alignment,
+    },
+  );
   await page.evaluate(() => {
     const backdrop = document.createElement('div');
     backdrop.dataset.glassComparisonBackdrop = 'true';

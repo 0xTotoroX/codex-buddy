@@ -429,7 +429,16 @@ try {
   const settingsPage = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
+  await settingsPage
+    .getByRole('navigation', { name: '设置分类' })
+    .getByRole('link', { name: '显示与布局', exact: true })
+    .click();
   const section = settingsPage.locator('#settings-surfaces');
+  const themeControl = async (placement, label) => {
+    const details = section.locator(`#theme-${placement}`);
+    if (!(await details.evaluate((node) => node.open))) await details.locator('summary').click();
+    return settingsPage.getByLabel(`${label}主题`, { exact: true });
+  };
   const surfaceState = async () => (await request('surfaces', { op: 'state' })).body;
   const beforeAppearance = (await request('state')).body.panelPreferences;
   const beforeModel = (await api('state')).preferences;
@@ -440,7 +449,7 @@ try {
     desktop: '桌面窗口',
     edge: '贴边 / 刘海',
   })) {
-    const control = settingsPage.getByLabel(`${label}主题`, { exact: true });
+    const control = await themeControl(placement, label);
     await waitFor(() => control.isEnabled(), `${label} ready`);
     await control.selectOption(chosen[placement]);
     await waitFor(
@@ -453,10 +462,11 @@ try {
     async () => (await surfaceState()).preferences.themes.edge.liquidVariant === 'clear',
     'variant saves',
   );
-  await section.locator('summary').click();
+  await section.locator('#edge-position > summary').click();
   await settingsPage.getByLabel('贴边边缘', { exact: true }).selectOption('left');
   await waitFor(async () => (await surfaceState()).preferences.edge.edge === 'left', 'edge saves');
   const position = settingsPage.getByLabel('贴边位置', { exact: true });
+  await waitFor(() => position.isEnabled(), 'position ready after saving edge');
   await position.focus();
   await position.press('Home');
   await waitFor(
@@ -470,10 +480,9 @@ try {
     desktop: '桌面窗口',
     edge: '贴边 / 刘海',
   })) {
+    const control = await themeControl(placement, label);
     await waitFor(
-      async () =>
-        (await settingsPage.getByLabel(`${label}主题`, { exact: true }).inputValue()) ===
-        chosen[placement],
+      async () => (await control.inputValue()) === chosen[placement],
       `${label} restored`,
     );
   }
@@ -483,7 +492,10 @@ try {
   );
   assert.deepEqual((await request('state')).body.panelPreferences, beforeAppearance);
   assert.deepEqual((await api('state')).preferences, beforeModel);
-  await settingsPage.getByLabel('主界面形式', { exact: true }).selectOption('overlay');
+  await settingsPage
+    .getByRole('group', { name: '主界面形式', exact: true })
+    .getByRole('button', { name: '页面浮层', exact: true })
+    .click();
   await waitFor(
     async () => (await request('features', { op: 'state' })).body.mainPlacement === 'overlay',
     'one main placement saved',

@@ -115,6 +115,18 @@ export async function checkPopout({
     });
   const settle = () =>
     waitFor(async () => (await state()) && !(await state()).busy, 'Popout transition stuck');
+  const launcherAnchor = () =>
+    desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).evaluate((button) => {
+      const rect = button.getBoundingClientRect();
+      const border = Math.max(0, (outerWidth - innerWidth) / 2);
+      const titlebar = Math.max(0, outerHeight - innerHeight - border);
+      return {
+        x: screenX + border + rect.left,
+        y: screenY + titlebar + rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+    });
   try {
     await pop.goto(`${base}/panel#token=${runtime.token}&lease=${lease}`);
     await waitFor(
@@ -137,9 +149,10 @@ export async function checkPopout({
     assert.equal((await api('panel/state', { lease })).body.presented, true);
     const home = await api('panel/anchor', { lease });
     assert.equal(home.status, 200);
-    assert.ok(
-      home.body.anchor?.width >= 300 && home.body.anchor?.height >= 340,
-      'Hidden embedded panel must retain a nonzero return anchor',
+    assert.deepEqual(
+      home.body.anchor,
+      await launcherAnchor(),
+      'Hidden embedded panel must return to the visible rail launcher',
     );
     assert.ok(Number.isFinite(home.body.anchor.x) && Number.isFinite(home.body.anchor.y));
     await desktop.evaluate(() =>
@@ -877,7 +890,7 @@ export async function checkPopout({
     await desktop.emulateMedia({ reducedMotion: 'no-preference' });
     record('快速反转与减少动态效果均恢复可操作面板，无透明动画残留');
 
-    // 胶囊出发时首击可能已在 100ms 后展开；双击仍须记住首击前的形态。
+    // 主界面收起时，左栏首击可能已在 100ms 后展开；双击仍须记住首击前的状态。
     await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(false));
     await settle();
     await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick({ delay: 180 });
@@ -896,7 +909,7 @@ export async function checkPopout({
     );
     assert.equal(await pop.evaluate(() => window.__companionFloatingPanel.state.open), true);
     const chipAnchor = (await api('panel/anchor', { lease: chipLease })).body.anchor;
-    assert.ok(chipAnchor.width >= 40 && chipAnchor.height >= 20 && chipAnchor.height < 100);
+    assert.deepEqual(chipAnchor, await launcherAnchor(), 'Closed workspace returns to the rail');
     await pop.locator('.csw-head-face').dblclick({ delay: 80 });
     await waitFor(
       async () => !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detached)),
@@ -909,7 +922,7 @@ export async function checkPopout({
       'chip window lease was not released',
     );
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'panel.json'))).ui.open, false);
-    record('胶囊态双击直接弹出：180ms 慢双击保存首击前状态，收回恢复胶囊且动画锚点为胶囊区域');
+    record('左栏入口慢双击保留首击前的收起状态，窗口收回到同一入口');
 
     const recoveryLease = (await api('panel/open', {})).body.lease;
     await pop.goto('about:blank');
