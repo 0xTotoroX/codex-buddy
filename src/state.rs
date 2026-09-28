@@ -1,6 +1,6 @@
 // [INPUT]: CDP Client、Config、Model 与胶囊状态摘要。
 // [OUTPUT]: App、View、连接与无正文胶囊状态；退出信号取消模型请求，开发模式锁定启动窗口。
-// [POS]: 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
+// [POS]: 持有独立 tasks 服务； 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
@@ -46,6 +46,7 @@ pub struct View {
     pub panel_preferences: crate::panel::Preferences,
     pub panel_theme: Option<String>,
     pub panel_font_base: f64,
+    pub panel_colors: Value,
 }
 
 #[derive(Clone)]
@@ -61,6 +62,10 @@ struct Desired {
 }
 
 pub struct App {
+    pub(crate) surfaces: Mutex<crate::surfaces::Surfaces>,
+    pub(crate) features: Mutex<crate::features::Features>,
+    pub(crate) feature_operation: Mutex<()>,
+    pub tasks: Arc<crate::tasks::Service>,
     pub views: watch::Sender<View>,
     pub shutdown: Notify,
     pub closing: watch::Sender<bool>,
@@ -112,8 +117,13 @@ impl App {
             panel_preferences: crate::panel::Preferences::read(&paths),
             panel_theme: None,
             panel_font_base: 13.,
+            panel_colors: json!({}),
         });
         Arc::new(Self {
+            surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
+            features: Mutex::new(crate::features::Features::load(&paths)),
+            feature_operation: Mutex::new(()),
+            tasks: crate::tasks::Service::load(&paths),
             views,
             shutdown: Notify::new(),
             closing: watch::channel(false).0,
@@ -154,8 +164,8 @@ impl App {
             let mut attempts = 0;
             loop {
                 interval.tick().await;
+                self.supervise_features().await;
                 self.supervise_panel().await;
-                self.supervise_model_control().await;
                 let prefs = self.appearance().await;
                 self.views.send_if_modified(|view| {
                     if view.panel_preferences == prefs {
@@ -167,7 +177,8 @@ impl App {
                 let session = self.session.read().await.clone();
                 if session.is_some() {
                     let guard = self.transition.lock().await;
-                    if self.refresh().await.is_err() {
+                    if let Err(error) = self.refresh().await {
+                        tracing::debug!(error = %error, "宿主状态刷新失败");
                         self.clear_connection("disconnected", "Codex 连接中断，正在重连…")
                             .await;
                     }
@@ -177,7 +188,8 @@ impl App {
                     if attempts % 4 == 1 && self.desired.read().await.enabled {
                         let _guard = self.transition.lock().await;
                         let desired = self.desired.read().await.clone();
-                        if self.establish(&desired).await.is_err() {
+                        if let Err(error) = self.establish(&desired).await {
+                            tracing::debug!(error = %error, "宿主连接建立失败");
                             self.update_connection(
                                 "disconnected",
                                 "未发现可连接的 Codex。请通过调试启动入口打开，或指定本机端口。",
@@ -242,6 +254,11 @@ impl App {
             client: client.clone(),
         };
         *self.session.write().await = Some(session);
+        if let Err(error) = client.install_desktop(Arc::downgrade(self)).await {
+            self.clear_connection("disconnected", "桌面浮窗安装失败，正在等待重连…")
+                .await;
+            return Err(error);
+        }
         self.views.send_modify(|view| {
             view.connection = Connection {
                 status: "connected".into(),
@@ -253,11 +270,6 @@ impl App {
             view.desktop = DesktopStatus::default();
             view.updated_at = now();
         });
-        if let Err(error) = client.install_desktop(Arc::downgrade(self)).await {
-            self.clear_connection("disconnected", "桌面浮窗安装失败，正在等待重连…")
-                .await;
-            return Err(error);
-        }
         Ok(())
     }
 
@@ -343,17 +355,20 @@ impl App {
             .await?;
         let desktop = serde_json::from_value(result["desktop"].clone())?;
         let theme = result["theme"].as_str().map(String::from);
+        let colors = result["colors"].clone();
         let font_base = result["fontBase"].as_f64().unwrap_or(13.);
         self.views.send_if_modified(|view| {
             if view.desktop == desktop
                 && view.panel_theme == theme
                 && view.panel_font_base == font_base
+                && view.panel_colors == colors
             {
                 return false;
             }
             view.desktop = desktop;
             view.panel_theme = theme;
             view.panel_font_base = font_base;
+            view.panel_colors = colors;
             view.updated_at = now();
             true
         });

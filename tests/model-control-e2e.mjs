@@ -126,11 +126,21 @@ try {
   decoy.on('pageerror', (error) => pageErrors.push(error.message));
   await page.goto(`${fixtureOrigin}/fixture?selected=1`);
   await decoy.goto(`${fixtureOrigin}/fixture?decoy=1`);
+  await page.bringToFront();
   assert.equal(await page.evaluate(() => typeof window.__codexBuddyModelControl), 'undefined');
   const cdp = await context.newCDPSession(page);
   const { targetInfo } = await cdp.send('Target.getTargetInfo');
   await cdp.detach();
   const targetId = targetInfo.targetId;
+  // Exercise the enabled service without a native control bar adding passive polls.
+  writeFileSync(
+    join(directory, 'features.json'),
+    JSON.stringify({ model: { placement: 'sidebar', open: false, size: [840, 620] } }),
+    { mode: 0o600 },
+  );
+  writeFileSync(join(directory, 'model-control.json'), JSON.stringify({ enabled: true }), {
+    mode: 0o600,
+  });
   writeFileSync(
     join(directory, 'config.json'),
     JSON.stringify({
@@ -147,6 +157,7 @@ try {
   // Do not inherit development asset overrides, real credentials or model routing from the caller.
   for (const key of Object.keys(env)) if (/^(CODEX_BUDDY_|COMPANION_)/.test(key)) delete env[key];
   env.CODEX_BUDDY_PANEL_TEST = '1';
+  env.RUST_LOG = 'codex_buddy=debug';
   service = spawn(binary, ['--data-dir', directory, 'serve', '--port', '0', '--allow-fixture'], {
     cwd: tmpdir(),
     env,
@@ -193,7 +204,22 @@ try {
   const initial = { model: 'alpha', reasoning: 'low', speed: 'standard' };
   const fast = { model: 'alpha', reasoning: 'high', speed: 'fast' };
   const beta = { model: 'beta', reasoning: 'high', speed: 'standard' };
-  await page.waitForFunction(() => typeof window.__codexBuddyModelControl?.snapshot === 'function');
+  try {
+    await page.waitForFunction(
+      () => typeof window.__codexBuddyModelControl?.snapshot === 'function',
+    );
+  } catch (error) {
+    report.startup = {
+      connection: (await request('state')).body.connection,
+      page: await page.evaluate(() => ({
+        adapter: typeof window.__codexBuddyModelControl,
+        panel: !!window.__companionFloatingPanel,
+        settingsLoaded: window.__companionFloatingPanel?.state.settingsLoaded,
+      })),
+    };
+    console.error(JSON.stringify(report.startup));
+    throw error;
+  }
   await waitFor(
     async () => (await request('state')).body.connection?.targetId === targetId,
     'Backend did not use the configured target',
@@ -211,10 +237,11 @@ try {
   );
 
   const missing = await api('state');
-  assert.equal(missing.snapshot.status, 'waiting');
+  assert.equal(missing.snapshot.status, 'waiting', JSON.stringify(missing.snapshot));
   assert.deepEqual(missing.snapshot.models, []);
   await page.evaluate(() => capability('backend-observed'));
   const passive = await api('state');
+  assert.ok(passive.snapshot.target, JSON.stringify(passive.snapshot));
   assert.equal(passive.snapshot.target.id, 'chat-a');
   assert.equal(passive.snapshot.status, 'waiting');
   assert.equal(passive.snapshot.current, null);
@@ -264,17 +291,20 @@ try {
   record('stale revision and invalid complete preset reject through real API before menu mutation');
 
   await page.evaluate(() => {
-    host.delay = 200;
+    host.holdCommit = true;
   });
   const pending = api('apply', command(applied.snapshot, beta));
-  await page.waitForFunction(() =>
-    host.clicks.some((entry) => entry.action === 'select:model:beta'),
-  );
+  await page.waitForFunction(() => typeof host.pendingCommit === 'function');
   assert.equal((await api('state')).snapshot.status, 'busy');
   assert.equal(
     (await request('model-control/apply', command(applied.snapshot, initial))).status,
     400,
   );
+  await page.evaluate(() => {
+    host.holdCommit = false;
+    host.pendingCommit();
+    host.pendingCommit = null;
+  });
   const delayed = await pending;
   assert.equal(delayed.result.status, 'success');
   assert.deepEqual(delayed.snapshot.current, beta);
@@ -299,7 +329,22 @@ try {
   assert.deepEqual(await page.evaluate(() => host.unexpected), []);
   await page.reload();
   // No test-side injection: this must come from backend Page.addScriptToEvaluateOnNewDocument.
-  await page.waitForFunction(() => typeof window.__codexBuddyModelControl?.snapshot === 'function');
+  try {
+    await page.waitForFunction(
+      () => typeof window.__codexBuddyModelControl?.snapshot === 'function',
+    );
+  } catch (error) {
+    report.startup = {
+      connection: (await request('state')).body.connection,
+      page: await page.evaluate(() => ({
+        adapter: typeof window.__codexBuddyModelControl,
+        panel: !!window.__companionFloatingPanel,
+        settingsLoaded: window.__companionFloatingPanel?.state.settingsLoaded,
+      })),
+    };
+    console.error(JSON.stringify(report.startup));
+    throw error;
+  }
   await page.evaluate(() => capability('after-navigation'));
   const navigated = await api('refresh', {});
   assert.equal(navigated.snapshot.status, 'ready');
@@ -314,7 +359,22 @@ try {
   record('navigation reinstalls embedded adapter and rejects the prior document revision');
 
   await page.goto(`${fixtureOrigin}/fixture?modern=1`);
-  await page.waitForFunction(() => typeof window.__codexBuddyModelControl?.snapshot === 'function');
+  try {
+    await page.waitForFunction(
+      () => typeof window.__codexBuddyModelControl?.snapshot === 'function',
+    );
+  } catch (error) {
+    report.startup = {
+      connection: (await request('state')).body.connection,
+      page: await page.evaluate(() => ({
+        adapter: typeof window.__codexBuddyModelControl,
+        panel: !!window.__companionFloatingPanel,
+        settingsLoaded: window.__companionFloatingPanel?.state.settingsLoaded,
+      })),
+    };
+    console.error(JSON.stringify(report.startup));
+    throw error;
+  }
   await page.evaluate(() => capability('modern-view'));
   const modern = await api('refresh', {});
   assert.equal(modern.snapshot.status, 'ready');
@@ -369,51 +429,79 @@ try {
   const settingsPage = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
-  const section = settingsPage.getByRole('region', { name: '模型快切设置' });
-  await settingsPage.getByLabel('模型快切材质', { exact: true }).waitFor();
-  await settingsPage.waitForFunction(
-    () => !document.querySelector('[aria-label="模型快切材质"]').disabled,
-  );
-  assert.equal(
-    await settingsPage.getByLabel('模型快切材质', { exact: true }).inputValue(),
-    'black',
-  );
-  const change = async (name, value, key) => {
-    await settingsPage.waitForFunction(
-      (name) => !document.querySelector(`[aria-label="${name}"]`).disabled,
-      name,
-    );
-    await settingsPage.getByLabel(name, { exact: true }).selectOption(value);
-    await waitFor(async () => (await api('state')).preferences[key] === value, `saved ${key}`);
-  };
+  const section = settingsPage.locator('#settings-surfaces');
+  const surfaceState = async () => (await request('surfaces', { op: 'state' })).body;
   const beforeAppearance = (await request('state')).body.panelPreferences;
-  await change('模型快切材质', 'matte', 'theme');
-  await change('模型快切材质', 'frosted', 'theme');
-  await change('模型快切边缘', 'left', 'edge');
-  const screens = await api('displays');
-  assert.equal((await request('model-control/displays', undefined, false)).status, 401);
-  if (screens.screens.length) await change('模型快切屏幕', screens.screens[0].id, 'screen');
-  const position = settingsPage.getByLabel('模型快切位置', { exact: true });
+  const beforeModel = (await api('state')).preferences;
+  const chosen = { sidebar: 'black', overlay: 'frosted', desktop: 'matte', edge: 'native-glass' };
+  for (const [placement, label] of Object.entries({
+    sidebar: '侧栏',
+    overlay: '页面浮层',
+    desktop: '桌面窗口',
+    edge: '贴边 / 刘海',
+  })) {
+    const control = settingsPage.getByLabel(`${label}主题`, { exact: true });
+    await waitFor(() => control.isEnabled(), `${label} ready`);
+    await control.selectOption(chosen[placement]);
+    await waitFor(
+      async () => (await surfaceState()).preferences.themes[placement].theme === chosen[placement],
+      `${label} saves`,
+    );
+  }
+  await settingsPage.getByLabel('贴边 / 刘海液态变体', { exact: true }).selectOption('clear');
+  await waitFor(
+    async () => (await surfaceState()).preferences.themes.edge.liquidVariant === 'clear',
+    'variant saves',
+  );
+  await section.locator('summary').click();
+  await settingsPage.getByLabel('贴边边缘', { exact: true }).selectOption('left');
+  await waitFor(async () => (await surfaceState()).preferences.edge.edge === 'left', 'edge saves');
+  const position = settingsPage.getByLabel('贴边位置', { exact: true });
   await position.focus();
   await position.press('Home');
   await waitFor(
-    async () => (await api('state')).preferences.position === 0,
+    async () => (await surfaceState()).preferences.edge.position === 0,
     'keyboard position saves',
   );
-  await change('模型快切材质', 'native-glass', 'theme');
-  await change('模型快切液态变体', 'clear', 'liquidVariant');
   await settingsPage.reload();
-  await settingsPage.waitForFunction(
-    () => document.querySelector('[aria-label="模型快切材质"]')?.value === 'native-glass',
-  );
+  for (const [placement, label] of Object.entries({
+    sidebar: '侧栏',
+    overlay: '页面浮层',
+    desktop: '桌面窗口',
+    edge: '贴边 / 刘海',
+  })) {
+    await waitFor(
+      async () =>
+        (await settingsPage.getByLabel(`${label}主题`, { exact: true }).inputValue()) ===
+        chosen[placement],
+      `${label} restored`,
+    );
+  }
   assert.equal(
-    await settingsPage.getByLabel('模型快切液态变体', { exact: true }).inputValue(),
+    await settingsPage.getByLabel('贴边 / 刘海液态变体', { exact: true }).inputValue(),
     'clear',
   );
   assert.deepEqual((await request('state')).body.panelPreferences, beforeAppearance);
+  assert.deepEqual((await api('state')).preferences, beforeModel);
+  await settingsPage.getByLabel('主界面形式', { exact: true }).selectOption('overlay');
+  await waitFor(
+    async () => (await request('features', { op: 'state' })).body.mainPlacement === 'overlay',
+    'one main placement saved',
+  );
+  for (const name of ['大纲', '看板', '下一步', '模型快切']) {
+    assert.deepEqual(
+      await settingsPage
+        .getByLabel(`${name}默认位置`, { exact: true })
+        .locator('option')
+        .evaluateAll((nodes) => nodes.map((n) => n.value)),
+      ['overlay', 'edge'],
+    );
+  }
   await section.screenshot({ path: join(output, 'settings-placement-themes.png') });
   await settingsPage.close();
-  record('settings page persists screen, edge, keyboard position and four independent themes');
+  record(
+    'four surface themes persist independently without changing model or legacy workbench preferences',
+  );
   assert.deepEqual(pageErrors, []);
   report.passed = true;
 } catch (error) {

@@ -4,6 +4,7 @@
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { workbenchHeadHtml } from './chrome.js';
 import { IS_POPOUT, POPOUT } from '../runtime/constants.js';
 import {
   clamp,
@@ -53,6 +54,11 @@ import { setOpen } from '../core/geometry.js';
 
 import { installAssociation, updateAssociation } from './association.js';
 import { installArrangement } from './arrangement.js';
+import { bindSeparator as bindSharedSeparator } from './separator.js';
+const bindSeparator = (handle, axis, read, change) =>
+  bindSharedSeparator(handle, axis, read, change, saveWorkbench);
+
+import { installFeatureControls, updateFeatureControls } from './features.js';
 
 const arrangements = new WeakMap();
 const paneContent = new WeakMap();
@@ -106,42 +112,6 @@ function registeredPanels(nextHtml, attachNextEvents) {
   return activeWorkbenchPanels().map((pane) => ({ ...pane, ...views[pane.id] }));
 }
 
-function bindSeparator(handle, axis, read, change) {
-  handle.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    handle.setPointerCapture(event.pointerId);
-    const direction = typeof axis === 'function' ? axis() : axis;
-    const origin = direction === 'x' ? event.clientX : event.clientY;
-    const value = read();
-    const move = (event) =>
-      change(value, (direction === 'x' ? event.clientX : event.clientY) - origin);
-    const finish = () => {
-      handle.removeEventListener('pointermove', move);
-      handle.removeEventListener('pointerup', finish);
-      handle.removeEventListener('lostpointercapture', finish);
-      saveWorkbench();
-    };
-    handle.addEventListener('pointermove', move);
-    handle.addEventListener('pointerup', finish);
-    handle.addEventListener('lostpointercapture', finish);
-  });
-  handle.addEventListener('keydown', (event) => {
-    const direction = typeof axis === 'function' ? axis() : axis;
-    const delta = { ArrowLeft: -16, ArrowRight: 16, ArrowUp: -16, ArrowDown: 16 }[event.key];
-    if (
-      !delta ||
-      (direction === 'x'
-        ? !['ArrowLeft', 'ArrowRight'].includes(event.key)
-        : !['ArrowUp', 'ArrowDown'].includes(event.key))
-    )
-      return;
-    event.preventDefault();
-    change(read(), delta);
-    saveWorkbench();
-  });
-}
-
 export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   const panel = shellState.panel;
   const registry = registeredPanels(nextHtml, attachNextEvents);
@@ -153,7 +123,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (!panel.querySelector('.csw-workbench')) {
     shellState.workbenchLayoutCleanup?.();
     panel.innerHTML = `<div class="csw-workbench">
-      <header class="csw-head csw-workbench-head"><button type="button" class="csw-head-face csw-workbench-face" aria-label="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}" title="${IS_POPOUT ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面'}">${statusStageHtml()}</button><span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>
+      ${workbenchHeadHtml(IS_POPOUT)}
       <div class="csw-workbench-panes">
         <div class="csw-workbench-tabs" role="tablist" aria-label="工作台面板" hidden>${registry.map((pane) => `<button type="button" role="tab" id="csw-tab-${pane.id}" data-pane-tab="${pane.id}" aria-controls="csw-pane-${pane.id}">${pane.title}</button>`).join('')}</div>
         ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong data-pane-focus="${pane.id}" role="button" tabindex="0" title="拖动调整位置；双击放大">${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" title="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><span class="csw-pane-menu" hidden>${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
@@ -161,6 +131,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section><button hidden data-legacy-settings aria-label="旧版内置设置"></button>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
     </div>`;
+    installFeatureControls(panel.querySelector('.csw-workbench'));
     installAssociation(panel.querySelector('.csw-workbench-head'));
     panel.querySelector('.csw-workbench-face').addEventListener('click', onWorkbenchFaceClick);
     for (const pane of registry) {
@@ -368,6 +339,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       writeWorkbenchScroll(preview, restored.previewTop);
     }
   }
+  updateFeatureControls(root);
   alignOutlineNestedText();
   updateSplit();
   applyMaterial({ animate: false });
@@ -428,7 +400,7 @@ function updateSplit() {
     if (focused instanceof HTMLElement && panes.contains(focused))
       focused.focus({ preventScroll: true });
   }
-  const focused = arrangement?.focused;
+  const focused = shellState.feature === 'outline' ? 'outline' : arrangement?.focused;
   const tabs = preference.group === 'tabs' && !focused;
   const single = Boolean(focused) || tabs;
   tabbar.hidden = !tabs;

@@ -4,6 +4,12 @@
  * [POS]: 视图组合层，设置请求由 runtime/settings-sync 负责。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import {
+  independentFeatures,
+  renderFeatureShell,
+  featurePlacement,
+  featureTheme,
+} from '../workbench/feature-host.js';
 
 import {
   CHIP_HEIGHT,
@@ -93,6 +99,7 @@ import {
   onFabPointerDown,
   onGlassClick,
   onHeadFaceClick,
+  onWorkbenchFaceClick,
   onKeyDown,
   onPanelWheel,
   onResize,
@@ -252,6 +259,39 @@ function renderFloat(options = {}) {
     deferRender();
     return;
   }
+  if (independentFeatures()) {
+    installStyle();
+    installFloat();
+    shellState.root.style.removeProperty('display');
+    const docked = featurePlacement() === 'sidebar' && shellState.dockStatus === 'open';
+    if (!docked && shellState.root.parentNode !== document.body)
+      document.body.append(shellState.root);
+    const theme = featureTheme();
+    if (theme) {
+      shellState.root.dataset.surfaceTheme = theme.theme;
+      shellState.root.dataset.surfaceVariant = theme.liquidVariant;
+    }
+    syncTheme();
+    shellState.root.dataset.hidden = 'false';
+    shellState.fab.dataset.expression = resolveFabExpression(Date.now());
+    if (docked || shellState.open) shellState.root.dataset.workbench = 'true';
+    else delete shellState.root.dataset.workbench;
+    delete shellState.root.dataset.dockVisible;
+    delete shellState.root.dataset.dockSuspended;
+    if (featurePlacement() === 'sidebar') shellState.open = docked;
+    renderFeatureShell(onWorkbenchFaceClick);
+    if (featurePlacement() === 'desktop') {
+      shellState.open = false;
+      shellState.root.style.display = 'none';
+      return;
+    }
+    applyMaterial({ animate: false });
+    applyPosition();
+    installPanelDrag();
+    if (!options.preserveMorph && !shellState.morphAnimation) settleMorph(shellState.open ? 1 : 0);
+    syncEyeTracking();
+    return;
+  }
   shellState.activeTab = normalizeActiveTab();
   syncWorkbench();
   const unsupportedDock = !IS_POPOUT && isWorkbench() && shellState.dockStatus === 'unsupported';
@@ -348,6 +388,7 @@ function renderFloat(options = {}) {
   const tone = statusToneForView(expression);
   const paneCue = activePaneCue();
   const viewTabs = enabledViewOrder().map(viewTabHtml).join('');
+  shellState.featureCleanup?.();
   shellState.panel.innerHTML = `
       <div class="csw-head">
         <div class="csw-head-side csw-head-left">

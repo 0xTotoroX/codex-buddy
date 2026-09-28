@@ -32,6 +32,8 @@ export interface EditableSettings {
   timeoutMs: number;
 }
 export interface Settings extends EditableSettings {
+  taskBoardEnabled?: boolean;
+  modelControlEnabled?: boolean;
   popoutSupported: boolean;
   apiKeyConfigured: boolean;
   storedApiKey: boolean;
@@ -107,6 +109,7 @@ export interface PanelSnapshot {
   association?: ChatAssociation;
 }
 export interface PanelReadingState {
+  taskView?: { search: string; stage: string; tab: string };
   viewToken: string;
   contentToken: string;
   activeTab: string;
@@ -164,6 +167,7 @@ export interface PanelPreferences {
   width: number;
   height: number;
   layoutMode: 'capsule' | 'workbench';
+  feature?: 'workbench' | 'outline' | 'board';
   dockWidth: number;
   splitRatio: number; // Legacy dock vertical ratio.
   dockLayout: WorkbenchLayout | null;
@@ -177,10 +181,11 @@ export interface PanelPreferences {
   viewOrder: string[];
 }
 export interface PopoutBridge {
+  taskRequest(path: string, body?: unknown): Promise<unknown>;
   request(path: string, input?: unknown): Promise<CommandResult>;
   size(width: number, height: number): Promise<void>;
   save(ui: PanelPreferences): void;
-  dock(): Promise<void>;
+  dock(options?: { expand?: boolean }): Promise<void>;
   cancelDock?(): void;
   motionActive?(): boolean;
   presented(): Promise<void>;

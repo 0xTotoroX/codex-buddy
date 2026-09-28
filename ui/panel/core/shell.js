@@ -116,9 +116,10 @@ function usesOutlineExpression(now = Date.now()) {
 
 function resolveFabExpression(now = Date.now()) {
   if (!runtimeEnabled()) return 'hidden';
-  return usesOutlineExpression(now)
+  const expression = usesOutlineExpression(now)
     ? resolveOutlineExpression(now)
     : resolveStepwiseExpression(now);
+  return expression === 'hidden' && runtimeState.settings?.taskBoardEnabled ? 'idle' : expression;
 }
 
 function fabExpressionLabel(expression, outlineExpression = usesOutlineExpression()) {

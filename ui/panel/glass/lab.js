@@ -63,7 +63,7 @@ function sync() {
     refresh();
     return;
   }
-  surface = root.querySelector('.csw-glass');
+  surface = /** @type {HTMLElement} */ (root.querySelector('.csw-glass'));
   if (!surface) return;
   try {
     glass = createSvgGlass(surface);

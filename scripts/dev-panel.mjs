@@ -38,6 +38,19 @@ function measurePanel() {
   const base = document.querySelector('.csw-popover')?.getBoundingClientRect();
   const glass = window.__codexBuddyGlassLab?.status();
   return {
+    board: [...document.querySelectorAll('[data-codex-buddy-features-root]')].map((node) => {
+      const board = node.shadowRoot?.querySelector('.board-app');
+      const tools = board?.querySelector('.board-tools')?.getBoundingClientRect();
+      const heading = board?.querySelector('.column-heading')?.getBoundingClientRect();
+      return board && tools && heading
+        ? [
+            board.getBoundingClientRect().width,
+            tools.y + tools.height / 2,
+            heading.y + heading.height / 2,
+            board.querySelectorAll('.board-toolbar').length,
+          ]
+        : [];
+    }),
     glass: glass
       ? {
           selected: glass.selected,
@@ -83,15 +96,24 @@ export async function buildDevPanel(root, output) {
   const inputs = [
     ...filesUnder(root, 'ui/panel'),
     ...filesUnder(root, 'ui/bridge'),
+    ...filesUnder(root, 'ui/board'),
+    ...filesUnder(root, 'ui/features'),
+    'ui/settings/api.ts',
     'ui/tokens.css',
   ];
   const code = fingerprint(
     root,
-    inputs.filter((file) => !file.endsWith('.css')),
+    inputs.filter(
+      (file) =>
+        !file.endsWith('.css') || file.startsWith('ui/board/') || file.startsWith('ui/features/'),
+    ),
   );
   const styles = fingerprint(
     root,
-    inputs.filter((file) => file.endsWith('.css')),
+    inputs.filter(
+      (file) =>
+        file.endsWith('.css') && !file.startsWith('ui/board/') && !file.startsWith('ui/features/'),
+    ),
   );
   const html = readFileSync(join(root, 'ui/panel/popout/index.html'), 'utf8');
   const boot = readFileSync(join(root, 'ui/panel/popout/boot.js'), 'utf8');
@@ -122,6 +144,7 @@ export async function buildDevPanel(root, output) {
       window.__buddyDev = next;
       return;
     }
+    if (window.__buddyFeatureFlush && !(await window.__buddyFeatureFlush())) return;
     const ui = old?.panelPreferences();
     const detached = old?.state.detached;
     ${panel}
@@ -162,8 +185,54 @@ export async function buildDevPanel(root, output) {
       finally { pending = false; }
     }, 500);
   })();`;
+  const feature = await build({
+    absWorkingDir: root,
+    nodePaths: [resolve(import.meta.dirname, '../node_modules')],
+    entryPoints: ['ui/features/main.ts'],
+    bundle: true,
+    jsx: 'automatic',
+    loader: { '.css': 'text' },
+    define: { 'process.env.NODE_ENV': '"production"' },
+    format: 'iife',
+    target: 'safari17',
+    write: false,
+    logLevel: 'silent',
+  });
+  const featureCode = feature.outputFiles[0].text;
+  const featureRevision = hash(featureCode);
+  const featureClient = `
+;(() => {
+    window.__buddyFeatureRevision = ${JSON.stringify(featureRevision)};
+    let updating = false;
+    setInterval(async () => {
+      if (updating) return;
+      updating = true;
+      try {
+        const boardHost = [...document.querySelectorAll('.csw-feature-content > div,.edge-view')].find(node => node.shadowRoot?.querySelector('.board-app'));
+        const board = boardHost?.shadowRoot.querySelector('.board-app');
+        const tools = board?.querySelector('.board-tools')?.getBoundingClientRect();
+        const heading = board?.querySelector('.column-heading')?.getBoundingClientRect();
+        await fetch('/api/development', {method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+sessionStorage.getItem('companion-token')},body:JSON.stringify({
+          surface: document.getElementById('edge-panel') ? 'edge' : 'desktop',
+          native:true, revision:window.__buddyFeatureRevision, roots:1,
+          board:board && tools && heading ? [[board.getBoundingClientRect().width,tools.y+tools.height/2,heading.y+heading.height/2,board.querySelectorAll('.board-toolbar').length]] : []
+        })});
+        const next = await (await fetch('/dev-state.json', {cache:'no-store'})).json();
+        if (next.feature && next.feature !== window.__buddyFeatureRevision &&
+            !document.querySelector('[data-arranging="true"]') &&
+            await window.__buddyFeatureFlush?.()) location.reload();
+      } catch (error) { console.warn('CodexBuddy 开发更新等待重试', error.message); }
+      finally { updating = false; }
+    }, 800);
+  })();`;
   const snapshot = {
     revision,
+    featureRevision,
+    featureScript: featureCode + featureClient,
+    featureHtml: readFileSync(join(root, 'ui/settings/feature.html'), 'utf8').replace(
+      '../features/main.ts',
+      '/feature-dev.js',
+    ),
     page,
     script,
     boot,

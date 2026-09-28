@@ -188,7 +188,7 @@
     await savePreferences({ ui, expectedRevision: revision });
     lastSaved = fingerprint;
   }
-  async function dock() {
+  async function dock({ expand = false } = {}) {
     if (stopped || docking) return;
     docking = true;
     cancelReturning = false;
@@ -203,6 +203,7 @@
       const { anchor } = await request('anchor');
       if (cancelReturning || !(await travelHome(anchor))) return;
       await request('dock', {
+        expand,
         ui,
         expectedRevision,
         presentation,
@@ -291,6 +292,18 @@
 
   window.__companionPopout = {
     request,
+    async taskRequest(path, body) {
+      if (!['tasks/state', 'tasks/command'].includes(path)) throw new Error('不支持的任务请求');
+      const response = await fetch(`/api/${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(15000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || '任务服务不可用');
+      return result;
+    },
     native,
     notice,
     size,

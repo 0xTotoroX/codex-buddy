@@ -1,5 +1,5 @@
-// [INPUT]: 已连接的 CDP Client、宿主模型适配器、独立偏好及原生窗口租约。
-// [OUTPUT]: 模型控制条状态、串行切换、偏好保存、私有末次操作诊断与单实例窗口生命周期。
+// [INPUT]: 已连接的 CDP Client、宿主模型适配器及独立业务偏好。
+// [OUTPUT]: 模型状态、串行切换、预设保存与私有末次操作诊断；呈现交给 features。
 // [POS]: 宿主模型控制服务；不读写建议生成配置或工作台的来源/布局。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -10,10 +10,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{
-    process::{Child, Command, Stdio},
-    time::{Duration, Instant},
-};
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -36,12 +33,6 @@ pub struct Preset {
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Preferences {
     pub enabled: bool,
-    pub edge: String,
-    pub position: f64,
-    pub screen: String,
-    pub keep_open: bool,
-    pub theme: String,
-    pub liquid_variant: String,
     pub model_column_width: f64,
     pub pinned: Vec<String>,
     pub presets: Vec<Preset>,
@@ -51,12 +42,6 @@ impl Default for Preferences {
     fn default() -> Self {
         Self {
             enabled: false,
-            edge: "right".into(),
-            position: 0.5,
-            screen: String::new(),
-            keep_open: false,
-            theme: "black".into(),
-            liquid_variant: "regular".into(),
             model_column_width: 140.,
             pinned: vec![],
             presets: vec![],
@@ -79,17 +64,8 @@ impl Selection {
 
 impl Preferences {
     fn validate(&self) -> Result<()> {
-        if !["right", "left", "top"].contains(&self.edge.as_str())
-            || !(0. ..=1.).contains(&self.position)
-            || !(100. ..=280.).contains(&self.model_column_width)
-            || self.screen.len() > 256
-        {
-            bail!("控制条位置或列宽无效");
-        }
-        if !["black", "matte", "frosted", "native-glass"].contains(&self.theme.as_str())
-            || !["regular", "clear"].contains(&self.liquid_variant.as_str())
-        {
-            bail!("模型控制主题无效");
+        if !(100. ..=280.).contains(&self.model_column_width) {
+            bail!("模型列宽无效");
         }
         let mut ids = std::collections::HashSet::new();
         for preset in &self.presets {
@@ -129,10 +105,6 @@ impl Preferences {
 pub struct Control {
     pub preferences: Preferences,
     pub revision: u64,
-    child: Option<Child>,
-    lease: String,
-    reveal: u64,
-    last_start: Option<Instant>,
     pub operation: std::sync::Arc<Mutex<()>>,
     snapshot: Value,
 }
@@ -141,51 +113,28 @@ impl Control {
     pub fn load(paths: &Paths) -> Self {
         let preferences = std::fs::read(paths.root.join("model-control.json"))
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<Preferences>(&bytes).ok())
+            .and_then(|bytes| {
+                let mut value: Value = serde_json::from_slice(&bytes).ok()?;
+                for key in [
+                    "edge",
+                    "position",
+                    "screen",
+                    "keepOpen",
+                    "theme",
+                    "liquidVariant",
+                ] {
+                    value.as_object_mut()?.remove(key);
+                }
+                serde_json::from_value::<Preferences>(value).ok()
+            })
             .filter(|prefs| prefs.validate().is_ok())
             .unwrap_or_default();
         Self {
             preferences,
             revision: 1,
-            child: None,
-            lease: String::new(),
-            reveal: 0,
-            last_start: None,
             operation: std::sync::Arc::new(Mutex::new(())),
             snapshot: unavailable("尚未连接可操作的聊天"),
         }
-    }
-
-    fn alive(&mut self) -> bool {
-        if let Some(child) = &mut self.child {
-            if matches!(child.try_wait(), Ok(None)) {
-                return true;
-            }
-            self.child = None;
-            self.lease.clear();
-        }
-        false
-    }
-
-    fn start(&mut self, paths: &Paths) -> Result<()> {
-        if self.alive() {
-            return Ok(());
-        }
-        self.last_start = Some(Instant::now());
-        let lease = uuid::Uuid::new_v4().to_string();
-        let child = Command::new(std::env::current_exe()?)
-            .arg("--data-dir")
-            .arg(&paths.root)
-            .arg("model-control-window")
-            .arg("--lease")
-            .arg(&lease)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()?;
-        self.child = Some(child);
-        self.lease = lease;
-        Ok(())
     }
 
     fn save(&self, paths: &Paths) -> Result<()> {
@@ -257,11 +206,18 @@ impl App {
         Ok(control.envelope(snapshot))
     }
 
+    pub async fn validate_model_edge(&self, _lease: &str) -> Result<()> {
+        bail!("旧模型窗口已停用，请从设置重新打开模型快切")
+    }
     pub async fn model_control_apply(&self, command: Value) -> Result<Value> {
         let operation = self.model_control.lock().await.operation.clone();
         let _guard = operation
             .try_lock()
             .map_err(|_| anyhow::anyhow!("已有模型操作正在进行"))?;
+        anyhow::ensure!(
+            self.model_control.lock().await.preferences.enabled,
+            "模型快切已停用"
+        );
         let selection: Selection =
             serde_json::from_value(command["selection"].clone()).context("请选择完整模型配置")?;
         selection.validate()?;
@@ -314,16 +270,14 @@ impl App {
     }
 
     pub async fn model_control_preferences(&self, request: Value) -> Result<Value> {
+        let operation = self.model_control.lock().await.operation.clone();
+        let _guard = operation.lock().await;
         let mut control = self.model_control.lock().await;
         if let Some(revision) = request.get("revision") {
             if revision.as_u64() != Some(control.revision) {
                 bail!("model_control_conflict");
             }
-        } else if request["patch"].as_object().is_none_or(|patch| {
-            patch
-                .keys()
-                .any(|key| !["edge", "position", "screen", "keepOpen"].contains(&key.as_str()))
-        }) {
+        } else {
             bail!("保存预设必须提供当前版本");
         }
         let next = control.preferences.patched(&request["patch"])?;
@@ -337,83 +291,38 @@ impl App {
     }
 
     pub async fn open_model_control(&self) -> Result<Value> {
-        let mut control = self.model_control.lock().await;
-        let previous = control.preferences.enabled;
-        control.preferences.enabled = true;
-        if let Err(error) = control.save(&self.paths) {
-            control.preferences.enabled = previous;
-            return Err(error);
-        }
-        if let Err(error) = control.start(&self.paths) {
-            control.preferences.enabled = previous;
-            control.save(&self.paths)?;
-            return Err(error);
-        }
-        control.revision += 1;
-        control.reveal += 1;
-        Ok(json!({"ok":true}))
-    }
-
-    pub async fn close_model_control(&self) -> Result<Value> {
-        let mut control = self.model_control.lock().await;
-        let previous = control.preferences.enabled;
-        control.preferences.enabled = false;
-        if let Err(error) = control.save(&self.paths) {
-            control.preferences.enabled = previous;
-            return Err(error);
-        }
-        control.revision += 1;
-        control.lease.clear();
-        // 只回收本服务创建的控制条进程，不影响官方宿主或工作台。
-        if let Some(mut child) = control.child.take() {
-            let _ = child.kill();
-            let _ = child.wait();
-        }
-        Ok(json!({"ok":true}))
-    }
-
-    pub async fn model_control_window(&self, lease: &str) -> Value {
-        let host = if let Some(client) = self.desktop_client().await {
-            let presence = client
-                .evaluate_with_timeout(
-                    "({...window.__codexBuddyModelControl?.presence?.(), appearance: window.__companionFloatingPanel?.panelAppearance?.() ?? null})".into(),
-                    Duration::from_millis(600),
-                )
-                .await
-                .unwrap_or(Value::Null);
-            if self
-                .desktop_client()
-                .await
-                .is_some_and(|now| std::sync::Arc::ptr_eq(&client, &now))
-            {
-                presence
-            } else {
-                Value::Null
-            }
-        } else {
-            Value::Null
-        };
-        let ui = self.appearance().await.ui;
-        let appearance = json!({"material":ui.material,"liquidVariant":ui.liquid_variant,"fontOffset":ui.font_offset,"hostTheme":host["appearance"]});
-        let mut control = self.model_control.lock().await;
-        let valid = !lease.is_empty()
-            && control.lease == lease
-            && control.preferences.enabled
-            && control.alive();
-        json!({"valid":valid,"preferences":control.preferences,"reveal":control.reveal,"appearance":appearance,"host":host})
-    }
-
-    pub async fn supervise_model_control(&self) {
-        let mut control = self.model_control.lock().await;
-        if control.preferences.enabled
-            && !control.alive()
-            && control
-                .last_start
-                .is_none_or(|last| last.elapsed() > Duration::from_secs(30))
-            && let Err(error) = control.start(&self.paths)
         {
-            tracing::warn!(%error, "无法恢复模型控制条");
+            let mut control = self.model_control.lock().await;
+            let previous = control.preferences.enabled;
+            control.preferences.enabled = true;
+            if let Err(error) = control.save(&self.paths) {
+                control.preferences.enabled = previous;
+                return Err(error);
+            }
+            control.revision += 1;
         }
+        self.feature_request(json!({"op":"reveal","id":"model"}))
+            .await
+    }
+    pub async fn close_model_control(&self) -> Result<Value> {
+        let operation = self.model_control.lock().await.operation.clone();
+        let _guard = operation.lock().await;
+        {
+            let mut control = self.model_control.lock().await;
+            let previous = control.preferences.enabled;
+            control.preferences.enabled = false;
+            if let Err(error) = control.save(&self.paths) {
+                control.preferences.enabled = previous;
+                return Err(error);
+            }
+            control.revision += 1;
+        }
+        drop(_guard);
+        self.close_feature("model").await?;
+        Ok(json!({"ok":true}))
+    }
+    pub async fn model_control_window(&self, _lease: &str) -> Value {
+        json!({"valid":false})
     }
 }
 
@@ -434,11 +343,9 @@ mod tests {
             }],
             ..Default::default()
         };
-        let next = prefs
-            .patched(&json!({"edge":"top","position":0.2}))
-            .unwrap();
+        let next = prefs.patched(&json!({"pinned":["a"]})).unwrap();
         assert_eq!(next.presets, prefs.presets);
-        assert_eq!(next.edge, "top");
+        assert_eq!(next.pinned, vec!["a"]);
         for patch in [
             json!({"edge":"free"}),
             json!({"position":1.5}),
@@ -462,32 +369,16 @@ mod tests {
                 .as_bool()
                 .unwrap()
         );
-        let result = app.model_control_preferences(json!({"revision":1,"patch":{"edge":"top","theme":"native-glass","liquidVariant":"clear","screen":"fixture-screen","presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
+        let result = app.model_control_preferences(json!({"revision":1,"patch":{"presets":[{"id":"p","name":"日常","selection":{"model":"a","reasoning":"high","speed":"standard"}}]}})).await.unwrap();
         assert_eq!(result["revision"], 2);
         assert!(
             app.model_control_preferences(json!({"revision":1,"patch":{"presets":[]}}))
                 .await
                 .is_err()
         );
-        app.model_control_preferences(json!({"patch":{"position":0.7}}))
-            .await
-            .unwrap();
         let loaded = Control::load(&paths);
         assert_eq!(loaded.preferences.presets.len(), 1);
-        assert_eq!(loaded.preferences.edge, "top");
-        assert_eq!(loaded.preferences.position, 0.7);
-        assert_eq!(loaded.preferences.theme, "native-glass");
-        assert_eq!(loaded.preferences.liquid_variant, "clear");
-        assert_eq!(loaded.preferences.screen, "fixture-screen");
         assert_eq!(before, app.appearance().await);
-        let appearance = app.model_control_window("invalid").await["appearance"].clone();
-        assert_eq!(appearance["material"], before.ui.material);
-        let changed = app.save_appearance(json!({"expectedRevision":before.revision,"ui":{"material":"native-glass","liquidVariant":"clear","fontOffset":2}})).await.unwrap();
-        let inherited = app.model_control_window("invalid").await["appearance"].clone();
-        assert_eq!(inherited["material"], "native-glass");
-        assert_eq!(inherited["liquidVariant"], "clear");
-        assert_eq!(inherited["fontOffset"], 2.);
-        assert_eq!(changed, app.appearance().await);
         assert!(!paths.config().exists());
         assert!(app.model_control_apply(json!({"target":{"id":"a"},"expectedRevision":"old","selection":{"model":"a","reasoning":"high","speed":"fast"}})).await.is_err());
     }
@@ -495,15 +386,6 @@ mod tests {
     fn defaults_do_not_open_windows_or_change_workbench() {
         let prefs: Preferences = serde_json::from_value(json!({})).unwrap();
         assert!(!prefs.enabled);
-        assert_eq!(prefs.edge, "right");
-        assert_eq!(prefs.theme, "black");
-        for theme in ["black", "matte", "frosted", "native-glass"] {
-            let next = prefs
-                .patched(&json!({"theme":theme,"liquidVariant":"clear"}))
-                .unwrap();
-            assert_eq!(next.theme, theme);
-        }
-        assert!(prefs.patched(&json!({"theme":"neon"})).is_err());
         prefs.validate().unwrap();
     }
 }

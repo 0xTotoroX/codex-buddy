@@ -59,6 +59,7 @@ pub struct Ui {
     pub width: f64,
     pub height: f64,
     pub layout_mode: String,
+    pub feature: String,
     #[serde(deserialize_with = "deserialize_dock_width")]
     pub dock_width: f64,
     #[serde(deserialize_with = "deserialize_split_ratio")]
@@ -81,6 +82,7 @@ impl Default for Ui {
             width: 404.,
             height: 420.,
             layout_mode: "capsule".into(),
+            feature: "workbench".into(),
             dock_width: 340.,
             split_ratio: 0.45,
             dock_layout: None,
@@ -106,6 +108,7 @@ impl Ui {
             || !self.height.is_finite()
             || self.height < 340.
             || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
+            || !["workbench", "outline", "board"].contains(&self.feature.as_str())
             || !(300. ..=460.).contains(&self.dock_width)
             || !(0.2..=0.8).contains(&self.split_ratio)
             || self
@@ -260,6 +263,8 @@ impl Panel {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Input {
+    #[serde(default)]
+    pub expand: bool,
     pub lease: String,
     pub expected_revision: Option<u64>,
     pub ui: Option<Ui>,
@@ -273,7 +278,19 @@ pub struct Input {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TaskView {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub editor: Option<Value>,
+    pub search: String,
+    pub tab: String,
+    pub stage: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ReadingState {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_view: Option<TaskView>,
     pub view_token: String,
     pub content_token: String,
     pub active_tab: String,
@@ -302,6 +319,17 @@ pub struct PaneReadingState {
 
 impl ReadingState {
     fn validate(&self) -> Result<()> {
+        if let Some(view) = &self.task_view
+            && (view
+                .editor
+                .as_ref()
+                .is_some_and(|v| v.to_string().len() > 128 * 1024)
+                || view.search.len() > 4000
+                || !["board", "archive", "attention"].contains(&view.tab.as_str())
+                || !["todo", "doing", "waiting", "done"].contains(&view.stage.as_str()))
+        {
+            bail!("任务视图状态无效");
+        }
         if self.view_token.len() > 128
             || self.content_token.len() > 128
             || !["next", "outline", "settings"].contains(&self.active_tab.as_str())
@@ -361,6 +389,9 @@ impl App {
     }
 
     pub async fn detach_panel(&self, ui: Option<Ui>) -> Result<()> {
+        if self.features_active().await {
+            bail!("请在独立功能标题旁选择桌面窗口");
+        }
         let activate = ui.is_some();
         let mut panel = self.panel.lock().await;
         require_popout(panel.popout_supported)?;
@@ -511,6 +542,9 @@ impl App {
                     panel.prefs = next;
                 }
             }
+            if input.expand {
+                panel.prefs.return_open = Some(true);
+            }
             panel.docking = true;
             panel.ready
         };
@@ -575,13 +609,17 @@ impl App {
                 bail!("浮窗尚未就绪");
             }
         }
+        self.execute_panel_command(&input.command).await
+    }
+
+    pub(crate) async fn execute_panel_command(&self, command: &Value) -> Result<Value> {
         let client = self.desktop_client().await.context("Codex 连接已断开")?;
         let result = client.evaluate(format!(
-            "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", input.command
+            "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", command
         )).await?;
         if result["ok"] == true
             && ["fill", "quick-fill", "outline-jump", "outline-anchor"]
-                .contains(&input.command["kind"].as_str().unwrap_or_default())
+                .contains(&command["kind"].as_str().unwrap_or_default())
         {
             let _ = client.request("Page.bringToFront", json!({})).await;
         }
@@ -667,13 +705,21 @@ impl App {
         if next.detached {
             next.ui.open = true;
         }
+        let dock_changed = next.ui.dock_layout != panel.prefs.ui.dock_layout;
+        let desktop_changed = next.ui.popout_layout != panel.prefs.ui.popout_layout;
         if next != panel.prefs {
             next.revision += 1;
             next.web_revision += 1;
             next.save(&self.paths)?;
             panel.prefs = next;
         }
-        Ok(panel.prefs.clone())
+        let saved = panel.prefs.clone();
+        drop(panel);
+        if dock_changed || desktop_changed {
+            self.reset_feature_layouts(dock_changed, desktop_changed)
+                .await?;
+        }
+        Ok(saved)
     }
 
     pub async fn close_panel(&self) -> Result<Value> {
@@ -685,6 +731,7 @@ impl App {
             return Ok(json!({"ok":true}));
         }
         self.dock_panel(&Input {
+            expand: false,
             lease,
             expected_revision: None,
             ui: None,
@@ -746,6 +793,7 @@ mod tests {
 
     fn panel_input(lease: String) -> Input {
         Input {
+            expand: false,
             lease,
             expected_revision: None,
             ui: None,
@@ -777,6 +825,7 @@ mod tests {
         assert!(app.presented_panel(&input).await.is_err());
         assert!(app.panel_host_state().await.0);
         input.presentation = Some(ReadingState {
+            task_view: None,
             view_token: "view".into(),
             content_token: "content".into(),
             active_tab: "outline".into(),
@@ -1134,6 +1183,31 @@ mod tests {
         assert_eq!(changed.ui.liquid_variant, "clear");
         assert_eq!(changed.return_open, Some(false));
         assert_eq!(Preferences::read(&app.paths).return_open, Some(false));
+    }
+
+    #[tokio::test]
+    async fn explicit_surface_return_expands_but_gesture_preserves_compact_origin() {
+        for expand in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let paths = Paths::new(Some(dir.path().into())).unwrap();
+            let app = App::new(paths, crate::config::Config::default(), None, true);
+            {
+                let mut panel = app.panel.lock().await;
+                panel.lease = "surface-test".into();
+                panel.prefs.detached = true;
+                panel.prefs.return_open = Some(false);
+            }
+            let mut input = panel_input("surface-test".into());
+            input.expand = expand;
+            input.expected_revision = Some(app.appearance().await.revision);
+            let mut ui = Ui::default();
+            ui.layout_mode = "capsule".into();
+            input.ui = Some(ui);
+            app.dock_panel(&input).await.unwrap();
+            assert_eq!(app.appearance().await.ui.open, expand);
+            assert_eq!(app.panel_host_state().await.1["open"], expand);
+            assert_eq!(Preferences::read(&app.paths).ui.open, expand);
+        }
     }
 
     #[test]

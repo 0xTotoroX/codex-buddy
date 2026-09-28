@@ -1,4 +1,4 @@
-// [INPUT]: CLI 参数以及 config/lifecycle/server/panel_window/model_control 模块。
+// [INPUT]: CLI 参数以及 config/lifecycle/server/panel_window/model_control/tasks 模块。
 // [OUTPUT]: codex-buddy 命令分发与进程入口；launch --host-only 供开发入口仅准备宿主。
 // [POS]: 独立可执行文件入口，区分后台和窗口子进程。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -7,11 +7,13 @@ mod assets;
 mod cdp;
 mod config;
 mod directions;
+mod edge_window;
+mod feature_window;
+mod features;
 mod jev;
 mod lifecycle;
 mod model;
 mod model_control;
-mod model_control_window;
 mod native_backdrop;
 mod panel;
 mod panel_window;
@@ -21,6 +23,8 @@ mod settings;
 mod state;
 #[cfg(test)]
 mod stepwise_tests;
+mod surfaces;
+mod tasks;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -37,12 +41,33 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(hide = true)]
+    FeatureWindow {
+        #[arg(long)]
+        feature: String,
+        #[arg(long)]
+        lease: String,
+    },
+    #[command(hide = true)]
+    RemindersWorker {
+        #[arg(long)]
+        lease: String,
+        #[arg(long)]
+        runtime_token: String,
+    },
+    #[command(hide = true)]
+    BoardWindow {
+        #[arg(long)]
+        lease: String,
+    },
+    #[command(about = "打开独立任务看板")]
+    Board,
     #[command(about = "将胶囊弹出到桌面，复用后台与当前连接")]
     Popout,
-    #[command(about = "打开独立模型控制条，保留工作台和宿主当前任务")]
+    #[command(about = "在保存的呈现形式中打开模型快切，保留宿主当前任务")]
     ModelControl,
     #[command(hide = true)]
-    ModelControlWindow {
+    EdgeWindow {
         #[arg(long)]
         lease: String,
     },
@@ -122,7 +147,20 @@ async fn main() -> Result<()> {
         no_open: false,
         allow_fixture: false,
     }) {
-        Commands::ModelControlWindow { lease } => model_control_window::run(&paths, &lease),
+        Commands::RemindersWorker {
+            lease,
+            runtime_token,
+        } => tasks::native::run(&paths, &lease, &runtime_token),
+        Commands::FeatureWindow { feature, lease } => feature_window::run(&paths, &feature, &lease),
+        Commands::BoardWindow { lease } => tasks::window::run(&paths, &lease),
+        Commands::Board => {
+            lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;
+            lifecycle::Runtime::read(&paths)?
+                .request("tasks/command", Some(serde_json::json!({"op":"open"})))
+                .await?;
+            Ok(())
+        }
+        Commands::EdgeWindow { lease } => edge_window::run(&paths, &lease),
         Commands::ModelControl => {
             lifecycle::start(&paths, config::DEFAULT_PORT, None, true, false).await?;
             lifecycle::Runtime::read(&paths)?

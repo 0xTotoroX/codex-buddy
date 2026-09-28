@@ -18,6 +18,8 @@ export function SettingsOutline({
   const sections = useMemo(
     () => [
       { id: 'settings-model-control', label: '模型快切' },
+      { id: 'settings-tasks', label: '任务看板' },
+      { id: 'settings-surfaces', label: '呈现形式' },
       ...(panelReady ? [{ id: 'settings-capsule', label: '胶囊' }] : []),
       ...(formReady
         ? [

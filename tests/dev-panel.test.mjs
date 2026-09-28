@@ -27,6 +27,15 @@ test('dev snapshots publish CSS independently and preserve the last successful b
     appendFileSync(join(root, 'ui/panel/runtime/constants.js'), '\n// Development logic update\n');
     const logic = await buildDevPanel(root, output);
     assert.notEqual(code(logic), code(css));
+    appendFileSync(join(root, 'ui/board/styles.css'), '\n.board-app { --board-update: 1; }');
+    const boardStyles = await buildDevPanel(root, output);
+    assert.notEqual(code(boardStyles), code(logic));
+    assert.notEqual(boardStyles.featureRevision, logic.featureRevision);
+    assert.match(boardStyles.featureHtml, /feature-dev.js/);
+    assert.match(boardStyles.featureScript, /--board-update/);
+    appendFileSync(join(root, 'ui/board/app.tsx'), '\n// Board logic update\n');
+    const boardLogic = await buildDevPanel(root, output);
+    assert.notEqual(code(boardLogic), code(boardStyles));
     const saved = readFileSync(output, 'utf8');
     appendFileSync(join(root, 'ui/panel/runtime/constants.js'), '\nexport const broken = ;\n');
     await assert.rejects(buildDevPanel(root, output));

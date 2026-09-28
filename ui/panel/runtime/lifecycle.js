@@ -4,6 +4,13 @@
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import {
+  startFeatureHost,
+  stopFeatureHost,
+  independentFeatures,
+  popoutSelectedFeature,
+  toggleFeatureDock,
+} from '../workbench/feature-host.js';
 import { panelAppearance } from '../core/panel-appearance.js';
 
 import {
@@ -272,7 +279,12 @@ function installObserver() {
   runtimeState.observer = new MutationObserver((mutations) => {
     if (!isCurrentRuntime(generation)) return;
     const relevant = mutations.some((mutation) => {
-      if (shellState.root?.contains(mutation.target)) return false;
+      if (
+        shellState.root?.contains(mutation.target) ||
+        (mutation.target instanceof Element &&
+          mutation.target.closest('[data-codex-buddy-features-root]'))
+      )
+        return false;
       return mutation.addedNodes.length || mutation.type === 'characterData';
     });
     if (relevant) scheduleScan();
@@ -286,6 +298,7 @@ function installObserver() {
 }
 
 function stopRuntime() {
+  stopFeatureHost();
   stopWorkbench();
   cancelFaceClick();
   window.dispatchEvent(
@@ -361,6 +374,7 @@ function stopRuntime() {
   outlineState.outlineFingerprint = '';
   outlineState.outlineStatus = 'idle';
   outlineState.outlineError = '';
+  shellState.featureCleanup?.();
   shellState.root?.remove();
   shellState.root = null;
   shellState.fab = null;
@@ -404,6 +418,7 @@ function activateRuntime() {
     renderFloat();
     return true;
   }
+  startFeatureHost();
   installContextTracking();
   if (!runtimeState.observer && !installObserver()) {
     const domReadyHandler = () => {
@@ -422,6 +437,7 @@ function activateRuntime() {
 }
 
 function destroy() {
+  shellState.featureCleanup?.();
   clearTimeout(shellState.detachedRecoveryTimer);
   if (!IS_POPOUT) sessionStorage.removeItem(DETACHED_KEY);
   runtimeState.destroyed = true;
@@ -517,8 +533,18 @@ function install() {
     onSignal('generationControl', ({ mode, busy }) => updateGenerationModeControl(mode, busy)),
     onSignal('verify', () => scan()),
     onSignal('theme', () => syncTheme()),
-    onSignal('windowToggle', () => void togglePanelWindow()),
-    onSignal('workbenchToggle', (expanded) => (expanded ? openWorkbench() : closeWorkbench())),
+    onSignal(
+      'windowToggle',
+      (options) =>
+        void (independentFeatures() ? popoutSelectedFeature() : togglePanelWindow(options)),
+    ),
+    onSignal('workbenchToggle', (expanded) =>
+      independentFeatures()
+        ? toggleFeatureDock(expanded)
+        : expanded
+          ? openWorkbench()
+          : closeWorkbench(),
+    ),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
   window[API_KEY] = {

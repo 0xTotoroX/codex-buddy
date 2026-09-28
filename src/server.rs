@@ -1,5 +1,5 @@
 // [INPUT]: App、Runtime、本机认证令牌、target/web 与 ui/panel/popout 资源。
-// [OUTPUT]: serve、HTTP/SSE API、设置页和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
+// [OUTPUT]: serve、认证任务 API、HTTP/SSE API、设置页、看板和弹出页资源；含原生呈现确认的窗口协议及受鉴权的无正文开发状态与仅开发模式开放的工作台唤起接口。
 // [POS]: 仅监听 loopback 的服务入口，公开状态剔除聊天正文；认证状态携带 Dev 设置地址供旧入口跳转；独立模型控制 API、页面与窗口租约共用鉴权。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -92,6 +92,7 @@ pub async fn serve(
     };
     let router = router(state);
     let watcher = app.clone().supervise();
+    let task_watcher = app.tasks.start();
     tracing::info!(port, "CodexBuddy 本地服务启动");
     let shutdown_app = app.clone();
     let result = axum::serve(listener, router)
@@ -101,6 +102,9 @@ pub async fn serve(
         })
         .await;
     watcher.abort();
+    task_watcher.abort();
+    app.stop_features().await;
+    app.tasks.stop().await;
     app.disconnect().await;
     if let Ok(current) = Runtime::read(&paths)
         && current.token == runtime.token
@@ -118,6 +122,10 @@ async fn termination() {
 
 fn router(service: Service) -> Router {
     let api = Router::new()
+        .route("/features", post(features))
+        .route("/surfaces", post(surfaces))
+        .route("/tasks/state", get(tasks_state))
+        .route("/tasks/command", post(tasks_command))
         .route("/state", get(state))
         .route(
             "/development",
@@ -151,7 +159,8 @@ fn router(service: Service) -> Router {
         .route("/model-control/open", post(model_control_open))
         .route("/model-control/close", post(model_control_close))
         .route("/model-control/window", get(model_control_window))
-        .route("/model-control/displays", get(model_control_displays))
+        .route("/model-control/displays", get(surface_displays))
+        .route("/surfaces/displays", get(surface_displays))
         .route("/shutdown", post(shutdown))
         .route_layer(middleware::from_fn_with_state(service.clone(), authorize));
     Router::new()
@@ -348,7 +357,12 @@ async fn development_report(State(service): State<Service>, Json(value): Json<Va
     if crate::assets::development().is_none() {
         return StatusCode::NOT_FOUND.into_response();
     }
+    let surface = value["surface"]
+        .as_str()
+        .filter(|s| ["desktop", "edge"].contains(s));
     let report = json!({
+        "updatedAt":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        "board":value["board"].as_array().map(|rows| rows.iter().take(4).map(|row| row.as_array().map(|values| values.iter().take(4).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
         "revision": value["revision"].as_str().unwrap_or("").chars().take(64).collect::<String>(),
         "instance": value["instance"].as_str().unwrap_or("").chars().take(128).collect::<String>(),
         "roots": value["roots"].as_u64(), "styles": value["styles"].as_u64(),
@@ -358,7 +372,11 @@ async fn development_report(State(service): State<Service>, Json(value): Json<Va
         "layout": value["layout"].as_array().map(|rows| rows.iter().take(7).map(|row| row.as_array().map(|values| values.iter().take(6).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
     });
     match write_private(
-        &service.app.paths.root.join("development.json"),
+        &service.app.paths.root.join(
+            surface
+                .map(|s| format!("development-{s}.json"))
+                .unwrap_or("development.json".into()),
+        ),
         &serde_json::to_vec(&report).unwrap(),
     ) {
         Ok(()) => Json(json!({"ok":true})).into_response(),
@@ -370,11 +388,26 @@ async fn development_status(State(service): State<Service>) -> Response {
         return StatusCode::NOT_FOUND.into_response();
     };
     if !service.app.appearance().await.detached {
-        let report = if let Some(client) = service.app.desktop_client().await {
+        let mut report = if let Some(client) = service.app.desktop_client().await {
             client.evaluate(dev.probe).await.unwrap_or(Value::Null)
         } else {
             Value::Null
         };
+        if report.is_object() {
+            for surface in ["desktop", "edge"] {
+                let value = std::fs::read(
+                    service
+                        .app
+                        .paths
+                        .root
+                        .join(format!("development-{surface}.json")),
+                )
+                .ok()
+                .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+                .unwrap_or(Value::Null);
+                report[surface] = value;
+            }
+        }
         return Json(report).into_response();
     }
     let report = std::fs::read(service.app.paths.root.join("development.json"))
@@ -400,14 +433,36 @@ async fn model_control_refresh(State(service): State<Service>) -> Result<Json<Va
 }
 async fn model_control_apply(
     State(service): State<Service>,
+    headers: HeaderMap,
     Json(command): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
+    let _guard = service
+        .app
+        .feature_operation
+        .try_lock()
+        .map_err(|_| ApiError::from(anyhow::anyhow!("已有功能操作正在进行")))?;
+    if let Some(lease) = headers.get("x-model-control-lease") {
+        service
+            .app
+            .validate_model_edge(lease.to_str().unwrap_or(""))
+            .await?;
+    }
     Ok(Json(service.app.model_control_apply(command).await?))
 }
 async fn model_control_preferences(
     State(service): State<Service>,
+    headers: HeaderMap,
     Json(patch): Json<Value>,
 ) -> Response {
+    let _guard = service.app.feature_operation.lock().await;
+    if let Some(lease) = headers.get("x-model-control-lease")
+        && let Err(error) = service
+            .app
+            .validate_model_edge(lease.to_str().unwrap_or(""))
+            .await
+    {
+        return ApiError::from(error).into_response();
+    }
     match service.app.model_control_preferences(patch).await {
         Ok(value) => Json(value).into_response(),
         Err(error) if error.to_string() == "model_control_conflict" => (
@@ -424,8 +479,8 @@ async fn model_control_open(State(service): State<Service>) -> Result<Json<Value
 async fn model_control_close(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_model_control().await?))
 }
-async fn model_control_displays() -> Result<Json<Value>, ApiError> {
-    Ok(Json(crate::model_control_window::display_options()?))
+async fn surface_displays() -> Result<Json<Value>, ApiError> {
+    Ok(Json(crate::edge_window::display_options()?))
 }
 async fn model_control_window(
     State(service): State<Service>,
@@ -444,13 +499,20 @@ async fn index() -> Response {
 async fn asset(Path(path): Path<String>) -> Response {
     if let Some(dev) = crate::assets::development() {
         let resource = match path.as_str() {
+            "feature.html" if !dev.feature_html.is_empty() => {
+                Some(("text/html; charset=utf-8", dev.feature_html))
+            }
+            "feature-dev.js" if !dev.feature_script.is_empty() => {
+                Some(("text/javascript; charset=utf-8", dev.feature_script))
+            }
             "panel" => Some(("text/html; charset=utf-8", dev.html)),
             "panel.js" => Some(("text/javascript; charset=utf-8", dev.script)),
             "panel-boot.js" => Some(("text/javascript; charset=utf-8", dev.boot)),
             "dev-client.js" => Some(("text/javascript; charset=utf-8", dev.client)),
             "dev-state.json" => Some((
                 "application/json",
-                json!({"revision":dev.revision,"page":dev.page}).to_string(),
+                json!({"revision":dev.revision,"page":dev.page,"feature":dev.feature_revision})
+                    .to_string(),
             )),
             _ => None,
         };
@@ -458,41 +520,11 @@ async fn asset(Path(path): Path<String>) -> Response {
             return ([(header::CONTENT_TYPE, kind)], body).into_response();
         }
     }
-    match path.as_str() {
-        "model-control" => {
-            return panel_asset(
-                "text/html; charset=utf-8",
-                include_str!("../ui/model-control/index.html"),
-            );
-        }
-        "model-control/app.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/model-control/app.js"),
-            );
-        }
-        "model-control/icons.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/panel/icons/index.js"),
-            );
-        }
-        "model-control/tokens.css" => {
-            return panel_asset("text/css; charset=utf-8", include_str!("../ui/tokens.css"));
-        }
-        "model-control/view.js" => {
-            return panel_asset(
-                "text/javascript; charset=utf-8",
-                include_str!("../ui/model-control/view.js"),
-            );
-        }
-        "model-control/styles.css" => {
-            return panel_asset(
-                "text/css; charset=utf-8",
-                include_str!("../ui/model-control/styles.css"),
-            );
-        }
-        _ => {}
+    if path == "model-control" {
+        return panel_asset(
+            "text/html; charset=utf-8",
+            "<!doctype html><meta charset=utf-8><script>location.replace('/'+location.hash)</script><a href=/>打开设置</a>",
+        );
     }
     if path == "panel" {
         return panel_asset(
@@ -626,7 +658,9 @@ mod tests {
                         .header("host", "127.0.0.1:47831")
                         .header("authorization", "Bearer test-token")
                         .header("content-type", "application/json")
-                        .body(Body::from(r#"{"revision":1,"patch":{"edge":"left"}}"#))
+                        .body(Body::from(
+                            r#"{"revision":1,"patch":{"pinned":["fixture"]}}"#,
+                        ))
                         .unwrap(),
                 )
                 .await
@@ -732,4 +766,47 @@ async fn save_appearance(
 }
 async fn close_panel(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.close_panel().await?))
+}
+
+async fn tasks_state(State(service): State<Service>) -> Json<Value> {
+    Json(service.app.tasks.state().await)
+}
+async fn tasks_command(
+    State(service): State<Service>,
+    Json(command): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    let window_guard = if command["op"] == "open" {
+        Some(service.app.feature_operation.lock().await)
+    } else {
+        None
+    };
+    if command["op"] == "open" && service.app.feature_managed("board").await {
+        drop(window_guard);
+        return Ok(Json(
+            service
+                .app
+                .feature_request(json!({"op":"reveal","id":"board"}))
+                .await?,
+        ));
+    }
+    let modules_changed = command["op"] == "modules";
+    let result = service.app.tasks.command(command).await?;
+    if modules_changed {
+        let settings = service.app.settings().await;
+        service.app.sync_desktop_settings(&settings).await;
+    }
+    Ok(Json(result))
+}
+
+async fn surfaces(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.surface_request(input).await?))
+}
+async fn features(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.feature_request(input).await?))
 }

@@ -10,7 +10,9 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 
 开发版 `window_warp` 动态解析 CGS 私有网格接口，不截屏；原生内容尺寸在动画中固定，合成后网格按临时坐标收束。入场在窗口显示前预置来源网格，再沿收回曲线反向展开，取消起步停顿与淡入遮挡；来源与目标按 NSScreen 全局逻辑坐标分别校验，可跨屏，不乘 backingScaleFactor；失效坐标仍回退。每 16ms 至多更新一次，完成、取消或接管后复位；失败停用，正式构建不加载。临时原生测试可在 debug 程序使用 `CODEX_BUDDY_DEV_GENIE=1`。
 
-模型控制条由独立 model_control 服务与 NSPanel 子进程管理，不调用工作台弹出/收回契约。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；preserveSpeed用于模型格在同一事务内保留实际可用Fast，预设仍指定完整配置；与建议生成的 model.rs 完全分离。私有 model-control.json 仅保存边缘/屏幕位置、独立材质/液态变体、保持展开、模型置顶和配置预设，不保存聊天正文。model-control-diagnostic.json 只保留最近一次显式刷新/切换的阶段与失败计数，0600写入，不含聊天身份、正文或凭据，被动轮询不覆盖。API 鉴权复用现有服务；关闭或后端断开时租约失效。默认关闭，用户从设置或 CLI 开启后记住选择。控制条继承宿主字号，默认固定纯黑凹角外壳；可选哑光/磨砂/液态继承宿主明暗与语义色，收起与展开保持 NSPanel/WebView/背景视口固定，由 native_backdrop 的根遮罩统一裁切凹角及物理刘海两翼；场景修订确认控制首次显示和键盘交接；NSEvent位置采样报告进入/离开与按键状态，由网页统一决定开合。window租约保留宿主诊断和外观信息；原生面板固定在所选显示器并加入所有Spaces/全屏辅助空间，不因宿主失焦、隐藏或失联撤出；只在服务租约失效时退出。显示不改变后台对模型操作目标的校验。content-size IPC按内容调整高度，窗口/网页共用凹角命中规则与刘海内容预算。
+模型快切由 model_control 管理能力、串行切换、实际回读、置顶与预设；与生成建议的 model.rs 分离。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；preserveSpeed 用于模型格在同一事务内保留实际可用 Fast，预设指定完整配置。私有 model-control.json 只保存业务开关、置顶、预设和兼容列宽，不保存聊天正文；旧视觉偏好由 surfaces 一次迁移到 surfaces.json。model-control-diagnostic.json 只保留最近一次显式刷新/切换的阶段与失败计数，0600 写入，不含聊天身份、正文或凭据，被动轮询不覆盖。
+
+四功能共用 features 的位置、owner 和阅读状态交接；surfaces 管理每种形式的主题以及唯一贴边窗口。edge_window 不依赖模型服务，固定在所选显示器并加入所有 Spaces/全屏辅助空间；收起与换标签保留功能挂载，场景修订确认控制首帧与键盘交接，原生根遮罩统一裁切背景与网页。模型关闭只关闭自己的功能条目，最后一个贴边功能关闭后才回收共享窗口。
 
 成员清单：
 
@@ -21,9 +23,9 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 
 - [native_backdrop.rs](native_backdrop.rs)：NSWindow/NSPanel 共用的原生磨砂、液态 Regular/Clear、圆角/可选贴边凹角及刘海两翼裁切与网页承载；控制条单独在根视图同步裁切背景与网页；根据宿主 theme 设置自有窗口 NSAppearance，不写系统偏好，不持有业务或窗口生命周期。
 
-- [model_control.rs](model_control.rs)：独立控制条服务、串行操作、版本化局部偏好及窗口租约，防止跨聊天迟到结果与并发覆盖。
-- [model_control_window.rs](model_control_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标精确点击边界、稳定悬停区域及8pt退出容错与冻结区域、非动画期按内容调高、整点承载包围盒与原生轮廓、scene-ready 首帧/键盘交接、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、掉帧按实际时间推进、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
-- [model_control_geometry.rs](model_control_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
+- [model_control.rs](model_control.rs)：模型能力、串行切换、实际回读、开关/置顶/预设及末次私有诊断；旧打开入口转到 features，不管理窗口。
+- [edge_window.rs](edge_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标精确点击边界、稳定悬停区域及8pt退出容错与冻结区域、非动画期按内容调高、整点承载包围盒与原生轮廓、scene-ready 首帧/键盘交接、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、掉帧按实际时间推进、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
+- [edge_geometry.rs](edge_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
 
 
 - [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源；debug 通过 CODEX_BUDDY_DEV_SETTINGS 接收经验证的本机统一设置地址。
@@ -37,8 +39,21 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [panel.rs](panel.rs)：后台系统浮窗管理层，窗口呈现确认后才隐藏内嵌胶囊，宿主恢复失败时保留浮窗；携带 ui 的收回请求必须匹配 expectedRevision，有效偏好先按修订号保存，过期请求不覆盖 Web 新选择；Panel、Preferences、临时 ReadingState 及弹出/收回/受限命令协调，普通建议与快捷词填入成功后唤起宿主；reveal_panel 保留现有呈现方式和实例，提供开发入口的唤起目标；统一检测 macOS 15+ arm64 弹出能力，限制手动/自动恢复及窗口子进程入口；旧玻璃偏好迁移为磨砂，弹出偏好始终展开且忽略宿主收起同步，外观 PATCH（含 liquidVariant）验证与版本控制，Web 修改和宿主回传分开同步，不提供 Codex 主题写入 API。
 - [window_warp.rs](window_warp.rs)：panel_window 的开发版整窗形变后端；私有 ABI 动态加载、独立曲面网格、错误回退和复位，网格身份/四方向顺序测试同文件维护。
 - [panel_window.rs](panel_window.rs)：窗口子进程实现，被 main.rs 调用；系统窗口事件循环、只允许展开尺寸的 WebView IPC、位置恢复、原生 resize 同事务更新玻璃与 WebView、拒绝过期网页尺寸、只读宿主主题对应的窗口外观及 macOS 原生手势；通过共享 native_backdrop 按材质实时切换传统磨砂 NSVisualEffectView HUDWindow/BehindWindow/Active 与系统液态 NSGlassEffectView（始终展开，由 liquidVariant 选择 Regular/Clear），回读实际状态；应用侧圆角父视图限制外溢绘制，液态通过 contentView 承载 WebView，磨砂位于透明 WebView 下方；哑光关闭原生背景，macOS 15–25 的弹出液态回退哑光；弹出进程禁止后台任务暂停以维持浮窗投影和租约。
-- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
+- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊及独立功能页面资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何，桌面/贴边各自回报真实功能 bundle 修订号；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
 - [settings.rs](settings.rs)：分开维护保存版本与生成版本，大纲切换不取消生成；外部读取只返回密钥配置状态；Options、QuickPrompt、方向库/位置/来源与 Jev 同意和独立凭据、Update 及设置读取、校验和保存（maxInputChars 默认 0 表示完整最近一问一答，兼容旧正数上限）；快捷词持久化但不改变生成版本；返回后台检测的只读 popoutSupported。
-- [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
+- [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要（包含宿主语义色）；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+- [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、单列表三共享字段合并与旧数据安全升级、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
+
+工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
+
+独立功能呈现：
+- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态与主窗口监督；不复制业务服务。
+- [features/AGENTS.md](features/AGENTS.md)：唯一主界面的偏好迁移、共享桌面窗口租约与整组原子交接。
+- [feature_window.rs](feature_window.rs)：共享 main lease 的轻量入口，复用 panel_window::run_surface 的原生材质、几何与往返动效；唤起复用窗口而不重播入场。
+
+App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 与 CDP 白名单，/surfaces 只管理呈现偏好/贴边租约。所有功能写入验 owner；旧模型窗口租约写入拒绝。
+
+- [surfaces.rs](surfaces.rs)：四形式独立主题、旧面板/模型视觉偏好一次迁移、宿主语义色投影、版本保护与共享贴边窗口租约/监督。

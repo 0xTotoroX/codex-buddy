@@ -13,6 +13,7 @@ function panelPreferences() {
     open: IS_POPOUT || shellState.open,
     activeTab: shellState.activeTab,
     layoutMode: shellState.layoutMode,
+    feature: shellState.feature,
     dockWidth: shellState.dockWidth,
     splitRatio: shellState.dockLayout.verticalRatio,
     dockLayout: { ...shellState.dockLayout },

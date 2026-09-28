@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Vite、React 插件与 CODEX_BUDDY_DEV_API 本机地址。
- * [OUTPUT]: 支持冷启动后正常退出的开发服务器配置及 target/web 构建输出。
+ * [OUTPUT]: 支持冷启动后正常退出的开发服务器配置及设置/看板多入口 target/web 输出。
  * [POS]: 设置页构建配置，产物由 Rust 内嵌；依赖缓存隔离到本工作树 target，React 去重。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -58,5 +58,15 @@ export default defineConfig({
       },
     },
   },
-  build: { outDir: fileURLToPath(new URL('../../target/web', import.meta.url)), emptyOutDir: true },
+  build: {
+    rollupOptions: {
+      input: {
+        index: fileURLToPath(new URL('index.html', import.meta.url)),
+        board: fileURLToPath(new URL('board.html', import.meta.url)),
+        feature: fileURLToPath(new URL('feature.html', import.meta.url)),
+      },
+    },
+    outDir: fileURLToPath(new URL('../../target/web', import.meta.url)),
+    emptyOutDir: true,
+  },
 });

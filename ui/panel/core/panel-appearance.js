@@ -221,6 +221,12 @@ function dockAppearanceScope() {
 }
 
 function currentAppearance() {
+  const surface = shellState.root?.dataset.surfaceTheme;
+  if (surface)
+    return {
+      material: surface === 'black' ? 'matte' : surface,
+      liquidVariant: shellState.root.dataset.surfaceVariant || 'regular',
+    };
   const scope = dockAppearanceScope();
   if (!scope) return { material: shellState.material, liquidVariant: shellState.liquidVariant };
   const material = storage.get(`${MATERIAL_KEY}:dock-${scope}`);

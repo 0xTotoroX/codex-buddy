@@ -19,6 +19,9 @@
     '/stepwise/test',
     '/settings/open',
     '/panel/detach',
+    '/features',
+    '/tasks/state',
+    '/tasks/command',
   ]);
 
   function complete(id, value) {

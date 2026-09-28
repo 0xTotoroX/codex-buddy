@@ -25,7 +25,9 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 | Next-step suggestions | Generate follow-up questions from the current answer, then copy them or insert them into the composer |
 | Docked workbench | Show the outline and suggestions together without covering the chat; use automatic, vertical, or horizontal layouts, drag panels, group tabs, or focus one panel; remember docked and desktop layouts separately |
 | Desktop window | On macOS 15+, pop out and return to the embedded panel, move and resize the window, or keep it on top |
-| Model quick switch | Use a separate screen-edge control to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
+| Model quick switch | Use the shared main interface or edge panel to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
+| Task board | To do, In progress and Done; editable groups, inline creation and drag-and-drop in wide columns or narrow tabs |
+| Apple Reminders sync | Optional title, notes and completion sync with one selected iCloud list; local stages and archive |
 | Reading and appearance | Choose materials, font size, and summary visibility, with saved preferences |
 | Your choice of model | Use an existing Codex login or connect your own model API |
 
@@ -46,6 +48,28 @@ Inside Codex, click the face to expand or collapse the workbench. Double-click i
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Complete arrangement options remain in Web settings. Press Esc during a drag to cancel it.
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
+
+## Task board and Apple Reminders
+
+Open **任务看板与提醒事项** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.
+
+To sync, grant macOS access, select one writable iCloud Reminders list, confirm and save it, then enable sync. Only titles, notes and completion are synchronized. To do/Doing stages and archive remain local; archiving never deletes Apple reminders. Apple handles iCloud delivery.
+
+Narrow containers show group tabs; wide windows show columns. Legacy Waiting tasks appear under To do without changing their stored stage or content. Upgrading a three-list configuration pauses sync: move the old reminders into one list in Apple, then select it here to reconnect. Existing remote identities are retained; missing items are never automatically recreated.
+
+Edit recurring reminders in Apple. Dates, priorities, native sections, tags, attachments and ordering are outside the sync contract. Missing items keep local records, conflicting fields require a choice, and uncertain creates are not automatically repeated.
+
+Task content stays local and is never sent to a model. An internal **CodexBuddy Reminders** helper owns the system permission. Native helper input changes can require renewed authorization; UI-only rebuilds reuse the verified helper; production signing and cross-device delivery require separate release acceptance.
+
+### Feature display locations
+
+In Web settings, use **Presentation → Main interface form** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
+The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Open a card for notes; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
+
+
+Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
+
+Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 
 ## Operations and state transitions
 
@@ -113,11 +137,11 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 
 ### Model quick switch
 
-Open the control from settings or run `codex-buddy model-control`. Its default shell stays pure black; independently choose matte, frosted, or liquid material with Regular/Clear variants. The capsule, workbench, desktop window, and the three optional model-control materials follow Codex colors in every state. The pure-black model-control palette stays fixed. Web settings continue to follow the browser theme. Typography and icons are shared with the workbench, whose appearance remains unchanged. Select the display, screen edge, and position from settings or the control's menu.
+Enable the model feature in settings or run `codex-buddy model-control`. It initially opens in the shared edge form and subsequently uses its saved placement. Search, pinned models, reasoning, speed and presets are available in every form; next-step generation settings remain independent.
 
-The control stays on the selected display across desktop Spaces and full-screen apps, even when Codex loses focus or is hidden. If Codex disconnects, the control remains visible but model actions require a valid target. Closing the control or stopping the Buddy service removes it. It docks to the right by default, with left and top positions available. Hover to expand; leave for roughly half a second to collapse. Hold `⌥` and drag the entry to reposition it.
+The edge/notch form now hosts all four features. Use **Presentation** settings for its theme, display, edge, position and keep-open preference. Hover to expand, leave for roughly half a second to collapse, or press `⌘⇧M` to toggle. Editing and business operations suppress automatic collapse; collapsing or switching tabs preserves drafts. The panel stays on its selected display across Spaces and full-screen apps regardless of Codex focus. Stopping Buddy closes it.
 
-Models and reasoning efforts share a matrix. Open search from the menu or with `⌘F`. Hovering does not steal keyboard focus; search, editing, and keyboard interaction can request it. `⌘⇧M` toggles the panel, and the menu lets you keep it open or close the control.
+Legacy model visual preferences migrate once to `surfaces.json`; model pins and presets remain in `model-control.json`.
 
 Available models and efforts come from the host. The first selection reads and applies the configuration in one operation, without a separate refresh, then verifies the actual result. You can adjust subsequent configuration while an answer is being generated, provided the official controls allow it. Switching stops if the controls are disabled, the target is ambiguous, or capabilities have not loaded. If the official model list has not yet been observed after connecting, the control waits; there is no need to restart a working host just to load the list.
 
@@ -141,7 +165,7 @@ Built with **Rust, JavaScript / TypeScript, and React**.
 src/               Backend, CLI, and native windows
 ui/panel/          Capsule, next-step suggestions, and outlines
 ui/settings/       Settings web app
-ui/model-control/  Independent model control and official-menu adapter
+ui/model-control/  Official model-menu business adapter
 ui/bridge/         Host communication
 tests/            Automated tests
 scripts/           Development, build, and installation tools

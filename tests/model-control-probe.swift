@@ -1,6 +1,6 @@
 // [INPUT]: 合成窗口验收命令；仅操作明确给定的测试坐标。
 // [OUTPUT]: 前台应用/屏幕安全区/事件投递权限，以及可选真实鼠标事件。
-// [POS]: model-control-native.mjs 的辅助；窗口几何复用 native-probe.swift。
+// [POS]: edge-native.mjs 的辅助；窗口几何复用 native-probe.swift。
 // [PROTOCOL]: 由集成任务同步 tests/AGENTS.md。
 import AppKit
 import Foundation

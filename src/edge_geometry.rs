@@ -1,6 +1,6 @@
 // [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
 // [OUTPUT]: 稳定承载窗口的整点包围盒、贴合物理边缘的内容高度布局、精确点击/稳定悬停命中、多屏选择与可反向连续开合进度。
-// [POS]: model_control_window 私有几何模块，不依赖 AppKit 或工作台。
+// [POS]: edge_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
 
 pub const COMPACT_DEPTH: f64 = 10.;

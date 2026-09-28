@@ -16,3 +16,5 @@ boot 先 ready，再请求原生 show；AppKit 在来源位置已可见时调用
 boot 将位置、置顶及外观写入串行化，每个响应同步本地 revision；外观及携带 ui 的收回请求均携带 expectedRevision；收回使用动画前与偏好一起捕获的版本，冲突取消返回并恢复投影轮询，真正外部冲突不会静默覆盖或无限重试。所有弹出均显示工作台，仍保留出发时的布局偏好和 returnOpen。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+boot 的 taskRequest 仅提供 tasks/state 与 tasks/command 的自有认证 HTTP，使桌面任务操作不依赖宿主聊天连接；不向宿主注入 bearer。dock 可携带 expand 意图，显式选择返回位置时展开，旧双击仍恢复出发状态；transport 同步活动 feature。

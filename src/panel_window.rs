@@ -377,6 +377,15 @@ mod macos {
 
 // 独立子进程在主线程运行系统窗口；后台退出会回收它。
 pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
+    run_surface(paths, lease, activate, None)
+}
+
+pub fn run_surface(
+    paths: &Paths,
+    lease: &str,
+    activate: bool,
+    feature: Option<&str>,
+) -> Result<()> {
     crate::panel::require_popout(crate::panel::popout_supported())?;
     let runtime = Runtime::read(paths)?;
     let prefs = Preferences::read(paths);
@@ -417,8 +426,22 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
     }
     keep_on_screen(&window);
     macos::set_window_alpha(&window, 0.);
-    let page = format!("http://127.0.0.1:{}/panel", runtime.port);
-    let url = format!("{page}#token={}&lease={lease}", runtime.token);
+    let page = format!(
+        "http://127.0.0.1:{}/{}",
+        runtime.port,
+        if feature.is_some() {
+            "feature.html"
+        } else {
+            "panel"
+        }
+    );
+    let url = format!(
+        "{page}#token={}&lease={lease}{}",
+        runtime.token,
+        feature
+            .map(|id| format!("&feature={id}"))
+            .unwrap_or_default()
+    );
     let proxy = event_loop.create_proxy();
     let allowed = page.clone();
     let builder = WebViewBuilder::new()
@@ -441,7 +464,7 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
         // 浮窗不抢占焦点，也可能暂时被遮挡；投影与租约不能随 WebKit 后台页面一起暂停。
         .with_background_throttling(wry::BackgroundThrottlingPolicy::Disabled)
         .with_initialization_script(format!(
-            "window.__companionNativeMotion = true; window.__companionNativeBackdrop = true; window.__companionNativeGlass = {};",
+            "window.__buddyNativeSurface = true; window.__companionNativeMotion = true; window.__companionNativeBackdrop = true; window.__companionNativeGlass = {};",
             macos::glass_available()
         ));
     let webview = builder.build(&window)?;
@@ -477,6 +500,11 @@ pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
                             json!(style)
                         ));
                     }
+                }
+                "reveal" => {
+                    window.set_minimized(false);
+                    window.set_visible(true);
+                    window.set_focus();
                 }
                 "show" => {
                     let mut target = macos::pose(&window);

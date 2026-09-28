@@ -1,5 +1,5 @@
 /*
- * [INPUT]: React、settings-outline.tsx、use-settings-form.ts、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
+ * [INPUT]: React、task-settings.tsx、settings-outline.tsx、use-settings-form.ts、panel-settings.tsx、api.ts、共享 tokens.css、styles.css 与 lucide-react。
  * [OUTPUT]: 分组锚点导航、自动/手动保存的模型与完整/限长上下文表单、方向配置与常用提示词编辑、全量胶囊设置、连接状态和操作反馈。
  * [POS]: 设置页入口与视图，不接收聊天正文。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -32,6 +32,8 @@ import {
 import { request, useCompanion } from './api';
 import { PanelSettings } from './panel-settings';
 import { SettingsOutline } from './settings-outline';
+import { TaskSettings } from './task-settings';
+import { SurfaceSettings } from './surface-settings';
 import { ModelControlSettings } from './model-control-settings';
 import { DirectionSettings } from './direction-settings';
 import { useSettingsForm } from './use-settings-form';
@@ -190,6 +192,8 @@ function App() {
             </h1>
           </div>
           <ModelControlSettings live={live} />
+          <TaskSettings />
+          <SurfaceSettings live={live} desktopSupported={saved?.popoutSupported === true} />
           {loadingError && (
             <div
               className="mb-4 rounded-[9px] border border-error-border bg-error px-[13px] py-[11px] text-[11px] leading-[1.8] text-error-foreground [overflow-wrap:anywhere]"

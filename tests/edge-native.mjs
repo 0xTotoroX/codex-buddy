@@ -1,6 +1,6 @@
 /*
- * [INPUT]: 已构建的 codex-buddy、真实模型控制页面和隔离 loopback fixture。
- * [OUTPUT]: target/reports/model-control-native 的跨桌面策略/几何/焦点/租约证据及可选截图。
+ * [INPUT]: 已构建的 codex-buddy、真实通用功能页面和隔离 loopback fixture。
+ * [OUTPUT]: target/reports/edge-native 的跨桌面策略/几何/焦点/租约证据及可选截图。
  * [POS]: 只创建本工具合成窗口；不连接、读取或重启官方宿主。运行前 cargo build --locked。
  * [PROTOCOL]: 由集成任务同步 tests/AGENTS.md。
  */
@@ -12,13 +12,13 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { once } from 'node:events';
 
-if (process.platform !== 'darwin') throw Error('Native model-control acceptance requires macOS');
+if (process.platform !== 'darwin') throw Error('Native edge acceptance requires macOS');
 const root = resolve(import.meta.dirname, '..');
 const binaryIndex = process.argv.indexOf('--binary');
 const binary =
   binaryIndex < 0 ? join(root, 'target/debug/codex-buddy') : resolve(process.argv[binaryIndex + 1]);
 const dir = mkdtempSync(join(tmpdir(), 'buddy-model-control-'));
-const output = join(root, 'target/reports/model-control-native');
+const output = join(root, 'target/reports/edge-native');
 mkdirSync(output, { recursive: true });
 const geometryProbe = join(dir, 'geometry-probe');
 const inputProbe = join(dir, 'input-probe');
@@ -28,6 +28,8 @@ const environment = JSON.parse(execFileSync(inputProbe, ['state'], { encoding: '
 const delay = (ms) => new Promise((done) => setTimeout(done, ms));
 const prefs = {
   enabled: true,
+  theme: 'black',
+  liquidVariant: 'regular',
   edge: 'right',
   position: 0.5,
   screen: '',
@@ -66,7 +68,7 @@ const appearance = {
   },
 };
 let valid = true,
-  reveal = 5,
+  reveal = 0,
   revision = 1,
   telemetry = null,
   queue = [],
@@ -134,8 +136,10 @@ function probePage() {
     for (const raw of window.heldScenes.splice(0)) send(raw);
   };
   const dispatch = window.dispatchEvent.bind(window);
+  window.fixturePointer = (detail) => dispatch(new CustomEvent('edge-pointer', { detail }));
   window.dispatchEvent = (event) => {
-    if (window.deferNative && event.type === 'model-control-native') {
+    if (window.ignoreNativePointer && event.type === 'edge-pointer') return true;
+    if (window.deferNative && event.type === 'edge-native') {
       window.delayedNative = event.detail;
       return true;
     }
@@ -165,10 +169,10 @@ function probePage() {
   requestAnimationFrame(frame);
   window.addEventListener('error', (event) => errors.push(event.message));
   window.addEventListener('unhandledrejection', (event) => errors.push(String(event.reason)));
-  window.addEventListener('model-control-pointer', (event) => {
+  window.addEventListener('edge-pointer', (event) => {
     pointer = event.detail;
   });
-  window.addEventListener('model-control-native', (event) => {
+  window.addEventListener('edge-native', (event) => {
     if (event.detail.keyboard && !native?.keyboard) keyboardActivations++;
     native = event.detail;
     nativeEvents++;
@@ -191,24 +195,26 @@ function probePage() {
           nativeEvents,
           heldScenes: window.heldScenes.length,
           delayedNative: window.delayedNative,
-          clip: getComputedStyle(document.getElementById('surface')).clipPath,
+          clip: getComputedStyle(document.getElementById('edge-panel')).clipPath,
           motion,
           keyboardActivations,
           errors,
           pointerDown,
           pointer,
-          background: getComputedStyle(document.getElementById('surface')).backgroundColor,
-          handleBackground: getComputedStyle(document.getElementById('surface')).backgroundColor,
+          background: getComputedStyle(document.getElementById('edge-panel')).backgroundColor,
+          handleBackground: getComputedStyle(document.getElementById('edge-handle'))
+            .backgroundColor,
           hasFocus: document.hasFocus(),
           active: document.activeElement?.id,
           path: location.pathname,
           viewport: [innerWidth, innerHeight],
-          searchRect: document.getElementById('menu-button')?.getBoundingClientRect().toJSON(),
-          matrixRect: document.getElementById('model-scroll')?.getBoundingClientRect().toJSON(),
-          ultraRect: document
-            .querySelector('[data-model="fixture-a"][data-reasoning="ultra"]')
+          searchRect: document
+            .querySelector('#edge-panel nav button')
             ?.getBoundingClientRect()
             .toJSON(),
+          featureVisible: !!document
+            .querySelector('.edge-view')
+            ?.shadowRoot?.querySelector('[data-feature="model"]'),
         }),
       });
       for (const command of await response.json()) {
@@ -248,47 +254,55 @@ const server = createServer(async (request, response) => {
   }
   if (path.startsWith('/api/')) {
     if (request.headers.authorization !== 'Bearer native-fixture-token') return json({}, 401);
-    if (path.endsWith('/window')) {
+    const input = body ? JSON.parse(body) : {};
+    if (path === '/api/surfaces') {
+      if (input.op === 'save') {
+        Object.assign(prefs, input.edge);
+        revision++;
+        return json({});
+      }
       windowPolls++;
-      return json({ valid, preferences: prefs, reveal, appearance, host: hostPresence });
+      return json({ valid, preferences: prefs, reveal, appearance });
     }
-    if (path.endsWith('/preferences')) {
-      Object.assign(prefs, JSON.parse(body).patch);
-      revision++;
+    if (path === '/api/features') {
+      const feature = {
+        id: 'model',
+        owner: 'feature-lease',
+        placement: 'edge',
+        open: true,
+        size: [840, 620],
+        view: {},
+        reveal: 1,
+        pending: null,
+      };
+      const visual = {
+        theme: appearance.hostTheme.theme,
+        surface: { theme: prefs.theme, liquidVariant: prefs.liquidVariant },
+      };
+      if (input.op === 'read') return json({ ...envelope(), appearance: visual });
+      return json({ features: [feature] });
     }
-    if (path.endsWith('/close')) {
-      valid = false;
-      prefs.enabled = false;
-    }
-    return json(envelope());
+    return json({});
   }
-  if (path === '/model-control') {
+  if (path === '/feature.html') {
     response.writeHead(200, { 'Content-Type': 'text/html' });
     return response.end(
-      readFileSync(join(root, 'ui/model-control/index.html'), 'utf8').replace(
+      readFileSync(join(root, 'target/web/feature.html'), 'utf8').replace(
         '</head>',
         `<script>(${probePage.toString()})()</script></head>`,
       ),
     );
   }
-  const files = {
-    '/model-control/tokens.css': 'ui/tokens.css',
-    '/model-control/app.js': 'ui/model-control/app.js',
-    '/model-control/view.js': 'ui/model-control/view.js',
-    '/model-control/styles.css': 'ui/model-control/styles.css',
-    '/model-control/icons.js': 'ui/panel/icons/index.js',
-  };
-  if (files[path]) {
+  if (path.startsWith('/assets/') && !path.includes('..')) {
     response.writeHead(200, {
       'Content-Type': path.endsWith('.css') ? 'text/css' : 'text/javascript',
     });
-    let source = readFileSync(join(root, files[path]), 'utf8');
-    if (path === '/model-control/app.js') {
-      // Wry's IPC object is immutable: fault-inject only the fixture's transport call.
-      const call = 'window.ipc.postMessage(JSON.stringify(message))';
-      assert.ok(source.includes(call));
-      source = source.replace(call, 'window.fixturePostMessage(JSON.stringify(message))');
-    }
+    let source = readFileSync(join(root, 'target/web', path), 'utf8');
+    if (path.endsWith('.js'))
+      source = source.replace(
+        /\b\w+\.postMessage\(JSON.stringify\((\w+)\)\)/g,
+        'window.fixturePostMessage(JSON.stringify($1))',
+      );
     return response.end(source);
   }
   response.writeHead(404);
@@ -337,8 +351,8 @@ async function capture(name) {
       ),
     );
     report.screenshots.push(path);
-  } catch {
-    report.screenshots.push({ name, unavailable: 'Window screenshot unavailable' });
+  } catch (error) {
+    report.screenshots.push({ name, unavailable: error.message });
   }
 }
 function check(name, detail = telemetry?.native) {
@@ -346,11 +360,9 @@ function check(name, detail = telemetry?.native) {
 }
 function start() {
   telemetry = null;
-  child = spawn(
-    binary,
-    ['--data-dir', dir, 'model-control-window', '--lease', 'native-fixture-lease'],
-    { stdio: ['ignore', 'ignore', 'pipe'] },
-  );
+  child = spawn(binary, ['--data-dir', dir, 'edge-window', '--lease', 'native-fixture-lease'], {
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
   child.stderr.on('data', (chunk) => {
     stderr += chunk;
   });
@@ -429,7 +441,7 @@ try {
   await until(() => !telemetry.native.expanded && !telemetry.native.animating, 'restore compact');
   // Re-arm hover after the explicit collapse before testing pointer entry.
   await command(
-    "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:false,buttons:0,hoverSuppressed:false}}))",
+    `window.ignoreNativePointer = ${!environment.canPostEvents}; window.fixturePointer({inside:false,buttons:0,hoverSuppressed:false})`,
   );
   hostPresence = { visible: true, focused: true };
 
@@ -441,9 +453,7 @@ try {
       String(bounds.Y + telemetry.native.compactY + 40),
     ]);
   } else {
-    await command(
-      "window.dispatchEvent(new CustomEvent('model-control-pointer',{detail:{inside:true,buttons:0,hoverSuppressed:false}}))",
-    );
+    await command('window.fixturePointer({inside:true,buttons:0,hoverSuppressed:false})');
   }
   await until(
     () => telemetry.native.expanded && telemetry.native.animating,
@@ -458,19 +468,18 @@ try {
   check('native contour unfolds against a fixed screen edge inside a stable window');
   await until(() => telemetry.native.expanded && !telemetry.native.animating, 'unfold settles');
   assert.equal(telemetry.native.keyboard, false);
-  assert.equal(
+  assert.notEqual(
     JSON.parse(execFileSync(inputProbe, ['state'], { encoding: 'utf8' })).frontmost,
-    environment.frontmost,
+    child.pid,
+    'hover must not activate the edge process; the user may switch other apps',
   );
   check(
     environment.canPostEvents
       ? 'real native hover expands without stealing focus'
       : 'synthetic native pointer message expands without stealing focus',
   );
-  assert.ok(telemetry.ultraRect && telemetry.ultraRect.width > 0);
-  assert.ok(telemetry.ultraRect.left >= telemetry.matrixRect.left);
-  assert.ok(telemetry.ultraRect.right <= telemetry.matrixRect.right + 1);
-  check('six reasoning levels including Ultra are fully visible in the native WebView');
+  assert.equal(telemetry.featureVisible, true);
+  check('shared model feature is mounted inside the native edge shell');
   await capture('expanded');
   const stableBounds = windowInfo().kCGWindowBounds;
   await command('window.deferNative = true');
@@ -488,7 +497,7 @@ try {
   assert.equal(telemetry.clip, 'none');
   await capture('delayed-webview-native-compact');
   await command(
-    "window.deferNative = false; window.dispatchEvent(new CustomEvent('model-control-native',{detail:window.delayedNative}))",
+    "window.deferNative = false; window.dispatchEvent(new CustomEvent('edge-native',{detail:window.delayedNative}))",
   );
   await until(() => !telemetry.native.expanded, 'deliver held native geometry');
   check('native contour collapses independently while WebView geometry delivery is withheld');
@@ -521,7 +530,9 @@ try {
       String(bounds.Y + search.y + search.height / 2),
     ]);
   } else {
-    await command("document.getElementById('menu-button').click()");
+    await command(
+      "document.querySelector('#edge-panel nav button').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}))",
+    );
   }
   await until(
     () => telemetry.native.keyboard && telemetry.hasFocus,
@@ -552,7 +563,7 @@ try {
   assert.equal(windowInfo().kCGWindowBounds.Width, 480);
   assert.equal(telemetry.native.shell.width, 10);
   check('collapse retains prepared viewport and shrinks only the native contour');
-  await command("document.getElementById('panel').dispatchEvent(new PointerEvent('pointerleave'))");
+  await command('window.fixturePointer({inside:false,buttons:0,hoverSuppressed:false})');
   prefs.keepOpen = true;
   revision++;
   await until(
@@ -601,7 +612,8 @@ try {
   await capture('top-expanded');
   // Material reparenting can send a real pointerleave while the pointer is outside.
   // Keep the screenshot subject open; collapse behavior is exercised above.
-  await command("document.getElementById('keep-open').click()");
+  prefs.keepOpen = true;
+  revision++;
   await until(() => telemetry.native.keepOpen && prefs.keepOpen, 'pin material screenshots');
   // Workbench changes do not replace the control's own default.
   Object.assign(appearance, { material: 'native-glass', liquidVariant: 'clear' });
@@ -663,9 +675,8 @@ try {
     );
     if (theme === 'black') assert.equal(telemetry.background, 'rgb(0, 0, 0)');
     else if (effective === 'frosted') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
-    else if (effective === 'native-glass')
-      assert.notEqual(telemetry.background, 'rgba(0, 0, 0, 0)');
-    assert.ok(telemetry.viewport[1] < 320);
+    else if (effective === 'native-glass') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
+    assert.ok(telemetry.viewport[1] >= 280);
     check(`independent theme ${theme}/${variant}`, telemetry.native);
     await capture(`theme-${theme}-${variant}`);
     const expandedBackground = telemetry.background;
@@ -680,15 +691,19 @@ try {
     assert.equal(Math.min(telemetry.native.shell.width, telemetry.native.shell.height), 10);
     await capture(`compact-${theme}-${variant}`);
     check(`compact retains ${theme}/${variant} material`);
+    // Explicit collapse clears keepOpen; restore it before the next material sample.
+    // Keyboard focus may legitimately move to another app during this visual check.
+    prefs.keepOpen = true;
+    revision++;
     await ipc({ action: 'expand', keyboard: true });
     await until(
-      () => telemetry.native.expanded && !telemetry.native.animating,
+      () => telemetry.native.keepOpen && telemetry.native.expanded && !telemetry.native.animating,
       'restore expanded material',
     );
   }
   await command("location.href='https://example.invalid/blocked-navigation'");
   await delay(500);
-  assert.equal(telemetry.path, '/model-control');
+  assert.equal(telemetry.path, '/feature.html');
   check('external top-level navigation denied');
   report.motion = Object.fromEntries(
     ['black', 'matte', 'frosted', 'native-glass'].map((theme) => {
@@ -714,7 +729,13 @@ try {
   valid = true;
   prefs.keepOpen = false;
   start();
-  await until(() => telemetry?.native, 'backend-loss fixture startup');
+  await until(() => telemetry?.heldScenes > 0, 'explicit reveal fixture startup');
+  await command('window.releaseScenes()');
+  await until(
+    () => telemetry?.native.expanded && telemetry.native.keyboard,
+    'first snapshot honors explicit reveal',
+  );
+  check('fresh edge process honors an explicit reveal on its first snapshot');
   server.close();
   server.closeAllConnections();
   await exited('backend disappearance exits');
