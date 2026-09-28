@@ -88,7 +88,9 @@ export function chatBindingCases({
         );
         await page.locator('[data-quick-prompt="0"]').click();
         const composer = page.locator('#composer-form .ProseMirror');
-        assert.equal(await composer.innerText(), '继续');
+        await page.waitForFunction(
+          () => document.querySelector('#composer-form .ProseMirror').textContent === '继续',
+        );
         assert.equal(
           await page.evaluate(
             () =>
@@ -125,7 +127,7 @@ export function chatBindingCases({
               ...source,
               kind: 'quick-fill',
               index: 0,
-              submit: true,
+              submit: false,
             }),
           current,
         );
@@ -155,6 +157,57 @@ export function chatBindingCases({
         );
       },
     ],
+    ...['fill', 'direct', 'hybrid'].map((clickMode) => [
+      `binding quick prompts follow ${clickMode} click mode and protect drafts`,
+      async (page) => {
+        await mode(page, true);
+        await page.evaluate((promptClickMode) => {
+          const panel = window.__companionFloatingPanel;
+          panel.syncPanelPreferences({ ...panel.panelPreferences(), promptClickMode }, 1, false);
+        }, clickMode);
+        const button = page.locator('[data-quick-prompt="0"]');
+        const composer = page.locator('#composer-form .ProseMirror');
+        await button.click();
+        await page.waitForFunction(
+          () => document.querySelector('#composer-form .ProseMirror').textContent === '继续',
+        );
+        await page.waitForTimeout(350);
+        assert.equal(await page.evaluate(() => window.submitCount), clickMode === 'direct' ? 1 : 0);
+        await composer.fill('');
+        await page.evaluate(() => (window.submitCount = 0));
+        await button.dblclick();
+        await page.waitForTimeout(500);
+        assert.equal(await page.evaluate(() => window.submitCount), clickMode === 'fill' ? 0 : 1);
+        const sent = await page.evaluate(() => window.submitCount);
+        await composer.fill('已有草稿');
+        page.once('dialog', (dialog) => dialog.accept());
+        await button.click();
+        await page.waitForFunction(() => {
+          const text = document.querySelector('#composer-form .ProseMirror').innerText;
+          return text.includes('已有草稿') && text.includes('继续');
+        });
+        await page.waitForTimeout(350);
+        assert.equal(
+          await page.evaluate(() => window.submitCount),
+          sent,
+          'appending a draft never sends',
+        );
+        await composer.fill('');
+        const current = await snapshot(page);
+        const result = await page.evaluate(
+          (source) =>
+            window.__companionFloatingPanel.panelCommand({
+              ...source,
+              kind: 'quick-fill',
+              index: 0,
+              submit: true,
+            }),
+          current,
+        );
+        assert.equal(result.ok, true);
+        await page.waitForFunction((count) => window.submitCount === count + 1, sent);
+      },
+    ]),
     ...['manual', 'auto'].map((generationMode) => [
       `binding suggestion cache restores ${generationMode} A-B-A without new requests`,
       async (page) => {

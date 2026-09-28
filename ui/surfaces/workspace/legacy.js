@@ -4,6 +4,8 @@
  * [POS]: 工作台组合视图；复用业务状态和写入校验，不创建第二套运行时。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { bindDockResize } from '../embedded/width.js';
+import { dockWidthLimit } from '../embedded/dock.js';
 import { workbenchHeadHtml } from './chrome.js';
 import { IS_POPOUT, POPOUT } from '../../shared/constants.js';
 import {
@@ -124,7 +126,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
         ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong data-pane-focus="${pane.id}" role="button" tabindex="0" title="拖动调整位置；双击放大">${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" title="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><span class="csw-pane-menu" hidden>${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
       </div>
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section><button hidden data-legacy-settings aria-label="旧版内置设置"></button>
-      <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical" aria-valuemin="300" aria-valuemax="460"></div>
+      <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical"></div>
     </div>`;
     installFeatureControls(panel.querySelector('.csw-workbench'));
     installAssociation(panel.querySelector('.csw-workbench-head'));
@@ -177,14 +179,19 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       observer.disconnect();
       events.abort();
     };
-    bindSeparator(
+    bindDockResize(
       panel.querySelector('.csw-workbench-resize'),
-      'x',
-      () => shellState.dockWidth,
-      (width, dx) => {
-        shellState.dockWidth = clamp(width - dx, 300, 460);
+      () => ({
+        width: shellState.dockRect?.width || shellState.dockWidth,
+        saved: shellState.dockWidth,
+        maximum: dockWidthLimit(),
+      }),
+      (width, open) => {
+        shellState.dockWidth = width;
+        shellState.dockOpen = open;
         emitSignal('render', undefined);
       },
+      saveWorkbench,
     );
     bindSeparator(
       panel.querySelector('.csw-workbench-split'),
@@ -336,7 +343,10 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   applyMaterial({ animate: false });
   root
     .querySelector('.csw-workbench-resize')
-    .setAttribute('aria-valuenow', String(shellState.dockWidth));
+    .setAttribute('aria-valuenow', String(shellState.dockRect?.width || shellState.dockWidth));
+  root
+    .querySelector('.csw-workbench-resize')
+    .setAttribute('aria-valuemax', String(dockWidthLimit()));
 }
 
 function currentSplit() {

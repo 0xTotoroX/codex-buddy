@@ -118,7 +118,8 @@ impl Ui {
             || self.height < 340.
             || !["capsule", "workbench"].contains(&self.layout_mode.as_str())
             || !["workbench", "outline", "board"].contains(&self.feature.as_str())
-            || !(300. ..=460.).contains(&self.dock_width)
+            || !self.dock_width.is_finite()
+            || self.dock_width < 240.
             || !(0.2..=0.8).contains(&self.split_ratio)
             || self
                 .dock_layout
@@ -145,7 +146,7 @@ impl Ui {
 fn deserialize_dock_width<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<f64, D::Error> {
-    Ok(f64::deserialize(deserializer)?.clamp(300., 460.))
+    Ok(f64::deserialize(deserializer)?.max(240.))
 }
 
 fn deserialize_split_ratio<'de, D: serde::Deserializer<'de>>(
@@ -983,8 +984,8 @@ mod tests {
         assert_eq!((legacy.ui.width, legacy.ui.height), (510., 600.));
         assert_eq!(legacy.ui.material, "matte");
         for (width, ratio, expected_width, expected_ratio) in [
-            (10., -1., 300., 0.2),
-            (900., 2., 460., 0.8),
+            (10., -1., 240., 0.2),
+            (900., 2., 900., 0.8),
             (380., 0.6, 380., 0.6),
         ] {
             let ui: Ui = serde_json::from_value(json!({
@@ -1030,7 +1031,7 @@ mod tests {
             }))
             .await
             .unwrap();
-        assert_eq!((changed.ui.dock_width, changed.ui.split_ratio), (460., 0.2));
+        assert_eq!((changed.ui.dock_width, changed.ui.split_ratio), (900., 0.2));
         assert_eq!(
             (changed.ui.width, changed.ui.height),
             (before.ui.width, before.ui.height)
@@ -1042,7 +1043,7 @@ mod tests {
             }))
             .await
             .unwrap();
-        assert_eq!((resized.ui.dock_width, resized.ui.split_ratio), (460., 0.2));
+        assert_eq!((resized.ui.dock_width, resized.ui.split_ratio), (900., 0.2));
         assert_eq!(resized.ui.layout_mode, "workbench");
         assert!(!resized.ui.dock_open);
         assert_eq!(app.settings().await, settings);

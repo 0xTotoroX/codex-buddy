@@ -1,9 +1,10 @@
 /*
  * [INPUT]: 工作台纯布局模型的旧比例迁移； 后台 popoutSupported 能力、共享胶囊状态、宿主上下文与弹出页通信对象。
- * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，窗口往返优先使用左栏图标锚点，桌面置顶按钮串行保存目标值。
+ * [OUTPUT]: 宿主明暗/语义色投影及原生外观同步； 共享关联及双面板阅读投影、关联/快捷词填入或发送命令及配置/身份校验；阅读状态与自定义任务分组按实际渲染外壳接续，窗口往返优先使用左栏图标锚点，桌面置顶按钮串行保存目标值。
  * [POS]: 内嵌与系统窗口的显示边界，宿主保留业务权威状态，在不可见宿主中仍提供临时屏幕区域与交接眨眼，配合原生窗口位置接续。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { DOCK_MIN_WIDTH } from '../../surfaces/embedded/width.js';
 import { panelAppearance, syncTheme } from '../../surfaces/embedded/shell/panel-appearance.js';
 import { launcherButton } from '../../surfaces/embedded/launcher.js';
 
@@ -137,7 +138,7 @@ function applyWorkbenchPreferences(ui) {
   shellState.layoutMode = ui.layoutMode === 'workbench' ? 'workbench' : 'capsule';
   shellState.feature =
     ui.feature === 'outline' || ui.feature === 'board' ? ui.feature : 'workbench';
-  shellState.dockWidth = clamp(Number(ui.dockWidth) || 340, 300, 460);
+  shellState.dockWidth = Math.max(DOCK_MIN_WIDTH, Number(ui.dockWidth) || 340);
   shellState.splitRatio = clamp(Number(ui.splitRatio) || 0.45, 0.2, 0.8);
   shellState.dockLayout = normalizeWorkbenchLayout(ui.dockLayout, shellState.splitRatio);
   shellState.popoutLayout = normalizeWorkbenchLayout(ui.popoutLayout, shellState.splitRatio);
@@ -488,7 +489,7 @@ function panelCommand(command) {
     command.promptToken !== current.promptToken
   )
     return { ok: false, message: '建议或生成配置已经更新，请刷新后重试。' };
-  if (chatBusy() && command.kind !== 'quick-fill')
+  if (chatBusy() && (command.kind !== 'quick-fill' || command.submit === true))
     return { ok: false, message: '回答正在生成，请等待完成。' };
   if (command.kind === 'generate') {
     forceRefreshStepwise();
@@ -512,7 +513,7 @@ function panelCommand(command) {
       command.kind === 'quick-fill' ? runtimeState.settings?.quickPrompts : stepwiseState.prompts;
     const prompt = Number.isInteger(index) ? items?.[index]?.prompt : null;
     if (!prompt) return { ok: false, message: '这条建议已经失效。' };
-    const result = fillComposer(prompt, command.kind === 'fill' && command.submit === true, {
+    const result = fillComposer(prompt, command.submit === true, {
       remote: true,
       quick: command.kind === 'quick-fill',
       append: command.append === true,

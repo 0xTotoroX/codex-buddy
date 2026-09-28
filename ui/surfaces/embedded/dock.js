@@ -1,10 +1,11 @@
 /*
  * [INPUT]: 已识别的 Codex 主内容、标签页与前景聊天布局、期望侧栏宽度和开合状态。
- * [OUTPUT]: 自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时仅保留左栏入口，不创建提示或替代菜单。
+ * [OUTPUT]: dockWidthLimit 提供聊天实际可用宽度，自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时仅保留左栏入口，不创建提示或替代菜单。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { foregroundSurface } from '../../codex/page-context.js';
+import { DOCK_MIN_WIDTH, CHAT_MIN_WIDTH } from './width.js';
 const SLOT = 'data-codex-buddy-dock';
 const OWN_UI = `[${SLOT}],[data-companion-stepwise-root],[data-codex-buddy-features-root]`;
 const visible = (node) =>
@@ -31,6 +32,17 @@ export function findDockHost() {
     }
   }
   return null;
+}
+
+export function dockWidthLimit() {
+  const host = findDockHost();
+  if (!host) return DOCK_MIN_WIDTH;
+  const slot = host.row.querySelector(`[${SLOT}]`);
+  const available = Math.min(
+    host.row.getBoundingClientRect().width,
+    host.content.getBoundingClientRect().width + (slot?.getBoundingClientRect().width || 0),
+  );
+  return Math.max(DOCK_MIN_WIDTH, available - CHAT_MIN_WIDTH);
 }
 
 export function createDock(onChange, beforeMove = () => {}) {
@@ -146,9 +158,13 @@ export function createDock(onChange, beforeMove = () => {}) {
       bounds.width,
       host.content.getBoundingClientRect().width + slot.getBoundingClientRect().width,
     );
-    const requestedWidth = Math.min(options.width, Math.max(300, availableWidth - 560));
+    const requestedWidth = Math.min(
+      options.width,
+      Math.max(DOCK_MIN_WIDTH, availableWidth - CHAT_MIN_WIDTH),
+    );
     const enough =
-      availableWidth >= 560 + requestedWidth && bounds.bottom - Math.max(bounds.top, 48) >= 426;
+      availableWidth >= CHAT_MIN_WIDTH + requestedWidth &&
+      bounds.bottom - Math.max(bounds.top, 48) >= 426;
     // 收起后即使空间恢复也保持收起，由用户主动重新打开。
     if (options.open && !options.detached && !enough) blocked = true;
     if (!options.open) blocked = false;

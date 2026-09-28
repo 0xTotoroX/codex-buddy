@@ -83,17 +83,17 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.equal(await font.inputValue(), '23.1');
     assert.equal(await font.getAttribute('step'), '1');
     const width = page.getByLabel('侧栏宽度（px）', { exact: true });
-    await width.fill('400');
+    await width.fill('640');
     await width.press('Tab');
-    await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '400');
+    await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '640');
     await page.getByLabel('大纲字号（px）', { exact: true }).fill('16.34');
     await page.getByLabel('大纲字号（px）', { exact: true }).press('Tab');
     await page.waitForFunction(() =>
       [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
     );
     await page.getByLabel('内容显示', { exact: true }).selectOption('true');
-    await page.getByLabel('点击建议', { exact: true }).selectOption('hybrid');
-    await page.getByText('双击建议会直接发送。', { exact: true }).waitFor();
+    await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
+    await page.getByText('双击常用提示词或推荐指令会直接发送。', { exact: true }).waitFor();
     await page.waitForFunction(() =>
       [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
     );
@@ -101,7 +101,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     await page.waitForFunction(
       () => document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true',
     );
-    assert.equal(prefs.ui.dockWidth, 400);
+    assert.equal(prefs.ui.dockWidth, 640);
     assert.equal(prefs.ui.fontSizes.outline, 16.3);
     assert.equal(prefs.ui.fontOffset, 10.130000000000003);
     assert.equal(await font.inputValue(), '16.3');
@@ -153,7 +153,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     await width.fill('200');
     await width.press('Tab');
     await page.getByRole('alert').waitFor();
-    assert.equal(prefs.ui.dockWidth, 400);
+    assert.equal(prefs.ui.dockWidth, 640);
   } finally {
     await browser.close();
   }

@@ -2,6 +2,7 @@
  * [OUTPUT]: 下一步的显示/点击设置，及四功能独立字号、一键重置、宽度和置顶设置。
  * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
+import { DOCK_MIN_WIDTH } from '../surfaces/embedded/width.js';
 import { useEffect, useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
 import { Button } from './components/ui/button';
@@ -80,7 +81,7 @@ export function PanelSettings({
             type="number"
             defaultValue={value}
             min={min}
-            max={max}
+            max={Number.isFinite(max) ? max : undefined}
             step={1}
             onKeyDown={(e) => {
               if (decimal && ['ArrowUp', 'ArrowDown'].includes(e.key)) {
@@ -100,7 +101,9 @@ export function PanelSettings({
                 if (n !== value) commit(n);
               } else {
                 e.currentTarget.value = String(value);
-                setError(`${label}范围为 ${min}–${max}`);
+                setError(
+                  Number.isFinite(max) ? `${label}范围为 ${min}–${max}` : `${label}不能小于 ${min}`,
+                );
               }
             }}
           />
@@ -140,12 +143,12 @@ export function PanelSettings({
           </Field>
           <Field
             id="suggestion-click"
-            label="点击建议"
+            label="指令执行模式"
             hint={
               ui.promptClickMode === 'direct'
-                ? '单击建议会直接发送。'
+                ? '单击常用提示词或推荐指令会直接发送。'
                 : ui.promptClickMode === 'hybrid'
-                  ? '双击建议会直接发送。'
+                  ? '双击常用提示词或推荐指令会直接发送。'
                   : undefined
             }
           >
@@ -197,7 +200,7 @@ export function PanelSettings({
           </section>
           <section className="settings-section settings-surface-group">
             <h2>尺寸与窗口</h2>
-            {number('dock-width', '侧栏宽度（px）', ui.dockWidth, 300, 460, (n) =>
+            {number('dock-width', '侧栏宽度（px）', ui.dockWidth, DOCK_MIN_WIDTH, Infinity, (n) =>
               change('dockWidth', n),
             )}
             <div id="window-pinning">

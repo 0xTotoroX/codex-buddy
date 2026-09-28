@@ -212,7 +212,10 @@ async function layout(page) {
     'panel fits host vertically',
   );
   assert.ok(slot.x + slot.width <= page.viewportSize().width + 1, 'dock inside viewport');
-  assert.ok(outline.y + outline.height <= next.y + 1, 'panes do not overlap');
+  assert.ok(
+    outline.y + outline.height <= next.y + 1 || outline.x + outline.width <= next.x + 1,
+    'panes do not overlap',
+  );
   for (const pane of [outline, next]) {
     assert.ok(pane.height >= 180, 'pane has usable height');
     assert.ok(
@@ -2214,6 +2217,9 @@ const cases = [
       for (let i = 0; i < 8; i++)
         await page.getByRole('separator', { name: '调整工作台宽度' }).press('ArrowLeft');
       await settle(page);
+      const savedWidth = await page.evaluate(
+        () => window.__companionFloatingPanel.panelPreferences().dockWidth,
+      );
       await page.evaluate(() => {
         const panel = document.createElement('section');
         panel.id = 'fixture-file-panel';
@@ -2244,14 +2250,14 @@ const cases = [
       near((await box(page, slotSelector)).width, 340, 'dock uses actual remaining width');
       assert.equal(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
-        460,
+        savedWidth,
       );
       assert.equal(await page.locator('.csw-workbench-source').isVisible(), false);
       await page.locator('#fixture-file-panel').evaluate((node) => node.remove());
       await settle(page);
       near(
         (await box(page, slotSelector)).width,
-        460,
+        savedWidth,
         'saved width returns when file panel closes',
       );
     },
@@ -2474,20 +2480,36 @@ const cases = [
       await handle.press('ArrowRight');
       await settle(page);
       near((await layout(page)).slot.width, before.slot.width, 'ArrowRight restores width');
-      for (let i = 0; i < 12; i += 1) await handle.press('ArrowLeft');
+      const maximum = Number(await handle.getAttribute('aria-valuemax'));
+      assert.ok(maximum > 460, 'wide chat permits a wider sidebar');
+      for (let i = 0; i < 50; i += 1) await handle.press('ArrowLeft');
       await settle(page);
-      near((await layout(page)).slot.width, 460, 'maximum width');
-      for (let i = 0; i < 12; i += 1) await handle.press('ArrowRight');
+      near((await layout(page)).slot.width, maximum, 'maximum follows available chat space');
+      for (let i = 0; i < 50; i += 1) await handle.press('ArrowRight');
       await settle(page);
-      near((await layout(page)).slot.width, 300, 'minimum width');
+      near((await layout(page)).slot.width, 240, 'minimum width');
+      await page.screenshot({ path: resolve(output, 'sidebar-240.png') });
       const saved = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
-      assert.equal(saved.dockWidth, 300);
+      assert.equal(saved.dockWidth, 240);
       assert.equal(saved.layoutMode, 'workbench');
       assert.equal(saved.width, capsule.width, 'capsule width stays independent');
       assert.equal(saved.height, capsule.height, 'capsule height stays independent');
       await mode(page, false);
       await mode(page, true);
-      near((await layout(page)).slot.width, 300, 'width survives mode switch');
+      near((await layout(page)).slot.width, 240, 'width survives mode switch');
+      const box = await handle.boundingBox();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 65, box.y + box.height / 2, { steps: 10 });
+      await page.mouse.up();
+      await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
+      near(
+        (await page.locator(slotSelector).boundingBox()).width,
+        0,
+        'drag past breakpoint releases sidebar',
+      );
+      await mode(page, true);
+      near((await layout(page)).slot.width, 240, 'reopening restores pre-collapse width');
       await hostUnchanged(page);
     },
   ],

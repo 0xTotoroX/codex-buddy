@@ -1256,7 +1256,7 @@ try {
     });
     await page.screenshot({ path: join(output, 'settings-single-liquid.png') });
     await page.getByRole('link', { name: '下一步', exact: true }).click();
-    await page.getByLabel('点击建议', { exact: true }).selectOption('hybrid');
+    await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
     await waitFor(
       async () => (await panelState()).clickMode === 'hybrid',
       'Web click mode did not reach embedded panel',

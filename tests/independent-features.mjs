@@ -277,11 +277,11 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await widthHandle.press('ArrowLeft');
         assert.equal(
           Number(await widthHandle.getAttribute('aria-valuenow')),
-          Math.min(460, beforeWidth + 16),
+          Math.min(Number(await widthHandle.getAttribute('aria-valuemax')), beforeWidth + 16),
         );
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
-          Math.min(460, beforeWidth + 16),
+          Math.min(Number(await widthHandle.getAttribute('aria-valuemax')), beforeWidth + 16),
         );
         const dock = page.locator('[data-codex-buddy-dock]');
         const dockBefore = await dock.boundingBox();
@@ -336,6 +336,31 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
         await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
         await board.getByLabel('新任务标题', { exact: true }).fill('尚未保存的标题');
+        const beforeCollapse = await dock.boundingBox();
+        const resizeBox = await widthHandle.boundingBox();
+        await page.mouse.move(
+          resizeBox.x + resizeBox.width / 2,
+          resizeBox.y + resizeBox.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(
+          resizeBox.x + resizeBox.width / 2 + beforeCollapse.width - 180,
+          resizeBox.y + resizeBox.height / 2,
+          { steps: 15 },
+        );
+        await page.mouse.up();
+        await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
+        assert.equal((await dock.boundingBox()).width, 0, 'collapsed sidebar releases its slot');
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await board.getByLabel('新任务标题', { exact: true }).waitFor();
+        assert.equal(
+          await board.getByLabel('新任务标题', { exact: true }).inputValue(),
+          '尚未保存的标题',
+        );
+        assert.ok(
+          Math.abs((await dock.boundingBox()).width - beforeCollapse.width) < 2,
+          'reopen restores pre-collapse width',
+        );
 
         for (let i = 0; i < 10; i++) {
           await configureFeature('board', 'overlay');
