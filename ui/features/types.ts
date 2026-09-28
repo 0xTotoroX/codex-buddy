@@ -12,6 +12,9 @@ export type Reading = {
   selected?: number;
   board?: BoardView;
   modelSearch?: string;
+  modelTools?: boolean;
+  modelOthers?: boolean;
+  modelLeft?: number;
 };
 export type Entry = {
   id: FeatureId;

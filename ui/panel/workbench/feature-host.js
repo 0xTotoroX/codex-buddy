@@ -70,7 +70,7 @@ export function toggleFeatureDock(open) {
   shellState.dockOpen = open;
   dock?.reopen();
   emitSignal('render', undefined);
-  if (open && shellState.dockStatus === 'space')
+  if (open && ['space', 'unsupported'].includes(shellState.dockStatus))
     dock?.showOptions(shellState.fab?.getBoundingClientRect());
 }
 function frame(container, faceClick) {

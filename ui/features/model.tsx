@@ -2,7 +2,7 @@
  * [OUTPUT]: Original compact model matrix, presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep features/AGENTS.md in sync. */
-import { useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { iconSvg } from '../panel/icons/index.js';
 import type { Reading } from './types';
 type Selection = { model: string; reasoning: string; speed: string };
@@ -37,9 +37,13 @@ export function ModelView({
   busy: boolean;
 }) {
   const [search, setSearch] = useState(reading.modelSearch || ''),
-    [tools, setTools] = useState(false),
-    [others, setOthers] = useState(false),
+    [tools, setTools] = useState(reading.modelTools || false),
+    [others, setOthers] = useState(reading.modelOthers || false),
     [menu, setMenu] = useState('');
+  const matrix = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
+  }, []);
   const s = state.snapshot,
     prefs = state.preferences;
   const allowed = !!s.target && ['ready', 'waiting'].includes(s.status) && prefs.enabled;
@@ -181,7 +185,7 @@ export function ModelView({
           aria-label="模型工具"
           title="模型工具"
           aria-expanded={tools}
-          onClick={() => setTools(!tools)}
+          onClick={() => setTools((reading.modelTools = !tools))}
         >
           {icon('more')}
         </button>
@@ -241,7 +245,13 @@ export function ModelView({
           ))}
         </div>
       )}
-      <div className="model-scroll">
+      <div
+        className="model-scroll"
+        ref={matrix}
+        onScroll={(event) => {
+          if (event.currentTarget.clientWidth) reading.modelLeft = event.currentTarget.scrollLeft;
+        }}
+      >
         <div className="model-matrix-head">
           <span>模型</span>
           <div>
@@ -255,7 +265,7 @@ export function ModelView({
           <button
             className="model-disclosure"
             aria-expanded={others || !!search}
-            onClick={() => setOthers(!others)}
+            onClick={() => setOthers((reading.modelOthers = !others))}
           >
             其他模型 ({remaining.length})
           </button>

@@ -292,11 +292,47 @@ try {
   await view.getByLabel('模型工具').click();
   await view.getByLabel('模型 Model B 菜单').click();
   await page.screenshot({ path: join(output, 'edge-model.png') });
+  model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+  model.snapshot.models.push({ id: 'c', label: 'Model C', reasoning: ['high'], fast: false });
+  model.preferences.modelColumnWidth = 280;
+  await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
+  await view.getByLabel('模型工具').click();
+  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.locator('.model-scroll').evaluate((node) => {
+    node.scrollLeft = 160;
+  });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.edge-view')].some(
+      (node) => node.shadowRoot?.querySelector('.model-scroll')?.scrollLeft > 0,
+    ),
+  );
+  await page.evaluate(() => new Promise(requestAnimationFrame));
+  await page.waitForFunction(() => window.__buddyFeatureFlush !== undefined);
+  assert.equal(await page.evaluate(() => window.__buddyFeatureFlush()), true);
+  const modelReading = entries.find((e) => e.id === 'model').view;
+  assert.ok(modelReading.modelLeft > 0);
+  assert.equal(modelReading.modelTools, true);
+  assert.equal(modelReading.modelOthers, true);
   for (const entry of entries) entry.placement = 'desktop';
   await page.goto(
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
+  await view.getByLabel('模型名称列宽').waitFor();
+  assert.equal(
+    await view.getByRole('button', { name: /其他模型/ }).getAttribute('aria-expanded'),
+    'true',
+  );
+  assert.equal(
+    await view.locator('.model-scroll').evaluate((node) => node.scrollLeft),
+    await view
+      .locator('.model-scroll')
+      .evaluate(
+        (node, saved) => Math.min(saved, node.scrollWidth - node.clientWidth),
+        modelReading.modelLeft,
+      ),
+  );
+  record('model tools, expanded rows and horizontal reading survive remount');
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
   await board.getByRole('button', { name: '隔离任务', exact: true }).click();

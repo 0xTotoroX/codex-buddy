@@ -392,6 +392,24 @@ export function independentFeatureCases({ mode, syncSettings }) {
           await model.locator('[data-model="a"][data-reasoning="low"]').isDisabled(),
           true,
         );
+        await page.setViewportSize({ width: 1500, height: 1000 });
+        await configureFeature('model', 'sidebar');
+        await page.waitForFunction(() => !window.workbenchFixture.features.get('model').pending);
+        await page
+          .locator('.workspace')
+          .evaluate((node) => node.classList.remove('app-shell-main-content-frame'));
+        await page.waitForFunction(
+          () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
+        );
+        await page.locator('.csw-fab').click();
+        await page.getByRole('button', { name: '在聊天内展开', exact: true }).waitFor();
+        assert.match(await page.locator('.csw-dock-reason').innerText(), /暂不支持侧栏/);
+        assert.equal(
+          await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
+          'workbench',
+        );
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.csw-dock-menu').evaluate((node) => node.open), false);
         await page.evaluate(() => window.__companionFloatingPanel.destroy());
         assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 0);
