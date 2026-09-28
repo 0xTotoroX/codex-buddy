@@ -22,7 +22,7 @@ type Props = {
   setApiKey: (value: string) => void;
   setClearKey: (value: boolean) => void;
 };
-const labelClass = 'mb-2 block text-xs font-medium';
+const labelClass = 'mb-2 block text-[14px] font-medium';
 export function DirectionSettings({
   form,
   saved,
@@ -74,7 +74,7 @@ export function DirectionSettings({
         <option value="manual">我来选择</option>
         <option value="smart">智能挑选（实验）</option>
       </NativeSelect>
-      <p className="my-3 text-xs text-muted-foreground">
+      <p className="my-3 text-[14px] text-muted-foreground">
         {form.directionSource === 'auto'
           ? '根据最近一问一答自由探索，不受方向库限制。'
           : form.directionSource === 'manual'
@@ -99,7 +99,7 @@ export function DirectionSettings({
         <div className="mt-4 space-y-3">
           {form.selectedDirections.map((id, index) => (
             <div key={id} className="flex items-center gap-2">
-              <label htmlFor={`direction-slot-${index}`} className="shrink-0 text-xs">
+              <label htmlFor={`direction-slot-${index}`} className="shrink-0 text-[14px]">
                 {index + 1}
               </label>
               <NativeSelect
@@ -180,7 +180,7 @@ export function DirectionSettings({
               加入
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[14px] text-muted-foreground">
             {form.selectedDirections.length
               ? `最多 ${form.selectedDirections.length} 条，按位置排序。`
               : '请选择至少一个方向后再生成。'}
@@ -189,7 +189,7 @@ export function DirectionSettings({
       )}
       {form.directionSource !== 'auto' && (
         <details className="mt-5" open={form.directionSource === 'smart' || undefined}>
-          <summary className="cursor-pointer text-xs font-medium">编辑方向库</summary>
+          <summary className="cursor-pointer text-[14px] font-medium">编辑方向库</summary>
           <div className="mt-4 space-y-5">
             {library.map((item, index) => (
               <div key={item.id} className="space-y-2 border-b border-border pb-4">
@@ -236,7 +236,7 @@ export function DirectionSettings({
                   required
                   maxLength={4000}
                   aria-label={`倾向说明 ${index + 1}`}
-                  className="w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-xs leading-relaxed focus-visible:outline-2 focus-visible:outline-ring"
+                  className="w-full min-h-20 rounded-md border border-input bg-background px-3 py-2 text-[14px] leading-relaxed focus-visible:outline-2 focus-visible:outline-ring"
                   value={item.instruction}
                   onChange={(e) =>
                     change(
@@ -267,7 +267,7 @@ export function DirectionSettings({
       )}
       {form.directionSource === 'smart' && (
         <div className="mt-5 space-y-4 border-t border-border pt-5">
-          <label className="flex gap-2 text-xs leading-relaxed">
+          <label className="flex gap-2 text-[14px] leading-relaxed">
             <input
               className="mt-1 self-start"
               type="checkbox"
@@ -319,7 +319,7 @@ export function DirectionSettings({
             />
           </div>
           {saved.storedJevApiKey && (
-            <label className="flex gap-2 text-xs">
+            <label className="flex gap-2 text-[14px]">
               <input
                 type="checkbox"
                 checked={clearKey}
@@ -328,7 +328,7 @@ export function DirectionSettings({
               清除已存 Jev 密钥
             </label>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[14px] text-muted-foreground">
             {saved.directionSource !== 'smart' || !saved.jev.consent
               ? '智能挑选未启用，不会发送判断请求。'
               : saved.jevKeyConfigured

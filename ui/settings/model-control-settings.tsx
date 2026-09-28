@@ -2,10 +2,10 @@
  * [POS]: Business enablement only; all placement and themes belong to shared settings.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useState } from 'react';
+import { FeatureSwitch, Feedback } from './settings-controls';
 import { request } from './api';
-import { Button } from './components/ui/button';
 export function ModelControlSettings({ live }: { live: boolean }) {
-  const [enabled, setEnabled] = useState(false),
+  const [enabled, setEnabled] = useState<boolean | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState('');
   useEffect(() => {
@@ -39,31 +39,16 @@ export function ModelControlSettings({ live }: { live: boolean }) {
       id="settings-model-control"
       tabIndex={-1}
       aria-label="模型快切设置"
-      className="mb-5 rounded-xl border border-border bg-card p-4"
+      className="settings-section"
     >
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-sm font-medium">模型快切</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            切换当前聊天的模型、推理强度和速度，支持置顶与预设。
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" disabled={!live || busy} onClick={() => void change(true)}>
-            {enabled ? '打开模型快切' : '开启模型快切'}
-          </Button>
-          {enabled && (
-            <Button variant="ghost" disabled={!live || busy} onClick={() => void change(false)}>
-              停用
-            </Button>
-          )}
-        </div>
-      </div>
-      {message && (
-        <p role="status" className="mt-2 text-xs text-muted-foreground">
-          {message}
-        </p>
-      )}
+      <FeatureSwitch
+        name="模型快切"
+        checked={enabled ?? false}
+        disabled={!live || busy || enabled === null}
+        onChange={(value) => void change(value)}
+        onOpen={() => void change(true)}
+      />
+      <Feedback text={message} />
     </section>
   );
 }

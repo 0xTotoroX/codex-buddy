@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 共享 tokens、Tailwind 与系统外观/动效偏好。
  * [OUTPUT]: 设置页工具类、语义主题与必要的全局可访问性规则。
- * [POS]: Web 样式入口；布局和控件样式在 TSX 中，不注入宿主。
+ * [POS]: 设置页分类布局、设置行与基础控件样式，不注入宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 @import 'tailwindcss' source(none);
@@ -91,5 +91,204 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/* Category navigation and form layout share the existing semantic colors. */
+.settings-app {
+  max-width: 1080px;
+  margin: auto;
+  padding: 0 32px 32px;
+  font-size: 15px;
+}
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 88px;
+}
+.settings-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 44px;
+  align-items: start;
+}
+.settings-nav {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 24px;
+}
+.settings-nav-label {
+  font-size: 14px;
+  color: var(--buddy-muted);
+  padding: 0 12px 10px;
+}
+.settings-nav a {
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--buddy-muted);
+}
+.settings-nav a:hover,
+.settings-nav a[aria-current='page'] {
+  color: var(--buddy-text);
+  background: var(--buddy-subtle);
+}
+.settings-nav-divider {
+  margin-top: 20px;
+}
+.settings-title {
+  margin: 20px 0 32px;
+  font-size: 24px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+.settings-section {
+  margin: 0 0 32px;
+  padding: 0;
+  min-width: 0;
+}
+.settings-section h2 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.settings-section h3 {
+  font-size: 15px;
+  font-weight: 550;
+}
+.settings-field {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(0, 1.4fr);
+  align-items: start;
+  gap: 16px 24px;
+  margin-bottom: 22px;
+}
+.settings-field > label {
+  padding-top: 9px;
+  font-size: 15px;
+}
+.settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 0;
+  margin-bottom: 12px;
+  font-size: 15px;
+}
+.settings-hint {
+  margin-top: 8px;
+  color: var(--buddy-muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.settings-feedback {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.settings-error {
+  color: var(--error-foreground);
+}
+.settings-save {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  margin: 24px 0;
+  font-size: 14px;
+  color: var(--buddy-muted);
+}
+.settings-section > summary,
+.settings-details > summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 550;
+}
+.settings-section[open] > summary,
+.settings-details[open] > summary {
+  margin-bottom: 24px;
+}
+.settings-footer {
+  margin-top: 36px;
+  color: var(--buddy-muted);
+  font-size: 14px;
+}
+.settings-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+.settings-choice button {
+  flex: 1;
+  min-width: 100px;
+  padding: 10px 12px;
+  border: 1px solid var(--buddy-border);
+  border-radius: 10px;
+  background: var(--buddy-surface);
+}
+.settings-choice button[aria-pressed='true'] {
+  background: var(--buddy-subtle);
+  border-color: var(--buddy-text);
+}
+.settings-choice button:disabled {
+  opacity: 0.45;
+}
+.settings-choice button:focus-visible {
+  outline: 2px solid var(--buddy-focus);
+  outline-offset: 3px;
+}
+@media (max-width: 760px) {
+  .settings-app {
+    padding: 0 20px 24px;
+  }
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .settings-nav {
+    min-width: 0;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--buddy-page);
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 12px 0;
+  }
+  .settings-nav a {
+    white-space: nowrap;
+    flex: none;
+  }
+  .settings-nav-label {
+    display: none;
+  }
+  .settings-nav-divider {
+    margin: 0 0 0 12px;
+  }
+  .settings-title {
+    margin-top: 20px;
+  }
+}
+@media (max-width: 520px) {
+  .settings-field {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .settings-field > label {
+    padding-top: 0;
+  }
+  .settings-header {
+    min-height: 76px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 16px 0;
   }
 }

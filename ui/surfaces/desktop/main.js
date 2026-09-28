@@ -1,4 +1,4 @@
-/* [INPUT]: Shared main-window lease, feature owners and the original native window IPC.
+/* [INPUT]: Shared main-window lease, feature owners, checked layout saves and the original native window IPC.
  * [OUTPUT]: Existing desktop chrome/material and spatial enter/return transitions.
  * [POS]: Desktop surface adapter; feature content and actions stay in features/content.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
@@ -201,10 +201,17 @@ export function startDesktop(request, lease) {
     });
   }
   const composition = installFeatureLayout(root.querySelector('.csw-workbench'), {
-    save: async (placement, layout) => {
+    save: async (placement, layout, expectedLayout) => {
       const item = [...mounts.values()].find((item) => item.active);
       if (item)
-        await request({ op: 'layout', id: item.id, owner: item.entry.owner, placement, layout });
+        await request({
+          op: 'layout',
+          id: item.id,
+          owner: item.entry.owner,
+          placement,
+          layout,
+          expectedLayout,
+        });
     },
     error,
   });

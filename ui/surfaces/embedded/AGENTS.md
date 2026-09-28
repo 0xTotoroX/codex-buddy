@@ -9,4 +9,6 @@
 
 Codex 容器识别由 ui/codex/page-context.js 提供，输入与内容读取留在 codex。嵌入层不把自有功能节点识别为聊天。所有新功能位置完成迁移、旧 panel 入口退出后，才能删除 legacy.js。
 
+布局保存将 workspace 持有的 expectedLayout 交给后台，避免覆盖设置页刚保存的编排；失败后由共用布局模块重新接收远端布局，功能草稿不卸载。
+
 [PROTOCOL]: 结构、职责或接口变化时更新本文；父级描述受影响时同步父级地图。

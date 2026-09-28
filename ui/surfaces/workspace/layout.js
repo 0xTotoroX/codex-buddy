@@ -1,10 +1,40 @@
 /* [INPUT]: Live feature mounts, per-surface layout and authenticated save callback.
- * [OUTPUT]: Shared tabs, drag-to-split/merge, focus and separator resizing without remounting views.
+ * [OUTPUT]: Shared layout interpretation, tabs, split/merge, focus and resizing with checked saves; views stay mounted.
  * [POS]: Presentation-only composition; reuses the workbench gestures and styles.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { titles } from '../../shared/features';
 import { installArrangement } from './arrangement.js';
 import { bindSeparator } from './separator.js';
+
+// Settings and the workspace must interpret an old two-feature layout identically.
+export function resolveFeatureLayout(saved, legacy, ids) {
+  if (saved) return structuredClone(saved);
+  const first = legacy?.first || 'outline';
+  const other = first === 'outline' ? 'next' : 'outline';
+  const ratio = legacy?.mode === 'horizontal' ? legacy.horizontalRatio : legacy?.verticalRatio;
+  return legacy?.group === 'split' && ids.includes(first) && ids.includes(other)
+    ? {
+        axis: legacy.mode,
+        groups: [
+          {
+            ids: ids.filter((id) => id !== other),
+            active: first,
+            weight: ratio || 0.45,
+          },
+          { ids: [other], active: other, weight: 1 - (ratio || 0.45) },
+        ],
+      }
+    : {
+        axis: 'auto',
+        groups: [
+          {
+            ids,
+            active: ids.includes(legacy?.active) ? legacy.active : ids[0],
+            weight: 1,
+          },
+        ],
+      };
+}
 
 export function installFeatureLayout(root, { save, error }) {
   const panes = document.createElement('div');
@@ -21,6 +51,7 @@ export function installFeatureLayout(root, { save, error }) {
     revision = 0;
   const cache = new Map();
   const inputs = new Map();
+  const persisted = new Map();
   const visible = () => {
     const ids = new Set(items.filter((item) => item.active).map((item) => item.id));
     return layout.groups
@@ -33,13 +64,21 @@ export function installFeatureLayout(root, { save, error }) {
     if (saving) return;
     saving = true;
     root.dataset.layoutSaving = 'true';
+    let surface = placement;
     try {
       while (dirty) {
         const current = revision;
-        await save(placement, structuredClone(layout));
+        surface = placement;
+        const next = structuredClone(layout);
+        await save(surface, next, structuredClone(persisted.get(surface) ?? null));
+        persisted.set(surface, next);
         if (current === revision) dirty = false;
       }
     } catch (e) {
+      dirty = false;
+      cache.delete(surface);
+      inputs.delete(surface);
+      if (placement === surface) placement = null;
       error(e);
     } finally {
       saving = false;
@@ -245,7 +284,10 @@ export function installFeatureLayout(root, { save, error }) {
         cache.delete(surface);
         if (placement === surface) placement = null;
       }
-      if (!dirty && !saving) inputs.set(surface, incoming);
+      if (!dirty && !saving && inputs.get(surface) !== incoming) {
+        inputs.set(surface, incoming);
+        persisted.set(surface, structuredClone(saved ?? null));
+      }
       if (placement !== surface) {
         arrangement.cancel();
         placement = surface;
@@ -254,33 +296,7 @@ export function installFeatureLayout(root, { save, error }) {
         layout = cache.get(surface) || (saved && structuredClone(saved));
         if (!layout) {
           const ids = items.filter((item) => item.active).map((item) => item.id);
-          const first = legacy?.first || 'outline';
-          const other = first === 'outline' ? 'next' : 'outline';
-          const ratio =
-            legacy?.mode === 'horizontal' ? legacy.horizontalRatio : legacy?.verticalRatio;
-          layout =
-            legacy?.group === 'split' && ids.includes(first) && ids.includes(other)
-              ? {
-                  axis: legacy.mode,
-                  groups: [
-                    {
-                      ids: ids.filter((id) => id !== other),
-                      active: first,
-                      weight: ratio || 0.45,
-                    },
-                    { ids: [other], active: other, weight: 1 - (ratio || 0.45) },
-                  ],
-                }
-              : {
-                  axis: 'auto',
-                  groups: [
-                    {
-                      ids,
-                      active: ids.includes(legacy?.active) ? legacy.active : ids[0],
-                      weight: 1,
-                    },
-                  ],
-                };
+          layout = resolveFeatureLayout(null, legacy, ids);
         }
       }
       const known = new Set(layout.groups.flatMap((group) => group.ids));

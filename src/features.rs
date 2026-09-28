@@ -1,6 +1,6 @@
 // [INPUT]: Fixed feature identities, authenticated UI requests and existing business services.
-// [OUTPUT]: One main placement plus independent edge membership, owner leases and view handoff.
-// [POS]: Presentation lifecycle only; business validation remains in tasks/host/model_control.
+// [OUTPUT]: One main placement, independent edge membership, checked per-surface layouts and view handoff.
+// [POS]: Presentation lifecycle only; business validation remains in tasks/codex/model_control.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
     config::{Paths, write_private},
@@ -211,6 +211,32 @@ impl App {
             f.begin_main(&self.paths, placement, None)?;
             return Ok(f.snapshot());
         }
+        if op == "main-layout" {
+            let _operation = self.feature_operation.lock().await;
+            let mut f = self.features.lock().await;
+            ensure!(f.main.target.is_none(), "功能正在交接");
+            let placement = input["placement"].as_str().context("缺少布局位置")?;
+            ensure!(
+                ["sidebar", "overlay", "desktop"].contains(&placement),
+                "布局位置无效"
+            );
+            let previous = f.main.pref.layouts.get(placement).cloned();
+            let expected: Option<FeatureLayout> =
+                serde_json::from_value(input.get("expectedLayout").context("缺少原布局")?.clone())?;
+            ensure!(expected == previous, "布局已在其他窗口更新，请重新调整");
+            let layout: FeatureLayout = serde_json::from_value(input["layout"].clone())?;
+            ensure!(layout.valid(), "分栏布局无效");
+            f.main.pref.layouts.insert(placement.into(), layout);
+            if let Err(error) = f.save(&self.paths) {
+                if let Some(previous) = previous {
+                    f.main.pref.layouts.insert(placement.into(), previous);
+                } else {
+                    f.main.pref.layouts.remove(placement);
+                }
+                return Err(error);
+            }
+            return Ok(f.snapshot());
+        }
         if op.starts_with("main-") {
             return self.main_surface_request(&input).await;
         }
@@ -230,6 +256,14 @@ impl App {
                 f.entries[id].pref.placement == placement && f.main.target.is_none(),
                 "功能正在交接"
             );
+            // Older window bundles omit this field; current surfaces always send it.
+            if let Some(expected) = input.get("expectedLayout") {
+                let expected: Option<FeatureLayout> = serde_json::from_value(expected.clone())?;
+                ensure!(
+                    expected.as_ref() == f.main.pref.layouts.get(placement),
+                    "布局已在其他窗口更新，请重新调整"
+                );
+            }
             let layout: FeatureLayout = serde_json::from_value(input["layout"].clone())?;
             ensure!(layout.valid(), "分栏布局无效");
             let previous = f.main.pref.layouts.insert(placement.into(), layout);
@@ -688,6 +722,58 @@ mod tests {
         app.save_appearance(json!({"expectedRevision":prefs.revision,"ui":{"dockLayout":{"group":"tabs","active":"outline","mode":"auto","first":"outline","verticalRatio":0.45,"horizontalRatio":0.4}}})).await.unwrap();
         assert!(app.feature_state().await["layouts"]["sidebar"].is_null());
         assert!(Features::load(&app.paths).snapshot()["layouts"]["sidebar"].is_null());
+    }
+
+    #[tokio::test]
+    async fn settings_layout_preserves_four_features_and_rejects_concurrent_changes() {
+        let (_dir, app) = app().await;
+        let before = app.appearance().await;
+        let layout = json!({"axis":"horizontal","groups":[{"ids":["outline","board"],"active":"board","weight":0.6},{"ids":["next","model"],"active":"model","weight":0.4}]});
+        app.feature_request(
+            json!({"op":"main-layout","placement":"sidebar","expectedLayout":null,"layout":layout}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            layout
+        );
+        assert_eq!(
+            serde_json::to_value(app.appearance().await).unwrap(),
+            serde_json::to_value(before).unwrap()
+        );
+        assert!(
+            app.feature_state().await["features"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        assert!(app.feature_request(json!({"op":"main-layout","placement":"sidebar","expectedLayout":null,"layout":layout})).await.is_err());
+        assert!(app.feature_request(json!({"op":"main-layout","placement":"sidebar","expectedLayout":layout,"layout":{"axis":"vertical","groups":[]}})).await.is_err());
+        app.feature_request(
+            json!({"op":"main-layout","placement":"desktop","expectedLayout":null,"layout":layout}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            Features::load(&app.paths).snapshot()["layouts"]["sidebar"],
+            layout
+        );
+        // JavaScript serializes integral weights as 1, while Rust writes f64 as 1.0.
+        let tabs = json!({"axis":"auto","groups":[{"ids":["outline","next","board","model"],"active":"board","weight":1}]});
+        app.feature_request(
+            json!({"op":"main-layout","placement":"sidebar","expectedLayout":layout,"layout":tabs}),
+        )
+        .await
+        .unwrap();
+        app.feature_request(
+            json!({"op":"main-layout","placement":"sidebar","expectedLayout":tabs,"layout":layout}),
+        )
+        .await
+        .unwrap();
+        let owner = open(&app, "outline").await;
+        assert!(app.feature_request(json!({"op":"layout","id":"outline","owner":owner,"placement":"sidebar","expectedLayout":tabs,"layout":tabs})).await.is_err());
+        app.feature_request(json!({"op":"layout","id":"outline","owner":owner,"placement":"sidebar","expectedLayout":layout,"layout":tabs})).await.unwrap();
     }
 
     #[tokio::test]

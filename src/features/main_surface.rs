@@ -4,14 +4,14 @@
 // [PROTOCOL]: Keep features/AGENTS.md in sync.
 use super::*;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct LayoutGroup {
     pub ids: Vec<String>,
     pub active: String,
     pub weight: f64,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct FeatureLayout {
     pub axis: String,

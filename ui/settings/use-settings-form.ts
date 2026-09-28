@@ -172,7 +172,7 @@ export function useSettingsForm(
             clearJevKey:
               !control && latest.clearJevKey === submitted.clearJevKey ? false : latest.clearJevKey,
           });
-          notifyRef.current('设置已保存，桌面浮窗会自动同步。');
+          notifyRef.current('');
         }
         return baseline.current;
       } catch (error) {
@@ -273,3 +273,5 @@ export function useSettingsForm(
     setClearKey,
   };
 }
+
+export type SettingsEditor = ReturnType<typeof useSettingsForm>;

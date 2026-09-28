@@ -107,8 +107,11 @@ test(
       });
       const page = await browser.newPage();
       const errors = [];
-      page.on('pageerror', (error) => errors.push(error.message));
+      page.on('pageerror', (error) => {
+        errors.push(error.message);
+      });
       await page.goto(`http://127.0.0.1:${server.address().port}/#token=fixture`);
+      await page.getByRole('link', { name: '启动与连接', exact: true }).click();
       const policy = page.getByLabel('ChatGPT 已打开，但没有调试连接时');
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'ask');
@@ -119,11 +122,14 @@ test(
       await page.reload();
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'force');
+      await page.getByRole('link', { name: '下一步', exact: true }).click();
+      await page.getByText('高级生成设置', { exact: true }).click();
       const context = page.getByLabel('输入上下文', { exact: true });
       await context.selectOption('latest');
       await until(() => settings.maxInputChars === 0);
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).count(), 0);
       await page.reload();
+      await page.getByText('高级生成设置', { exact: true }).click();
       await context.waitFor();
       assert.equal(await context.inputValue(), 'latest');
       await context.selectOption('limited');
@@ -132,19 +138,22 @@ test(
       await input.fill('8000');
       // Typed input stays local until blur or the explicit save button.
       assert.equal(settings.maxInputChars, 12000);
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await until(() => settings.maxInputChars === 8000);
       await page.getByText('设置已同步到本机', { exact: true }).waitFor();
       hold = true;
       await input.fill('9000');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
+      await page.getByRole('link', { name: '大纲', exact: true }).click();
+      await page.getByRole('link', { name: '下一步', exact: true }).click();
+      assert.equal(await input.inputValue(), '9000');
       await input.fill('10000');
       pending.shift()();
       await until(() => settings.maxInputChars === 9000);
       assert.equal(await input.inputValue(), '10000', 'slow save must not erase newer typing');
       assert.equal(pending.length, 0, 'typing alone must not be saved');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
       hold = false;
       pending.shift()();
@@ -153,7 +162,7 @@ test(
       assert.equal(maxInFlight, 1);
       rejectNext = true;
       await input.fill('11000');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await page.getByText('合成保存失败，请重试', { exact: true }).waitFor();
       assert.equal(await input.inputValue(), '11000');
       assert.equal(settings.maxInputChars, 10000);
@@ -162,10 +171,10 @@ test(
       await page.getByText('设置已同步到本机', { exact: true }).waitFor();
       hold = true;
       await input.fill('12000');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
       await input.fill('13000');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       // Allow the second blur debounce to join the active save queue.
       await page.waitForTimeout(300);
       assert.equal(pending.length, 1);
@@ -178,7 +187,7 @@ test(
       assert.equal(maxInFlight, 1, 'queued saves must use the new revision serially');
       settings = { ...settings, configurationRevision: settings.configurationRevision + 1 };
       await input.fill('14000');
-      await page.getByRole('heading', { name: '生成设置', exact: true }).click();
+      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await page.getByText('设置已在其他窗口更新，请重新载入后再保存', { exact: true }).waitFor();
       assert.equal(await input.inputValue(), '14000');
       assert.equal(settings.maxInputChars, 13000);
@@ -187,6 +196,7 @@ test(
         true,
       );
       await page.reload();
+      await page.getByText('高级生成设置', { exact: true }).click();
       await input.waitFor();
       assert.equal(await input.inputValue(), '13000');
       const quick = page.getByLabel('常用提示词 1 内容', { exact: true });

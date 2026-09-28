@@ -7,7 +7,7 @@
 import * as React from 'react';
 import { cn } from '@/utils';
 export const inputStyles =
-  'h-[39px] w-full min-w-0 rounded-lg border border-border bg-input px-[11px] py-0 text-xs text-foreground transition-colors hover:border-ring/50 placeholder:text-muted-foreground placeholder:opacity-80 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-3 disabled:opacity-45 disabled:cursor-not-allowed';
+  'h-[39px] w-full min-w-0 rounded-lg border border-border bg-input px-[11px] py-0 text-[14px] text-foreground transition-colors hover:border-ring/50 placeholder:text-muted-foreground placeholder:opacity-80 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-3 disabled:opacity-45 disabled:cursor-not-allowed';
 export function Input({ className, type, ...props }: React.ComponentProps<'input'>) {
   return <input type={type} data-slot="input" className={cn(inputStyles, className)} {...props} />;
 }

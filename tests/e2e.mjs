@@ -28,7 +28,12 @@ const root = resolve(import.meta.dirname, '..');
 const artifact = prepareTestBinary();
 const binary = artifact.binary;
 const popoutOnly = process.argv.includes('--popout-only');
-const output = join(root, 'target/reports', popoutOnly ? 'popout' : 'e2e');
+const settingsOnly = process.argv.includes('--settings-only');
+const output = join(
+  root,
+  'target/reports',
+  settingsOnly ? 'settings' : popoutOnly ? 'popout' : 'e2e',
+);
 mkdirSync(output, { recursive: true });
 rmSync(join(output, 'e2e-report.json'), { force: true });
 const dataDir = mkdtempSync(join(tmpdir(), 'companion-desktop-e2e-'));
@@ -46,6 +51,80 @@ async function waitFor(check, message, timeout = 12000) {
     await delay(80);
   }
   throw new Error(message);
+}
+async function checkSettingsNavigation(page, context, base, runtime) {
+  const nav = page.getByRole('navigation', { name: '设置分类' });
+  const names = ['大纲', '下一步', '看板', '模型快切', '显示与布局', '启动与连接'];
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const width of [1280, 780, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const name of names) {
+      await nav.getByRole('link', { name, exact: true }).click();
+      await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+      assert.equal(
+        await nav.getByRole('link', { name, exact: true }).getAttribute('aria-current'),
+        'page',
+      );
+      assert.equal(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+        true,
+        `${name} overflow at ${width}`,
+      );
+    }
+    await nav.getByRole('link', { name: '显示与布局', exact: true }).click();
+    await page.screenshot({ path: join(output, `settings-layout-${width}.png`), fullPage: true });
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await nav.getByRole('link', { name: '看板', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('heading', { name: '看板', exact: true, level: 1 }).waitFor();
+  await page.getByText('看板分组', { exact: true }).click();
+  const groupName = page.getByLabel('分组名称：待办', { exact: true });
+  await groupName.fill('尚未保存的分组名称');
+  await nav.getByRole('link', { name: '大纲', exact: true }).click();
+  await nav.getByRole('link', { name: '看板', exact: true }).click();
+  assert.equal(await groupName.inputValue(), '尚未保存的分组名称');
+  await page.goto(`${base}/#settings-limits`);
+  await page.getByLabel('输入上下文', { exact: true }).waitFor();
+  assert.equal(
+    await nav.getByRole('link', { name: '下一步', exact: true }).getAttribute('aria-current'),
+    'page',
+  );
+  await page.getByLabel('输入上下文', { exact: true }).scrollIntoViewIfNeeded();
+  const top = await page.evaluate(() => scrollY);
+  await nav.getByRole('link', { name: '大纲', exact: true }).click();
+  await nav.getByRole('link', { name: '下一步', exact: true }).click();
+  assert.ok(
+    Math.abs((await page.evaluate(() => scrollY)) - top) < 2,
+    'category scroll position is retained',
+  );
+  await page.goBack();
+  await page.getByRole('heading', { name: '大纲', exact: true, level: 1 }).waitFor();
+  await page.goForward();
+  await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).waitFor();
+  const gated = await context.newPage();
+  await gated.route('**/api/settings', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), popoutSupported: false } });
+  });
+  await gated.goto(`${base}/#token=${runtime.token}`);
+  await gated.getByRole('link', { name: '显示与布局', exact: true }).click();
+  await waitFor(
+    () => gated.getByRole('button', { name: '侧栏', exact: true }).isEnabled(),
+    'feature state did not load',
+  );
+  assert.equal(
+    await gated.getByRole('button', { name: '桌面窗口', exact: true }).isDisabled(),
+    true,
+  );
+  assert.equal(
+    await gated
+      .locator('option[value="edge"]')
+      .evaluateAll((options) => options.length === 4 && options.every((option) => option.disabled)),
+    true,
+  );
+  await gated.close();
+  record('设置分类宽窄布局、键盘/历史/旧链接、草稿和阅读位置保留、平台限制');
 }
 const suggestions = [
   {
@@ -291,7 +370,30 @@ try {
   };
 
   await waitFor(async () => (await panelState())?.active, 'Desktop floating runtime did not start');
-  if (popoutOnly) {
+  if (settingsOnly) {
+    page = await context.newPage();
+    page.on('pageerror', (error) => errors.push(`settings: ${error.message}`));
+    await page.goto(`${base}/#token=${runtime.token}`);
+    await checkSettingsNavigation(page, context, base, runtime);
+    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
+    const before = (await api('features', { op: 'state' })).body;
+    for (const axis of ['vertical', 'horizontal', 'tabs']) {
+      await page.getByLabel('主界面布局', { exact: true }).selectOption(axis);
+      await waitFor(async () => {
+        const layout = (await api('features', { op: 'state' })).body.layouts.sidebar;
+        return axis === 'tabs' ? layout?.groups.length === 1 : layout?.axis === axis;
+      }, `layout ${axis} did not save`);
+    }
+    assert.deepEqual((await api('features', { op: 'state' })).body.features, before.features);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.screenshot({ path: join(output, 'settings-dark.png'), fullPage: true });
+    assert.deepEqual(errors, []);
+    record('真实 Rust 服务连续布局保存，不启用功能；深色设置页面');
+    writeFileSync(
+      join(output, 'e2e-report.json'),
+      JSON.stringify({ artifact, scope: 'settings', reports, pageErrors: errors }, null, 2),
+    );
+  } else if (popoutOnly) {
     await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(true));
     await settle();
     await checkPopout({
@@ -840,7 +942,7 @@ try {
     page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`settings: ${error.message}`));
     await page.goto(`${base}/#token=${runtime.token}`);
-    await page.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
+    await page.getByRole('navigation', { name: '设置分类' }).waitFor();
     assert.equal(page.url(), `${base}/`);
     assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).count(), 0);
     assert.equal(await desktop.locator('[data-action="theme"]').count(), 0);
@@ -848,117 +950,9 @@ try {
       await desktop.evaluate(() => typeof window.__companionFloatingPanel.setThemeMode),
       'undefined',
     );
-    const outline = page.getByRole('navigation', { name: '设置大纲' });
-    const sections = [
-      'settings-model-control',
-      'settings-capsule',
-      'settings-features',
-      'settings-model',
-      'settings-directions',
-      'settings-quick-prompts',
-      'settings-limits',
-      'settings-startup',
-      'settings-connection',
-    ];
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    for (const width of [1280, 780, 390]) {
-      await page.setViewportSize({ width, height: 900 });
-      for (const id of sections) {
-        await outline.locator(`a[href="#${id}"]`).click();
-        await waitFor(
-          () =>
-            outline
-              .locator(`a[href="#${id}"]`)
-              .getAttribute('aria-current')
-              .then((v) => v === 'location'),
-          `Outline did not track ${id} at ${width}`,
-        );
-        const rect = await page.locator(`#${id}`).boundingBox();
-        assert.ok(rect.y >= 0 && rect.y < 900, `Section ${id} must be visible`);
-      }
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-      );
-      await outline.locator('a[href="#settings-model-control"]').click();
-      await waitFor(
-        () =>
-          outline
-            .locator('a[href="#settings-model-control"]')
-            .getAttribute('aria-current')
-            .then((value) => value === 'location'),
-        'Outline did not return to first group',
-      );
-      assert.equal(
-        await outline
-          .locator('[aria-current="location"]')
-          .evaluate((node) => getComputedStyle(node).fontWeight),
-        '500',
-      );
-      await page.screenshot({ path: join(output, `settings-outline-${width}.png`) });
-    }
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
-    await page.locator('#settings-model').evaluate((node) => node.scrollIntoView());
-    await waitFor(
-      () =>
-        outline
-          .locator('a[href="#settings-model"]')
-          .getAttribute('aria-current')
-          .then((v) => v === 'location'),
-      'Outline did not follow scrolling',
-    );
-    await outline.locator('a[href="#settings-capsule"]').focus();
-    await page.keyboard.press('Enter');
-    await waitFor(
-      () =>
-        outline
-          .locator('a[href="#settings-capsule"]')
-          .getAttribute('aria-current')
-          .then((v) => v === 'location'),
-      'Keyboard navigation failed',
-    );
-    await page.reload();
-    await page.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
-    await waitFor(
-      () =>
-        outline
-          .locator('a[href="#settings-capsule"]')
-          .getAttribute('aria-current')
-          .then((v) => v === 'location'),
-      'Deep link did not restore after reload',
-    );
-    record('设置大纲桌面/窄屏跳转、滚动跟随、键盘与深链接；Codex 主题写入入口移除');
-
-    assert.equal(
-      await page
-        .getByLabel('显示方式', { exact: true })
-        .locator('option[value="desktop"]')
-        .isDisabled(),
-      false,
-    );
-    const gatedSettings = await context.newPage();
-    await gatedSettings.route('**/api/settings', async (route) => {
-      const response = await route.fetch();
-      const body = await response.json();
-      await route.fulfill({ response, json: { ...body, popoutSupported: false } });
-    });
-    await gatedSettings.goto(`${base}/#token=${runtime.token}`);
-    await gatedSettings.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
-    await waitFor(
-      () =>
-        gatedSettings
-          .locator('option[value="desktop"]')
-          .evaluateAll(
-            (options) => options.length === 5 && options.every((option) => option.disabled),
-          ),
-      'Unsupported desktop option remained enabled',
-    );
-    assert.equal(await gatedSettings.locator('option[value="embedded"]').isDisabled(), false);
-    await gatedSettings.close();
-    record('Web 设置禁用不支持平台的桌面选项，内嵌选项保持可用');
+    await checkSettingsNavigation(page, context, base, runtime);
+    await page.getByRole('link', { name: '下一步', exact: true }).click();
+    await page.getByText('高级生成设置', { exact: true }).click();
 
     assert.equal(await page.getByLabel('API 密钥', { exact: true }).inputValue(), '');
     await page.getByLabel('最多建议数量').fill('3');
@@ -976,47 +970,34 @@ try {
     await page.getByText('连接正常，已生成 3 条测试建议。', { exact: true }).waitFor();
     record('网页保存、模型列表、连接测试、密钥保留与私有权限');
     const appearanceBefore = (await api('appearance')).body;
-    const selectLiquid = async () => {
-      const saved = page.waitForResponse(
-        (response) =>
-          response.url().endsWith('/api/appearance') && response.request().method() === 'POST',
-      );
-      await page.getByLabel('材质', { exact: true }).selectOption('native-glass');
-      return saved;
-    };
-    let materialSave = await selectLiquid();
-    if (!materialSave.ok()) {
-      // 前面的内嵌收放可能刚保存新修订；确认冲突提示和重新读取，再按界面约定重试一次。
-      assert.equal((await materialSave.json()).message, '外观已在其他窗口更新，请重试');
-      await page.getByText('外观已在其他窗口更新，请重试', { exact: true }).waitFor();
-      await waitFor(
-        () => page.getByLabel('材质', { exact: true }).isEnabled(),
-        'Appearance conflict did not recover',
-      );
-      materialSave = await selectLiquid();
-    }
-    assert.ok(materialSave.ok(), 'Web material save failed after refreshing preferences');
-    await waitFor(
-      async () => (await panelState()).material === 'native-glass',
-      'Web material did not reach embedded panel',
-    );
-    const clearStar = page.getByRole('button', { name: '通透液态（Clear）', exact: true });
-    assert.equal(await clearStar.count(), 1);
-    await clearStar.click();
+    // Themes belong to surfaces; legacy panel appearance remains compatible but is not edited here.
+    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
+    const surfaceBefore = (await api('surfaces', { op: 'state' })).body;
+    const theme = page.getByLabel('侧栏主题', { exact: true });
+    await theme.selectOption('native-glass');
     await waitFor(
       async () =>
-        (await desktop.evaluate(() => window.__companionFloatingPanel.panelPreferences()))
-          .liquidVariant === 'clear',
-      'Web Clear preference did not reach embedded panel',
+        (await api('surfaces', { op: 'state' })).body.preferences.themes.sidebar.theme ===
+        'native-glass',
+      'Surface theme did not save',
     );
-    await clearStar.click();
+    await page.getByLabel('侧栏液态变体', { exact: true }).selectOption('clear');
     await waitFor(
       async () =>
-        (await desktop.evaluate(() => window.__companionFloatingPanel.panelPreferences()))
-          .liquidVariant === 'regular',
-      'Web Regular preference did not reach embedded panel',
+        (await api('surfaces', { op: 'state' })).body.preferences.themes.sidebar.liquidVariant ===
+        'clear',
+      'Surface variant did not save',
     );
+    const surfaceCurrent = (await api('surfaces', { op: 'state' })).body;
+    assert.deepEqual(surfaceCurrent.preferences.themes.edge, surfaceBefore.preferences.themes.edge);
+    await api('surfaces', {
+      op: 'save',
+      revision: surfaceCurrent.revision,
+      placement: 'sidebar',
+      theme: surfaceBefore.preferences.themes.sidebar,
+    });
     await page.screenshot({ path: join(output, 'settings-single-liquid.png') });
+    await page.getByRole('link', { name: '下一步', exact: true }).click();
     await page.getByLabel('点击建议', { exact: true }).selectOption('hybrid');
     await waitFor(
       async () => (await panelState()).clickMode === 'hybrid',
@@ -1029,16 +1010,12 @@ try {
           .labelOnly,
       'Web label display did not reach embedded panel',
     );
-    await desktop.evaluate(() => window.__companionFloatingPanel.setMaterial('matte'));
-    await waitFor(
-      async () => (await page.getByLabel('材质', { exact: true }).inputValue()) === 'matte',
-      'Panel material did not reach Web',
-    );
     const staleAppearance = await api('appearance', {
       expectedRevision: appearanceBefore.revision,
       ui: { material: 'frosted' },
     });
     assert.notEqual(staleAppearance.status, 200);
+    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
     await page.getByLabel('字号（px）', { exact: true }).fill('16');
     await page.getByLabel('字号（px）', { exact: true }).blur();
     await waitFor(
@@ -1058,7 +1035,7 @@ try {
       async () => (await panelState()).material === appearanceBefore.ui.material,
       'Appearance restore failed',
     );
-    record('Web 与内嵌胶囊的材质、点击和摘要设置双向同步，旧版本保存被拒绝');
+    record('各形式主题独立保存；点击、摘要和字号同步，旧版本保存被拒绝');
 
     await switchView('settings');
     await desktop.locator('[data-action="generation-mode"]').selectOption('auto');
@@ -1317,7 +1294,7 @@ try {
     await generate();
     record('旧格式 JSON 作为普通正文保留，建议只来自独立模型');
     await page.reload();
-    await page.getByRole('heading', { name: 'Stepwise 模型', exact: true }).waitFor();
+    await page.getByRole('navigation', { name: '设置分类' }).waitFor();
     await delay(300);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: join(output, 'settings-desktop.png'), fullPage: true });

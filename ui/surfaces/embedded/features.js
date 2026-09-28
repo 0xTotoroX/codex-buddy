@@ -1,4 +1,4 @@
-/* [INPUT]: Feature owners, saved placements and the existing capsule/dock.
+/* [INPUT]: Feature owners, saved placements, checked layout snapshots and the existing capsule/dock.
  * [OUTPUT]: Business views inside the original workbench shell; no launcher menu.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
@@ -86,10 +86,17 @@ function frame(container, faceClick) {
     .addEventListener('click', () => void openSettings());
   composition?.destroy();
   composition = installFeatureLayout(root, {
-    save: async (placement, layout) => {
+    save: async (placement, layout, expectedLayout) => {
       const entry = state.features.find((entry) => entry.open && entry.placement === placement);
       if (entry)
-        await request({ op: 'layout', id: entry.id, owner: entry.owner, placement, layout });
+        await request({
+          op: 'layout',
+          id: entry.id,
+          owner: entry.owner,
+          placement,
+          layout,
+          expectedLayout,
+        });
     },
     error: showError,
   });
