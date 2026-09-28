@@ -231,10 +231,31 @@ test(
           process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
       });
       const page = await browser.newPage();
+      let switchingSource = false;
+      const responseChecks = [];
       page.on('pageerror', (error) => errors.push(error.message));
       page.on('console', (message) => {
-        if (message.type() === 'error' && !message.text().startsWith('WebSocket connection to'))
+        if (
+          message.type() === 'error' &&
+          !message.text().startsWith('WebSocket connection to') &&
+          !message.text().startsWith('Failed to load resource:')
+        )
           errors.push(message.text());
+      });
+      page.on('response', (response) => {
+        if (response.status() < 400) return;
+        const duringSwitch = switchingSource;
+        responseChecks.push(
+          (async () => {
+            const path = new URL(response.url()).pathname;
+            if (duringSwitch && response.status() === 503 && path.startsWith('/api/')) {
+              const body = await response.json().catch(() => null);
+              if (['开发来源正在切换，请等待完成。', '开发后台正在重启'].includes(body?.message))
+                return;
+            }
+            errors.push(`HTTP ${response.status()} ${path}`);
+          })(),
+        );
       });
       await page.goto(`${session.url}/#token=${session.token}`);
       const navigation = page.getByRole('navigation', { name: '设置分类' });
@@ -246,6 +267,7 @@ test(
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings controls must be usable');
       await navigation.getByRole('link', { name: '开发', exact: true }).click();
       await page.getByText(/开发来源 · Stepwise/).waitFor();
+      await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'complete settings page must render without React errors');
       const alignment = await page.evaluate(() => ({
         source: document
@@ -259,12 +281,15 @@ test(
         'source and settings share the same content edge',
       );
       await page.getByLabel('调试 worktree').selectOption(main);
+      switchingSource = true;
       await page.getByRole('button', { name: '切换来源' }).click();
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
       await page.getByText(/界面资源已确认/).waitFor();
+      switchingSource = false;
       await navigation.getByRole('link', { name: '大纲', exact: true }).click();
       await outlineSwitch.waitFor();
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
+      await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'settings must still render after switching source');
       assert.equal(
         await page.evaluate(
