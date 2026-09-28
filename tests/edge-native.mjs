@@ -14,6 +14,7 @@ import { once } from 'node:events';
 
 if (process.platform !== 'darwin') throw Error('Native edge acceptance requires macOS');
 const root = resolve(import.meta.dirname, '..');
+let screenshots = process.argv.includes('--screenshots');
 const binaryIndex = process.argv.indexOf('--binary');
 const binary =
   binaryIndex < 0 ? join(root, 'target/debug/codex-buddy') : resolve(process.argv[binaryIndex + 1]);
@@ -80,6 +81,14 @@ const report = {
   environment,
   checks: [],
   skipped: [
+    ...(!screenshots
+      ? [
+          {
+            name: 'screen capture',
+            reason: 'Disabled by default; --screenshots requires an explicit screenshot request',
+          },
+        ]
+      : []),
     {
       name: 'real Spaces and full-screen transitions',
       reason:
@@ -342,6 +351,7 @@ function windowInfo() {
     )[0];
 }
 async function capture(name) {
+  if (!screenshots) return;
   const info = windowInfo();
   const path = join(output, `${name}.png`);
   try {
@@ -352,6 +362,7 @@ async function capture(name) {
     );
     report.screenshots.push(path);
   } catch (error) {
+    screenshots = false; // A failed capture must not trigger another permission prompt.
     report.screenshots.push({ name, unavailable: error.message });
   }
 }
