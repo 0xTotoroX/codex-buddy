@@ -8,7 +8,7 @@
 - [outline/AGENTS.md](outline/AGENTS.md)：大纲列表、编号对齐及定位操作。
 - [next/AGENTS.md](next/AGENTS.md)：建议列表、预览与点击规则。
 - [model/AGENTS.md](model/AGENTS.md)：模型矩阵、预设和选择操作。
-- `content.tsx`：固定四种功能的内容组合与业务命令适配；接收受限传输，保持身份校验与确认流程。
+- `content.tsx`：固定四种功能的内容组合与业务命令适配；接收受限传输和可选顶栏操作位置，保持身份校验与确认流程。
 - `projected.tsx`：大纲/下一步的 React 投影适配，复用各自 view.js，保留预览及滚动状态；不解析宿主 DOM；名称由容器标签显示，内容区不重复绘制小标题，保留刷新操作。
 - `content.css`：大纲、建议与快捷词的共用内容样式、焦点及内容动效；不绘制容器材质。
 

@@ -1,4 +1,4 @@
-/* [INPUT]: Owner lease, business projection and a container-independent request function.
+/* [INPUT]: Owner lease, business projection, request function and optional surface header slot.
  * [OUTPUT]: Business content with guarded actions and draft/reading handoff; the surface owns chrome.
  * [POS]: Shared by native windows and host Shadow DOM surfaces; no host parsing.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
@@ -17,7 +17,9 @@ export function FeatureView({
   registerReload,
   beforeHandoff,
   onHandoffError,
+  headerActions,
 }: {
+  headerActions?: HTMLElement;
   entry: Entry;
   owner: string;
   request: Request;
@@ -227,6 +229,7 @@ export function FeatureView({
         inert={!active}
       >
         <FeatureContent
+          headerActions={headerActions}
           id={entry.id}
           reading={reading.current}
           value={value}

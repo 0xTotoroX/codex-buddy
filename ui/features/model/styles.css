@@ -138,6 +138,8 @@
 .model-disclosure {
   color: var(--muted);
   margin: 4px 0;
+  padding-inline: 0;
+  text-align: left;
 }
 .model-footer {
   justify-content: flex-end;

@@ -1,4 +1,4 @@
-/* [INPUT]: Native edge geometry/events and shared feature owners. [OUTPUT]: One tabbed edge/notch shell.
+/* [INPUT]: Native edge geometry/events and feature owners. [OUTPUT]: Tabbed edge shell with per-view header slots.
  * [POS]: Keeps mounted views alive while collapsed or in another tab; no business state.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { mountFeature } from '../workspace/mount';
@@ -24,6 +24,7 @@ export function startEdge(request: Request) {
       id: string;
       owner: string;
       node: HTMLElement;
+      headerActions: HTMLElement;
       mount: ReturnType<typeof mountFeature>;
       reveal: number;
     }
@@ -62,10 +63,12 @@ export function startEdge(request: Request) {
   function visibility() {
     for (const item of mounts.values()) {
       item.node.hidden = item.id !== selected;
+      item.headerActions.hidden = item.node.hidden || item.node.dataset.active !== 'true';
       item.node.inert =
         !expanded ||
         item.id !== selected ||
         document.documentElement.dataset.buddyReloading === 'true';
+      item.headerActions.inert = item.node.inert;
     }
     panel.inert = !expanded;
   }
@@ -89,10 +92,15 @@ export function startEdge(request: Request) {
             const node = document.createElement('div');
             node.className = 'edge-view';
             views.append(node);
+            const headerActions = document.createElement('span');
+            headerActions.className = 'edge-feature-actions';
+            headerActions.hidden = true;
+            settings.before(headerActions);
             item = {
               id: entry.id,
               owner: candidate.owner,
               node,
+              headerActions,
               mount: mountFeature(
                 node,
                 entry,
@@ -100,6 +108,8 @@ export function startEdge(request: Request) {
                 'edge',
                 request,
                 () => void refresh(),
+                undefined,
+                headerActions,
               ),
               reveal: entry.reveal,
             };
@@ -117,6 +127,7 @@ export function startEdge(request: Request) {
       for (const [key, item] of mounts)
         if (!wanted.has(key)) {
           item.mount.dispose();
+          item.headerActions.remove();
           mounts.delete(key);
         }
       if (!ids.includes(selected)) selected = ids[0] || '';

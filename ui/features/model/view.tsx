@@ -1,8 +1,9 @@
-/* [INPUT]: Existing model control envelope and serialized actions.
+/* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
  * [OUTPUT]: Compact model matrix, favorites, persisted drag order, presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { Reading } from '../../shared/features';
 type Selection = { model: string; reasoning: string; speed: string };
@@ -31,7 +32,9 @@ export function ModelView({
   action,
   busy,
   reading,
+  headerActions,
 }: {
+  headerActions?: HTMLElement;
   reading: Reading;
   state: ModelState;
   action: (data: unknown, action: string) => Promise<unknown>;
@@ -181,6 +184,17 @@ export function ModelView({
         </div>
       </div>
     ));
+  const refreshButton = (
+    <button
+      data-refresh="model"
+      aria-label="刷新可用模型"
+      title="刷新可用模型"
+      disabled={busy || !prefs.enabled}
+      onClick={() => void action({}, 'refresh')}
+    >
+      {icon('refresh')}
+    </button>
+  );
   return (
     <section
       className="feature-model"
@@ -218,6 +232,17 @@ export function ModelView({
             </button>
           ))}
         </div>
+        {!!prefs.presets.length && (
+          <button
+            aria-label="模型工具"
+            title="模型工具"
+            aria-expanded={tools}
+            onClick={() => setTools((reading.modelTools = !tools))}
+          >
+            {icon('more')}
+          </button>
+        )}
+        {headerActions ? createPortal(refreshButton, headerActions) : refreshButton}
         <button
           aria-label="保存预设"
           title="保存当前预设"
@@ -235,16 +260,6 @@ export function ModelView({
         >
           {icon('plus')}
         </button>
-        {!!prefs.presets.length && (
-          <button
-            aria-label="模型工具"
-            title="模型工具"
-            aria-expanded={tools}
-            onClick={() => setTools((reading.modelTools = !tools))}
-          >
-            {icon('more')}
-          </button>
-        )}
       </header>
       {tools && !!prefs.presets.length && (
         <div className="model-tools">
@@ -371,22 +386,13 @@ export function ModelView({
           {!models.length && <p>暂无可用模型</p>}
         </div>
       </div>
-      <footer className="model-footer">
-        {(!prefs.enabled || s.message) && (
+      {(!prefs.enabled || s.message) && (
+        <footer className="model-footer">
           <span role="status">
             {!prefs.enabled ? '模型快切已停用，请在设置页开启。' : s.message}
           </span>
-        )}
-        <button
-          data-refresh="model"
-          aria-label="刷新可用模型"
-          title="刷新可用模型"
-          disabled={busy || !prefs.enabled}
-          onClick={() => void action({}, 'refresh')}
-        >
-          {icon('refresh')}
-        </button>
-      </footer>
+        </footer>
+      )}
     </section>
   );
 }

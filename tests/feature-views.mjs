@@ -284,10 +284,10 @@ try {
   const waitModelRefresh = (opacity) =>
     page.waitForFunction((opacity) => {
       const hosts = [...document.querySelectorAll('.edge-view, .csw-feature-content > div')];
-      return hosts.some((host) => {
-        const button = host.shadowRoot?.querySelector('[data-refresh="model"]');
-        return button && getComputedStyle(button).opacity === opacity;
-      });
+      const button =
+        document.querySelector('#edge-panel [data-refresh="model"]') ||
+        hosts.map((host) => host.shadowRoot?.querySelector('[data-refresh="model"]')).find(Boolean);
+      return button && getComputedStyle(button).opacity === opacity;
     }, opacity);
   await page.mouse.move(499, 699);
   await waitModelRefresh('0');
@@ -296,13 +296,13 @@ try {
   await page.mouse.move(499, 699);
   await waitModelRefresh('0');
   await page.keyboard.press('Tab');
-  await view.getByRole('button', { name: '刷新可用模型' }).focus();
+  await page.getByRole('button', { name: '刷新可用模型' }).focus();
   await waitModelRefresh('1');
-  await view.getByRole('button', { name: '刷新可用模型' }).evaluate((node) => node.blur());
+  await page.getByRole('button', { name: '刷新可用模型' }).evaluate((node) => node.blur());
   await waitModelRefresh('0');
   await page.emulateMedia({ reducedMotion: 'reduce' });
   assert.equal(
-    await view
+    await page
       .getByRole('button', { name: '刷新可用模型' })
       .evaluate((node) => getComputedStyle(node).transitionDuration),
     '0s',
@@ -318,6 +318,13 @@ try {
   await view.getByRole('button', { name: /其他模型/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  const modelNameBox = await view.locator('.model-name strong').first().boundingBox();
+  const disclosureBox = await view.locator('.model-disclosure').boundingBox();
+  assert.ok(Math.abs(disclosureBox.x - modelNameBox.x) < 1);
+  assert.equal(
+    await view.locator('.model-disclosure').evaluate((node) => getComputedStyle(node).paddingLeft),
+    '0px',
+  );
   const visibility = view.getByLabel('隐藏 Model A', { exact: true });
   const edgeSettings = page.getByRole('button', { name: '设置', exact: true });
   const waitOpacity = async (locator, opacity) => {
@@ -383,6 +390,38 @@ try {
   await view.getByRole('button', { name: /其他模型/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  const refreshBox = await page.getByRole('button', { name: '刷新可用模型' }).boundingBox();
+  const settingsBox = await page.getByRole('button', { name: '设置', exact: true }).boundingBox();
+  const plusBox = await view.getByRole('button', { name: '保存预设', exact: true }).boundingBox();
+  const toolbarBox = await view.locator('.model-toolbar').boundingBox();
+  assert.ok(
+    Math.abs(refreshBox.y + refreshBox.height / 2 - settingsBox.y - settingsBox.height / 2) < 2,
+  );
+  assert.ok(refreshBox.x + refreshBox.width <= settingsBox.x);
+  assert.ok(Math.abs(plusBox.x + plusBox.width - toolbarBox.x - toolbarBox.width) < 1);
+  await page.getByRole('button', { name: '刷新可用模型' }).click();
+  await page.getByRole('button', { name: '刷新可用模型' }).evaluate(async (node) => {
+    const deadline = performance.now() + 5000;
+    while (node.disabled) {
+      if (performance.now() > deadline) throw Error('Refresh remained disabled');
+      await new Promise(requestAnimationFrame);
+    }
+  });
+  assert.equal(actions.at(-1).action, 'refresh');
+  assert.equal(actions.at(-1).id, 'model');
+  await page
+    .getByRole('navigation', { name: '功能' })
+    .getByRole('button', { name: '看板', exact: true })
+    .click();
+  await page.getByRole('button', { name: '刷新可用模型' }).waitFor({ state: 'hidden' });
+  await page
+    .getByRole('navigation', { name: '功能' })
+    .getByRole('button', { name: '模型快切' })
+    .click();
+  await page.getByRole('button', { name: '刷新可用模型' }).waitFor();
+  record(
+    'edge model refresh sits before settings, follows the active tab and dispatches model refresh; plus and disclosure align',
+  );
   page.once('dialog', (dialog) => dialog.accept('日常'));
   await view.getByRole('button', { name: '保存预设', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();

@@ -1,4 +1,4 @@
-/* [INPUT]: A surface element, owner and transport. [OUTPUT]: Reusable isolated view lifecycle.
+/* [INPUT]: Surface element, owner, transport and optional header slot. [OUTPUT]: Isolated view lifecycle.
  * [POS]: React adapter shared by host and native pages. [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { createRoot } from 'react-dom/client';
 import { FeatureView } from './feature-session';
@@ -51,6 +51,7 @@ export function mountFeature(
     handoff: () => Promise<unknown>;
     failed?: (pendingOwner: string) => void;
   },
+  headerActions?: HTMLElement,
 ) {
   const css =
     boardStyles.replaceAll(':root', ':host').replace(/\bbody\s*\{/g, '.board-app {') +
@@ -91,6 +92,7 @@ export function mountFeature(
     root.render(
       <>
         <FeatureView
+          headerActions={headerActions}
           registerReload={(handler) => {
             prepareReload = handler;
           }}

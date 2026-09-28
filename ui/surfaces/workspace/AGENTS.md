@@ -8,7 +8,7 @@
 - `layout.js`：通用功能标签、拖动分栏/合并、比例及临时放大；与设置页共用 resolveFeatureLayout 读取新旧布局，保存携带已确认布局快照，冲突后恢复远端布局并保留挂载。
 - `arrangement.js`：标题/标签拖动、落位预览、键盘标签导航和专注查看；通过 composedPath 接入 Shadow DOM 内标题，取消不触发业务或窗口拖动。
 - `separator.js`：新旧工作台共用的指针/键盘分隔线调节。
-- `mount.tsx`：共用 Shadow DOM/React 挂载与样式隔离；提供 mountFeature 和兼容 mountBoard，开发重载前冻结输入并保存草稿，繁忙/交接/拖动时延期。
+- `mount.tsx`：共用 Shadow DOM/React 挂载与样式隔离；提供 mountFeature 和兼容 mountBoard；透传可选的 `headerActions` 位置，供功能将自己的按钮放入容器顶栏；开发重载前冻结输入并保存草稿，繁忙/交接/拖动时延期。
 - `feature-session.tsx`：owner 校验、读取、繁忙/错误状态、草稿及阅读交接生命周期，共用 shared/scroll 保留隐藏或尺寸夹紧前的阅读位置；将内容委托 features/content，不解析 Codex DOM。
 - `content.css`：隔离挂载的容器尺寸、通用状态和标题样式；隔离视图的刷新按钮继承容器悬停状态，键盘聚焦及触屏仍显示；内容规则由 features 提供，材质配方由 theme 提供。
 - `styles.css`：头部、窗内布局、标签和分隔线；操作与刷新随整个工作台悬停显现，键盘和触屏仍可用。

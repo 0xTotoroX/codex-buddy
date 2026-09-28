@@ -1,4 +1,4 @@
-/* [INPUT]: Feature identity, business envelope, guarded transport and transient reading state.
+/* [INPUT]: Feature identity, business envelope, guarded transport, reading state and optional header slot.
  * [OUTPUT]: The four feature views and their business command adapters, without window policy.
  * [POS]: Fixed feature composition; persistence and validation remain in existing services.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
@@ -26,7 +26,9 @@ export function FeatureContent({
   call,
   operation,
   update,
+  headerActions,
 }: {
+  headerActions?: HTMLElement;
   id: FeatureId;
   reading: Reading;
   value: FeatureData | null;
@@ -59,6 +61,7 @@ export function FeatureContent({
   if (id === 'model')
     return value ? (
       <ModelView
+        headerActions={headerActions}
         state={value as unknown as ModelState}
         reading={reading}
         busy={locked || !connected}

@@ -51,16 +51,29 @@ body {
 #edge-handle {
   padding: 0;
 }
-#edge-settings {
+#edge-settings,
+.edge-feature-actions button {
   display: grid;
   place-items: center;
   flex: none;
   width: 30px;
   height: 30px;
 }
-#edge-settings svg {
+#edge-settings svg,
+.edge-feature-actions svg {
   width: 18px;
   height: 18px;
+}
+.edge-feature-actions {
+  display: flex;
+}
+.edge-feature-actions:empty,
+.edge-feature-actions[hidden] {
+  display: none;
+}
+.edge-feature-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 #edge-settings:hover {
   color: var(--muted);
@@ -90,16 +103,22 @@ body {
   #edge-panel:hover {
     --feature-refresh-opacity: 1;
   }
-  #edge-settings {
+  #edge-settings,
+  .edge-feature-actions button {
     opacity: var(--feature-refresh-opacity, 0);
     transition: opacity 140ms ease-out;
   }
-  #edge-settings:focus-visible {
+  .edge-feature-actions button:disabled {
+    opacity: calc(var(--feature-refresh-opacity, 0) * 0.45);
+  }
+  #edge-settings:focus-visible,
+  .edge-feature-actions button:focus-visible {
     opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  #edge-settings {
+  #edge-settings,
+  .edge-feature-actions button {
     transition: none;
   }
 }
