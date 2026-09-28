@@ -181,6 +181,25 @@ try {
   });
   await page.goto('http://127.0.0.1:47991/feature.html#token=fixture&surface=edge');
   const board = page.locator('[data-feature="board"]');
+  surfaceTheme = 'native-glass';
+  await board.evaluate(async (node) => {
+    const deadline = performance.now() + 5000;
+    while (!getComputedStyle(node).getPropertyValue('--surface').includes('color-mix')) {
+      if (performance.now() > deadline)
+        throw Error('Liquid content did not receive translucent color');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  });
+  assert.equal(
+    await board.locator('.board-header').evaluate((node) => getComputedStyle(node).backgroundColor),
+    'rgba(0, 0, 0, 0)',
+  );
+  assert.equal(
+    await board.locator('button.primary').evaluate((node) => getComputedStyle(node).color),
+    'rgb(245, 239, 230)',
+  );
+  await page.screenshot({ path: join(output, 'board-liquid.png') });
+  surfaceTheme = 'matte';
   await board.getByRole('button', { name: '隔离任务', exact: true }).click();
   await board.getByLabel('标题', { exact: true }).fill('还未保存');
   await page.evaluate(() => window.ipc.postMessage(JSON.stringify({ action: 'collapse' })));

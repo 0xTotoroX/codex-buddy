@@ -35,6 +35,7 @@ const request = async (input) => {
   return result;
 };
 export const independentFeatures = () => !IS_POPOUT && independent;
+export const ownsFeatureSurface = (node) => node === secondary;
 export async function revealFeature(id, placement) {
   const result = await request({ op: placement ? 'move' : 'reveal', id, placement });
   selected[placement || result.features.find((e) => e.id === id)?.placement] = id;

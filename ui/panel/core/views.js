@@ -6,6 +6,7 @@
  */
 import {
   independentFeatures,
+  ownsFeatureSurface,
   renderFeatureShell,
   featurePlacement,
   featureTheme,
@@ -693,7 +694,7 @@ function promptClickSubmits(clickDetail, value = shellState.promptClickMode) {
 function installFloat() {
   if (!isCurrentRuntime()) return;
   document.querySelectorAll?.(`[${ROOT_ATTR}="true"]`).forEach((node) => {
-    if (node !== shellState.root) node.remove();
+    if (node !== shellState.root && !ownsFeatureSurface(node)) node.remove();
   });
   if (shellState.root && document.body.contains(shellState.root)) return;
 

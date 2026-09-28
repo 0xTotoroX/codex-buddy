@@ -232,15 +232,12 @@ export function FeatureView({
         ? projection?.settings.enabled
         : true;
   const disabled = locked || !connected || !enabled || projection?.association?.available === false;
-  const style = surfaceStyle(
-    {
-      ...appearance,
-      theme: projection?.theme || appearance.theme,
-      colors: projection?.colors || appearance.colors,
-      fontSize: projection?.hostTypography?.baseItemFontSize || appearance.fontSize,
-    },
-    true,
-  );
+  const style = surfaceStyle({
+    ...appearance,
+    theme: projection?.theme || appearance.theme,
+    colors: projection?.colors || appearance.colors,
+    fontSize: projection?.hostTypography?.baseItemFontSize || appearance.fontSize,
+  });
   return (
     <section
       className="feature-view"

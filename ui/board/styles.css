@@ -492,8 +492,12 @@ h1 {
   min-height: 220px;
 }
 .embedded .board-header {
+  background: transparent;
   padding: 12px;
   justify-content: flex-end;
+}
+.embedded button.primary {
+  color: var(--paper, var(--surface));
 }
 .embedded .heading {
   display: none;

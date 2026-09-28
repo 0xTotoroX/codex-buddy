@@ -203,6 +203,28 @@ export function independentFeatureCases({ mode, syncSettings }) {
               0,
             );
             await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
+            const removed = await page.evaluate(async () => {
+              const side = document.querySelector(
+                '[data-codex-buddy-dock] [data-companion-stepwise-root]',
+              );
+              if (!side) throw Error('Missing shared sidebar');
+              let removals = 0;
+              const observer = new MutationObserver((records) => {
+                removals += records.filter((record) =>
+                  [...record.removedNodes].some((node) => node === side || node.contains(side)),
+                ).length;
+              });
+              observer.observe(document.body, { subtree: true, childList: true });
+              // Navigation and background refresh both render the capsule shell.
+              for (let j = 0; j < 5; j++) {
+                window.__companionFloatingPanel.renderFloat();
+                await new Promise(requestAnimationFrame);
+              }
+              await new Promise((resolve) => setTimeout(resolve, 1600));
+              observer.disconnect();
+              return removals;
+            });
+            assert.equal(removed, 0, 'shell refresh must not remove the active sidebar');
             await page.screenshot({ path: 'target/reports/workbench/restored-shell.png' });
             await page.emulateMedia({ reducedMotion: 'reduce' });
           }
