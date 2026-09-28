@@ -4,7 +4,7 @@ Map: required
 
 - 功能与形式解耦只替换承载的业务内容；沿用原胶囊、工作台头部、主题和收放/窗口往返动效。位置在设置页选择，不能用新增菜单或另一套外壳替代原交互。
 
-- 工作台控制图标统一使用 OpenAI 公开 apps-sdk-ui 的 MIT SVG 子集，来源和许可位于 `ui/panel/icons/`，分发自动收集署名；统一 18px 图形和至少 28px 点击区域，不混用文本符号或各自缩放。公共表情保持顶部中轴与胶囊相同的 84×36 尺寸；展开态表情只显示眼睛，不绘制胶囊底色、边框或光晕；紧凑胶囊键盘聚焦使用中性色细线，展开表情键盘聚焦仅轻微放大眼睛，不增加下划线；来源与操作各占等宽区域，不能挤偏表情。
+- 工作台控制图标统一使用 OpenAI 公开 apps-sdk-ui 的 MIT SVG 子集，来源和许可位于 `ui/shared/icons/`，分发自动收集署名；统一 18px 图形和至少 28px 点击区域，不混用文本符号或各自缩放。公共表情保持顶部中轴与胶囊相同的 84×36 尺寸；展开态表情只显示眼睛，不绘制胶囊底色、边框或光晕；紧凑胶囊键盘聚焦使用中性色细线，展开表情键盘聚焦仅轻微放大眼睛，不增加下划线；来源与操作各占等宽区域，不能挤偏表情。
 - 前端界面保持简洁，以清晰的信息层级、对齐和适度留白组织内容。主界面只保留核心内容与高频操作，分组管理等个性化配置统一放在设置页；新增能力不默认增加前端入口。功能标签用文字明暗区分选中状态，不叠加下划线等重复装饰；保留必要的键盘焦点提示。聊天来源文字、关联及编排下拉暂时隐藏，保留已有状态与功能逻辑。鼠标进入整个工作台时统一显现顶部操作和面板刷新，离开工作台后统一隐藏；键盘聚焦仍显现对应操作，触屏保持可见，透明度过渡尊重减少动态效果；面板标题旁只保留刷新；标题/标签拖动编排、双击临时放大，Esc 恢复；窗口与收放图标隐藏，表情单击聊天内收放、双击弹出/收回（Alt+Enter 键盘替代），桌面单击保持展开；聊天内头部仅保留设置齿轮，桌面浮窗另有置顶按钮（默认开启，保存取消选择）；齿轮直接打开外部 Web 设置，旧内置设置页及处理器保留但入口始终隐藏，位置和排列集中到 Web 设置，置顶同时可在 Web 设置调整。
 - UI 调整统一核对标签左边界、文字中轴、控件尺寸与分隔线留白；附加图标不得挤偏文字，验证实际渲染而非仅检查样式值。
 - 停靠外观按宿主场景区分：主侧栏默认液态 Clear，Codex 内独立打开的前景聊天默认哑光；手动选择在当前宿主本地分别保存，不改变胶囊或桌面独立浮窗的共享外观。Clear 星星使用中性色空心/实心状态，不使用强调色底块。
@@ -14,7 +14,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 独立的 Rust + TypeScript 桌面浮窗与网页配置工具。维护资料统一放在维护者的 Obsidian 项目目录；本机通过 `git config --local buddy.docsPath` 定位，构建、测试和分发不读取该目录。
 
 - 材质统一为哑光、磨砂、液态（内部标识保留 native-glass）。内嵌哑光/磨砂使用 CSS；哑光共用样式，磨砂用中性染色与均匀模糊近似弹出 HUDWindow。正式与开发构建的内嵌液态共用自有 SVG 边缘折射，无页面采集或额外渲染依赖；采用 B 版凸面透镜，Regular/Clear 共用几何与动效，通过独立星星切换共享 liquidVariant；A/B 对比入口已移除。弹出哑光关闭原生背景，磨砂使用 NSVisualEffectView HUDWindow + BehindWindow + Active，保持激活外观；液态使用 NSGlassEffectView，始终展开，由 liquidVariant 选择 Regular / Clear（默认 Regular），由 AppKit 跟随系统 Liquid Glass 偏好及焦点，不提供独立通透度条或 glassStyle。网页表面用阴影与反光定位；内嵌液态两变体共用阴影和内侧反光；原生液态自身光学边缘由 AppKit 绘制，不叠加网页定位层；弹出哑光与原生磨砂仅保留一层圆角浅阴影，范围限于窗口透明留白。保留圆角外溢裁切。macOS 26 以下仅弹出液态回退哑光，传统磨砂与内嵌 SVG 液态仍可用。保留已有材质偏好与历史迁移。
-- 胶囊继续使用原生 CSS，styles/ 按变量、布局、内容、控件、材质、动画分层；native.css 只处理原生覆盖。Web 设置使用 Tailwind v4 和本地 shadcn/ui，Preflight 不进入功能视图。通用贴边/刘海容器固定在所选显示器，通过 CanJoinAllSpaces/FullScreenAuxiliary 跨桌面与全屏空间显示，不依赖宿主焦点；后台断开或租约失效退出。NSPanel/WebView 视口稳定，原生根遮罩负责轮廓动画，scene-ready 门控首帧与键盘焦点。悬停区域保持稳定、点击按精确轮廓穿透；离开约450ms收起，编辑/按住/业务操作时保留，收起及换标签不卸载功能。主题和显示器/边缘/位置属于容器，设置页统一管理。
+- 胶囊继续使用原生 CSS，embedded/shell/styles 管理布局、控件和动画，features 管理内容，theme 管理材质变量；desktop/legacy/native.css 只处理原生覆盖。Web 设置使用 Tailwind v4 和本地 shadcn/ui，Preflight 不进入功能视图。通用贴边/刘海容器固定在所选显示器，通过 CanJoinAllSpaces/FullScreenAuxiliary 跨桌面与全屏空间显示，不依赖宿主焦点；后台断开或租约失效退出。NSPanel/WebView 视口稳定，原生根遮罩负责轮廓动画，scene-ready 门控首帧与键盘焦点。悬停区域保持稳定、点击按精确轮廓穿透；离开约450ms收起，编辑/按住/业务操作时保留，收起及换标签不卸载功能。主题和显示器/边缘/位置属于容器，设置页统一管理。
 - `npm run install:dev` 生成独立 CodexBuddy Dev.app，绑定当前源码与 Node 路径，双击后台运行开发流程，输出写入 target/dev/launcher.log；冷启动无连接时读取开发配置 hostRestartPolicy，开发配置尚不存在时回退日常配置，经当前源码 CLI 的 launch --host-only --restart-running 准备宿主，不启动安装版后台或写回其配置；重复启动唤起现有工作台，断连只尝试重连原目标；启动期间显示 Dock 图标，AppKit 协作交接焦点后退出入口；工作台已连接但前台切换被拒绝、超时或异常时只发送无需确认的系统通知，通知不可用也正常退出入口，后台保持运行。后台会话通过 npm run dev:stop 正常退出，前台 npm run dev 仍使用 Ctrl+C，不更新日常安装。移动源码或 Node 后重新生成入口。
 - 多 worktree 调试由一个 Dev 监督进程交接来源；工作台齿轮与 `npm run dev:settings` 共用一个稳定的开发设置页，普通设置和来源选择在同页；后台通过 CODEX_BUDDY_DEV_SETTINGS 接收地址，正式构建忽略它。各来源隔离 Vite 缓存并去重 React；来源区域显示路径、分支、提交、未提交状态和实际资源回读。选择器由监督进程注入设置页，旧源码分支不必先合并管理器。先编译再交接，失败恢复原来源；同一宿主目标使用跨 worktree 的独占记录，旧独立 Dev 会话需正常退出后再用统一入口。每个来源保留独立配置和构建目录，不迁移运行期建议缓存。设置地址与令牌在切换期间保持，旧标签页写入通过来源标识拒绝；切换不重启 Codex、不合并代码。来源选择存于 Git 公共目录，源码归档仅提供当前目录；`--source WORKTREE_PATH` 可显式覆盖启动来源。开发脚本升级仍需一次正常重开 Buddy，日常来源切换不需重新安装。异常退出后仅在监督进程与关联后台都确认退出时自动恢复租约；恢复串行互斥，活动、损坏或无法确认的记录保留并显示具体原因。
 - `npm run dev` 只连接已开启调试端口的真实 Codex，默认内嵌；开发配置在 target/dev/real，首次复制日常模型配置并采用手动生成，不写回日常配置。占用同一窗口的安装版连接会暂停，退出后恢复；不重启或另开 ChatGPT。CSS 原位更新，胶囊逻辑清理后重新加载，Rust 编译成功后重启开发后台；release 忽略开发资源环境变量。示例宿主和模拟数据仅用于 tests 下的自动测试。
@@ -58,13 +58,15 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + Tailwind CSS v4/shadcn/ui 设置页。
 
 - [src/AGENTS.md](src/AGENTS.md)：命令、后台、CDP、模型和系统窗口；macOS 手势内联于 `src/panel_window.rs`。
-- [ui/model-control/AGENTS.md](ui/model-control/AGENTS.md)：模型能力和官方菜单适配；呈现交由通用功能视图与容器。
-- [ui/bridge/AGENTS.md](ui/bridge/AGENTS.md)：受限 CDP binding 与请求生命周期。
-- [ui/panel/AGENTS.md](ui/panel/AGENTS.md)：共享胶囊；core 外壳、host 宿主适配、runtime 协调、stepwise.js 建议、outline.js 大纲、popout 窗口页面；静态依赖无环。
+- [ui/codex/AGENTS.md](ui/codex/AGENTS.md)：聊天读取、定位、输入框与官方模型菜单适配，以及浏览器运行协调；不包含功能内容渲染。
+- [ui/shared/bridge/AGENTS.md](ui/shared/bridge/AGENTS.md)：受限 CDP binding 与请求生命周期。
+- [ui/features/AGENTS.md](ui/features/AGENTS.md)：看板、大纲、下一步与模型快切的内容界面及交互，各形式复用。
+- [ui/surfaces/AGENTS.md](ui/surfaces/AGENTS.md)：workspace 共用头部与布局、embedded 嵌入外壳、desktop 桌面、edge 贴边、theme 主题材质；不修改业务数据。
+- [ui/shared/AGENTS.md](ui/shared/AGENTS.md)：跨模块类型、受限通信、图标及纯资源。
 - `components.json`：shadcn/ui 的设置页路径与组件别名配置。
 - [ui/settings/AGENTS.md](ui/settings/AGENTS.md)：React 配置页、基础组件与 Vite 入口，构建输出到 `target/web/`。
-- `ui/contracts.ts`：设置、字体、上下文与投影命令的共享类型；保存版本和生成版本各司其职。
-- `ui/tokens.css`：设置页与胶囊共享的颜色、间距、圆角和控件尺寸变量。
+- `ui/shared/contracts.ts`：设置、字体、上下文与投影命令的共享类型；保存版本和生成版本各司其职。
+- `ui/shared/tokens.css`：设置页与胶囊共享的颜色、间距、圆角和控件尺寸变量。
 - `ui/icon.png`：启动器图标唯一源图；安装时由系统工具生成多尺寸 ICNS，不修改原始构图。
 - [scripts/AGENTS.md](scripts/AGENTS.md)：开发、构建、来源/许可、安装、打包与统一验证编排。
 - [tests/AGENTS.md](tests/AGENTS.md)：Node 契约测试、端到端/生命周期/原生验收，以及测试辅助和合成宿主 fixture。
@@ -100,17 +102,17 @@ Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + 
 
 ## 任务看板与 Apple 提醒事项
 
-任务服务位于 src/tasks，独立 React 看板位于 ui/board，从设置页开启。看板、提醒事项同步与模型快切分别启停，不调用模型。只绑定一个可写 iCloud 列表，双向同步标题、备注与完成状态；待办/进行中和归档仅本地管理，归档不删除远端。旧 schema 升级自动暂停同步、保留原任务与身份，并保存 tasks-v1.json 恢复副本；用户在 Apple 合并列表后显式选择唯一列表接续。关闭看板窗口保留同步；停用保留数据。辅助 EventKit App 按需由当前二进制生成并本地签名，开发/正式身份隔离；原生输入或应用身份变化后重签名可能需要重新授权，UI 变化复用校验过的辅助程序，正式分发的权限连续性需单独验收。数据与恢复记录保存在私有 tasks.json。
+任务服务位于 src/tasks，独立 React 看板位于 ui/features/board，从设置页开启。看板、提醒事项同步与模型快切分别启停，不调用模型。只绑定一个可写 iCloud 列表，双向同步标题、备注与完成状态；待办/进行中和归档仅本地管理，归档不删除远端。旧 schema 升级自动暂停同步、保留原任务与身份，并保存 tasks-v1.json 恢复副本；用户在 Apple 合并列表后显式选择唯一列表接续。关闭看板窗口保留同步；停用保留数据。辅助 EventKit App 按需由当前二进制生成并本地签名，开发/正式身份隔离；原生输入或应用身份变化后重签名可能需要重新授权，UI 变化复用校验过的辅助程序，正式分发的权限连续性需单独验收。数据与恢复记录保存在私有 tasks.json。
 
 - [src/tasks/AGENTS.md](src/tasks/AGENTS.md)：任务数据、冲突合并、原生授权、持久化待同步操作与独立窗口。
-- [ui/board/AGENTS.md](ui/board/AGENTS.md)：默认待办、进行中、完成，分组新增/改名在设置页；组内创建、标题卡片拖放，窄标签与宽多列；按需编辑及冲突恢复。
+- [ui/features/board/AGENTS.md](ui/features/board/AGENTS.md)：默认待办、进行中、完成，分组新增/改名在设置页；组内创建、标题卡片拖放，窄标签与宽多列；按需编辑及冲突恢复。
 
 ## 功能与承载形式
 
 未配置功能位置时保留旧工作台。设置页“呈现形式 → 主界面形式”在侧栏、页面浮层、桌面窗口中三选一，全部非贴边功能共用这一份主界面，可拖动标签分栏/合并、调整比例、双击放大和 Esc 恢复，侧栏边缘继续支持调宽；桌面也只有一个原生窗口。每个功能只选择加入主界面或贴边/刘海；贴边共用另一原生窗口，可独立共存。每功能只有一个活动 owner。旧桌面工作台须先收回；已有任务、布局及模型预设保留。
 
-src/surfaces.rs 管理每种形式的主题和共享贴边进程，surfaces.json 独立保存四主题与贴边位置；首次从旧 panel.json 继承浮层/桌面材质与 liquidVariant，侧栏沿用液态 Clear 默认，贴边从旧 model-control.json 迁移视觉偏好；已有 surfaces.json 保持不变。src/features.rs 管理呈现归属，src/features/main_surface.rs 管理共享主窗口与整组交接；features.json 分开保存 main 偏好（含各主形式布局）和 features 条目，兼容旧平铺配置并统一非贴边位置，保留关闭状态。阅读和任务编辑草稿只在服务内存中交接。主界面移动冻结所有来源，等待来源快照及全部目标 ready 后统一切换 owner；超时或失败整组恢复，贴边不受影响。交接回调校验 pendingOwner，拒绝旧事务迟到回调；业务操作与移动串行。ui/features 通过同一 transport 挂载到 host Shadow DOM 或独立 Wry 页面；宿主 runtime 仍是大纲/下一步的唯一业务权威。任务服务与窗口无关，模型写入继续验证唯一输入目标并实际回读。关闭视图不关闭功能或同步；胶囊单击收放主界面，不重新打开已关闭的功能；双击整组弹出，桌面双击整组返回，设置页唤起复用已有窗口。看板按容器宽度呈现分组标签或多列，旧 waiting 投影为待办且保留原值；新的单列表同步与功能位置独立。
+src/surfaces.rs 管理每种形式的主题和共享贴边进程，surfaces.json 独立保存四主题与贴边位置；首次从旧 panel.json 继承浮层/桌面材质与 liquidVariant，侧栏沿用液态 Clear 默认，贴边从旧 model-control.json 迁移视觉偏好；已有 surfaces.json 保持不变。src/features.rs 管理呈现归属，src/features/main_surface.rs 管理共享主窗口与整组交接；features.json 分开保存 main 偏好（含各主形式布局）和 features 条目，兼容旧平铺配置并统一非贴边位置，保留关闭状态。阅读和任务编辑草稿只在服务内存中交接。主界面移动冻结所有来源，等待来源快照及全部目标 ready 后统一切换 owner；超时或失败整组恢复，贴边不受影响。交接回调校验 pendingOwner，拒绝旧事务迟到回调；业务操作与移动串行。ui/surfaces/workspace 通过同一 transport 将 ui/features 内容挂载到嵌入 Shadow DOM 或独立 Wry 页面；ui/codex/runtime 仍是大纲/下一步的唯一业务权威。任务服务与窗口无关，模型写入继续验证唯一输入目标并实际回读。关闭视图不关闭功能或同步；胶囊单击收放主界面，不重新打开已关闭的功能；双击整组弹出，桌面双击整组返回，设置页唤起复用已有窗口。看板按容器宽度呈现分组标签或多列，旧 waiting 投影为待办且保留原值；新的单列表同步与功能位置独立。
 
-- [ui/features/AGENTS.md](ui/features/AGENTS.md)：固定四功能视图、临时阅读状态与容器无关挂载协议。
+- [ui/features/AGENTS.md](ui/features/AGENTS.md)：固定四功能内容和交互；临时阅读契约在 shared，挂载与交接在 surfaces/workspace。
 
 首次将旧独立看板迁入独立功能模式时，先保存草稿并关闭旧窗口；未处理前会保留旧窗口并提示，不自动结束进程。

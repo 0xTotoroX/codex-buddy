@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FeatureSettings } from './feature-settings';
 import { request } from './api';
 import { NativeSelect } from './components/ui/native-select';
-import type { SurfaceTheme } from '../features/surface';
+import type { SurfaceTheme } from '../surfaces/theme/appearance';
 const labels = { sidebar: '侧栏', overlay: '页面浮层', desktop: '桌面窗口', edge: '贴边 / 刘海' };
 type Edge = { edge: string; screen: string; position: number; keepOpen: boolean };
 type State = {

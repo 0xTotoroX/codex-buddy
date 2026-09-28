@@ -62,7 +62,7 @@ test('native backdrop updates even while animation frames are suspended', () => 
     fetch: () => new Promise(() => {}),
   };
   runInNewContext(
-    readFileSync(new URL('../ui/panel/popout/boot.js', import.meta.url), 'utf8'),
+    readFileSync(new URL('../ui/surfaces/desktop/legacy/boot.js', import.meta.url), 'utf8'),
     environment,
   );
   const notify = () => {
@@ -126,7 +126,7 @@ test('popout size stays expanded and retains the latest resize request', async (
   const { build } = await import('esbuild');
   const result = await build({
     stdin: {
-      contents: `export { sizeNativePanel } from './ui/panel/popout/transport.js'; export { shellState } from './ui/panel/runtime/state.js';`,
+      contents: `export { sizeNativePanel } from './ui/surfaces/desktop/legacy/transport.js'; export { shellState } from './ui/codex/runtime/state.js';`,
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -168,7 +168,7 @@ test('material migration preserves the old glass choice and new choices remain a
   const { build } = await import('esbuild');
   const result = await build({
     stdin: {
-      contents: `export { readMaterial } from './ui/panel/core/panel-appearance.js';`,
+      contents: `export { readMaterial } from './ui/surfaces/embedded/shell/panel-appearance.js';`,
       resolveDir: process.cwd(),
     },
     bundle: true,

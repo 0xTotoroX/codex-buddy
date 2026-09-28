@@ -3,7 +3,7 @@
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useState } from 'react';
 import { request } from './api';
-import { titles, type FeatureState } from '../features/types';
+import { titles, type FeatureState } from '../shared/features';
 export function FeatureSettings({
   notify,
   desktopSupported,

@@ -336,7 +336,7 @@ async function createPopout(host, preserveSnapshot = false) {
   });
   await page.evaluate(bundle);
   await page.addStyleTag({
-    content: readFileSync(resolve(root, 'ui/panel/popout/native.css'), 'utf8'),
+    content: readFileSync(resolve(root, 'ui/surfaces/desktop/legacy/native.css'), 'utf8'),
   });
   await page.waitForFunction(() => window.__companionFloatingPanel?.state.runtimeActive);
   await project(page, projection, true);

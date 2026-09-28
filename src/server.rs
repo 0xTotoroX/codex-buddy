@@ -529,7 +529,7 @@ async fn asset(Path(path): Path<String>) -> Response {
     if path == "panel" {
         return panel_asset(
             "text/html; charset=utf-8",
-            include_str!("../ui/panel/popout/index.html"),
+            include_str!("../ui/surfaces/desktop/legacy/index.html"),
         );
     }
     if path == "panel.js" {
@@ -538,7 +538,7 @@ async fn asset(Path(path): Path<String>) -> Response {
     if path == "panel-boot.js" {
         return panel_asset(
             "text/javascript; charset=utf-8",
-            include_str!("../ui/panel/popout/boot.js"),
+            include_str!("../ui/surfaces/desktop/legacy/boot.js"),
         );
     }
     static_asset(&path)

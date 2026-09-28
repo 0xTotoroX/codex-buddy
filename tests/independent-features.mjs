@@ -29,6 +29,14 @@ export function independentFeatureCases({ mode, syncSettings }) {
           fixture.activeFeature = '';
           fixture.busyOnce = new Set(['handoff', 'ready']);
           fixture.featureActions = [];
+          fixture.outlineProjection = {
+            outlineItems: Array.from({ length: 60 }, (_, i) => ({
+              id: `test-${i}`,
+              text: `合成大纲条目 ${i + 1}`,
+              displayLevel: i % 3,
+            })),
+            outlineStatus: 'ok',
+          };
           const modelState = {
             revision: 1,
             preferences: { enabled: true, pinned: [], presets: [] },
@@ -162,7 +170,14 @@ export function independentFeatureCases({ mode, syncSettings }) {
                   ? modelState
                   : p.id === 'board'
                     ? tasks
-                    : { snapshot: window.__companionFloatingPanel.exportPanelState() };
+                    : {
+                        snapshot: {
+                          ...window.__companionFloatingPanel.exportPanelState(),
+                          ...(p.id === 'next'
+                            ? fixture.nextProjection || {}
+                            : fixture.outlineProjection || {}),
+                        },
+                      };
             else if (p.owner !== entry?.owner || entry.pending) result = { error: '过期归属' };
             else if (p.op === 'save' || p.op === 'close') {
               entry.view = p.view;
@@ -193,6 +208,15 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await openFeature('outline');
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
+        await outline.locator('[data-pane-focus="outline"]').dblclick();
+        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
+        await page.keyboard.press('Escape');
+        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 0);
+        await outline.locator('[data-pane-focus="outline"]').press('Enter');
+        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
+        await page.keyboard.press('Escape');
+
         await page.locator('.csw-workbench-face').click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         await page.locator('.csw-fab').click();
@@ -207,6 +231,21 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.equal(
           await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockWidth),
           Math.min(460, beforeWidth + 16),
+        );
+        await outline.locator('.feature-body').evaluate((node) => {
+          node.scrollTop = 150;
+        });
+        await page.waitForFunction(
+          () => window.workbenchFixture.features.get('outline').view.top === 150,
+        );
+        await openFeature('board');
+        await page.waitForTimeout(2100);
+        await openFeature('outline');
+        await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        assert.equal(
+          await outline.locator('.feature-body').evaluate((node) => node.scrollTop),
+          150,
+          'hidden tabs preserve reading across periodic save',
         );
         await openFeature('board');
         const capsule = page.locator('.csw-fab');
@@ -325,14 +364,97 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
         await openFeature('next');
         const next = page.locator('[data-feature="next"]');
-        await next.getByRole('button', { name: '生成下一步', exact: true }).waitFor();
+        await next.getByRole('button', { name: '重新生成建议', exact: true }).waitFor();
+        await page.evaluate(() => {
+          window.workbenchFixture.nextProjection = {
+            prompts: [
+              { label: '第一条合成建议', prompt: 'SYNTHETIC_FIRST' },
+              {
+                label: '第二条合成建议',
+                prompt: 'SYNTHETIC_SECOND\n' + '合成的长预览内容，用于验证阅读位置。\n'.repeat(50),
+              },
+            ],
+            display: { labelOnly: true, promptClickMode: 'fill' },
+            bridgeStatus: 'ok',
+          };
+        });
+        await next.locator('.csw-row[data-index="1"]').waitFor();
+        await next.locator('.csw-row[data-index="1"]').focus();
+        await page.waitForTimeout(1800);
+        assert.equal(
+          await next
+            .locator('.csw-row[data-index="1"]')
+            .evaluate((node) => node.getRootNode().activeElement === node),
+          true,
+          'polling preserves preview focus and pending click targets',
+        );
+        assert.equal(
+          (await next.locator('.csw-prompt-preview-body').innerText()).split('\n')[0],
+          'SYNTHETIC_SECOND',
+        );
+        const preview = next.locator('.csw-prompt-preview-scroll');
+        const oldTop = await preview.evaluate((node) => {
+          node.scrollTop = node.scrollHeight;
+          return node.scrollTop;
+        });
+        assert.ok(oldTop > 0, 'long preview scrolls within the feature');
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        await page.waitForFunction(
+          (top) => window.workbenchFixture.features.get('next').view.previewTop === top,
+          oldTop,
+        );
+        const originalHeight = await preview.evaluate((node) => node.clientHeight);
+        await preview.evaluate((node) => {
+          node.style.height = `${node.clientHeight + 200}px`;
+        });
+        await page.waitForFunction(
+          ({ height }) => {
+            const host = [...document.querySelectorAll('[data-codex-buddy-features-root]')].find(
+              (node) => node.shadowRoot?.querySelector('[data-feature="next"]'),
+            );
+            return (
+              host?.shadowRoot.querySelector('.csw-prompt-preview-scroll')?.clientHeight ===
+              height + 200
+            );
+          },
+          { height: originalHeight },
+        );
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        assert.ok(
+          (await preview.evaluate((node) => node.scrollTop)) < oldTop,
+          'larger preview clamps the visible scroll',
+        );
+        await preview.evaluate((node) => node.style.removeProperty('height'));
+        await page.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        assert.equal(
+          await preview.evaluate((node) => node.scrollTop),
+          oldTop,
+          'preview restores reading after a resize clamp',
+        );
+        await page.screenshot({ path: 'target/reports/workbench/independent-next.png' });
+        await next.locator('.csw-row[data-index="1"]').click();
+        await page.waitForFunction(() => window.workbenchFixture.featureActions.length === 1);
+        const fill = await page.evaluate(() => window.workbenchFixture.featureActions[0]);
+        assert.equal(fill.data.kind, 'fill');
+        assert.equal(fill.data.index, 1);
+        assert.equal(fill.data.submit, false, 'fill preference never sends a message');
+        await page.evaluate(() => {
+          window.workbenchFixture.featureActions.length = 0;
+        });
+
         await syncSettings(page, { enabled: false });
         await next.getByText('功能已停用，可在设置中重新开启。').waitFor();
         assert.equal(
-          await next.getByRole('button', { name: '生成下一步', exact: true }).isDisabled(),
+          await next.getByRole('button', { name: '重新生成建议', exact: true }).isDisabled(),
           true,
         );
-        assert.equal(await next.locator('.feature-actions button:enabled').count(), 0);
+        assert.equal(await next.locator('.feature-projection button:enabled').count(), 0);
         await syncSettings(page, { enabled: true, answerOutlineEnabled: false });
         await openFeature('outline');
         await outline.getByText('功能已停用，可在设置中重新开启。').waitFor();

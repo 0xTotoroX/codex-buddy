@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { records, installModelControlFixture } from './model-control-fixture.mjs';
 
-const source = readFileSync(new URL('../ui/model-control/host.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../ui/codex/model.js', import.meta.url), 'utf8');
 const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),

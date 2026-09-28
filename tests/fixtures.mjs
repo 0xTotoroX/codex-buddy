@@ -1,10 +1,10 @@
 /*
- * [INPUT]: ui/contracts.ts 共享类型。
+ * [INPUT]: ui/shared/contracts.ts 共享类型。
  * [OUTPUT]: 无聊天和凭据的标准设置、字体投影 fixture。
  * [POS]: 验收共用数据；形状由完整类型检查约束。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
-/** @satisfies {import('../ui/contracts').Settings} */
+/** @satisfies {import('../ui/shared/contracts').Settings} */
 export const fixtureSettings = {
   hostRestartPolicy: 'ask',
   popoutSupported: true,
@@ -43,7 +43,7 @@ export const fixtureSettings = {
   generationRevision: 1,
   environmentOverrides: [],
 };
-/** @satisfies {import('../ui/contracts').HostTypography} */
+/** @satisfies {import('../ui/shared/contracts').HostTypography} */
 export const fixtureTypography = {
   source: 'fixture',
   fontFamily: '-apple-system',

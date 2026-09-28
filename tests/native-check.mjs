@@ -369,7 +369,7 @@ const server = createServer(async (req, res) => {
   if (req.url === '/panel') {
     res.setHeader('Content-Type', 'text/html');
     res.end(
-      readFileSync(root + '/ui/panel/popout/index.html', 'utf8').replace(
+      readFileSync(root + '/ui/surfaces/desktop/legacy/index.html', 'utf8').replace(
         '</head>',
         `<script>window.probeErrors=[];window.addEventListener('error',e=>window.probeErrors.push(e.message));window.addEventListener('unhandledrejection',e=>window.probeErrors.push(String(e.reason)));</script><script src="/probe.js" defer></script></head>`,
       ),
@@ -383,7 +383,7 @@ const server = createServer(async (req, res) => {
         ? script
         : req.url === '/probe.js'
           ? probe
-          : readFileSync(root + '/ui/panel/popout/boot.js'),
+          : readFileSync(root + '/ui/surfaces/desktop/legacy/boot.js'),
     );
     return;
   }

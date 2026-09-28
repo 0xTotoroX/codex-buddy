@@ -212,7 +212,7 @@ test(
         'selector supplied to older source too',
       );
       const revision = readRecord(join(other, 'target/dev/panel.json')).revision;
-      appendFileSync(join(other, 'ui/tokens.css'), '\n:root { --fixture-change: 1; }');
+      appendFileSync(join(other, 'ui/shared/tokens.css'), '\n:root { --fixture-change: 1; }');
       await until(
         () => readRecord(join(other, 'target/dev/panel.json')).revision !== revision,
         'selected worktree hot update',

@@ -10,7 +10,7 @@ import { Card } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Button } from './components/ui/button';
 import { NativeSelect } from './components/ui/native-select';
-import type { EditableSettings, Settings } from '../contracts';
+import type { EditableSettings, Settings } from '../shared/contracts';
 
 type Props = {
   form: EditableSettings;

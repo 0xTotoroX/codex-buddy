@@ -41,7 +41,9 @@ function measurePanel() {
     board: [...document.querySelectorAll('[data-codex-buddy-features-root]')].map((node) => {
       const board = node.shadowRoot?.querySelector('.board-app');
       const tools = board?.querySelector('.board-tools')?.getBoundingClientRect();
-      const heading = board?.querySelector('.column-heading')?.getBoundingClientRect();
+      const heading = [...(board?.querySelectorAll('.stage-tabs,.column-heading') || [])]
+        .map((node) => node.getBoundingClientRect())
+        .find((rect) => rect.width && rect.height);
       return board && tools && heading
         ? [
             board.getBoundingClientRect().width,
@@ -94,29 +96,27 @@ export async function buildDevPanel(root, output) {
   }
   const probe = `(${measurePanel.toString()})()`;
   const inputs = [
-    ...filesUnder(root, 'ui/panel'),
-    ...filesUnder(root, 'ui/bridge'),
-    ...filesUnder(root, 'ui/board'),
+    ...filesUnder(root, 'ui/codex'),
+    ...filesUnder(root, 'ui/surfaces'),
     ...filesUnder(root, 'ui/features'),
+    ...filesUnder(root, 'ui/shared'),
     'ui/settings/api.ts',
-    'ui/tokens.css',
   ];
+  // Shadow roots own content CSS; its updates require a draft-safe remount.
+  const contentStyle = (file) =>
+    file.startsWith('ui/features/') ||
+    file === 'ui/surfaces/workspace/content.css' ||
+    file === 'ui/surfaces/edge/styles.css';
   const code = fingerprint(
     root,
-    inputs.filter(
-      (file) =>
-        !file.endsWith('.css') || file.startsWith('ui/board/') || file.startsWith('ui/features/'),
-    ),
+    inputs.filter((file) => !file.endsWith('.css') || contentStyle(file)),
   );
   const styles = fingerprint(
     root,
-    inputs.filter(
-      (file) =>
-        file.endsWith('.css') && !file.startsWith('ui/board/') && !file.startsWith('ui/features/'),
-    ),
+    inputs.filter((file) => file.endsWith('.css') && !contentStyle(file)),
   );
-  const html = readFileSync(join(root, 'ui/panel/popout/index.html'), 'utf8');
-  const boot = readFileSync(join(root, 'ui/panel/popout/boot.js'), 'utf8');
+  const html = readFileSync(join(root, 'ui/surfaces/desktop/legacy/index.html'), 'utf8');
+  const boot = readFileSync(join(root, 'ui/surfaces/desktop/legacy/boot.js'), 'utf8');
   const page = hash(html + boot);
   const revision = hash(code + styles);
   const panel = await buildPanel(root, true);
@@ -124,7 +124,7 @@ export async function buildDevPanel(root, output) {
     absWorkingDir: root,
     stdin: {
       contents:
-        "import {installStyle} from './ui/panel/core/install-styles.js'; installStyle(true);",
+        "import {installStyle} from './ui/surfaces/embedded/shell/install-styles.js'; installStyle(true);",
       resolveDir: root,
     },
     bundle: true,
@@ -188,7 +188,7 @@ export async function buildDevPanel(root, output) {
   const feature = await build({
     absWorkingDir: root,
     nodePaths: [resolve(import.meta.dirname, '../node_modules')],
-    entryPoints: ['ui/features/main.ts'],
+    entryPoints: ['ui/surfaces/main.ts'],
     bundle: true,
     jsx: 'automatic',
     loader: { '.css': 'text' },
@@ -211,7 +211,8 @@ export async function buildDevPanel(root, output) {
         const boardHost = [...document.querySelectorAll('.csw-feature-content > div,.edge-view')].find(node => node.shadowRoot?.querySelector('.board-app'));
         const board = boardHost?.shadowRoot.querySelector('.board-app');
         const tools = board?.querySelector('.board-tools')?.getBoundingClientRect();
-        const heading = board?.querySelector('.column-heading')?.getBoundingClientRect();
+        const heading = [...(board?.querySelectorAll('.stage-tabs,.column-heading') || [])]
+        .map(node => node.getBoundingClientRect()).find(rect => rect.width && rect.height);
         await fetch('/api/development', {method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+sessionStorage.getItem('companion-token')},body:JSON.stringify({
           surface: document.getElementById('edge-panel') ? 'edge' : 'desktop',
           native:true, revision:window.__buddyFeatureRevision, roots:1,
@@ -230,7 +231,7 @@ export async function buildDevPanel(root, output) {
     featureRevision,
     featureScript: featureCode + featureClient,
     featureHtml: readFileSync(join(root, 'ui/settings/feature.html'), 'utf8').replace(
-      '../features/main.ts',
+      '../surfaces/main.ts',
       '/feature-dev.js',
     ),
     page,

@@ -120,9 +120,11 @@ let sourceEpoch = randomUUID();
 let injectedSettings;
 const nativeInputs = (root) => [
   ...filesUnder(root, 'src'),
-  ...filesUnder(root, 'ui/model-control'),
-  'ui/tokens.css',
-  'ui/panel/icons/index.js',
+  existsSync(join(root, 'ui/codex/model.js')) ? 'ui/codex/model.js' : 'ui/model-control/host.js',
+  existsSync(join(root, 'ui/shared/tokens.css')) ? 'ui/shared/tokens.css' : 'ui/tokens.css',
+  existsSync(join(root, 'ui/shared/icons/index.js'))
+    ? 'ui/shared/icons/index.js'
+    : 'ui/panel/icons/index.js',
   ...filesUnder(root, '.cargo'),
   'build.rs',
   'Cargo.toml',
@@ -254,18 +256,25 @@ async function flush() {
 function changed(path) {
   if (path.endsWith('.md') || path.endsWith('.log')) return;
   if (
-    path === 'ui/tokens.css' ||
-    path.startsWith('ui/panel/') ||
-    path.startsWith('ui/bridge/') ||
-    path.startsWith('ui/board/') ||
+    path === 'ui/shared/tokens.css' ||
+    ['ui/panel/', 'ui/bridge/', 'ui/board/'].some((prefix) => path.startsWith(prefix)) ||
+    path.startsWith('ui/codex/') ||
+    path.startsWith('ui/surfaces/') ||
+    path.startsWith('ui/shared/') ||
     path.startsWith('ui/features/') ||
     path === 'ui/settings/api.ts'
   )
     pendingPanel = true;
   if (
     path.startsWith('src/') ||
+    path === 'ui/codex/model.js' ||
     path.startsWith('ui/model-control/') ||
-    ['ui/tokens.css', 'ui/panel/icons/index.js'].includes(path) ||
+    [
+      'ui/shared/tokens.css',
+      'ui/shared/icons/index.js',
+      'ui/tokens.css',
+      'ui/panel/icons/index.js',
+    ].includes(path) ||
     path.startsWith('.cargo/') ||
     ['build.rs', 'Cargo.toml', 'Cargo.lock'].includes(path)
   )

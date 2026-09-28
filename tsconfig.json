@@ -10,6 +10,7 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "allowJs": true,
     "noEmit": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -25,8 +26,8 @@
   },
   "include": [
     "ui/settings",
-    "ui/board",
     "ui/features",
-    "ui/contracts.ts"
+    "ui/surfaces",
+    "ui/shared/contracts.ts"
   ]
 }

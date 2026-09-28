@@ -7,7 +7,12 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Switch } from './components/ui/switch';
 import { NativeSelect } from './components/ui/native-select';
-import { useTasks, columns as defaultColumns, type Bindings, type Calendar } from '../board/api';
+import {
+  useTasks,
+  columns as defaultColumns,
+  type Bindings,
+  type Calendar,
+} from '../features/board/api';
 export function TaskSettings() {
   const { state, error, busy, command } = useTasks(true);
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});

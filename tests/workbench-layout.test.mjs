@@ -12,7 +12,7 @@ import {
   workbenchPanels,
   normalizeWorkbenchLayout,
   resolveWorkbenchLayout,
-} from '../ui/panel/workbench/model.js';
+} from '../ui/surfaces/workspace/legacy-layout.js';
 
 test('legacy ratio migrates without coupling presentation preferences', () => {
   const dock = normalizeWorkbenchLayout(null, 0.6);

@@ -14,7 +14,7 @@ export async function buildPanel(projectRoot = root, development = false) {
   const result = await build({
     absWorkingDir: projectRoot,
     nodePaths: [resolve(root, 'node_modules')],
-    entryPoints: ['ui/panel/runtime/lifecycle.js'],
+    entryPoints: ['ui/codex/runtime/lifecycle.js'],
     loader: { '.css': 'text' },
     jsx: 'automatic',
     bundle: true,
@@ -32,7 +32,7 @@ export async function buildPanel(projectRoot = root, development = false) {
   });
   const glass = await build({
     absWorkingDir: projectRoot,
-    entryPoints: ['ui/panel/glass/lab.js'],
+    entryPoints: ['ui/surfaces/theme/glass/lab.js'],
     bundle: true,
     format: 'iife',
     target: 'safari17',
@@ -40,7 +40,7 @@ export async function buildPanel(projectRoot = root, development = false) {
     legalComments: 'inline',
     logLevel: 'silent',
   });
-  const bridge = readFileSync(resolve(projectRoot, 'ui/bridge/requests.js'), 'utf8');
+  const bridge = readFileSync(resolve(projectRoot, 'ui/shared/bridge/requests.js'), 'utf8');
   return `(() => { const install = () => {\n${bridge}\n${result.outputFiles[0].text}\nif (!window.__companionPopout) {${glass.outputFiles[0].text}}\n}; if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install, {once:true}); else install(); })();`;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

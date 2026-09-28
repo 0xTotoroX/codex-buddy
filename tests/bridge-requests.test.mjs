@@ -15,15 +15,18 @@ test('unanswered popout expires independently from generation and can be retried
   let sequence = 0;
   let now = 0;
   const window = { __companionHostRequest: (raw) => sent.push(JSON.parse(raw)) };
-  runInNewContext(readFileSync(new URL('../ui/bridge/requests.js', import.meta.url), 'utf8'), {
-    window,
-    setTimeout(callback, delay) {
-      const id = ++sequence;
-      timers.set(id, { callback, at: now + delay });
-      return id;
+  runInNewContext(
+    readFileSync(new URL('../ui/shared/bridge/requests.js', import.meta.url), 'utf8'),
+    {
+      window,
+      setTimeout(callback, delay) {
+        const id = ++sequence;
+        timers.set(id, { callback, at: now + delay });
+        return id;
+      },
+      clearTimeout: (id) => timers.delete(id),
     },
-    clearTimeout: (id) => timers.delete(id),
-  });
+  );
   const bridge = window.__companionDesktop;
   const generation = window.__companionDesktopRequest('/stepwise/generate');
   const detach = window.__companionDesktopRequest('/panel/detach');

@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { AppearanceSettings } from '../contracts';
+import type { AppearanceSettings } from '../shared/contracts';
 export interface View {
   settingsUrl?: string | null;
   version: string;
@@ -25,7 +25,7 @@ export interface View {
   panelTheme: string | null;
   panelFontBase: number;
 }
-export type { EditableSettings, Settings } from '../contracts';
+export type { EditableSettings, Settings } from '../shared/contracts';
 export interface Failure {
   ok: false;
   code: string;

@@ -10,7 +10,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import { request } from './api';
-import type { AppearanceSettings, PanelPreferences, WorkbenchLayout } from '../contracts';
+import type { AppearanceSettings, PanelPreferences, WorkbenchLayout } from '../shared/contracts';
 
 export function PanelSettings({
   value,

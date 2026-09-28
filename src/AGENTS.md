@@ -4,7 +4,7 @@
 
 main → lifecycle/server；server → App；App → CDP/模型；panel 管理窗口子进程。业务校验在后台和宿主完成。当前仅实现 macOS arm64 路径，由根 build.rs 拒绝其他目标；不保留未适配的 Windows/Linux 启动、升级和窗口分支。
 
-共享胶囊是宿主识别和写入的唯一实现，经受限请求桥请求模型；后台仅保留连接与胶囊状态摘要。HTTP 不再提供独立的建议、导航或草稿写入链。
+ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模型；后台仅保留连接与胶囊状态摘要。HTTP 不再提供独立的建议、导航或草稿写入链。
 
 窗口交接由 panel 管理 ready / presented / docking：server 暴露呈现确认端点，panel_window 在来源位置已可见时回报 presented，随后隐藏内嵌并继续移动；收回须等待内嵌确认恢复。ReadingState 仅供同任务、同内容的阅读接续，不持久化；可选 panes 分别保存 outline/next 的 contentToken 与 scrollTop，全局提示词预览索引和滚动位置保持兼容。Ui 的 layoutMode 默认 capsule，工作台 dockWidth（默认 340，截取到 300–460）、splitRatio（默认 0.45，截取到 0.2–0.8）和 dockOpen（默认 true）独立持久化；可选 dockLayout/popoutLayout 分别保存分栏/标签分组、激活标签、自动/上下/左右、首个面板和双轴比例（旧配置默认为分栏、大纲标签），旧配置缺失时由前端迁移旧比例，外观 PATCH 保持旧 splitRatio 与停靠上下比例兼容，不覆盖胶囊 width/height。Ui 的 width/height 只校验有限正数与最小尺寸，不再限定浮窗最大宽高；内嵌在渲染时约束实际尺寸，不截断保存的大尺寸。Preferences.alwaysOnTop 默认 true，缺失字段沿用默认，显式 false 持久保留；Preferences.returnOpen 独立持久保存出发形态，弹出 ui.open 恒为 true，投影给内嵌时恢复 returnOpen，收回成功才把该值写回 ui.open；旧配置缺少字段时保持此前展开行为。原生整窗位置、尺寸与共同容器轻缩放驱动 320ms 提起、260ms 收回移动及 90ms 交还后的淡出；panel/anchor 临时读取内嵌屏幕区域，隐藏时按布局计算，断开的屏幕或无效坐标回退短过渡，减少动态效果时立即完成；原生材质与 WebView 在同一无动画事务内切换，尺寸更新不追赶动画。
 
@@ -39,7 +39,7 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 - [panel.rs](panel.rs)：后台系统浮窗管理层，窗口呈现确认后才隐藏内嵌胶囊，宿主恢复失败时保留浮窗；携带 ui 的收回请求必须匹配 expectedRevision，有效偏好先按修订号保存，过期请求不覆盖 Web 新选择；Panel、Preferences、临时 ReadingState 及弹出/收回/受限命令协调，普通建议与快捷词填入成功后唤起宿主；reveal_panel 保留现有呈现方式和实例，提供开发入口的唤起目标；统一检测 macOS 15+ arm64 弹出能力，限制手动/自动恢复及窗口子进程入口；旧玻璃偏好迁移为磨砂，弹出偏好始终展开且忽略宿主收起同步，外观 PATCH（含 liquidVariant）验证与版本控制，Web 修改和宿主回传分开同步，不提供 Codex 主题写入 API。
 - [window_warp.rs](window_warp.rs)：panel_window 的开发版整窗形变后端；私有 ABI 动态加载、独立曲面网格、错误回退和复位，网格身份/四方向顺序测试同文件维护。
 - [panel_window.rs](panel_window.rs)：窗口子进程实现，被 main.rs 调用；系统窗口事件循环、只允许展开尺寸的 WebView IPC、位置恢复、原生 resize 同事务更新玻璃与 WebView、拒绝过期网页尺寸、只读宿主主题对应的窗口外观及 macOS 原生手势；通过共享 native_backdrop 按材质实时切换传统磨砂 NSVisualEffectView HUDWindow/BehindWindow/Active 与系统液态 NSGlassEffectView（始终展开，由 liquidVariant 选择 Regular/Clear），回读实际状态；应用侧圆角父视图限制外溢绘制，液态通过 contentView 承载 WebView，磨砂位于透明 WebView 下方；哑光关闭原生背景，macOS 15–25 的弹出液态回退哑光；弹出进程禁止后台任务暂停以维持浮窗投影和租约。
-- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/panel/popout 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊及独立功能页面资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何，桌面/贴边各自回报真实功能 bundle 修订号；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
+- [server.rs](server.rs)：仅监听 loopback 的服务入口，公开状态剔除聊天正文；serve、HTTP/SSE API，内嵌 target/web 设置页与 ui/surfaces/desktop/legacy 页面；仅在认证 HTTP/SSE 状态附带 Dev 设置地址，供普通入口跳转，不注入宿主状态；开发模式按快照替换胶囊及独立功能页面资源，受鉴权保护的 development API 报告内嵌/原生实例、材质能力及限定的数值几何，桌面/贴边各自回报真实功能 bundle 修订号；development/reveal 仅开发快照启用时开放，展开并定位原宿主或返回已有浮窗 PID，由前台启动器交接焦点，不另建窗口。
 - [settings.rs](settings.rs)：分开维护保存版本与生成版本，大纲切换不取消生成；外部读取只返回密钥配置状态；Options、QuickPrompt、方向库/位置/来源与 Jev 同意和独立凭据、Update 及设置读取、校验和保存（maxInputChars 默认 0 表示完整最近一问一答，兼容旧正数上限）；快捷词持久化但不改变生成版本；返回后台检测的只读 popoutSupported。
 - [state.rs](state.rs)：后台业务状态层，为 server、requests 与 panel 提供一致状态；App、View、连接与胶囊状态摘要（包含宿主语义色）；until_shutdown 统一取消退出中的生成、测试及模型列表请求；开发资源启用时固定启动端点及窗口，避免调试中切换到其他窗口。
 

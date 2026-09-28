@@ -12,7 +12,7 @@ import { Switch } from './components/ui/switch';
 
 import { StrictMode, useEffect, useState, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '../tokens.css';
+import '../shared/tokens.css';
 import './styles.css';
 import icon from '../icon.png';
 import {

@@ -159,10 +159,11 @@ npm run install:local
 
 ```text
 src/          后台、CLI 和原生窗口
-ui/panel/     胶囊界面、下一步建议和大纲
+ui/features/  看板、大纲、下一步、模型快切内容
+ui/surfaces/  共用工作台、嵌入、桌面、贴边和主题
+ui/codex/     Codex 页面读取、定位和输入适配
+ui/shared/    共用契约、通信、图标和基础变量
 ui/settings/  设置网页
-ui/model-control/  独立模型控制条及官方菜单适配器
-ui/bridge/    宿主通信
 tests/        自动测试
 scripts/      开发、构建与安装工具
 ```

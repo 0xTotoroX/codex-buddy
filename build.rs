@@ -1,4 +1,4 @@
-// [INPUT]: scripts/build-panel.mjs、ui/panel ES modules 与 ui/bridge/requests.js。
+// [INPUT]: scripts/build-panel.mjs、ui/panel ES modules 与 ui/shared/bridge/requests.js。
 // [OUTPUT]: 校验 macOS arm64 目标，生成 OUT_DIR/panel.js；模型控制资源变化触发 Cargo 重新内嵌。
 // [POS]: Cargo 构建入口，调用项目已安装的 Node/esbuild 解析显式依赖。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -12,12 +12,10 @@ fn main() {
         "CodexBuddy currently supports only macOS 14+ on Apple Silicon"
     );
     for path in [
-        "ui/panel",
-        "ui/board",
+        "ui/codex",
+        "ui/surfaces",
         "ui/features",
-        "ui/model-control",
-        "ui/tokens.css",
-        "ui/bridge/requests.js",
+        "ui/shared",
         "scripts/build-panel.mjs",
         "package-lock.json",
     ] {

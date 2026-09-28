@@ -51,7 +51,7 @@
 - [dev-panel.test.mjs](dev-panel.test.mjs)：隔离源码副本验证 CSS/逻辑版本分离，以及构建失败不覆盖最后可用快照。
 - [fixtures.mjs](fixtures.mjs)：符合共享设置/字体契约的合成投影数据。
 
-- [panel-modules.test.mjs](panel-modules.test.mjs)：对全部胶囊功能模块执行 checkJs，检查依赖无环和两项功能无互相依赖。
+- [panel-modules.test.mjs](panel-modules.test.mjs)：对既有胶囊检查范围及共用内容模块执行 checkJs，检查依赖无环、Codex context 与大纲/下一步保持依赖边界；窗口入口及独立传输仍由各自检查覆盖。
 - [native-probe.swift](native-probe.swift)：原生验收的合成背景窗口、指定测试进程窗口几何、合成窗口的真实鼠标拖拽及截图颜色读取器，只编译到临时目录。
 
 - [host-fixture.html](host-fixture.html)：e2e 和弹出测试的宿主 fixture，不包含真实聊天；共享胶囊可交互的桌面宿主 DOM。
@@ -92,3 +92,5 @@ independent-features 的配置操作模拟设置 API；十轮往返保留草稿�
 主界面回归检查仅有一个根节点、浮层不占用侧栏空间、展开不重开已关闭功能；通用视图检查液态看板工具栏透明、内容半透明而主要按钮文字不透明。
 
 共享功能验收覆盖实际拖动分栏/合并、比例、专注恢复、重载布局、侧栏宽度导出与看板工具同行；Dev 快照验证独立 feature 页面和样式更新，Rust 验证布局持久化、旧 owner 拒绝及设置重置。
+
+结构重构继续复用 workbench、independent-features、feature-views 与 dev-panel 检查；旧工作台验收通过 workspace/legacy-content 使用同一份大纲/下一步渲染。source 路径随目录变更更新，不为搬文件单独增加测试。真实 Dev 生效另核对当前来源、活动窗口和资源修订号，不能以合成验收替代。

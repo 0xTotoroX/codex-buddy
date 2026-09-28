@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../../AGENTS.md)
 
-main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责传输；类型来自 ../contracts.ts，API 层处理认证和 SSE 通信；设置版本变化时刷新，取消固定轮询。Web 覆盖模型、外观、交互与窗口设置；外观即时保存，模型表单失焦/选择自动保存与手动保存共用串行队列；在途编辑、保存失败和外部冲突保留草稿。Vite 构建到 target/web，由 Rust 内嵌；不接收聊天正文。
+main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责传输；类型来自 ../shared/contracts.ts，API 层处理认证和 SSE 通信；设置版本变化时刷新，取消固定轮询。Web 覆盖模型、外观、交互与窗口设置；外观即时保存，模型表单失焦/选择自动保存与手动保存共用串行队列；在途编辑、保存失败和外部冲突保留草稿。Vite 构建到 target/web，由 Rust 内嵌；不接收聊天正文。
 
 成员清单：
 
@@ -24,6 +24,6 @@ main 挂载设置视图，use-settings-form 管理编辑与保存，api 负责�
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
 - [task-settings.tsx](task-settings.tsx)：看板分组新增/改名、任务看板和 Apple 同步独立开关、授权、一个 iCloud 列表选择、旧配置暂停迁移说明及失效列表修复；不修改模型快切与胶囊偏好。
-- [board.html](board.html)：独立任务看板 HTML 入口；Vite 多入口构建输出 board.html 和共享资源，页面业务位于 ../board。
+- [board.html](board.html)：独立任务看板 HTML 入口；Vite 多入口构建输出 board.html 和共享资源，入口位于 ../surfaces/desktop/legacy-board.tsx，业务内容位于 ../features/board。
 
 `feature-settings.tsx` 在呈现形式分组提供三选一主界面形式；每个功能仅选择当前主界面或贴边，并可唤起。整组交接中禁用位置变更，改变位置不启用业务。`surface-settings.tsx` 管理四种形式独立主题及共享贴边位置。`feature.html` 是桌面和贴边通用入口。

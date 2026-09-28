@@ -163,10 +163,11 @@ Built with **Rust, JavaScript / TypeScript, and React**.
 
 ```text
 src/               Backend, CLI, and native windows
-ui/panel/          Capsule, next-step suggestions, and outlines
+ui/features/       Board, outline, next-step, and model content
+ui/surfaces/       Shared workspace, embedded, desktop, edge, and themes
+ui/codex/          Codex page reading, navigation, and input adapters
+ui/shared/         Shared contracts, communication, icons, and tokens
 ui/settings/       Settings web app
-ui/model-control/  Official model-menu business adapter
-ui/bridge/         Host communication
 tests/            Automated tests
 scripts/           Development, build, and installation tools
 ```
