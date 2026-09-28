@@ -220,19 +220,7 @@ export function Board({
                 </button>
               ))}
             </nav>
-            {boardTools}
           </div>
-        )}
-        {searchOpen && (
-          <input
-            className="board-search"
-            autoFocus
-            type="search"
-            aria-label="搜索任务"
-            placeholder="搜索任务…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
         )}
         {editor?.suspended && (
           <button
@@ -282,7 +270,6 @@ export function Board({
                   <>
                     <span className="group-title">{column.title}</span>
                     <small>{group.length}</small>
-                    {!narrow && column.id === columns.at(-1)?.id && boardTools}
                   </>
                 }
               >
@@ -292,6 +279,20 @@ export function Board({
             );
           })}
         </div>
+        <footer className="board-footer">
+          {searchOpen && (
+            <input
+              className="board-search"
+              autoFocus
+              type="search"
+              aria-label="搜索任务"
+              placeholder="搜索任务…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          )}
+          {boardTools}
+        </footer>
       </main>
       {editor && !editor.suspended && (
         <Editor

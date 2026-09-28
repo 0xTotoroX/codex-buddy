@@ -118,7 +118,7 @@ input:focus-visible {
 .feature-pane-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   height: 36px;
 }
 .feature-pane-head button {

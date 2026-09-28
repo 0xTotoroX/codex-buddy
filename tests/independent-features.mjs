@@ -24,6 +24,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
           const fixture = window.workbenchFixture,
             entries = new Map();
           fixture.features = entries;
+          fixture.layouts = {};
           fixture.mainPlacement = 'sidebar';
           fixture.pendingPlacement = null;
           fixture.activeFeature = '';
@@ -85,6 +86,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
             let result;
             const state = () => ({
               features: structuredClone([...entries.values()]),
+              layouts: structuredClone(fixture.layouts),
               mainPlacement: fixture.mainPlacement,
               pendingPlacement: fixture.pendingPlacement,
               activeFeature: fixture.activeFeature,
@@ -99,7 +101,10 @@ export function independentFeatureCases({ mode, syncSettings }) {
               return;
             }
             if (p.op === 'state') result = state();
-            else if (p.op === 'reveal' || p.op === 'move') {
+            else if (p.op === 'layout') {
+              fixture.layouts[p.placement] = p.layout;
+              result = state();
+            } else if (p.op === 'reveal' || p.op === 'move') {
               fixture.activeFeature = p.id;
               if (entry?.open && p.op === 'reveal') {
                 entry.reveal++;
@@ -209,14 +214,11 @@ export function independentFeatureCases({ mode, syncSettings }) {
         const outline = page.locator('[data-feature="outline"]');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         await outline.getByRole('button', { name: '定位到本轮开头' }).waitFor();
-        await outline.locator('[data-pane-focus="outline"]').dblclick();
+        await page.getByRole('tab', { name: '大纲', exact: true }).dblclick();
         assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 0);
-        await outline.locator('[data-pane-focus="outline"]').press('Enter');
-        assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 1);
-        await page.keyboard.press('Escape');
-
+        assert.equal(await outline.locator('.feature-pane-head strong').count(), 0);
         await page.locator('.csw-workbench-face').click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         await page.locator('.csw-fab').click();

@@ -394,16 +394,22 @@ try {
   );
   await board.locator('.board-grid:not(.narrow)').waitFor();
   const tools = await board.locator('.board-tools').boundingBox();
-  const heading = await board.locator('.column-heading').last().boundingBox();
-  assert.ok(Math.abs(tools.y + tools.height / 2 - heading.y - heading.height / 2) < 2);
+  const area = await board.locator('.board-app').boundingBox();
+  assert.ok(area.y + area.height - tools.y - tools.height <= 16, 'search stays at the bottom');
+  assert.ok(area.x + area.width - tools.x - tools.width <= 16, 'search stays at the right');
+  await board.getByRole('button', { name: '搜索任务', exact: true }).click();
+  const searchBox = await board.getByRole('searchbox', { name: '搜索任务' }).boundingBox();
+  assert.ok(Math.abs(searchBox.y + searchBox.height / 2 - tools.y - tools.height / 2) < 6);
+  await board.getByRole('searchbox', { name: '搜索任务' }).fill('没有匹配任务');
+  assert.equal(await board.getByRole('button', { name: '隔离任务', exact: true }).count(), 0);
+  await board.getByRole('button', { name: '搜索任务', exact: true }).click();
+  await board.getByRole('button', { name: '隔离任务', exact: true }).waitFor();
   await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
   await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   await page.getByLabel('窗口置顶', { exact: true }).click();
   await page.getByLabel('取消窗口置顶', { exact: true }).waitFor();
   assert.equal(pinned, true);
-  record(
-    'shared layout restores drag split/merge, ratio, focus, persistence and aligned board tools',
-  );
+  record('shared layout restores drag split/merge, ratio, focus, persistence and bottom search');
   surfaceTheme = 'black';
   await page.waitForFunction(
     () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',

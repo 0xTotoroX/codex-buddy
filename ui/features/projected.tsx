@@ -97,9 +97,6 @@ export function ProjectedContent({
   return (
     <>
       <header className="feature-pane-head">
-        <strong data-pane-focus={id} role="button" tabIndex={0} title="拖动调整位置；双击放大">
-          {id === 'outline' ? '大纲' : '下一步'}
-        </strong>
         <button
           aria-label={id === 'outline' ? '刷新大纲' : '重新生成建议'}
           title={id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}

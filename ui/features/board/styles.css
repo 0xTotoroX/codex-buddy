@@ -85,8 +85,15 @@ button:focus-visible {
   outline-offset: 3px;
 }
 .board-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   font-size: 15px;
   line-height: 1.5;
+}
+.board-app.embedded {
+  height: 100%;
+  min-height: 0;
 }
 .board-header {
   padding: 20px 24px 0;
@@ -97,7 +104,14 @@ h1 {
   font-weight: 500;
 }
 .board-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   padding: 16px 24px 24px;
+}
+.board-main > .resume-draft {
+  align-self: flex-start;
 }
 .board-toolbar {
   display: flex;
@@ -111,7 +125,15 @@ h1 {
   gap: 4px;
   flex: none;
 }
-.column-heading .board-tools {
+.board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: none;
+  padding-top: 12px;
+}
+.board-footer .board-tools {
   margin-left: auto;
 }
 .column-heading .group-title {
@@ -127,10 +149,13 @@ h1 {
 }
 .board-app .board-search {
   width: 100%;
-  margin-bottom: 16px;
+  flex: 1;
   background: transparent;
 }
 .board-grid {
+  flex: 1;
+  min-height: 0;
+  align-content: start;
   display: grid;
   gap: 20px;
   overflow: auto;
