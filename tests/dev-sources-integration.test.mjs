@@ -231,6 +231,7 @@ test(
           process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
       });
       const page = await browser.newPage();
+      const previousEpoch = readRecord(join(main, 'target/dev/session.json')).sourceEpoch;
       let switchingSource = false;
       const responseChecks = [];
       page.on('pageerror', (error) => errors.push(error.message));
@@ -248,9 +249,18 @@ test(
         responseChecks.push(
           (async () => {
             const path = new URL(response.url()).pathname;
-            if (duringSwitch && response.status() === 503 && path.startsWith('/api/')) {
+            if (duringSwitch && path.startsWith('/api/')) {
               const body = await response.json().catch(() => null);
-              if (['开发来源正在切换，请等待完成。', '开发后台正在重启'].includes(body?.message))
+              if (
+                response.status() === 503 &&
+                ['开发来源正在切换，请等待完成。', '开发后台正在重启'].includes(body?.message)
+              )
+                return;
+              if (
+                response.status() === 409 &&
+                response.request().headers()['x-codex-buddy-source'] === previousEpoch &&
+                body?.message === '开发来源已改变，请刷新此设置页后再保存。'
+              )
                 return;
             }
             errors.push(`HTTP ${response.status()} ${path}`);
@@ -282,7 +292,10 @@ test(
       );
       await page.getByLabel('调试 worktree').selectOption(main);
       switchingSource = true;
-      await page.getByRole('button', { name: '切换来源' }).click();
+      await Promise.all([
+        page.waitForEvent('domcontentloaded'),
+        page.getByRole('button', { name: '切换来源' }).click(),
+      ]);
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
       await page.getByText(/界面资源已确认/).waitFor();
       switchingSource = false;
