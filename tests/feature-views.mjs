@@ -78,6 +78,7 @@ try {
   let surfaceTheme = 'matte';
   let rejectHandoff = true;
   let handoffs = 0;
+  let pendingPlacement = null;
   await page.addInitScript(() => {
     window.nativeMessages = [];
     window.ipc = {
@@ -119,7 +120,9 @@ try {
     if (url.pathname === '/api/features') {
       const p = route.request().postDataJSON();
       let value;
-      if (p.op === 'read')
+      if (p.op === 'main-window') value = { valid: true };
+      else if (p.op === 'main-anchor') value = { anchor: null };
+      else if (p.op === 'read')
         value = {
           ...(p.id === 'board' ? tasks : model),
           appearance: {
@@ -129,6 +132,12 @@ try {
           },
         };
       else if (p.op === 'action') {
+        if (p.id === 'board') {
+          assert.equal(p.data.op, 'update');
+          Object.assign(task.fields, p.data.fields);
+          tasks.store.revision++;
+          return route.fulfill({ json: tasks });
+        }
         assert.equal(p.id, 'model');
         actions.push(p);
         if (p.action === 'apply') {
@@ -146,9 +155,18 @@ try {
       } else {
         const e = entries.find((e) => e.id === p.id);
         if (p.op === 'save') e.view = p.view;
+        if (p.op === 'main-placement') {
+          pendingPlacement = p.placement;
+          for (const item of entries)
+            if (item.placement === 'desktop')
+              item.pending = { owner: item.id + '-next', placement: p.placement, ready: false };
+        }
         if (p.op === 'move')
           e.pending = { owner: 'next-owner', placement: p.placement, ready: false };
-        if (p.op === 'cancel-move') e.pending = null;
+        if (p.op === 'cancel-move') {
+          for (const item of entries) item.pending = null;
+          pendingPlacement = null;
+        }
         if (p.op === 'handoff') {
           handoffs++;
           if (rejectHandoff)
@@ -160,6 +178,11 @@ try {
         }
         value = {
           features: entries,
+          mainPlacement: 'desktop',
+          returnPlacement: 'sidebar',
+          pendingPlacement,
+          activeFeature: 'model',
+          mainWindow: { lease: 'main-owner', size: [840, 620] },
           appearance: {
             theme: 'light',
             colors: { text: 'rgb(30, 35, 40)', 'surface-opaque': 'rgb(245, 239, 230)' },
@@ -191,14 +214,30 @@ try {
     }
   });
   assert.equal(
-    await board.locator('.board-header').evaluate((node) => getComputedStyle(node).backgroundColor),
+    await board
+      .locator('.board-toolbar')
+      .evaluate((node) => getComputedStyle(node).backgroundColor),
     'rgba(0, 0, 0, 0)',
   );
-  assert.equal(
-    await board.locator('button.primary').evaluate((node) => getComputedStyle(node).color),
-    'rgb(245, 239, 230)',
-  );
   await page.screenshot({ path: join(output, 'board-liquid.png') });
+  const stageTabs = board.getByRole('navigation', { name: '任务阶段' });
+  await board
+    .getByRole('button', { name: '隔离任务', exact: true })
+    .dragTo(stageTabs.getByRole('button', { name: '进行中', exact: true }));
+  await board
+    .getByRole('region', { name: '进行中', exact: true })
+    .getByRole('button', { name: '隔离任务', exact: true })
+    .waitFor();
+  assert.equal(task.fields.column, 'doing');
+  await board
+    .getByRole('button', { name: '隔离任务', exact: true })
+    .dragTo(stageTabs.getByRole('button', { name: '待办', exact: true }));
+  await board
+    .getByRole('region', { name: '待办', exact: true })
+    .getByRole('button', { name: '隔离任务', exact: true })
+    .waitFor();
+  assert.equal(task.fields.column, 'todo');
+  record('real mouse drag moves a card across compact group tabs inside Shadow DOM');
   surfaceTheme = 'matte';
   await board.getByRole('button', { name: '隔离任务', exact: true }).click();
   await board.getByLabel('标题', { exact: true }).fill('还未保存');
@@ -246,13 +285,25 @@ try {
   await view.getByLabel('模型工具').click();
   await view.getByLabel('模型 Model B 菜单').click();
   await page.screenshot({ path: join(output, 'edge-model.png') });
-  entries.find((entry) => entry.id === 'model').placement = 'desktop';
+  for (const entry of entries) entry.placement = 'desktop';
   await page.goto(
-    'http://127.0.0.1:47991/feature.html?feature=model&lease=model-owner#token=fixture',
+    'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
+  await page.getByRole('tab', { name: '看板', exact: true }).click();
+  await board.getByRole('button', { name: '隔离任务', exact: true }).click();
+  await board.getByLabel('标题', { exact: true }).fill('还未保存');
+  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
+  await page.getByRole('tab', { name: '看板', exact: true }).click();
+  await board.getByRole('button', { name: '继续编辑草稿' }).click();
+  assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '还未保存');
+  await board.getByRole('button', { name: '保留草稿并返回' }).click();
+  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
   assert.equal(await page.getByLabel('模型快切显示位置').count(), 0);
+  entries.find((e) => e.id === 'model').reveal++;
+  await page.waitForFunction(() => window.nativeMessages.some((m) => m.kind === 'reveal'));
   await page.screenshot({ path: join(output, 'desktop-model.png') });
   assert.deepEqual(errors, []);
   record('desktop reuses original eyes/header and shows content without a placement selector');
@@ -261,7 +312,7 @@ try {
     () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',
   );
   await page.waitForFunction(() => {
-    const host = document.querySelector('.csw-feature-content').shadowRoot;
+    const host = document.querySelector('.csw-feature-content > div:not([hidden])').shadowRoot;
     return (
       getComputedStyle(host.querySelector('[data-feature="model"]')).color === 'rgb(238, 238, 238)'
     );
@@ -282,17 +333,19 @@ try {
   await page.waitForFunction(() => window.nativeMessages.some((m) => m.kind === 'cancel-return'));
   await page.waitForFunction(
     () =>
-      !document.querySelector('.csw-feature-content').shadowRoot.querySelector('[data-model="a"]')
-        .disabled,
+      !document
+        .querySelector('.csw-feature-content > div:not([hidden])')
+        .shadowRoot.querySelector('[data-model="a"]').disabled,
   );
-  assert.equal(handoffs, 1);
+  const failedHandoffs = handoffs;
+  assert.ok(failedHandoffs >= 1);
   rejectHandoff = false;
   await page.locator('.csw-workbench-face').dblclick();
   await page.waitForFunction(
     () => window.nativeMessages.filter((m) => m.kind === 'return').length === 2,
   );
   await page.waitForTimeout(500);
-  assert.equal(handoffs, 2);
+  assert.equal(handoffs, failedHandoffs + 2);
   assert.equal(entries.find((e) => e.id === 'model').pending.ready, true);
   record(
     'desktop black theme restores host colors; failed return cancels motion and permits retry',

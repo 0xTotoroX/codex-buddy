@@ -1,4 +1,4 @@
-/* [INPUT]: Authenticated local task API. [OUTPUT]: Task DTOs and a refreshable state hook.
+/* [INPUT]: Authenticated local task API. [OUTPUT]: Task/group DTOs and a refreshable state hook.
  * [POS]: Shared board/settings task client. [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 export type TaskRequest = <T = TaskState>(path: string, body?: unknown) => Promise<T>;
@@ -40,29 +40,31 @@ export type Calendar = {
   sourceTitle: string;
   writable: boolean;
 };
+export type BoardColumn = { id: string; title: string };
 export type TaskState = {
   store: {
     revision: number;
     boardEnabled: boolean;
     syncEnabled: boolean;
     bindings: Bindings;
+    columns?: BoardColumn[];
     tasks: Task[];
     inflight: { taskId: string; action: string } | null;
   };
   status: string;
   error?: string | null;
 };
-export const columns = [
-  { id: 'todo', title: '待办', tab: '看板' },
-  { id: 'doing', title: '进行中', tab: '处理中' },
-  { id: 'done', title: '完成 / 归档', tab: '归档' },
+export const columns: BoardColumn[] = [
+  { id: 'todo', title: '待办' },
+  { id: 'doing', title: '进行中' },
+  { id: 'done', title: '完成' },
 ];
 export function taskGroup(task: Task) {
   return task.archived || task.fields.completed
     ? 'done'
-    : task.fields.column === 'doing'
-      ? 'doing'
-      : 'todo';
+    : task.fields.column === 'waiting'
+      ? 'todo'
+      : task.fields.column;
 }
 export const emptyFields = (): Fields => ({
   title: '',

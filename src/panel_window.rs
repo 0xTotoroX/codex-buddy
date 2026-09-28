@@ -501,6 +501,11 @@ pub fn run_surface(
                         ));
                     }
                 }
+                "reveal" => {
+                    window.set_minimized(false);
+                    window.set_visible(true);
+                    window.set_focus();
+                }
                 "show" => {
                     let mut target = macos::pose(&window);
                     target.alpha = 1.;

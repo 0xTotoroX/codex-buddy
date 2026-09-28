@@ -1,11 +1,19 @@
 /* [INPUT]: Task API, native window events and drag/drop components.
- * [OUTPUT]: Three task groups with compact tabs and a wide board.
+ * [OUTPUT]: Editable task groups, inline creation and compact tabs or wide columns.
  * [POS]: Task-only application entry; no Codex/model dependencies.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
-import { columns, taskGroup, useTasks, type Task, type Fields, type TaskRequest } from './api';
-import { Column, TaskCard } from './card';
+import { Plus, Search, X } from 'lucide-react';
+import {
+  columns as defaults,
+  emptyFields,
+  taskGroup,
+  useTasks,
+  type Task,
+  type Fields,
+  type TaskRequest,
+} from './api';
+import { Column, TaskCard, taskDragOver, taskDrop } from './card';
 import { Editor } from './editor';
 export type BoardEditor = {
   task: Task | null;
@@ -19,6 +27,7 @@ export type BoardView = {
   tab: string;
   gridLeft?: number;
   editor?: BoardEditor | null;
+  quickAdd?: { column: string; title: string } | null;
 };
 export function Board({
   request,
@@ -35,13 +44,7 @@ export function Board({
   const busy = taskBusy || locked;
   const element = useRef<HTMLDivElement>(null);
   const [narrow, setNarrow] = useState(false);
-  const [stage, setStage] = useState(
-    view?.tab === 'archive'
-      ? 'done'
-      : view?.stage === 'doing' || view?.stage === 'done'
-        ? view.stage
-        : 'todo',
-  );
+  const [stage, setStage] = useState(view?.tab === 'archive' ? 'done' : view?.stage || 'todo');
   useEffect(() => {
     const node = element.current;
     if (!node) return;
@@ -52,9 +55,17 @@ export function Board({
   const tab = 'board';
   const [editor, setEditor] = useState<BoardEditor | null>(view?.editor ?? null);
   const [search, setSearch] = useState(view?.search ?? '');
+  const [searchOpen, setSearchOpen] = useState(!!view?.search);
+  const [quickAdd, setQuickAdd] = useState(view?.quickAdd ?? null);
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(null);
+  const [dropTab, setDropTab] = useState('');
+  const columns = state?.store.columns ?? defaults;
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab, editor });
-  }, [view, search, stage, tab, editor]);
+    if (!columns.some((c) => c.id === stage)) setStage('todo');
+  }, [columns, stage]);
+  useEffect(() => {
+    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd });
+  }, [view, search, stage, tab, editor, quickAdd]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(
@@ -71,7 +82,7 @@ export function Board({
   const move = useCallback(
     (id: string, column: string, before?: string) => {
       const task = state?.store.tasks.find((t) => t.id === id);
-      if (!task || busy) return;
+      if (!task || busy || id === before) return;
       const fields = {
         ...task.fields,
         completed: column === 'done',
@@ -100,10 +111,98 @@ export function Board({
       task={task}
       disabled={busy || !state.store.boardEnabled || state.store.inflight?.taskId === task.id}
       edit={() => setEditor({ task, revision: state.store.revision })}
-      move={(c) => move(task.id, c)}
       before={(id) => move(id, taskGroup(task), task.id)}
     />
   );
+  const nameInput = () =>
+    renaming && (
+      <form
+        className="group-name-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void command({
+            op: renaming.id ? 'renameColumn' : 'createColumn',
+            id: renaming.id,
+            title: renaming.title,
+          }).then((ok) => {
+            if (ok) setRenaming(null);
+          });
+        }}
+      >
+        <input
+          autoFocus
+          aria-label="分组名称"
+          maxLength={40}
+          value={renaming.title}
+          disabled={busy}
+          onChange={(e) => setRenaming({ ...renaming, title: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setRenaming(null);
+          }}
+        />
+        <button disabled={busy || !renaming.title.trim()} type="submit">
+          保存
+        </button>
+        <button
+          disabled={busy}
+          type="button"
+          aria-label="取消分组编辑"
+          onClick={() => setRenaming(null)}
+        >
+          <X size={14} />
+        </button>
+      </form>
+    );
+  const addTask = (column: string) =>
+    quickAdd?.column === column ? (
+      <form
+        className="quick-add"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void command({
+            op: 'create',
+            fields: {
+              ...emptyFields(),
+              title: quickAdd.title.trim(),
+              column: column === 'done' ? 'todo' : column,
+              completed: column === 'done',
+            },
+          }).then((ok) => {
+            if (ok) setQuickAdd(null);
+          });
+        }}
+      >
+        <input
+          autoFocus
+          aria-label="新任务标题"
+          placeholder="任务标题"
+          maxLength={1000}
+          value={quickAdd.title}
+          disabled={busy}
+          onChange={(e) => setQuickAdd({ column, title: e.target.value })}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setQuickAdd(null);
+          }}
+        />
+        <div>
+          <button disabled={busy || !quickAdd.title.trim()} type="submit">
+            添加
+          </button>
+          <button disabled={busy} type="button" onClick={() => setQuickAdd(null)}>
+            取消
+          </button>
+        </div>
+      </form>
+    ) : (
+      <button
+        className="add-task"
+        disabled={busy}
+        onClick={() => setQuickAdd({ column, title: '' })}
+      >
+        <Plus size={14} />
+        新建任务
+      </button>
+    );
   return (
     <div
       ref={element}
@@ -114,37 +213,84 @@ export function Board({
       }}
       className={`board-app ${embedded ? 'embedded' : ''}`}
     >
-      <header className="board-header">
-        <div className="heading">
-          <div>
-            <p className="eyebrow">CodexBuddy</p>
-            <h1>任务看板</h1>
-          </div>
-        </div>
-        <div className="header-actions">
-          {editor?.suspended && (
-            <button onClick={() => setEditor({ ...editor, suspended: false })}>继续编辑草稿</button>
-          )}
-          <button
-            className="primary"
-            disabled={busy || !state.store.boardEnabled}
-            onClick={() => setEditor({ task: null, revision: state.store.revision })}
-          >
-            <Plus size={16} />
-            新建任务
-          </button>
-        </div>
-      </header>
+      {!embedded && (
+        <header className="board-header">
+          <h1>我的任务看板</h1>
+        </header>
+      )}
       <main className="board-main">
         <div className="board-toolbar">
+          {narrow && (
+            <nav className="stage-tabs" aria-label="任务阶段">
+              {columns.map((column) => (
+                <button
+                  key={column.id}
+                  aria-pressed={stage === column.id}
+                  className={dropTab === column.id ? 'drop-tab' : ''}
+                  title="双击修改分组名称"
+                  onClick={() => setStage(column.id)}
+                  onDoubleClick={() => setRenaming({ ...column })}
+                  onDragOver={(e) => {
+                    if (!busy && taskDragOver(e)) setDropTab(column.id);
+                  }}
+                  onDragLeave={() => setDropTab('')}
+                  onDrop={(e) => {
+                    setDropTab('');
+                    if (!busy)
+                      taskDrop(e, (id) => {
+                        move(id, column.id);
+                        setStage(column.id);
+                      });
+                  }}
+                >
+                  {column.title}
+                </button>
+              ))}
+            </nav>
+          )}
+          <div className="board-tools">
+            <button
+              title="新增分组"
+              aria-label="新增分组"
+              disabled={busy}
+              onClick={() => setRenaming({ id: '', title: '' })}
+            >
+              <Plus size={16} />
+              分组
+            </button>
+            <button
+              title="搜索任务"
+              aria-label="搜索任务"
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen(!searchOpen);
+                if (searchOpen) setSearch('');
+              }}
+            >
+              <Search size={15} />
+            </button>
+          </div>
+        </div>
+        {searchOpen && (
           <input
+            className="board-search"
+            autoFocus
             type="search"
             aria-label="搜索任务"
             placeholder="搜索任务…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </div>
+        )}
+        {renaming && (!renaming.id || narrow) && nameInput()}
+        {editor?.suspended && (
+          <button
+            className="resume-draft"
+            onClick={() => setEditor({ ...editor, suspended: false })}
+          >
+            继续编辑草稿
+          </button>
+        )}
         {error && (
           <p role="alert" className="error">
             {error}
@@ -165,25 +311,42 @@ export function Board({
             </button>
           </div>
         )}
-        {narrow && (
-          <nav className="stage-tabs" aria-label="任务阶段">
-            {columns.map((column) => (
-              <button
-                key={column.id}
-                aria-pressed={stage === column.id}
-                onClick={() => setStage(column.id)}
-              >
-                {column.tab}
-              </button>
-            ))}
-          </nav>
-        )}
-        <div className={`board-grid ${narrow ? 'narrow' : ''}`}>
+        <div
+          className={`board-grid ${narrow ? 'narrow' : ''}`}
+          style={
+            narrow
+              ? undefined
+              : { gridTemplateColumns: `repeat(${columns.length}, minmax(210px, 1fr))` }
+          }
+        >
           {(narrow ? columns.filter((column) => column.id === stage) : columns).map((column) => {
             const group = visible.filter((t) => taskGroup(t) === column.id);
             return (
-              <Column key={column.id} {...column} count={group.length} move={move}>
+              <Column
+                key={column.id}
+                {...column}
+                disabled={busy}
+                move={move}
+                heading={
+                  !narrow && renaming?.id === column.id ? (
+                    nameInput()
+                  ) : (
+                    <>
+                      <button
+                        className="group-title"
+                        title="修改分组名称"
+                        disabled={busy}
+                        onClick={() => setRenaming({ ...column })}
+                      >
+                        {column.title}
+                      </button>
+                      <small>{group.length}</small>
+                    </>
+                  )
+                }
+              >
                 {group.map(card)}
+                {addTask(column.id)}
               </Column>
             );
           })}
@@ -192,6 +355,7 @@ export function Board({
       {editor && !editor.suspended && (
         <Editor
           key={`${editor.task?.id ?? 'new'}-${editor.revision}`}
+          columns={columns}
           task={editor.task}
           draft={editor.draft}
           onDraft={(draft) => {

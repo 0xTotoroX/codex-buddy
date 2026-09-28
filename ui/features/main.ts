@@ -14,4 +14,4 @@ if (
   new URLSearchParams(location.search).get('surface') === 'edge'
 )
   startEdge(request);
-else if (id) startDesktop(request, id, owner);
+else if (id === 'main') startDesktop(request, owner);

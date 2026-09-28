@@ -1,5 +1,5 @@
 // [INPUT]: JSON task fields and complete EventKit snapshots.
-// [OUTPUT]: Durable tasks, list bindings and three-way field merge.
+// [OUTPUT]: Durable tasks and local groups, list bindings and three-way field merge.
 // [POS]: Pure task domain; no native objects, host connection or model calls.
 // [PROTOCOL]: Keep tasks/AGENTS.md in sync when changing the contract.
 use serde::{Deserialize, Serialize};
@@ -54,7 +54,12 @@ impl Fields {
         anyhow::ensure!(self.notes.len() <= 32000, "备注过长");
         anyhow::ensure!(self.priority <= 9, "优先级无效");
         anyhow::ensure!(
-            ["todo", "doing", "waiting"].contains(&self.column.as_str()),
+            !self.column.is_empty()
+                && self.column.len() <= 64
+                && self
+                    .column
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'-'),
             "看板列无效"
         );
         if let Some(due) = &self.due {
@@ -206,6 +211,20 @@ pub struct Intent {
     pub desired: Fields,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BoardColumn {
+    pub id: String,
+    pub title: String,
+}
+pub fn default_columns() -> Vec<BoardColumn> {
+    [("todo", "待办"), ("doing", "进行中"), ("done", "完成")]
+        .into_iter()
+        .map(|(id, title)| BoardColumn {
+            id: id.into(),
+            title: title.into(),
+        })
+        .collect()
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Store {
     pub schema: u32,
@@ -215,6 +234,8 @@ pub struct Store {
     pub bindings: Bindings,
     #[serde(default)]
     pub binding_source: Option<String>,
+    #[serde(default = "default_columns")]
+    pub columns: Vec<BoardColumn>,
     pub tasks: Vec<Task>,
     pub inflight: Option<Intent>,
     pub window_size: [u32; 2],
@@ -228,6 +249,7 @@ impl Default for Store {
             sync_enabled: false,
             bindings: Bindings::default(),
             binding_source: None,
+            columns: default_columns(),
             tasks: vec![],
             inflight: None,
             window_size: [1120, 740],

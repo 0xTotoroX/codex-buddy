@@ -16,7 +16,7 @@
 
 
 - [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、引用身份隔离、新旧菜单/内联/隐藏视图、菜单打开占位文字/速度可访问标签/高级视图返回、推理滑块、锁定选项、重复失败清理与完整回读、单次菜单事务、生成期间调整与官方禁用、迟到/部分失败及清理的合成宿主回归。
-- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删、原桌面头部、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
+- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
 - [model-control-e2e.mjs](model-control-e2e.mjs)：真实 Rust HTTP/CDP 到合成官方菜单的链路、鉴权、完整回读、旧目标拒绝及设置页四形式主题隔离/持久化及贴边位置保存及私有末次诊断验收。
 - [edge-native.mjs](edge-native.mjs)：共享 NSPanel 的稳定视口、原生轮廓/材质、scene-ready 首帧、焦点、悬停、定位、租约退出；合成后端，不操作官方宿主。
@@ -81,10 +81,10 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 - [feature-surfaces.mjs](feature-surfaces.mjs)：由 workbench.mjs 执行的功能/容器试点，验证状态接续、任务唯一性、独立开关、轮询回收、Shadow DOM 键盘及宿主断连后任务编辑；使用合成任务，不访问 EventKit。
 - native-check.mjs 的 --features-only 在真实 Wry/AppKit 窗口中验证大纲/看板选择、任务更新及宽窄布局，报告位于 target/reports/native-features；不连接用户聊天或提醒事项。
 
-`independent-features.mjs`：四功能共享侧栏/浮层、十轮交接、草稿、模型回读与无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的独立位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、单进程唤起及往返。
+`independent-features.mjs`：唯一主界面的十轮侧栏/浮层交接、关闭状态与草稿保留、模型回读及无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的整组位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、共享 PID、恰好一个可见主窗口、返回后旧租约立即回收及往返。
 
-看板简化验收：board.mjs 覆盖宽三列、窄三标签、旧 waiting/日期保留、完成与归档汇总、取消归档及删除接口拒绝；feature-surfaces 保持搜索与草稿跨容器接续。
+看板简化验收：board.mjs 覆盖组内创建、宽跨列/窄标签真实拖放、分组改名新增与重启保留、旧 waiting/日期及归档记录保留、删除接口拒绝；feature-surfaces 保持搜索与草稿跨容器接续。
 
-independent-features 的配置操作模拟设置 API；十轮往返保留草稿，并验证侧栏收起再开，实际采样胶囊展开/收回中的 morphing 状态及 84×36 收起尺寸，检查没有新增功能菜单或位置选择器。
+independent-features 的配置操作模拟设置 API；十轮往返保留草稿，并验证桥繁忙后的 ready/handoff 重试、侧栏收起再开，实际采样胶囊展开/收回中的 morphing 状态及 84×36 收起尺寸，检查没有新增功能菜单或位置选择器。
 
-独立功能回归同时检查壳层刷新不移除活动侧栏；通用视图检查液态看板工具栏透明、内容半透明而主要按钮文字不透明。
+主界面回归检查仅有一个根节点、浮层不占用侧栏空间、展开不重开已关闭功能；通用视图检查液态看板工具栏透明、内容半透明而主要按钮文字不透明。

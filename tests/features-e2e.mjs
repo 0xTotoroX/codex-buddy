@@ -153,6 +153,11 @@ try {
     return e.placement === destination && !e.pending && e;
   }, 'destination automatically ready');
   assert.notEqual(moved.owner, original.owner);
+  assert.ok(
+    (await state()).features
+      .filter((e) => e.placement !== 'edge')
+      .every((e) => e.placement === destination),
+  );
   assert.equal(moved.view.board.editor.draft.title, '仍未保存的草稿');
   assert.deepEqual((await api('tasks/state')).store, before.store);
   record('external placement waits for source draft and commits a new owner without task writes');
@@ -168,6 +173,12 @@ try {
   if (native) {
     const lease = await api('features', { op: 'window', id: 'board', owner: moved.owner });
     assert.ok(lease.pid);
+    const outlineLease = await api('features', {
+      op: 'window',
+      id: 'outline',
+      owner: (await entry('outline')).owner,
+    });
+    assert.equal(outlineLease.pid, lease.pid, 'all main features share one native process');
     const helper = join(directory, 'native-probe');
     execFileSync('swiftc', ['tests/native-probe.swift', '-o', helper], { cwd: root });
     const windows = await wait(() => {
@@ -176,6 +187,11 @@ try {
       );
       return rows.some((w) => w.kCGWindowBounds.Width >= 320) && rows;
     }, 'native feature window visible');
+    assert.equal(
+      windows.filter((w) => w.kCGWindowBounds.Width >= 320).length,
+      1,
+      'only one visible main window',
+    );
     report.windows = windows;
     assert.ok(windows.some((w) => w.kCGWindowBounds.Width >= 320));
     record('actual Wry window loaded the feature page and completed readiness');
@@ -192,6 +208,12 @@ try {
     const e = await entry('board');
     return e.placement === 'overlay' && !e.pending;
   }, 'return to host');
+  if (native)
+    assert.equal(
+      (await state()).mainWindow.pid,
+      null,
+      'return retires the desktop lease before another move',
+    );
   await board.getByRole('button', { name: '继续编辑草稿' }).click();
   assert.equal(await board.getByLabel('标题', { exact: true }).inputValue(), '仍未保存的草稿');
   await board.getByRole('button', { name: '保留草稿并返回' }).click();
@@ -224,6 +246,11 @@ try {
         const e = await entry(id);
         return e.placement === 'sidebar' && !e.pending;
       }, `${id} returned`);
+      assert.equal(
+        (await state()).mainWindow.pid,
+        null,
+        'no departing desktop process can be reused',
+      );
       record(`${id} native view automatically readies and returns to sidebar`);
     }
   }

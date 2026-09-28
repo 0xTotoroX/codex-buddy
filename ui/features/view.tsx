@@ -15,6 +15,7 @@ export function FeatureView({
   owner,
   request,
   onState,
+  onReady,
   beforeHandoff,
   onHandoffError,
 }: {
@@ -22,14 +23,15 @@ export function FeatureView({
   owner: string;
   request: Request;
   onState: () => void;
+  onReady?: () => Promise<void>;
   beforeHandoff?: () => Promise<unknown>;
-  onHandoffError?: () => void;
+  onHandoffError?: (pendingOwner: string) => void;
 }) {
   const reading = useRef<Reading>(structuredClone(entry.view || {}));
   const body = useRef<HTMLDivElement>(null);
   const gate = useRef(false);
   const restored = useRef(false);
-  const wasMoving = useRef(false);
+  const wasMoving = useRef('');
   const handoffOwner = useRef('');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState('');
@@ -53,10 +55,10 @@ export function FeatureView({
   }, []);
   useEffect(() => {
     if (wasMoving.current && !entry.pending && entry.owner === owner) {
-      onHandoffError?.();
+      onHandoffError?.(wasMoving.current);
       setError('切换未完成，已保留原位置。请检查目标窗口后重试。');
     }
-    wasMoving.current = entry.owner === owner && !!entry.pending;
+    wasMoving.current = entry.owner === owner ? entry.pending?.owner || '' : '';
   }, [entry.pending, entry.owner, owner]);
   useEffect(() => {
     if (!entry.pending) handoffOwner.current = '';
@@ -70,10 +72,14 @@ export function FeatureView({
       handoffOwner.current = entry.pending.owner;
       void Promise.resolve()
         .then(() => beforeHandoff?.())
-        .then(() => call('handoff', { view: capture() }))
+        .then(() => call('handoff', { view: capture(), pendingOwner: entry.pending!.owner }))
         .then(onState)
         .catch((e) => {
-          onHandoffError?.();
+          if (/请求较多|请求不可用，请稍后重试/.test(String(e))) {
+            if (handoffOwner.current === entry.pending!.owner) handoffOwner.current = '';
+            return;
+          }
+          onHandoffError?.(entry.pending!.owner);
           setError(String(e));
         });
     }
@@ -103,6 +109,7 @@ export function FeatureView({
           }
           setProjection(value.snapshot);
         } else if (entry.id !== 'board') setConnected(false);
+        await onReady?.();
       } catch {
         if (!stopped) setConnected(false);
       }

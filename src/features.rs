@@ -1,5 +1,5 @@
 // [INPUT]: Fixed feature identities, authenticated UI requests and existing business services.
-// [OUTPUT]: Per-feature placement, single-owner leases and transient view handoff.
+// [OUTPUT]: One main placement plus independent edge membership, owner leases and view handoff.
 // [POS]: Presentation lifecycle only; business validation remains in tasks/host/model_control.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -14,6 +14,10 @@ use std::{
     process::{Child, Command, Stdio},
     time::{Duration, Instant},
 };
+
+#[path = "features/main_surface.rs"]
+mod main_surface;
+use main_surface::{MainSurface, SavedFeatures};
 
 pub const IDS: [&str; 4] = ["outline", "board", "next", "model"];
 #[derive(Clone, Serialize, Deserialize)]
@@ -39,25 +43,35 @@ struct Pending {
     owner: String,
     started: Instant,
     source_ready: bool,
+    target_ready: bool,
+    grouped: bool,
 }
 struct Entry {
     pref: Preference,
     owner: String,
     view: Value,
     pending: Option<Pending>,
-    child: Option<Child>,
     reveal: u64,
 }
 pub struct Features {
     entries: BTreeMap<String, Entry>,
+    main: MainSurface,
 }
 impl Features {
     pub fn load(paths: &Paths) -> Self {
-        let mut prefs: BTreeMap<String, Preference> =
-            std::fs::read(paths.root.join("features.json"))
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .unwrap_or_default();
+        let saved = std::fs::read(paths.root.join("features.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice::<SavedFeatures>(&b).ok());
+        let (mut main, mut prefs) = saved.map(SavedFeatures::parts).unwrap_or_default();
+        if !["sidebar", "overlay", "desktop"].contains(&main.placement.as_str()) {
+            main.placement = "sidebar".into();
+        }
+        // Old mixed placements become one main surface; task data and open state stay intact.
+        for pref in prefs.values_mut() {
+            if pref.placement != "edge" {
+                pref.placement = main.placement.clone();
+            }
+        }
         if !prefs.contains_key("model")
             && std::fs::read(paths.root.join("model-control.json"))
                 .ok()
@@ -74,6 +88,7 @@ impl Features {
             );
         }
         Self {
+            main: MainSurface::new(main),
             entries: IDS
                 .into_iter()
                 .filter_map(|id| {
@@ -94,7 +109,6 @@ impl Features {
                                     owner: uuid::Uuid::new_v4().to_string(),
                                     view: json!({}),
                                     pending: None,
-                                    child: None,
                                     reveal: 1,
                                 },
                             )
@@ -107,11 +121,11 @@ impl Features {
         let prefs: BTreeMap<_, _> = self.entries.iter().map(|(id, e)| (id, &e.pref)).collect();
         write_private(
             &paths.root.join("features.json"),
-            &serde_json::to_vec_pretty(&prefs)?,
+            &serde_json::to_vec_pretty(&json!({"main":self.main.pref,"features":prefs}))?,
         )
     }
     fn snapshot(&self) -> Value {
-        json!({"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
+        json!({"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
     }
     fn validate(&self, id: &str, owner: &str) -> Result<()> {
         let e = self.entries.get(id).context("功能尚未打开")?;
@@ -152,11 +166,14 @@ impl App {
     pub async fn close_feature(&self, id: &str) -> Result<()> {
         let _operation = self.feature_operation.lock().await;
         let mut f = self.features.lock().await;
+        f.cancel_group();
         if let Some(e) = f.entries.get_mut(id) {
             e.pref.open = false;
             e.pending = None;
         }
-        f.save(&self.paths)
+        f.save(&self.paths)?;
+        f.retire_desktop();
+        Ok(())
     }
     pub async fn features_active(&self) -> bool {
         !self.features.lock().await.entries.is_empty()
@@ -168,6 +185,17 @@ impl App {
         let op = input["op"].as_str().unwrap_or("state");
         if op == "state" {
             return Ok(self.feature_state().await);
+        }
+        if op == "main-placement" {
+            ensure!(!self.appearance().await.detached, "请先收回旧工作台");
+            let _operation = self.feature_operation.lock().await;
+            let mut f = self.features.lock().await;
+            let placement = input["placement"].as_str().context("缺少主界面位置")?;
+            f.begin_main(&self.paths, placement, None)?;
+            return Ok(f.snapshot());
+        }
+        if op.starts_with("main-") {
+            return self.main_surface_request(&input).await;
         }
         let id = input["id"].as_str().context("缺少功能")?;
         ensure!(IDS.contains(&id), "未知功能");
@@ -202,7 +230,7 @@ impl App {
                 || e.pending
                     .as_ref()
                     .is_some_and(|p| p.owner == owner && p.placement == "desktop");
-            let mut result = json!({"valid":valid,"active":e.owner==owner,"pid":e.child.as_ref().map(|c|c.id()),"reveal":e.reveal,"size":e.pref.size});
+            let mut result = json!({"valid":valid,"active":e.owner==owner,"pid":f.main.child.as_ref().map(|c|c.id()),"reveal":e.reveal,"size":e.pref.size});
             drop(f);
             result["appearance"] = self.surface_appearance("desktop").await;
             return Ok(result);
@@ -264,22 +292,18 @@ impl App {
                 !self.appearance().await.detached,
                 "请先双击表情收回旧工作台，再选择独立功能位置；阅读状态会保留"
             );
-            let saved = self
-                .features
-                .lock()
-                .await
-                .entries
-                .get(id)
-                .map(|e| e.pref.placement.clone());
-            let placement = input["placement"]
-                .as_str()
-                .unwrap_or(saved.as_deref().unwrap_or(if id == "model" {
-                    "edge"
-                } else if id == "board" {
-                    "desktop"
-                } else {
-                    "sidebar"
-                }));
+            let (saved, primary) = {
+                let f = self.features.lock().await;
+                (
+                    f.entries.get(id).map(|e| e.pref.placement.clone()),
+                    f.main.pref.placement.clone(),
+                )
+            };
+            let placement = input["placement"].as_str().unwrap_or(
+                saved
+                    .as_deref()
+                    .unwrap_or(if id == "model" { "edge" } else { &primary }),
+            );
             ensure!(valid_placement(id, placement), "该功能不支持此位置");
             if placement == "desktop" {
                 ensure!(crate::panel::popout_supported(), "当前系统不支持桌面窗口");
@@ -298,24 +322,35 @@ impl App {
                 ensure!(self.tasks.board_enabled().await, "请先在设置页开启任务看板");
             }
             let mut f = self.features.lock().await;
+            ensure!(f.main.target.is_none(), "主界面正在切换，请稍后重试");
+            if placement != "edge" {
+                f.main.active = id.into();
+            }
             let e = f.entries.entry(id.into()).or_insert_with(|| Entry {
                 pref: Preference {
                     placement: if id == "model" {
                         "edge".into()
                     } else {
-                        placement.into()
+                        primary.clone()
                     },
                     ..Preference::default()
                 },
                 owner: uuid::Uuid::new_v4().to_string(),
                 view: json!({}),
                 pending: None,
-                child: None,
                 reveal: 0,
             });
             ensure!(e.pending.is_none(), "功能正在交接");
             if !owner.is_empty() {
                 ensure!(owner == e.owner, "功能归属已变化");
+            }
+            if placement != "edge" && placement != primary {
+                if let Some(view) = input.get("view") {
+                    ensure!(view.to_string().len() < 128 * 1024, "阅读状态过大");
+                    e.view = view.clone();
+                }
+                f.begin_main(&self.paths, placement, Some((id, owner)))?;
+                return Ok(f.snapshot());
             }
             if e.pref.open && (op == "reveal" || placement == e.pref.placement) {
                 e.reveal += 1;
@@ -332,20 +367,20 @@ impl App {
                 e.view = view.clone();
             }
             let lease = uuid::Uuid::new_v4().to_string();
-            // Spawn before mutating ownership. Existing views remain alive until ready.
-            if placement == "desktop" {
-                let child = spawn(&self.paths, id, &lease)?;
-                if let Some(mut old) = e.child.replace(child) {
-                    let _ = old.kill();
-                    let _ = old.wait();
-                }
-            }
             e.pending = Some(Pending {
                 placement: placement.into(),
                 owner: lease,
                 started: Instant::now(),
                 source_ready: !e.pref.open || owner == e.owner,
+                target_ready: false,
+                grouped: false,
             });
+            if placement == "desktop"
+                && let Err(error) = f.ensure_desktop(&self.paths)
+            {
+                f.entries.get_mut(id).unwrap().pending = None;
+                return Err(error);
+            }
             let result = f.snapshot();
             drop(f);
             if placement == "edge"
@@ -365,8 +400,15 @@ impl App {
         if op == "cancel-move" {
             let mut f = self.features.lock().await;
             let e = f.entries.get_mut(id).context("功能已关闭")?;
-            ensure!(e.owner == owner, "功能归属已变化");
-            e.pending = None;
+            let pending = e.pending.as_ref().context("交接已取消")?;
+            ensure!(e.owner == owner || pending.owner == owner, "功能归属已变化");
+            ensure!(input["pendingOwner"] == pending.owner, "交接已变化");
+            if pending.grouped {
+                f.cancel_group();
+            } else {
+                e.pending = None;
+            }
+            f.retire_desktop();
             return Ok(f.snapshot());
         }
         if op == "handoff" {
@@ -374,6 +416,7 @@ impl App {
             let e = f.entries.get_mut(id).context("功能已关闭")?;
             ensure!(e.owner == owner, "功能归属已变化");
             let p = e.pending.as_mut().context("交接已取消")?;
+            ensure!(input["pendingOwner"] == p.owner, "交接已变化");
             let view = input.get("view").context("缺少阅读状态")?;
             ensure!(view.to_string().len() < 128 * 1024, "阅读状态过大");
             e.view = view.clone();
@@ -408,6 +451,7 @@ impl App {
                 if op == "close" || input.get("size").is_some() {
                     f.save(&self.paths)?;
                 }
+                f.retire_desktop();
                 return Ok(f.snapshot());
             }
         }
@@ -464,8 +508,16 @@ impl App {
     async fn finish_feature(&self, id: &str, owner: &str) -> Result<Value> {
         let mut f = self.features.lock().await;
         let e = f.entries.get_mut(id).context("功能已关闭")?;
-        let p = e.pending.as_ref().context("交接已取消")?;
+        if e.owner == owner && e.pending.is_none() {
+            return Ok(f.snapshot());
+        }
+        let p = e.pending.as_mut().context("交接已取消")?;
         ensure!(p.owner == owner && p.source_ready, "交接尚未就绪或已过期");
+        if p.grouped {
+            p.target_ready = true;
+            f.finish_main(&self.paths)?;
+            return Ok(f.snapshot());
+        }
         let previous = e.pref.clone();
         if p.placement == "desktop" && e.pref.placement != "desktop" {
             e.pref.return_placement = e.pref.placement.clone();
@@ -479,6 +531,7 @@ impl App {
         let e = f.entries.get_mut(id).unwrap();
         e.owner = e.pending.take().unwrap().owner;
         e.reveal += 1;
+        f.retire_desktop();
         let result = f.snapshot();
         drop(f);
         if id == "board" {
@@ -491,29 +544,42 @@ impl App {
             return;
         };
         let mut f = self.features.lock().await;
-        for (id, e) in &mut f.entries {
+        if f.entries.values().any(|e| {
+            e.pending
+                .as_ref()
+                .is_some_and(|p| p.grouped && p.started.elapsed() > Duration::from_secs(15))
+        }) {
+            f.cancel_group();
+        }
+        for e in f.entries.values_mut() {
             if e.pending
                 .as_ref()
                 .is_some_and(|p| p.started.elapsed() > Duration::from_secs(15))
             {
                 e.pending = None;
             }
-            if e.child
-                .as_mut()
-                .is_some_and(|c| c.try_wait().ok().flatten().is_some())
-            {
-                e.child = None;
+        }
+        if f.main
+            .child
+            .as_mut()
+            .is_some_and(|c| c.try_wait().ok().flatten().is_some())
+        {
+            f.main.child = None;
+            f.cancel_group();
+            for e in f.entries.values_mut() {
                 if e.pref.placement == "desktop" {
                     e.pref.open = false;
                 }
+                if e.pending.as_ref().is_some_and(|p| p.placement == "desktop") {
+                    e.pending = None;
+                }
             }
-            if e.pref.open
-                && e.pref.placement == "desktop"
-                && e.child.is_none()
-                && e.pending.is_none()
-            {
-                e.child = spawn(&self.paths, id, &e.owner).ok();
-            }
+            let _ = f.save(&self.paths);
+        }
+        if f.desktop_active() {
+            let _ = f.ensure_desktop(&self.paths);
+        } else {
+            f.main.stop();
         }
         drop(f);
         let active = self.edge_features_active().await;
@@ -528,12 +594,7 @@ impl App {
     }
     pub async fn stop_features(&self) {
         self.surfaces.lock().await.stop();
-        for e in self.features.lock().await.entries.values_mut() {
-            if let Some(mut c) = e.child.take() {
-                let _ = c.kill();
-                let _ = c.wait();
-            }
-        }
+        self.features.lock().await.main.stop();
     }
 }
 
@@ -599,6 +660,25 @@ mod tests {
         app.feature_request(json!({"op":"ready","id":"outline","owner":pending}))
             .await
             .unwrap();
+        let pending_next = state["features"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|e| e["id"] == "next")
+            .unwrap()["pending"]["owner"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(
+            app.features.lock().await.entries["outline"].owner,
+            owner,
+            "one ready target cannot commit a partial move"
+        );
+        app.feature_request(json!({"op":"handoff","id":"next","owner":next,"pendingOwner":pending_next,"view":{"top":25}})).await.unwrap();
+        app.feature_request(json!({"op":"ready","id":"next","owner":pending_next}))
+            .await
+            .unwrap();
+        let next = pending_next;
         assert!(
             app.feature_request(json!({"op":"save","id":"outline","owner":owner,"view":{}}))
                 .await
@@ -640,7 +720,7 @@ mod tests {
                 .await
                 .is_err()
         );
-        app.feature_request(json!({"op":"handoff","id":"outline","owner":owner,"view":{"top":72}}))
+        app.feature_request(json!({"op":"handoff","id":"outline","owner":owner,"pendingOwner":dest,"view":{"top":72}}))
             .await
             .unwrap();
         app.features
@@ -751,5 +831,123 @@ mod tests {
                 .contains("停用")
         );
         assert!(!app.tasks.board_enabled().await);
+    }
+    #[tokio::test]
+    async fn main_group_cancel_is_atomic_and_leaves_edge_and_closed_features_alone() {
+        let (dir, app) = app().await;
+        let a = open(&app, "outline").await;
+        let b = open(&app, "next").await;
+        {
+            let mut f = app.features.lock().await;
+            f.entries.insert(
+                "model".into(),
+                Entry {
+                    pref: Preference {
+                        placement: "edge".into(),
+                        open: true,
+                        ..Default::default()
+                    },
+                    owner: "edge-owner".into(),
+                    view: json!({"modelSearch":"kept"}),
+                    pending: None,
+                    reveal: 1,
+                },
+            );
+            f.entries.insert(
+                "board".into(),
+                Entry {
+                    pref: Preference::default(),
+                    owner: "closed-owner".into(),
+                    view: json!({"draft":"kept"}),
+                    pending: None,
+                    reveal: 1,
+                },
+            );
+        }
+        app.feature_request(json!({"op":"main-placement","placement":"overlay"}))
+            .await
+            .unwrap();
+        let state = app.feature_state().await;
+        let pending = |id: &str| {
+            state["features"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|e| e["id"] == id)
+                .unwrap()["pending"]["owner"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
+        let pa = pending("outline");
+        let pb = pending("next");
+        app.feature_request(
+            json!({"op":"handoff","id":"outline","owner":a,"pendingOwner":pa,"view":{"top":42}}),
+        )
+        .await
+        .unwrap();
+        app.feature_request(json!({"op":"ready","id":"outline","owner":pa}))
+            .await
+            .unwrap();
+        assert_eq!(app.features.lock().await.main.pref.placement, "sidebar");
+        app.feature_request(json!({"op":"cancel-move","id":"next","owner":b,"pendingOwner":pb}))
+            .await
+            .unwrap();
+        assert!(
+            app.feature_request(json!({"op":"ready","id":"outline","owner":pa}))
+                .await
+                .is_err()
+        );
+        app.feature_request(json!({"op":"main-placement","placement":"overlay"}))
+            .await
+            .unwrap();
+        assert!(
+            app.feature_request(
+                json!({"op":"cancel-move","id":"next","owner":b,"pendingOwner":pb})
+            )
+            .await
+            .is_err(),
+            "late cancel cannot cancel retry"
+        );
+        let mut f = app.features.lock().await;
+        for id in ["outline", "next"] {
+            let p = f.entries.get_mut(id).unwrap().pending.as_mut().unwrap();
+            p.source_ready = true;
+            p.target_ready = true;
+        }
+        f.finish_main(&app.paths).unwrap();
+        assert_eq!(f.main.pref.placement, "overlay");
+        assert_eq!(f.entries["model"].owner, "edge-owner");
+        assert_eq!(f.entries["model"].view["modelSearch"], "kept");
+        assert!(!f.entries["board"].pref.open);
+        assert!(f.entries["board"].pending.is_none());
+        assert_eq!(f.entries["board"].pref.placement, "overlay");
+        assert_eq!(f.entries["board"].view["draft"], "kept");
+        let cold = Features::load(&Paths::new(Some(dir.path().into())).unwrap());
+        assert_eq!(cold.main.pref.placement, "overlay");
+        assert!(!cold.entries["board"].pref.open);
+    }
+    #[tokio::test]
+    async fn legacy_mixed_forms_load_as_one_main_without_changing_open_states_or_edge() {
+        let (_dir, app) = app().await;
+        std::fs::write(
+            app.paths.root.join("features.json"),
+            serde_json::to_vec(&json!({
+                "outline":{"placement":"sidebar","open":true},
+                "board":{"placement":"overlay","open":true},
+                "next":{"placement":"desktop","open":false},
+                "model":{"placement":"edge","open":true}
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let f = Features::load(&app.paths);
+        assert_eq!(f.main.pref.placement, "sidebar");
+        for id in ["outline", "board", "next"] {
+            assert_eq!(f.entries[id].pref.placement, "sidebar");
+        }
+        assert!(f.entries["board"].pref.open);
+        assert!(!f.entries["next"].pref.open);
+        assert_eq!(f.entries["model"].pref.placement, "edge");
     }
 }

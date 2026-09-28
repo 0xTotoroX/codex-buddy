@@ -24,6 +24,10 @@ export function independentFeatureCases({ mode, syncSettings }) {
           const fixture = window.workbenchFixture,
             entries = new Map();
           fixture.features = entries;
+          fixture.mainPlacement = 'sidebar';
+          fixture.pendingPlacement = null;
+          fixture.activeFeature = '';
+          fixture.busyOnce = new Set(['handoff', 'ready']);
           fixture.featureActions = [];
           const modelState = {
             revision: 1,
@@ -71,10 +75,24 @@ export function independentFeatureCases({ mode, syncSettings }) {
             const { id, path, payload: p } = JSON.parse(raw);
             if (path !== '/features') return original(raw);
             let result;
-            const state = () => ({ features: structuredClone([...entries.values()]) });
+            const state = () => ({
+              features: structuredClone([...entries.values()]),
+              mainPlacement: fixture.mainPlacement,
+              pendingPlacement: fixture.pendingPlacement,
+              activeFeature: fixture.activeFeature,
+            });
             const entry = entries.get(p.id);
+            if (p.id === 'board' && fixture.busyOnce.delete(p.op)) {
+              queueMicrotask(() =>
+                window.__companionDesktop.complete(id, {
+                  error: p.op === 'ready' ? '请求较多，请稍后再试' : '请求不可用，请稍后重试',
+                }),
+              );
+              return;
+            }
             if (p.op === 'state') result = state();
             else if (p.op === 'reveal' || p.op === 'move') {
+              fixture.activeFeature = p.id;
               if (entry?.open && p.op === 'reveal') {
                 entry.reveal++;
                 result = state();
@@ -96,6 +114,22 @@ export function independentFeatureCases({ mode, syncSettings }) {
                   ready: !e.open || p.owner === e.owner,
                 };
                 entries.set(p.id, e);
+                if (
+                  p.placement &&
+                  p.placement !== 'edge' &&
+                  p.placement !== fixture.mainPlacement
+                ) {
+                  fixture.pendingPlacement = p.placement;
+                  for (const item of entries.values())
+                    if (item.placement !== 'edge') {
+                      item.pending = {
+                        owner: crypto.randomUUID(),
+                        placement: p.placement,
+                        ready: !item.open,
+                        grouped: true,
+                      };
+                    }
+                }
                 result = state();
               }
             } else if (p.op === 'handoff') {
@@ -103,13 +137,24 @@ export function independentFeatureCases({ mode, syncSettings }) {
               entry.pending.ready = true;
               result = state();
             } else if (p.op === 'ready') {
-              Object.assign(entry, {
-                owner: entry.pending.owner,
-                placement: entry.pending.placement,
-                open: true,
-                pending: null,
-                reveal: entry.reveal + 1,
-              });
+              entry.pending.targetReady = true;
+              const targets = entry.pending.grouped
+                ? [...entries.values()].filter((e) => e.pending?.grouped)
+                : [entry];
+              if (targets.every((e) => e.pending.targetReady)) {
+                if (fixture.pendingPlacement) {
+                  fixture.mainPlacement = fixture.pendingPlacement;
+                  fixture.pendingPlacement = null;
+                }
+                for (const e of targets)
+                  Object.assign(e, {
+                    owner: e.pending.owner,
+                    placement: e.pending.placement,
+                    open: true,
+                    pending: null,
+                    reveal: e.reveal + 1,
+                  });
+              }
               result = state();
             } else if (p.op === 'read')
               result =
@@ -171,7 +216,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               !window.workbenchFixture.features.get('board').pending,
           );
           await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
-          assert.equal(await outline.isVisible(), true);
+          assert.equal(await outline.count(), 1);
           if (i === 0) {
             await page.emulateMedia({ reducedMotion: 'no-preference' });
             const face = page.locator(
@@ -203,28 +248,16 @@ export function independentFeatureCases({ mode, syncSettings }) {
               0,
             );
             await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
-            const removed = await page.evaluate(async () => {
-              const side = document.querySelector(
-                '[data-codex-buddy-dock] [data-companion-stepwise-root]',
-              );
-              if (!side) throw Error('Missing shared sidebar');
-              let removals = 0;
-              const observer = new MutationObserver((records) => {
-                removals += records.filter((record) =>
-                  [...record.removedNodes].some((node) => node === side || node.contains(side)),
-                ).length;
-              });
-              observer.observe(document.body, { subtree: true, childList: true });
-              // Navigation and background refresh both render the capsule shell.
-              for (let j = 0; j < 5; j++) {
-                window.__companionFloatingPanel.renderFloat();
-                await new Promise(requestAnimationFrame);
-              }
-              await new Promise((resolve) => setTimeout(resolve, 1600));
-              observer.disconnect();
-              return removals;
-            });
-            assert.equal(removed, 0, 'shell refresh must not remove the active sidebar');
+            assert.equal(
+              await page.locator('[data-companion-stepwise-root]').count(),
+              1,
+              'only one main shell',
+            );
+            assert.equal(
+              await page.locator('[data-codex-buddy-dock]').count(),
+              0,
+              'overlay releases sidebar',
+            );
             await page.screenshot({ path: 'target/reports/workbench/restored-shell.png' });
             await page.emulateMedia({ reducedMotion: 'reduce' });
           }
@@ -261,7 +294,17 @@ export function independentFeatureCases({ mode, syncSettings }) {
           });
         });
         await board.waitFor({ state: 'detached' });
-        assert.equal(await outline.isVisible(), true);
+        assert.equal(await outline.count(), 1);
+        await page.locator('.csw-workbench-face').click();
+        await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
+        await page.locator('.csw-fab').click();
+        await outline.getByRole('navigation', { name: '大纲' }).waitFor();
+        assert.equal(
+          await board.count(),
+          0,
+          'expanding the container must not reopen a closed feature',
+        );
+
         await openFeature('board');
         await board.getByRole('button', { name: '继续编辑草稿' }).waitFor();
         assert.equal(

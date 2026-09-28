@@ -75,12 +75,19 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         await page.getByLabel('显示功能', { exact: true }).selectOption('board');
         const board = page.locator('.csw-board-mount');
         await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
-        await board.getByLabel('移动 试点任务', { exact: true }).selectOption('doing');
+        await board
+          .getByRole('button', { name: '试点任务', exact: true })
+          .dragTo(
+            board
+              .getByRole('navigation', { name: '任务阶段' })
+              .getByRole('button', { name: '进行中', exact: true }),
+          );
         await board
           .getByRole('navigation', { name: '任务阶段' })
-          .getByRole('button', { name: '处理中', exact: true })
+          .getByRole('button', { name: '进行中', exact: true })
           .click();
         await board.getByRole('button', { name: '试点任务', exact: true }).waitFor();
+        await board.getByRole('button', { name: '搜索任务', exact: true }).click();
         await board.getByPlaceholder('搜索任务…').fill('试点');
         await page.getByLabel('功能显示位置', { exact: true }).selectOption('overlay');
         await page.waitForFunction(() => !document.querySelector('[data-codex-buddy-dock]'));
@@ -183,7 +190,7 @@ export function featureSurfaceCases({ mode, createPopout, settle, output, bundle
         await page.locator('.csw-fab').waitFor({ state: 'visible' });
         await page.locator('.csw-fab').press('Enter');
         await page.getByLabel('显示功能', { exact: true }).selectOption('board');
-        await board.getByPlaceholder('搜索任务…').waitFor();
+        await board.getByRole('button', { name: '搜索任务', exact: true }).waitFor();
       },
     ],
   ];

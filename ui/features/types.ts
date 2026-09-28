@@ -26,6 +26,11 @@ export type Entry = {
   pending: { placement: Placement; owner: string; ready: boolean } | null;
 };
 export type FeatureState = {
+  activeFeature?: string;
+  mainPlacement?: Placement;
+  returnPlacement?: Placement;
+  pendingPlacement?: Placement | null;
+  mainWindow?: { lease: string; pid?: number | null; size: [number, number] };
   features: Entry[];
   appearance?: {
     theme?: string | null;

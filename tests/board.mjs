@@ -83,13 +83,17 @@ try {
     console.error(e);
   });
   await page.goto(`http://127.0.0.1:${runtime.port}/board.html#token=${runtime.token}`);
-  await page.getByRole('button', { name: '新建任务', exact: true }).click();
-  await page.getByLabel('标题', { exact: true }).fill('整理下一次发布');
-  await page.getByLabel('备注', { exact: true }).fill('核对功能范围与验收结果。');
+  await page
+    .getByRole('region', { name: '待办', exact: true })
+    .getByRole('button', { name: '新建任务', exact: true })
+    .click();
+  await page.getByLabel('新任务标题', { exact: true }).fill('整理下一次发布');
   await command({ op: 'windowSize', size: [980, 680] });
-  await page.getByRole('button', { name: '保存任务', exact: true }).click();
+  await page.getByRole('button', { name: '添加', exact: true }).click();
   await page.getByRole('button', { name: '整理下一次发布', exact: true }).waitFor();
-  await page.getByLabel('移动 整理下一次发布').selectOption('doing');
+  await page
+    .getByRole('button', { name: '整理下一次发布', exact: true })
+    .dragTo(page.getByRole('region', { name: '进行中', exact: true }));
   await page.waitForFunction(
     () =>
       document.querySelector('[aria-label="进行中"] .card-title')?.textContent === '整理下一次发布',
@@ -141,19 +145,22 @@ try {
   await page.setViewportSize({ width: 360, height: 600 });
   await page.getByRole('navigation', { name: '任务阶段' }).waitFor();
   assert.deepEqual(await page.locator('.stage-tabs button').allTextContents(), [
-    '看板',
-    '处理中',
-    '归档',
+    '待办',
+    '进行中',
+    '完成',
   ]);
   assert.equal(await page.locator('.board-column').count(), 1);
   await page.screenshot({ path: join(report, 'narrow.png'), fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await page.getByRole('button', { name: '等待设计反馈', exact: true }).click();
-  await page.getByRole('button', { name: '归档', exact: true }).last().click();
-  await page.locator('dialog').waitFor({ state: 'detached' });
+  await command({
+    op: 'archive',
+    id: (await api('tasks/state')).store.tasks.find((t) => t.fields.title === '等待设计反馈').id,
+    archived: true,
+  });
+  await page.reload();
   await page
     .getByRole('navigation', { name: '任务阶段' })
-    .getByRole('button', { name: '归档', exact: true })
+    .getByRole('button', { name: '完成', exact: true })
     .click();
   await page.getByRole('button', { name: '等待设计反馈', exact: true }).waitFor();
   await stop();
@@ -172,15 +179,15 @@ try {
   await page.goto(`http://127.0.0.1:${runtime.port}/board.html#token=${runtime.token}`);
   await page
     .getByRole('navigation', { name: '任务阶段' })
-    .getByRole('button', { name: '归档', exact: true })
+    .getByRole('button', { name: '完成', exact: true })
     .click();
   await page.getByRole('button', { name: '完成本地数据持久化', exact: true }).waitFor();
   await page.getByRole('button', { name: '等待设计反馈', exact: true }).click();
-  await page.getByRole('button', { name: '取消归档', exact: true }).click();
+  await page.getByRole('button', { name: '移回未完成', exact: true }).click();
   await page.locator('dialog').waitFor({ state: 'detached' });
   await page
     .getByRole('navigation', { name: '任务阶段' })
-    .getByRole('button', { name: '看板', exact: true })
+    .getByRole('button', { name: '待办', exact: true })
     .click();
   await page.getByRole('button', { name: '等待设计反馈', exact: true }).waitFor();
   state = await api('tasks/state');
@@ -197,6 +204,49 @@ try {
     (await api('tasks/state')).store.tasks.find((t) => t.id === legacy.id).fields.due,
     legacy.fields.due,
   );
+  // Rename by stable ID, add a group and drag through compact tabs, then verify persistence.
+  await page
+    .getByRole('navigation', { name: '任务阶段' })
+    .getByRole('button', { name: '待办', exact: true })
+    .dblclick();
+  await page.getByLabel('分组名称', { exact: true }).fill('准备做');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await page.getByRole('button', { name: '新增分组', exact: true }).click();
+  await page.getByLabel('分组名称', { exact: true }).fill('等待确认');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  const groupTab = page
+    .getByRole('navigation', { name: '任务阶段' })
+    .getByRole('button', { name: '等待确认', exact: true });
+  await page.getByRole('button', { name: '等待设计反馈', exact: true }).dragTo(groupTab);
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[aria-label="等待确认"] .card-title')?.textContent === '等待设计反馈',
+  );
+  state = await api('tasks/state');
+  const custom = state.store.columns.find((c) => c.title === '等待确认');
+  assert.equal(state.store.tasks.find((t) => t.id === legacy.id).fields.column, custom.id);
+  assert.equal(state.store.tasks.find((t) => t.id === legacy.id).fields.completed, false);
+  await page
+    .getByRole('button', { name: '等待设计反馈', exact: true })
+    .dragTo(
+      page
+        .getByRole('navigation', { name: '任务阶段' })
+        .getByRole('button', { name: '完成', exact: true }),
+    );
+  await page.waitForFunction(
+    () => document.querySelector('[aria-label="完成"] .card-title')?.textContent,
+  );
+  assert.equal(
+    (await api('tasks/state')).store.tasks.find((t) => t.id === legacy.id).fields.completed,
+    true,
+  );
+  await page.screenshot({ path: join(report, 'custom-narrow.png'), fullPage: true });
+  await stop();
+  runtime = await start();
+  state = await api('tasks/state');
+  assert.equal(state.store.columns.find((c) => c.id === 'todo').title, '准备做');
+  assert.equal(state.store.columns.find((c) => c.id === custom.id).title, '等待确认');
+  assert.equal(state.store.tasks.length, 4);
   await assert.rejects(() => command({ op: 'delete', id: legacy.id, confirmBoth: true }), /未知/);
   assert.deepEqual(failures, []);
   writeFileSync(
@@ -207,7 +257,9 @@ try {
         checks: [
           'authentication',
           'create/edit',
-          'column menu',
+          'inline creation and title-only cards',
+          'custom group names and persistence',
+          'narrow tab drop',
           'drag/drop',
           'archive',
           'restart persistence',

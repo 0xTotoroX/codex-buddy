@@ -1,13 +1,14 @@
-/* [INPUT]: Feature lease and the original native window IPC.
+/* [INPUT]: Shared main-window lease, feature owners and the original native window IPC.
  * [OUTPUT]: Existing desktop chrome/material and spatial enter/return transitions.
  * [POS]: Desktop surface adapter; all task/model actions stay in FeatureView.
  * [PROTOCOL]: Keep features/AGENTS.md in sync. */
 import { mountFeature } from './mount';
+import { titles } from './types';
 import { installStyle } from '../panel/core/install-styles.js';
 import { workbenchHeadHtml, workbenchSettingsHtml } from '../panel/workbench/chrome.js';
 import { iconSvg } from '../panel/icons/index.js';
 /** @param {import('./types').Request} request */
-export function startDesktop(request, id, owner) {
+export function startDesktop(request, lease) {
   installStyle();
   document.documentElement.dataset.nativeBackdrop = 'true';
   const root = document.getElementById('root');
@@ -15,13 +16,16 @@ export function startDesktop(request, id, owner) {
   root.dataset.workbench = 'true';
   root.style.cssText =
     '--csw-default-chip-width:84px;--csw-default-chip-height:36px;--csw-default-panel-radius:24px;position:fixed;inset:12px;width:auto;height:auto;pointer-events:auto;';
-  root.innerHTML = `<div class="csw-popover" data-open="true" data-morphing="false" style="position:absolute;inset:0;width:100%;height:100%"><div class="csw-glass" style="inset:0;width:100%;height:100%;border-radius:24px"></div><section class="csw-panel" style="inset:0;width:100%;height:100%;border-radius:24px"><div class="csw-workbench">${workbenchHeadHtml(true)}<div class="csw-feature-content"></div></div></section><div class="csw-resize-handle" style="position:absolute;right:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="调整窗口大小"></div></div>`;
+  root.innerHTML = `<div class="csw-popover" data-open="true" data-morphing="false" style="position:absolute;inset:0;width:100%;height:100%"><div class="csw-glass" style="inset:0;width:100%;height:100%;border-radius:24px"></div><section class="csw-panel" style="inset:0;width:100%;height:100%;border-radius:24px"><div class="csw-workbench">${workbenchHeadHtml(true)}<nav class="csw-workbench-tabs" role="tablist" aria-label="工作台面板"></nav><div class="csw-feature-content"></div></div></section><div class="csw-resize-handle" style="position:absolute;right:0;bottom:0;width:20px;height:20px;pointer-events:auto" aria-label="调整窗口大小"></div></div>`;
   root.querySelector('.csw-workbench-controls').innerHTML =
     `<button class="csw-icon" data-pin aria-label="取消窗口置顶" aria-pressed="true">${iconSvg('pin')}</button>${workbenchSettingsHtml()}`;
-  let entry,
-    mounted,
-    starting = false,
-    shown = false,
+  const mounts = new Map();
+  let state,
+    selected = '',
+    sized = false,
+    showing = null,
+    returnMotion = null;
+  let shown = false,
     stopped = false,
     moving = false;
   let returning = null,
@@ -30,7 +34,7 @@ export function startDesktop(request, id, owner) {
     polling = false,
     failures = 0;
   const native = (message) => window.ipc?.postMessage(JSON.stringify(message));
-  const call = (op, data = {}) => request({ op, id, owner, ...data });
+  const call = (op, data = {}) => request({ op: `main-${op}`, lease, ...data });
   function error(e) {
     let message = root.querySelector('[role="alert"]');
     if (!message) {
@@ -41,29 +45,29 @@ export function startDesktop(request, id, owner) {
     message.textContent = String(e);
   }
   async function show() {
-    if (shown || starting) return;
-    starting = true;
-    const { anchor } = await call('anchor');
-    moving = true;
-    return new Promise((resolve, reject) => {
-      presented = async () => {
-        try {
-          if (entry.pending?.owner === owner) await call('ready');
+    if (shown) return;
+    if (showing) return showing;
+    showing = (async () => {
+      const { anchor } = await call('anchor');
+      moving = true;
+      await new Promise((resolve) => {
+        presented = () => {
           shown = true;
-          starting = false;
           resolve();
-          void poll();
-        } catch (e) {
-          starting = false;
-          reject(e);
-        }
-      };
-      native({ kind: 'show', anchor });
-      if (!window.ipc) void presented();
-    });
+        };
+        native({ kind: 'show', anchor });
+        if (!window.ipc) presented();
+      });
+    })();
+    return showing;
   }
   async function handoff() {
-    if (returning) return returning.promise;
+    if (!state.pendingPlacement || state.pendingPlacement === 'desktop') return;
+    if (returnMotion) return returnMotion;
+    returnMotion = returnWindow();
+    return returnMotion;
+  }
+  async function returnWindow() {
     const { anchor } = await call('anchor');
     moving = true;
     let finish;
@@ -87,15 +91,17 @@ export function startDesktop(request, id, owner) {
     if (!window.ipc) returning.finish(true);
     return promise;
   }
-  function recover() {
-    if (moving) native({ kind: 'cancel-return' });
+  function recover(id, owner, pendingOwner) {
+    const current = state?.features.find((e) => e.id === id)?.pending;
+    if (current && current.owner !== pendingOwner) return;
+    if (moving || returnMotion) native({ kind: 'cancel-return' });
     moving = false;
-    void call('cancel-move').catch(() => {});
+    returnMotion = null;
+    void request({ op: 'cancel-move', id, owner, pendingOwner }).catch(() => {});
   }
   async function dock() {
-    if (!entry || entry.pending || moving) return;
-    // Omit source owner so the normal handoff waits for the return animation.
-    await request({ op: 'move', id, placement: entry.returnPlacement || 'overlay' });
+    if (!state || state.pendingPlacement || moving) return;
+    await request({ op: 'main-placement', placement: state.returnPlacement || 'sidebar' });
     await poll();
   }
   Object.assign(window, {
@@ -181,34 +187,102 @@ export function startDesktop(request, id, owner) {
       open: true,
     });
   }
+  function renderContent() {
+    const items = [...mounts.values()].filter((item) => item.active);
+    if (!items.some((item) => item.id === selected)) selected = items[0]?.id || '';
+    const tabs = root.querySelector('nav');
+    const key = items.map((item) => item.id).join(':') + selected;
+    if (tabs.dataset.key !== key) {
+      tabs.dataset.key = key;
+      tabs.replaceChildren();
+      tabs.hidden = items.length < 2;
+      for (const item of items) {
+        const button = document.createElement('button');
+        button.textContent = titles[item.id];
+        button.setAttribute('role', 'tab');
+        button.setAttribute('aria-selected', String(item.id === selected));
+        button.onclick = () => {
+          selected = item.id;
+          renderContent();
+        };
+        tabs.append(button);
+      }
+    }
+    for (const item of mounts.values()) {
+      item.node.hidden = !item.active || item.id !== selected;
+      item.node.inert = !item.active;
+    }
+  }
   async function poll() {
     if (polling || stopped) return;
     polling = true;
     try {
-      const state = await request({ op: 'state' });
-      entry = state.features.find((item) => item.id === id);
-      if (!entry || !((entry.owner === owner && entry.open) || entry.pending?.owner === owner)) {
+      const [next, windowState] = await Promise.all([request({ op: 'state' }), call('window')]);
+      const groupCommitted = !!state?.pendingPlacement && !next.pendingPlacement;
+      if (next.activeFeature && next.activeFeature !== state?.activeFeature)
+        selected = next.activeFeature;
+      state = next;
+      if (!windowState.valid) {
         stopped = true;
-        mounted?.dispose();
+        for (const item of mounts.values()) item.mount.dispose();
         native({ kind: 'close' });
         return;
       }
+      if (!state.pendingPlacement && returnMotion) {
+        native({ kind: 'cancel-return' });
+        returnMotion = null;
+        moving = false;
+      }
       if (state.appearance)
         appearance({ ...state.appearance, surface: state.appearance.themes.desktop });
-      if (entry.pending?.owner === owner && !entry.pending.ready) return;
-      if (!mounted) {
-        native({ kind: 'size', width: entry.size[0] + 24, height: entry.size[1] + 24, id: 0 });
-        mounted = mountFeature(
-          root.querySelector('.csw-feature-content'),
-          entry,
-          owner,
-          'desktop',
-          request,
-          () => void poll(),
-          { ready: show, handoff, failed: recover },
-        );
-        if (entry.owner === owner) void show().catch(error);
-      } else mounted.update(entry);
+      if (!sized) {
+        const size = state.mainWindow?.size || [840, 620];
+        native({ kind: 'size', width: size[0] + 24, height: size[1] + 24, id: 0 });
+        sized = true;
+      }
+      const wanted = new Set();
+      const body = root.querySelector('.csw-feature-content');
+      for (const entry of state.features) {
+        const candidates = [
+          ...(entry.open && entry.placement === 'desktop' ? [{ owner: entry.owner }] : []),
+          ...(entry.pending?.placement === 'desktop' && entry.pending.ready ? [entry.pending] : []),
+        ];
+        for (const candidate of candidates) {
+          const owner = candidate.owner,
+            key = `${entry.id}:${owner}`;
+          wanted.add(key);
+          let item = mounts.get(key);
+          if (!item) {
+            const node = document.createElement('div');
+            node.style.cssText = 'height:100%;min-height:0';
+            body.append(node);
+            item = { node, id: entry.id, entry, mount: null, active: false, reveal: entry.reveal };
+            mounts.set(key, item);
+            item.mount = mountFeature(node, entry, owner, 'desktop', request, () => void poll(), {
+              ready: async () => {
+                await show();
+                await request({ op: 'ready', id: entry.id, owner });
+              },
+              handoff,
+              failed: (pendingOwner) => recover(entry.id, owner, pendingOwner),
+            });
+          } else item.mount.update(entry);
+          item.entry = entry;
+          item.active = entry.open && entry.owner === owner;
+          if (!groupCommitted && item.active && item.reveal !== entry.reveal) {
+            selected = entry.id;
+            if (shown && !moving) native({ kind: 'reveal' });
+          }
+          item.reveal = entry.reveal;
+          if (item.active) void show().catch(error);
+        }
+      }
+      for (const [key, item] of mounts)
+        if (!wanted.has(key)) {
+          item.mount.dispose();
+          mounts.delete(key);
+        }
+      renderContent();
       failures = 0;
     } catch (e) {
       error(e);
@@ -223,8 +297,8 @@ export function startDesktop(request, id, owner) {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      if (entry?.owner === owner && !moving && !entry.pending)
-        void call('save', { size: [innerWidth - 24, innerHeight - 24] }).catch(error);
+      if (state && !moving && !state.pendingPlacement)
+        void call('size', { size: [innerWidth - 24, innerHeight - 24] }).catch(error);
       void poll();
     }, 350);
   });

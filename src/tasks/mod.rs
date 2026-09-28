@@ -123,6 +123,8 @@ impl Service {
                 "restore",
                 "keepLocal",
                 "reorder",
+                "createColumn",
+                "renameColumn",
                 "sync",
                 "uncertain"
             ]
@@ -216,6 +218,36 @@ impl Service {
         }
         let mut next = inner.store.clone();
         match op {
+            "createColumn" | "renameColumn" => {
+                ensure!(next.board_enabled, "看板已停用");
+                let title = command["title"].as_str().unwrap_or("").trim();
+                ensure!(
+                    !title.is_empty() && title.chars().count() <= 40,
+                    "分组名称需为 1–40 个字"
+                );
+                if op == "createColumn" {
+                    let index = next
+                        .columns
+                        .iter()
+                        .position(|c| c.id == "done")
+                        .unwrap_or(next.columns.len());
+                    next.columns.insert(
+                        index,
+                        BoardColumn {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            title: title.into(),
+                        },
+                    );
+                } else {
+                    let id = command["id"].as_str().context("缺少分组 ID")?;
+                    let column = next
+                        .columns
+                        .iter_mut()
+                        .find(|c| c.id == id)
+                        .context("分组不存在")?;
+                    column.title = title.into();
+                }
+            }
             "modules" => {
                 if let Some(enabled) = command["boardEnabled"].as_bool() {
                     next.board_enabled = enabled;
@@ -289,6 +321,14 @@ impl Service {
                 ensure!(next.board_enabled, "看板已停用");
                 let fields: Fields = serde_json::from_value(command["fields"].clone())?;
                 fields.validate()?;
+                ensure!(
+                    fields.column == "waiting"
+                        || next
+                            .columns
+                            .iter()
+                            .any(|c| c.id == fields.column && c.id != "done"),
+                    "看板分组不存在"
+                );
                 next.tasks.push(Task {
                     id: uuid::Uuid::new_v4().to_string(),
                     fields,
@@ -341,6 +381,14 @@ impl Service {
                     "update" => {
                         let fields: Fields = serde_json::from_value(command["fields"].clone())?;
                         fields.validate()?;
+                        ensure!(
+                            fields.column == "waiting"
+                                || next
+                                    .columns
+                                    .iter()
+                                    .any(|c| c.id == fields.column && c.id != "done"),
+                            "看板分组不存在"
+                        );
                         if !fields.synced_eq(&task.fields) {
                             ensure!(
                                 !task.remote.as_ref().is_some_and(|r| r.recurring),

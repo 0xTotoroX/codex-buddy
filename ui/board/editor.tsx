@@ -1,8 +1,9 @@
 /* [INPUT]: Task editing snapshot and command handler. [OUTPUT]: Modal task editor and recovery choices.
- * [POS]: Minimal task editor with local archive and conditional conflict review. [PROTOCOL]: Keep board/AGENTS.md in sync. */
+ * [POS]: Task details, keyboard group selection and conditional recovery. [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
-import { columns, emptyFields, type Fields, type Task } from './api';
+import { emptyFields, type BoardColumn, type Fields, type Task } from './api';
 export function Editor({
+  columns,
   task,
   draft,
   onDraft,
@@ -12,6 +13,7 @@ export function Editor({
   close,
   command,
 }: {
+  columns: BoardColumn[];
   task: Task | null;
   draft?: Fields;
   onDraft?: (fields: Fields) => void;
@@ -159,7 +161,9 @@ export function Editor({
             阶段
             <select
               disabled={frozen || busy}
-              value={fields.completed ? 'done' : fields.column === 'doing' ? 'doing' : 'todo'}
+              value={
+                fields.completed ? 'done' : fields.column === 'waiting' ? 'todo' : fields.column
+              }
               onChange={(e) =>
                 patch(
                   e.target.value === 'done'
@@ -170,7 +174,7 @@ export function Editor({
             >
               {columns.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.id === 'done' ? '完成' : c.title}
+                  {c.title}
                 </option>
               ))}
             </select>
@@ -182,16 +186,20 @@ export function Editor({
               保留草稿并返回
             </button>
           )}
-          {task && (
-            <div className="actions">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void action({ op: 'archive', archived: !task.archived })}
-              >
-                {task.archived ? '取消归档' : '归档'}
-              </button>
-            </div>
+          {task?.archived && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void action({
+                  op: 'update',
+                  archived: false,
+                  fields: { ...fields, completed: false },
+                })
+              }
+            >
+              移回未完成
+            </button>
           )}
           <button className="primary" type="submit" disabled={busy || frozen}>
             {busy ? '处理中…' : '保存任务'}

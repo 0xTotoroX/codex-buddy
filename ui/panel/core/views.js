@@ -6,7 +6,6 @@
  */
 import {
   independentFeatures,
-  ownsFeatureSurface,
   renderFeatureShell,
   featurePlacement,
   featureTheme,
@@ -281,6 +280,11 @@ function renderFloat(options = {}) {
     delete shellState.root.dataset.dockSuspended;
     if (featurePlacement() === 'sidebar') shellState.open = docked;
     renderFeatureShell(onWorkbenchFaceClick);
+    if (featurePlacement() === 'desktop') {
+      shellState.open = false;
+      shellState.root.style.display = 'none';
+      return;
+    }
     applyMaterial({ animate: false });
     applyPosition();
     installPanelDrag();
@@ -694,7 +698,7 @@ function promptClickSubmits(clickDetail, value = shellState.promptClickMode) {
 function installFloat() {
   if (!isCurrentRuntime()) return;
   document.querySelectorAll?.(`[${ROOT_ATTR}="true"]`).forEach((node) => {
-    if (node !== shellState.root && !ownsFeatureSurface(node)) node.remove();
+    if (node !== shellState.root) node.remove();
   });
   if (shellState.root && document.body.contains(shellState.root)) return;
 

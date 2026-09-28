@@ -483,6 +483,20 @@ try {
   );
   assert.deepEqual((await request('state')).body.panelPreferences, beforeAppearance);
   assert.deepEqual((await api('state')).preferences, beforeModel);
+  await settingsPage.getByLabel('主界面形式', { exact: true }).selectOption('overlay');
+  await waitFor(
+    async () => (await request('features', { op: 'state' })).body.mainPlacement === 'overlay',
+    'one main placement saved',
+  );
+  for (const name of ['大纲', '看板', '下一步', '模型快切']) {
+    assert.deepEqual(
+      await settingsPage
+        .getByLabel(`${name}默认位置`, { exact: true })
+        .locator('option')
+        .evaluateAll((nodes) => nodes.map((n) => n.value)),
+      ['overlay', 'edge'],
+    );
+  }
   await section.screenshot({ path: join(output, 'settings-placement-themes.png') });
   await settingsPage.close();
   record(

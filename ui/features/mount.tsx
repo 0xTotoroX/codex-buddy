@@ -1,7 +1,6 @@
 /* [INPUT]: A surface element, owner and transport. [OUTPUT]: Reusable isolated view lifecycle.
  * [POS]: React adapter shared by host and native pages. [PROTOCOL]: Keep features/AGENTS.md in sync. */
 import { createRoot } from 'react-dom/client';
-import { useEffect } from 'react';
 import { FeatureView } from './view';
 import type { Entry, Request } from './types';
 import styles from './styles.css?inline';
@@ -13,7 +12,11 @@ export function mountFeature(
   placement: string,
   request: Request,
   onState: () => void,
-  motion?: { ready: () => Promise<unknown>; handoff: () => Promise<unknown>; failed?: () => void },
+  motion?: {
+    ready: () => Promise<unknown>;
+    handoff: () => Promise<unknown>;
+    failed?: (pendingOwner: string) => void;
+  },
 ) {
   const shadow = element.attachShadow({ mode: 'open' }),
     style = document.createElement('style'),
@@ -26,23 +29,29 @@ export function mountFeature(
   shadow.append(style, content);
   const root = createRoot(content);
   let stopped = false;
-  function Ready() {
-    useEffect(() => {
-      if (initial.pending?.owner === owner)
-        void request({ op: 'read', id: initial.id, owner })
-          .then(() => (motion ? motion.ready() : request({ op: 'ready', id: initial.id, owner })))
-          .then(() => {
-            if (!stopped) onState();
-          })
-          .catch(() => motion?.failed?.());
-    }, []);
-    return null;
+  let ready = initial.pending?.owner !== owner;
+  let readying = false;
+  async function confirmReady() {
+    if (ready || readying || stopped) return;
+    readying = true;
+    try {
+      await (motion ? motion.ready() : request({ op: 'ready', id: initial.id, owner }));
+      ready = true;
+      if (!stopped) onState();
+    } catch (error) {
+      // The shared host bridge can be busy during a group move. The next read retries readiness.
+      if (!/请求较多|请求不可用，请稍后重试/.test(String(error)))
+        motion?.failed?.(initial.pending!.owner);
+      throw error;
+    } finally {
+      readying = false;
+    }
   }
   function render(entry: Entry) {
     root.render(
       <>
-        <Ready />
         <FeatureView
+          onReady={confirmReady}
           beforeHandoff={motion?.handoff}
           onHandoffError={motion?.failed}
           entry={entry}

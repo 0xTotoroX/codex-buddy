@@ -25,8 +25,8 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 | Next-step suggestions | Generate follow-up questions from the current answer, then copy them or insert them into the composer |
 | Docked workbench | Show the outline and suggestions together without covering the chat; use automatic, vertical, or horizontal layouts, drag panels, group tabs, or focus one panel; remember docked and desktop layouts separately |
 | Desktop window | On macOS 15+, pop out and return to the embedded panel, move and resize the window, or keep it on top |
-| Model quick switch | Use a separate screen-edge control to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
-| Task board | To do, Doing, Done/archive; tabs in narrow containers and three columns in wide windows |
+| Model quick switch | Use the shared main interface or edge panel to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
+| Task board | To do, In progress and Done; editable groups, inline creation and drag-and-drop in wide columns or narrow tabs |
 | Apple Reminders sync | Optional title, notes and completion sync with one selected iCloud list; local stages and archive |
 | Reading and appearance | Choose materials, font size, and summary visibility, with saved preferences |
 | Your choice of model | Use an existing Codex login or connect your own model API |
@@ -55,7 +55,7 @@ Open **任务看板与提醒事项** in Web settings. Enable the board and click
 
 To sync, grant macOS access, select one writable iCloud Reminders list, confirm and save it, then enable sync. Only titles, notes and completion are synchronized. To do/Doing stages and archive remain local; archiving never deletes Apple reminders. Apple handles iCloud delivery.
 
-Narrow containers show three tabs; wide windows show all three groups. Legacy Waiting tasks appear under To do without changing their stored stage or content. Upgrading a three-list configuration pauses sync: move the old reminders into one list in Apple, then select it here to reconnect. Existing remote identities are retained; missing items are never automatically recreated.
+Narrow containers show group tabs; wide windows show columns. Legacy Waiting tasks appear under To do without changing their stored stage or content. Upgrading a three-list configuration pauses sync: move the old reminders into one list in Apple, then select it here to reconnect. Existing remote identities are retained; missing items are never automatically recreated.
 
 Edit recurring reminders in Apple. Dates, priorities, native sections, tags, attachments and ordering are outside the sync contract. Missing items keep local records, conflicting fields require a choice, and uncertain creates are not automatically repeated.
 
@@ -63,7 +63,9 @@ Task content stays local and is never sent to a model. An internal **CodexBuddy 
 
 ### Feature display locations
 
-Use **Independent open** in the workbench, or **Feature display location** in Web settings, to place the outline, task board, next-step suggestions and model switcher separately in a sidebar, an in-page overlay, a resizable desktop window or an edge/notch panel. Sidebar and edge views each share a tabbed container. **Presentation** settings independently save black, matte, frosted or liquid (Regular/Clear) themes for each form. Each feature has one active view. The CodexBuddy menu reopens or focuses it.
+In Web settings, use **Presentation → Main interface form** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
+The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Open a card for notes; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
+
 
 Return an existing desktop workbench before entering independent mode. Moving preserves reading state and unsaved task drafts for the current service session; choose **Keep draft and return** in the task editor to reach placement controls. Closing a view does not disable its service or reminder sync. Desktop views require macOS 15+.
 

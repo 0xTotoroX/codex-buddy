@@ -50,8 +50,9 @@ main → lifecycle/server；server → App；App → CDP/模型；panel 管理�
 工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
 
 独立功能呈现：
-- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态及独立窗口监督；不复制业务服务。
-- [feature_window.rs](feature_window.rs)：独立 feature lease 的轻量入口，复用 panel_window::run_surface 的原生材质、几何与往返动效。
+- [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态与主窗口监督；不复制业务服务。
+- [features/AGENTS.md](features/AGENTS.md)：唯一主界面的偏好迁移、共享桌面窗口租约与整组原子交接。
+- [feature_window.rs](feature_window.rs)：共享 main lease 的轻量入口，复用 panel_window::run_surface 的原生材质、几何与往返动效；唤起复用窗口而不重播入场。
 
 App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 与 CDP 白名单，/surfaces 只管理呈现偏好/贴边租约。所有功能写入验 owner；旧模型窗口租约写入拒绝。
 
