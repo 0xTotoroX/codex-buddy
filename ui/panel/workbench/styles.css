@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 中轴表情、透明工具按钮、无底块标签选中反馈、分隔线和各级菜单样式。
+ * [OUTPUT]: 中轴表情、透明工具按钮、文字明暗的标签选中反馈、分隔线和各级菜单样式。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -229,8 +229,7 @@
 }
 .csw-layout-options button:hover,
 .csw-layout-options button[aria-pressed='true'] {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  color: var(--csw-text);
 }
 .csw-layout-options button[aria-pressed='true']::after {
   content: '✓';
@@ -294,8 +293,6 @@
 }
 .csw-workbench-tabs button[aria-selected='true'] {
   color: var(--csw-text);
-  text-decoration: underline;
-  text-underline-offset: 4px;
 }
 .csw-workbench :is(.csw-workbench-tabs button, .csw-pane-arrange):focus-visible {
   outline: 2px solid var(--csw-accent);
@@ -490,8 +487,7 @@
   cursor: pointer;
 }
 .csw-dock-menu :is(button, summary):hover {
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  color: var(--color-text-primary, CanvasText);
 }
 .csw-dock-menu :is(button, summary):focus-visible {
   outline: 2px solid currentColor;

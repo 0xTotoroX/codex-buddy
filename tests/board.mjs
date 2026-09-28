@@ -204,16 +204,21 @@ try {
     (await api('tasks/state')).store.tasks.find((t) => t.id === legacy.id).fields.due,
     legacy.fields.due,
   );
-  // Rename by stable ID, add a group and drag through compact tabs, then verify persistence.
-  await page
-    .getByRole('navigation', { name: '任务阶段' })
-    .getByRole('button', { name: '待办', exact: true })
-    .dblclick();
-  await page.getByLabel('分组名称', { exact: true }).fill('准备做');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
-  await page.getByRole('button', { name: '新增分组', exact: true }).click();
-  await page.getByLabel('分组名称', { exact: true }).fill('等待确认');
-  await page.getByRole('button', { name: '保存', exact: true }).click();
+  // Group personalization belongs to settings; the board keeps stable IDs and live tasks.
+  assert.equal(await page.getByRole('button', { name: '新增分组', exact: true }).count(), 0);
+  const settings = await browser.newPage({ viewport: { width: 980, height: 900 } });
+  await settings.goto(`http://127.0.0.1:${runtime.port}/#token=${runtime.token}`);
+  await settings.getByText('看板分组', { exact: true }).click();
+  await settings.getByLabel('分组名称：待办', { exact: true }).fill('准备做');
+  await settings.getByRole('button', { name: '保存分组：待办', exact: true }).click();
+  await settings.getByLabel('分组名称：准备做', { exact: true }).waitFor();
+  await settings.getByLabel('新分组名称', { exact: true }).fill('等待确认');
+  await settings.getByRole('button', { name: '新增分组', exact: true }).click();
+  await settings.getByLabel('分组名称：等待确认', { exact: true }).waitFor();
+  await settings
+    .locator('#settings-tasks')
+    .screenshot({ path: join(report, 'group-settings.png') });
+  await settings.close();
   const groupTab = page
     .getByRole('navigation', { name: '任务阶段' })
     .getByRole('button', { name: '等待确认', exact: true });

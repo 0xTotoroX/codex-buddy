@@ -114,8 +114,7 @@ h1 {
 .column-heading .board-tools {
   margin-left: auto;
 }
-.column-heading .group-title,
-.column-heading .group-name-form {
+.column-heading .group-title {
   min-width: 0;
 }
 .board-app .board-tools button {
@@ -250,23 +249,9 @@ h1 {
 .board-app input,
 .board-app textarea,
 .board-app select,
-.board-app .quick-add button,
-.board-app .group-name-form button {
+.board-app .quick-add button {
   font-size: 15px;
   border-radius: 10px;
-}
-.group-name-form {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-.group-name-form input {
-  width: 100%;
-}
-.column-heading .group-name-form {
-  margin: 0;
 }
 .resume-draft {
   margin-bottom: 12px;

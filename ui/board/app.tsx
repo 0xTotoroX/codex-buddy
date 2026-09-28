@@ -26,7 +26,6 @@ export type BoardView = {
   stage: string;
   tab: string;
   gridLeft?: number;
-  renaming?: { id: string; title: string } | null;
   editor?: BoardEditor | null;
   quickAdd?: { column: string; title: string } | null;
 };
@@ -58,17 +57,14 @@ export function Board({
   const [search, setSearch] = useState(view?.search ?? '');
   const [searchOpen, setSearchOpen] = useState(!!view?.search);
   const [quickAdd, setQuickAdd] = useState(view?.quickAdd ?? null);
-  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(
-    view?.renaming ?? null,
-  );
   const [dropTab, setDropTab] = useState('');
   const columns = state?.store.columns ?? defaults;
   useEffect(() => {
     if (!columns.some((c) => c.id === stage)) setStage('todo');
   }, [columns, stage]);
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd, renaming });
-  }, [view, search, stage, tab, editor, quickAdd, renaming]);
+    if (view) Object.assign(view, { search, stage, tab, editor, quickAdd });
+  }, [view, search, stage, tab, editor, quickAdd]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(
@@ -117,56 +113,8 @@ export function Board({
       before={(id) => move(id, taskGroup(task), task.id)}
     />
   );
-  const nameInput = () =>
-    renaming && (
-      <form
-        className="group-name-form"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void command({
-            op: renaming.id ? 'renameColumn' : 'createColumn',
-            id: renaming.id,
-            title: renaming.title,
-          }).then((ok) => {
-            if (ok) setRenaming(null);
-          });
-        }}
-      >
-        <input
-          autoFocus
-          aria-label="分组名称"
-          maxLength={40}
-          value={renaming.title}
-          disabled={busy}
-          onChange={(e) => setRenaming({ ...renaming, title: e.target.value })}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setRenaming(null);
-          }}
-        />
-        <button disabled={busy || !renaming.title.trim()} type="submit">
-          保存
-        </button>
-        <button
-          disabled={busy}
-          type="button"
-          aria-label="取消分组编辑"
-          onClick={() => setRenaming(null)}
-        >
-          <X size={14} />
-        </button>
-      </form>
-    );
   const boardTools = (
     <div className="board-tools">
-      <button
-        title="新增分组"
-        aria-label="新增分组"
-        disabled={busy}
-        onClick={() => setRenaming({ id: '', title: '' })}
-      >
-        <Plus size={16} />
-        分组
-      </button>
       <button
         title="搜索任务"
         aria-label="搜索任务"
@@ -254,9 +202,7 @@ export function Board({
                   key={column.id}
                   aria-pressed={stage === column.id}
                   className={dropTab === column.id ? 'drop-tab' : ''}
-                  title="双击修改分组名称"
                   onClick={() => setStage(column.id)}
-                  onDoubleClick={() => setRenaming({ ...column })}
                   onDragOver={(e) => {
                     if (!busy && taskDragOver(e)) setDropTab(column.id);
                   }}
@@ -288,7 +234,6 @@ export function Board({
             onChange={(e) => setSearch(e.target.value)}
           />
         )}
-        {renaming && (!renaming.id || narrow) && nameInput()}
         {editor?.suspended && (
           <button
             className="resume-draft"
@@ -335,21 +280,8 @@ export function Board({
                 move={move}
                 heading={
                   <>
-                    {!narrow && renaming?.id === column.id ? (
-                      nameInput()
-                    ) : (
-                      <>
-                        <button
-                          className="group-title"
-                          title="修改分组名称"
-                          disabled={busy}
-                          onClick={() => setRenaming({ ...column })}
-                        >
-                          {column.title}
-                        </button>
-                        <small>{group.length}</small>
-                      </>
-                    )}
+                    <span className="group-title">{column.title}</span>
+                    <small>{group.length}</small>
                     {!narrow && column.id === columns.at(-1)?.id && boardTools}
                   </>
                 }

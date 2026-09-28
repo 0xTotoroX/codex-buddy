@@ -1,14 +1,17 @@
 /* [INPUT]: Independent task API and shared settings controls.
- * [OUTPUT]: Board/sync switches, explicit authorization and single-list binding.
+ * [OUTPUT]: Group personalization, board/sync switches, explicit authorization and single-list binding.
  * [POS]: Task settings do not modify model-control or workbench preferences.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useState } from 'react';
 import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { Switch } from './components/ui/switch';
 import { NativeSelect } from './components/ui/native-select';
-import { useTasks, type Bindings, type Calendar } from '../board/api';
+import { useTasks, columns as defaultColumns, type Bindings, type Calendar } from '../board/api';
 export function TaskSettings() {
   const { state, error, busy, command } = useTasks(true);
+  const [groupNames, setGroupNames] = useState<Record<string, string>>({});
+  const [newGroup, setNewGroup] = useState('');
   const [calendars, setCalendars] = useState<Calendar[]>([]);
   const [bindings, setBindings] = useState<Bindings | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -57,6 +60,81 @@ export function TaskSettings() {
           />
         </div>
       </div>
+      <details className="group">
+        <summary className="cursor-pointer text-[15px] group-open:mb-4">看板分组</summary>
+        <div className="space-y-3">
+          {(state?.store.columns ?? defaultColumns).map((column) => (
+            <form
+              key={column.id}
+              className="flex items-center gap-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void command({
+                  op: 'renameColumn',
+                  id: column.id,
+                  title: groupNames[column.id],
+                }).then((result) => {
+                  if (result)
+                    setGroupNames((names) => {
+                      const next = { ...names };
+                      delete next[column.id];
+                      return next;
+                    });
+                });
+              }}
+            >
+              <Input
+                className="text-[15px]"
+                aria-label={`分组名称：${column.title}`}
+                maxLength={40}
+                disabled={busy || !state}
+                value={groupNames[column.id] ?? column.title}
+                onChange={(event) =>
+                  setGroupNames({ ...groupNames, [column.id]: event.target.value })
+                }
+              />
+              <Button
+                type="submit"
+                variant="ghost"
+                className="w-24 shrink-0 text-[15px]"
+                aria-label={`保存分组：${column.title}`}
+                disabled={
+                  busy || !groupNames[column.id]?.trim() || groupNames[column.id] === column.title
+                }
+              >
+                保存
+              </Button>
+            </form>
+          ))}
+          <form
+            className="flex items-center gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void command({ op: 'createColumn', title: newGroup }).then((result) => {
+                if (result) setNewGroup('');
+              });
+            }}
+          >
+            <Input
+              className="text-[15px]"
+              aria-label="新分组名称"
+              placeholder="新分组名称"
+              maxLength={40}
+              disabled={busy || !state}
+              value={newGroup}
+              onChange={(event) => setNewGroup(event.target.value)}
+            />
+            <Button
+              type="submit"
+              variant="ghost"
+              className="w-24 shrink-0 text-[15px]"
+              disabled={busy || !state || !newGroup.trim()}
+            >
+              新增分组
+            </Button>
+          </form>
+        </div>
+      </details>
       <div className="flex items-center justify-between gap-4">
         <label htmlFor="reminders-enabled" className="text-sm">
           Apple 提醒事项同步

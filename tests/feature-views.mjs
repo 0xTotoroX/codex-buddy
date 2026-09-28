@@ -348,7 +348,15 @@ try {
     () => document.querySelectorAll('.csw-feature-panes > section').length === 1,
   );
   await page.setViewportSize({ width: 1200, height: 700 });
-  await board.getByRole('button', { name: '新增分组' }).waitFor();
+  await board.getByRole('button', { name: '搜索任务' }).waitFor();
+  assert.equal(await board.getByRole('button', { name: '新增分组' }).count(), 0);
+  assert.equal(
+    await page
+      .getByRole('tab', { name: '看板', exact: true })
+      .evaluate((node) => getComputedStyle(node).textDecorationLine),
+    'none',
+  );
+  await board.locator('.board-grid:not(.narrow)').waitFor();
   const tools = await board.locator('.board-tools').boundingBox();
   const heading = await board.locator('.column-heading').last().boundingBox();
   assert.ok(Math.abs(tools.y + tools.height / 2 - heading.y - heading.height / 2) < 2);
