@@ -190,10 +190,13 @@ Development mode connects to real Codex. UI changes reload automatically, and Ru
 
 ```sh
 npm run verify         # Run checks
+npm run verify:web     # Frontend and synthetic browser pilot (also runs on Linux)
 npm run build          # Build the application
 npm run package        # Create binary and source archives
 npm run install:local  # Install the current code locally
 ```
+
+For the frontend pilot, run `npm ci` first and provide an installed Chromium through `CHROME_PATH` if needed; Linux automatically uses `/usr/bin/chromium` when available. Logs and results go to `target/reports/web-pilot/`. The Node license integration test still requires Cargo and its dependencies; missing prerequisites remain failures. This pilot excludes native checks and does not replace full verification or establish Linux application support.
 
 Building or packaging does not update an installed application. When reporting an issue or contributing a change, include the version, OS, and reproduction steps, and remove credentials and private chat content.
 
