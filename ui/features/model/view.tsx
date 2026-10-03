@@ -43,7 +43,13 @@ export function ModelView({
   const [tools, setTools] = useState(reading.modelTools || false),
     [others, setOthers] = useState(reading.modelOthers || false),
     [drop, setDrop] = useState(''),
-    [columnWidth, setColumnWidth] = useState<number | null>(null);
+    [columnWidth, setColumnWidth] = useState<number | null>(null),
+    [presetDraft, setPresetDraft] = useState<{
+      id: string;
+      name: string;
+      selection: Selection;
+      creating: boolean;
+    } | null>(null);
   const matrix = useRef<HTMLDivElement>(null);
   const resize = useRef<{ pointer: number; x: number; width: number; value: number } | null>(null);
   useLayoutEffect(() => {
@@ -248,19 +254,61 @@ export function ModelView({
           title="保存当前预设"
           disabled={busy || !allowed || !s.current}
           onClick={() => {
-            const name = prompt('预设名称');
-            if (name?.trim())
-              void save({
-                presets: [
-                  ...prefs.presets,
-                  { id: crypto.randomUUID(), name: name.trim(), selection: s.current },
-                ],
+            if (s.current)
+              setPresetDraft({
+                id: crypto.randomUUID(),
+                name: '',
+                selection: { ...s.current },
+                creating: true,
               });
           }}
         >
           {icon('plus')}
         </button>
       </header>
+      {presetDraft && (
+        <form
+          key={presetDraft.id}
+          className="model-preset-editor"
+          aria-label={presetDraft.creating ? '保存模型预设' : '重命名模型预设'}
+          onSubmit={async (event) => {
+            event.preventDefault();
+            const name = presetDraft.name.trim();
+            if (busy || !prefs.enabled || !name) return;
+            const preset = { id: presetDraft.id, name, selection: presetDraft.selection };
+            const result = await save({
+              presets: presetDraft.creating
+                ? [...prefs.presets, preset]
+                : prefs.presets.map((item) => (item.id === preset.id ? { ...item, name } : item)),
+            });
+            if (result !== null) setPresetDraft(null);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation();
+              if (event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              if (!busy) setPresetDraft(null);
+            }
+          }}
+        >
+          <input
+            aria-label="预设名称"
+            placeholder="预设名称"
+            autoFocus
+            maxLength={256}
+            value={presetDraft.name}
+            disabled={busy || !prefs.enabled}
+            onChange={(event) => setPresetDraft({ ...presetDraft, name: event.target.value })}
+          />
+          <button type="submit" disabled={busy || !prefs.enabled || !presetDraft.name.trim()}>
+            保存
+          </button>
+          <button type="button" disabled={busy} onClick={() => setPresetDraft(null)}>
+            取消
+          </button>
+        </form>
+      )}
       {tools && !!prefs.presets.length && (
         <div className="model-tools">
           {prefs.presets.map((p) => (
@@ -269,15 +317,9 @@ export function ModelView({
               <button
                 aria-label={`重命名预设 ${p.name}`}
                 disabled={busy}
-                onClick={() => {
-                  const name = prompt('预设名称', p.name);
-                  if (name?.trim())
-                    void save({
-                      presets: prefs.presets.map((item) =>
-                        item.id === p.id ? { ...item, name: name.trim() } : item,
-                      ),
-                    });
-                }}
+                onClick={() =>
+                  setPresetDraft({ ...p, selection: { ...p.selection }, creating: false })
+                }
               >
                 改名
               </button>

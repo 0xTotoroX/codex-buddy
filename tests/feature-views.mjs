@@ -94,9 +94,13 @@ try {
   let pinned = false;
   let surfaceTheme = 'matte';
   let rejectHandoff = true;
+  let rejectPresetSave = false;
   let handoffs = 0;
   let pendingPlacement = null;
   await page.addInitScript(() => {
+    window.prompt = () => {
+      throw Error('Native prompt is unavailable');
+    };
     window.nativeMessages = [];
     let edgeSize = { width: 480, height: 650 },
       expanded = true;
@@ -181,6 +185,8 @@ try {
           model.snapshot.revision = 'v2';
         }
         if (p.action === 'preferences') {
+          if (rejectPresetSave && p.data.patch.presets)
+            return route.fulfill({ status: 409, json: { ok: false, message: '预设保存冲突' } });
           Object.assign(model.preferences, p.data.patch);
           model.revision++;
         }
@@ -464,10 +470,63 @@ try {
   record(
     'edge model refresh sits beside tabs, follows the active tab and dispatches model refresh; plus and disclosure align',
   );
-  page.once('dialog', (dialog) => dialog.accept('日常'));
-  await view.getByRole('button', { name: '保存预设', exact: true }).click();
+  const savedSelection = structuredClone(model.snapshot.current);
+  const presetButton = view.getByRole('button', { name: '保存预设', exact: true });
+  const editor = view.getByRole('form', { name: '保存模型预设' });
+  await presetButton.click();
+  const nameInput = editor.getByRole('textbox', { name: '预设名称' });
+  await nameInput.waitFor();
+  assert.equal(await nameInput.evaluate((node) => node.getRootNode().activeElement === node), true);
+  assert.equal(await editor.getByRole('button', { name: '保存', exact: true }).isDisabled(), true);
+  await nameInput.fill('取消的预设');
+  await editor.getByRole('button', { name: '取消', exact: true }).click();
+  assert.equal(model.preferences.presets.length, 0);
+  await presetButton.click();
+  await nameInput.fill('Esc 取消');
+  await nameInput.dispatchEvent('keydown', { key: 'Escape', isComposing: true });
+  assert.equal(await nameInput.inputValue(), 'Esc 取消', 'IME Escape keeps the draft');
+  await nameInput.press('Escape');
+  await editor.waitFor({ state: 'hidden' });
+  assert.equal(model.preferences.presets.length, 0);
+  await presetButton.click();
+  await nameInput.fill('  日常  ');
+  await page.screenshot({ path: join(output, 'model-preset-editor.png') });
+  rejectPresetSave = true;
+  await nameInput.press('Enter');
+  await nameInput.waitFor({ state: 'visible' });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll('.edge-view')].some((node) =>
+      node.shadowRoot?.textContent.includes('预设保存冲突'),
+    ),
+  );
+  assert.equal(await nameInput.inputValue(), '  日常  ', 'failed save keeps the name');
+  assert.equal(model.preferences.presets.length, 0);
+  rejectPresetSave = false;
+  // A host update while naming must not replace the captured preset selection.
+  model.snapshot.current = { model: 'b', reasoning: 'high', speed: 'standard' };
+  await view.locator('[data-model="b"][data-reasoning="high"][aria-pressed="true"]').waitFor();
+  await editor.getByRole('button', { name: '保存', exact: true }).click();
   await view.getByRole('button', { name: '日常', exact: true }).waitFor();
+  await editor.waitFor({ state: 'hidden' });
+  assert.deepEqual(model.preferences.presets[0].selection, savedSelection);
+  await view.getByRole('button', { name: '日常', exact: true }).click();
+  await view
+    .locator(
+      `[data-model="${savedSelection.model}"][data-reasoning="${savedSelection.reasoning}"][aria-pressed="true"]`,
+    )
+    .waitFor();
+  assert.deepEqual(model.snapshot.current, savedSelection);
   await view.getByLabel('模型工具').click();
+  await view.getByRole('button', { name: '重命名预设 日常', exact: true }).click();
+  const rename = view.getByRole('form', { name: '重命名模型预设' });
+  assert.equal(await rename.getByRole('textbox').inputValue(), '日常');
+  await rename.getByRole('textbox').fill('工作');
+  await rename.getByRole('textbox').press('Enter');
+  await view.getByRole('button', { name: '工作', exact: true }).waitFor();
+  assert.deepEqual(model.preferences.presets[0].selection, savedSelection);
+  record(
+    'preset create/rename/cancel work without native prompt; failed save keeps draft and captured model/effort/speed',
+  );
   assert.equal(await view.getByRole('searchbox').count(), 0);
   assert.equal(await view.getByRole('slider').count(), 0);
   const columnHandle = view.getByRole('separator', { name: '模型名称列宽' });
@@ -513,8 +572,8 @@ try {
     (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
     compactModelHeight,
   );
-  await view.getByLabel('删除预设 日常').click();
-  await view.getByRole('button', { name: '日常', exact: true }).waitFor({ state: 'detached' });
+  await view.getByLabel('删除预设 工作').click();
+  await view.getByRole('button', { name: '工作', exact: true }).waitFor({ state: 'detached' });
   record(
     'shared model view uses readback, preserves speed, hides/restores models, persists drag order and saves/removes presets',
   );
