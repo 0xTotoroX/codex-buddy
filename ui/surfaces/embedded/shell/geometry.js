@@ -141,8 +141,9 @@ function shellLayout() {
     !IS_POPOUT && shellState.layoutMode === 'workbench' && shellState.dockStatus === 'open'
       ? shellState.dockRect
       : null;
+  // The dock rect includes host CSS zoom; child layout needs the root's unscaled CSS size.
   const width = dockRect
-    ? dockRect.width
+    ? shellState.root.clientWidth
     : Math.max(CHIP_WIDTH, Math.min(clampPanelWidth(shellState.width), bounds.width));
   const anchor = clampPosition(shellState.position || defaultPosition());
   const chipWidth = Math.min(CHIP_WIDTH, width);
@@ -165,7 +166,7 @@ function shellLayout() {
       ? clampPanelHeight(SETTINGS_PANEL_HEIGHT)
       : clampPanelHeight(shellState.height);
   const height = dockRect
-    ? dockRect.height
+    ? shellState.root.clientHeight
     : Math.max(CHIP_HEIGHT, Math.min(requestedHeight, bounds.height, availableHeight));
   const compressionProgress =
     shellState.activeTab === 'settings'
