@@ -25,6 +25,7 @@
     "format": "prettier --write \"ui/**/*.{js,ts,tsx,css}\" \"scripts/*.mjs\" \"tests/*.mjs\"",
     "format:check": "prettier --check \"ui/**/*.{js,ts,tsx,css}\" \"scripts/*.mjs\" \"tests/*.mjs\"",
     "verify": "node scripts/verify.mjs",
+    "verify:web": "node scripts/verify-web.mjs",
     "test:glass": "node tests/embedded-glass.mjs",
     "test:workbench": "node tests/workbench.mjs",
     "install:dev": "node scripts/dev-launcher.mjs"

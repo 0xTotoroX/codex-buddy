@@ -186,10 +186,13 @@ npm run dev
 
 ```sh
 npm run verify         # 运行检查
+npm run verify:web     # 前端与合成浏览器试点（也可在 Linux 运行）
 npm run build          # 编译程序
 npm run package        # 生成程序包和源码包
 npm run install:local  # 将当前代码安装到本机
 ```
+
+前端试点先执行 `npm ci`，必要时通过 `CHROME_PATH` 指定已安装的 Chromium；Linux 自动复用存在的 `/usr/bin/chromium`。日志与结果位于 `target/reports/web-pilot/`。Node 许可集成测试仍需 Cargo 及其依赖，缺少前置条件仍报告失败。试点排除原生检查，不替代完整验收，也不代表应用支持 Linux。
 
 构建、打包不会自动更新已安装程序。提交问题或改进时，请附版本、系统和复现步骤，并移除密钥与私人聊天内容。
 
