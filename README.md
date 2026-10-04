@@ -192,7 +192,7 @@ Development mode connects to real Codex. UI changes reload automatically, and Ru
 npm run verify         # Run checks
 npm run verify:web     # Frontend and synthetic browser pilot (also runs on Linux)
 npm run build          # Build the application
-npm run package        # Create binary and source archives
+npm run package        # Create the CLI archive and release checksum notes
 npm run install:local  # Install the current code locally
 ```
 
