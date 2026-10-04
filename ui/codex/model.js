@@ -1,5 +1,5 @@
 /*
- * [INPUT]: 官方 DOM 菜单、稳定聊天标记和关联的 model/list 消息；不依赖工作台锁定。
+ * [INPUT]: 官方 DOM 菜单、稳定聊天标记/新聊天输入区和关联的 model/list 消息；不依赖工作台锁定。
  * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 presence/cancel/dispose。
  * [POS]: include_str / Page.addScriptToEvaluateOnNewDocument 可独立安装的宿主边界。
  * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、存储或发送模型请求。
@@ -8,6 +8,7 @@
  * 显式 snapshot/apply 附有界阶段诊断，不含目标、聊天正文或 DOM；被动读取不产生诊断。
  * restore 是调用方恢复意图标记；selection 仍须完整且通过全部校验，无隐式回滚。
  * revision 是实例内不透明的乐观并发令牌，包含目标/DOM/能力/可观察配置变化。
+ * 未发送的新聊天以当前官方输入区的实例身份作为临时 target；不保存、不继承旧聊天身份。
  *
  * Adapted from Model Deck v0.3.9: https://github.com/0xTotoroX/model-deck/blob/main/src/index.js
  * projectModels/tierSupportsFast, canonicalReasoning, accessibleText/isVisible,
@@ -200,7 +201,7 @@
     },
     { capture: true, signal: life.signal },
   );
-  function identity(root, scope, roots) {
+  function identity(root, scope, roots, draft = false) {
     const values = new Set();
     // Composer/ancestor identity is authoritative. A referenced answer may expose a
     // response-annotation marker for another conversation inside message content.
@@ -208,14 +209,17 @@
     if (root.hasAttribute('data-above-composer-conversation-id')) composerMarkers.push(root);
     composerMarkers
       .filter((node) => !owned(node))
-      .forEach((node) => values.add(node.getAttribute('data-above-composer-conversation-id')));
+      .forEach((node) => {
+        const id = node.getAttribute('data-above-composer-conversation-id');
+        if (id) values.add(id);
+      });
     for (let node = root; node && node !== document.body; node = node.parentElement) {
       if (roots.filter((entry) => node.contains(entry)).length > 1) break;
       IDS.forEach((name) => {
         if (node.getAttribute(name)) values.add(node.getAttribute(name));
       });
     }
-    if (!values.size) {
+    if (!values.size && !draft) {
       const annotations = all(root, '[data-response-annotation-conversation]');
       if (root.hasAttribute('data-response-annotation-conversation')) annotations.push(root);
       annotations
@@ -223,18 +227,35 @@
         .forEach((node) => values.add(node.getAttribute('data-response-annotation-conversation')));
     }
     // Only the sole main chat may inherit the route; never links in message content or pane/tab indices.
-    if (!values.size && roots.length === 1 && !root.closest('[role="dialog"],aside')) {
+    if (!values.size && !draft && roots.length === 1 && !root.closest('[role="dialog"],aside')) {
       const match = location.pathname.match(/\/(?:c|conversation|threads)\/([^/?#]+)/i);
       if (match) values.add(match[1]);
     }
+    if (!values.size && draft) return `draft:${epoch}:${nodeKey(root)}`;
     const id = one([...values].filter(Boolean));
     return id && id.length <= 256 ? id : '';
+  }
+  function modelTrigger(scope) {
+    return one(
+      all(scope, 'button[aria-haspopup="menu"],[role="button"][aria-haspopup="menu"]').filter(
+        (node) =>
+          visible(node) &&
+          !owned(node) &&
+          (node.hasAttribute('data-selected-reasoning-effort') ||
+            models.some((model) =>
+              normalized(`${text(node)} ${node.textContent || ''}`).includes(
+                normalized(model.label),
+              ),
+            ) ||
+            /\b(?:gpt[-\s]*)?\d+\.\d+/i.test(text(node))),
+      ),
+    );
   }
   function candidates() {
     const roots = all(document, '.thread-scroll-container').filter(
       (root) => visible(root) && !owned(root),
     );
-    return roots
+    const chats = roots
       .map((root) => {
         let scope = root;
         while (scope && scope !== document.body) {
@@ -246,26 +267,32 @@
         const composer = one(all(scope, EDITOR).filter((node) => visible(node) && !owned(node)));
         if (!composer) return null;
         const id = identity(root, scope, roots);
-        const triggers = all(
-          scope,
-          'button[aria-haspopup="menu"],[role="button"][aria-haspopup="menu"]',
-        ).filter((node) => {
-          if (!visible(node) || owned(node)) return false;
-          return (
-            node.hasAttribute('data-selected-reasoning-effort') ||
-            models.some((model) =>
-              normalized(`${text(node)} ${node.textContent || ''}`).includes(
-                normalized(model.label),
-              ),
-            ) ||
-            /\b(?:gpt[-\s]*)?\d+\.\d+/i.test(text(node))
-          );
-        });
-        const trigger = one(triggers);
+        const trigger = modelTrigger(scope);
         const title = text(scope.querySelector('header')) || `Chat ${id.slice(-8)}`;
         return { id, title: title.slice(0, 100), root, scope, composer, trigger };
       })
       .filter(Boolean);
+    const draftRoots = all(document, '[data-codex-composer-root]').filter((root) => {
+      if (!visible(root) || owned(root) || chats.some((chat) => chat.scope.contains(root)))
+        return false;
+      const pane = root.closest('.thread-pane,main,[role="dialog"],dialog');
+      return !roots.some((thread) => (pane || root).contains(thread));
+    });
+    const drafts = draftRoots
+      .map((root) => {
+        const composer = one(all(root, EDITOR).filter((node) => visible(node) && !owned(node)));
+        if (!composer?.hasAttribute('data-codex-composer')) return null;
+        return {
+          id: identity(root, root, [...roots, ...draftRoots], true),
+          title: '新聊天',
+          root,
+          scope: root,
+          composer,
+          trigger: modelTrigger(root),
+        };
+      })
+      .filter(Boolean);
+    return [...chats, ...drafts];
   }
   function resolveTarget() {
     let choices = candidates();

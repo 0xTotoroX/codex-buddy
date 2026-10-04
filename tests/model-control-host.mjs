@@ -36,6 +36,17 @@ async function apply(page, selection, extra = {}) {
     ...extra,
   });
 }
+async function newChat(page) {
+  await page.evaluate(() => {
+    history.replaceState(null, '', '/');
+    const pane = document.querySelector('section');
+    pane.classList.add('thread-pane');
+    pane.removeAttribute('data-thread-id');
+    pane.querySelector('.thread-scroll-container').remove();
+    pane.querySelector('.ProseMirror').setAttribute('data-codex-composer', 'true');
+    pane.querySelector('form').setAttribute('data-above-composer-conversation-id', '');
+  });
+}
 const targetBeta = { model: 'beta', reasoning: 'high', speed: 'standard' };
 let count = 0;
 async function check(name, test, options) {
@@ -50,6 +61,116 @@ async function check(name, test, options) {
   }
 }
 try {
+  await check(
+    'unsent new chat supports full model switching without a persisted chat ID',
+    async (page) => {
+      await newChat(page);
+      const before = await snapshot(page);
+      assert.match(before.target.id, /^draft:/);
+      assert.equal(before.status, 'waiting');
+      assert.equal(await page.evaluate(() => host.clicks.length), 0);
+      assert.equal((await snapshot(page, true)).status, 'ready');
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'success', result.message);
+      assert.deepEqual(result.snapshot.current, targetBeta);
+      assert.deepEqual(await page.evaluate(() => host.configs['chat-a']), targetBeta);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
+    },
+    { modern: true, openPlaceholder: true, speedFlyout: true },
+  );
+  await check(
+    'replacing a new-chat composer invalidates cached selection and old requests',
+    async (page) => {
+      await newChat(page);
+      const before = await snapshot(page, true);
+      await page.evaluate(() => {
+        const composer = document.querySelector('form');
+        composer.replaceWith(composer.cloneNode(true));
+      });
+      const after = await snapshot(page);
+      assert.notEqual(after.target.id, before.target.id);
+      assert.equal(after.current, null);
+      const result = await apply(page, targetBeta, {
+        target: before.target,
+        expectedRevision: before.revision,
+      });
+      assert.equal(result.status, 'failed');
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+    },
+  );
+  await check(
+    'new chat acquiring a saved identity aborts the pending menu operation',
+    async (page) => {
+      await newChat(page);
+      await page.evaluate(() => {
+        host.onOpen = (pane) => {
+          pane.dataset.threadId = 'saved-chat';
+        };
+      });
+      const result = await apply(page, targetBeta);
+      assert.equal(result.status, 'failed');
+      assert.equal(result.snapshot.target.id, 'saved-chat');
+      assert.equal(await page.evaluate(() => host.changes.length), 0);
+    },
+  );
+  await check(
+    'draft fallback rejects conflicting identity, unrelated editors and ambiguous composers',
+    async (page) => {
+      await newChat(page);
+      await page.evaluate(() => {
+        document.querySelector('section').dataset.threadId = 'chat-a';
+        document.querySelector('form').dataset.aboveComposerConversationId = 'chat-b';
+      });
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      await page.evaluate(() => {
+        document.querySelector('section').removeAttribute('data-thread-id');
+        document.querySelector('form').removeAttribute('data-above-composer-conversation-id');
+        document.querySelector('.ProseMirror').removeAttribute('data-codex-composer');
+      });
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      await page.evaluate(() => {
+        document.querySelector('.ProseMirror').setAttribute('data-codex-composer', 'true');
+        document.querySelector('section').append(document.querySelector('form').cloneNode(true));
+      });
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      assert.equal(await page.evaluate(() => host.clicks.length), 0);
+    },
+  );
+  await check(
+    'new chat and saved chat stay separate and follow the interacted official composer',
+    async (page) => {
+      await newChat(page);
+      const draft = (await snapshot(page)).target;
+      await page.evaluate(() => addChat('chat-b'));
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      await page.locator('[data-thread-id="chat-b"] .ProseMirror').click();
+      assert.equal((await snapshot(page)).target.id, 'chat-b');
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+      await page.locator('.thread-pane .ProseMirror').click();
+      assert.equal((await snapshot(page)).target.id, draft.id);
+      assert.equal((await apply(page, targetBeta)).status, 'success');
+      assert.deepEqual(await page.evaluate(() => host.changes.map((entry) => entry.id)), [
+        'chat-b',
+        'chat-b',
+        'chat-a',
+        'chat-a',
+      ]);
+    },
+  );
+  await check(
+    'new-chat fallback cannot bypass a visible message pane whose input is ambiguous',
+    async (page) => {
+      await page.evaluate(() => {
+        document.querySelector('section').classList.add('thread-pane');
+        document.querySelector('.ProseMirror').setAttribute('data-codex-composer', 'true');
+        document
+          .querySelector('section')
+          .append(document.querySelector('.thread-scroll-container').cloneNode(true));
+      });
+      assert.equal((await snapshot(page)).status, 'unavailable');
+      assert.equal(await page.evaluate(() => host.clicks.length), 0);
+    },
+  );
   await check(
     'Ultra round trips bind the correct model across all supported levels',
     async (page) => {

@@ -141,6 +141,12 @@ try {
   writeFileSync(join(directory, 'model-control.json'), JSON.stringify({ enabled: true }), {
     mode: 0o600,
   });
+  // Start with the current layout so legacy migration cannot race the theme-isolation baseline.
+  writeFileSync(
+    join(directory, 'panel.json'),
+    JSON.stringify({ ui: { layoutMode: 'workbench' } }),
+    { mode: 0o600 },
+  );
   writeFileSync(
     join(directory, 'config.json'),
     JSON.stringify({
@@ -325,6 +331,28 @@ try {
   assert.deepEqual(await page.evaluate(() => host.configs['chat-b']), initial);
   assert.deepEqual((await api('refresh', {})).snapshot.current, initial);
   record('old chat target fails through backend/CDP without changing the newly focused composer');
+
+  await page.evaluate(() => {
+    document.querySelector('[data-thread-id="chat-a"]').remove();
+    const pane = document.querySelector('[data-thread-id="chat-b"]');
+    pane.removeAttribute('data-thread-id');
+    pane.classList.add('thread-pane');
+    pane.querySelector('.thread-scroll-container').remove();
+    pane.querySelector('.ProseMirror').setAttribute('data-codex-composer', 'true');
+    pane.querySelector('form').setAttribute('data-above-composer-conversation-id', '');
+    pane.querySelector('.ProseMirror').focus();
+  });
+  const draft = await api('state');
+  assert.match(draft.snapshot.target.id, /^draft:/);
+  assert.equal(draft.snapshot.current, null);
+  const newChat = await api('apply', command(draft.snapshot, beta));
+  assert.equal(newChat.result.status, 'success', newChat.result.message);
+  assert.deepEqual(newChat.snapshot.current, beta);
+  assert.deepEqual(await page.evaluate(() => host.configs['chat-b']), beta);
+  assert.equal(await page.locator('[role="menu"]').count(), 0);
+  record(
+    'unsent new chat switches and reads back through authenticated backend/CDP without a saved ID',
+  );
 
   assert.deepEqual(await page.evaluate(() => host.unexpected), []);
   await page.reload();

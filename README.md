@@ -147,7 +147,7 @@ The edge/notch form now hosts all four features. Use **显示与布局** setting
 
 Legacy model visual preferences migrate once to `surfaces.json`; model pins and presets remain in `model-control.json`.
 
-Available models and efforts come from the host. The first selection reads and applies the configuration in one operation, without a separate refresh, then verifies the actual result. You can adjust subsequent configuration while an answer is being generated, provided the official controls allow it. Switching stops if the controls are disabled, the target is ambiguous, or capabilities have not loaded. If the official model list has not yet been observed after connecting, the control waits; there is no need to restart a working host just to load the list.
+Available models and efforts come from the host. You can switch models in a new chat before sending its first message. The first selection reads and applies the configuration in one operation, without a separate refresh, then verifies the actual result. You can adjust subsequent configuration while an answer is being generated, provided the official controls allow it. Switching stops if the controls are disabled, the target is ambiguous, or capabilities have not loaded. If the official model list has not yet been observed after connecting, the control waits; there is no need to restart a working host just to load the list.
 
 ## Updating and uninstalling
 
