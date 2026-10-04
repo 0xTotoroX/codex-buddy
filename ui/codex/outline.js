@@ -157,10 +157,10 @@ function outlineLooksStructuredHeading(text) {
   if (!value || outlineIsMarkerOnlyTitle(value)) return false;
   if (/^#{1,6}\s+\S/.test(value)) return true;
   if (/^第[一二三四五六七八九十百零\d]+[章节部分步]/.test(value)) return true;
-  if (/^[一二三四五六七八九十]+[、.．]\s*\S{2,}/.test(value)) return true;
-  if (/^（?[0-9]{1,2}）\s*\S{2,}/.test(value) || /^\([0-9]{1,2}\)\s*\S{2,}/.test(value))
+  if (/^[一二三四五六七八九十]+[、.．]\s*\S.*\S/.test(value)) return true;
+  if (/^（?[0-9]{1,2}）\s*\S.*\S/.test(value) || /^\([0-9]{1,2}\)\s*\S.*\S/.test(value))
     return true;
-  if (/^\d{1,2}[\.、．\)]\s*\S{2,}/.test(value)) return true;
+  if (/^\d{1,2}[\.、．\)]\s*\S.*\S/.test(value)) return true;
   return outlineHasChapterHeading(value);
 }
 
@@ -169,9 +169,9 @@ function outlineScorePseudoHeading(text, levelHint) {
   if (!outlineLooksStructuredHeading(text) && !levelHint) return 0;
   if (/^#{1,6}\s+\S/.test(text)) score += 50;
   if (/^第[一二三四五六七八九十百零\d]+[章节部分步]/.test(text)) score += 30;
-  if (/^[一二三四五六七八九十]+[、.．]\s*\S{2,}/.test(text)) score += 28;
-  if (/^（?[0-9]{1,2}）\s*\S{2,}/.test(text) || /^\([0-9]{1,2}\)\s*\S{2,}/.test(text)) score += 24;
-  if (/^\d{1,2}[\.、．\)]\s*\S{2,}/.test(text)) score += 26;
+  if (/^[一二三四五六七八九十]+[、.．]\s*\S.*\S/.test(text)) score += 28;
+  if (/^（?[0-9]{1,2}）\s*\S.*\S/.test(text) || /^\([0-9]{1,2}\)\s*\S.*\S/.test(text)) score += 24;
+  if (/^\d{1,2}[\.、．\)]\s*\S.*\S/.test(text)) score += 26;
   if (/[：:]$/.test(text) && text.length <= 18 && text.length >= 4) score += 8;
   if (outlineHasChapterHeading(text)) score += 24;
   if (text.length >= 4 && text.length <= 20) score += 6;

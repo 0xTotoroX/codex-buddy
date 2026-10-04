@@ -405,6 +405,52 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    '大纲保留编号后单字与空格开头的混排标题',
+    async (page) => {
+      const headings = [
+        '1．先核对现有资料，再准备本轮需要的输入。',
+        '2．旧资料保留，并清楚标注适用范围。',
+        '3．给 Example 的第一份输入应是需求材料，不需要先写好完整设计系统。',
+        '四、用 API 完成本轮需要的内容处理。',
+        '(5) 用 CLI 核对实际生成的结果。',
+        '6. A guide for the next stage.',
+      ];
+      await page.evaluate((headings) => {
+        const answer = document.querySelector('#answer');
+        answer.replaceChildren();
+        for (const title of [...headings, '7．', '只有一段加粗的解释文字，并不是章节标题。']) {
+          const paragraph = document.createElement('p');
+          const strong = document.createElement('strong');
+          const span = document.createElement('span');
+          span.textContent = title;
+          strong.append(span);
+          paragraph.append(strong);
+          const body = document.createElement('p');
+          body.textContent = '这是一段用于验证大纲解析和定位的合成正文。'.repeat(8);
+          answer.append(paragraph, body);
+        }
+        window.__companionFloatingPanel.scan();
+      }, headings);
+      await page.waitForFunction(() =>
+        window.__companionFloatingPanel.state.outlineItems.some((item) =>
+          item.text.startsWith('1．先'),
+        ),
+      );
+      assert.deepEqual(
+        await page.evaluate(() =>
+          window.__companionFloatingPanel.state.outlineItems.map((item) => item.text),
+        ),
+        headings,
+      );
+      await mode(page, true);
+      await page.locator('[data-view-body="outline"] [data-outline-id]').nth(2).click();
+      assert.equal(
+        await page.locator('#answer .companion-stepwise-outline-target-flash').textContent(),
+        headings[2],
+      );
+    },
+  ],
+  [
     'feature layout clears stale split handles during surface handoff',
     async (page) => {
       const { build } = await import('esbuild');
@@ -1572,6 +1618,7 @@ const cases = [
           await popout.page.locator('[data-view-body="outline"] .csw-progress-ring').count(),
           0,
         );
+        await page.bringToFront();
         await page.screenshot({ path: resolve(output, 'outline-waiting.png') });
         await page.evaluate(() => {
           document.querySelector('#fixture-stop').remove();
