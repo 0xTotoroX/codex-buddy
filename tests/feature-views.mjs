@@ -793,6 +793,108 @@ try {
     assert.equal(actions.at(-1).data.kind, kind);
   }
   record('desktop split refresh buttons share their own tab row and dispatch the matching action');
+  const outlineViewport = page.viewportSize();
+  projection.outlineItems = [
+    {
+      id: 'outline-long',
+      text: '检查长标题在换行之后，小圆点能否始终对齐第一行文字',
+      displayLevel: 0,
+    },
+    {
+      id: 'outline-numbered',
+      text: '12. 保留原文编号与层级',
+      labelText: '保留原文编号与层级',
+      numberPrefix: '12.',
+      displayLevel: 0,
+    },
+    { id: 'outline-child', text: '子级标题沿正文对齐', displayLevel: 1 },
+  ];
+  const outlineView = page.locator('[data-feature="outline"]');
+  await outlineView.locator('[data-outline-id="outline-child"]').waitFor();
+  await page.setViewportSize({ width: 1200, height: 900 });
+  for (const zoom of [1, 1.2]) {
+    await page.locator('#root').evaluate((node, value) => {
+      node.style.zoom = String(value);
+    }, zoom);
+    await outlineView.locator('[data-outline-id="outline-long"]').hover();
+    const appearance = await outlineView.evaluate((view) => {
+      const rows = [...view.querySelectorAll('.csw-outline-row')];
+      const row = rows[0],
+        marker = row.querySelector('.csw-outline-heading-marker');
+      const dot = getComputedStyle(marker, '::before');
+      const first = row.querySelector('.csw-outline-label');
+      const dotRect = marker.getBoundingClientRect(),
+        textRect = first.getBoundingClientRect();
+      return {
+        dots: rows.map(
+          (r) => getComputedStyle(r.querySelector('.csw-outline-heading-marker'), '::before').width,
+        ),
+        outline: getComputedStyle(row).outlineStyle,
+        background: getComputedStyle(row).backgroundColor,
+        layer: getComputedStyle(row, '::before').content,
+        weight: getComputedStyle(first).fontWeight,
+        round: dot.borderRadius,
+        pointBeforeText: dotRect.right < textRect.left,
+        numberedLeft: rows[1].querySelector('.csw-outline-label').getBoundingClientRect().left,
+        childLeft: rows[2].querySelector('.csw-outline-label').getBoundingClientRect().left,
+      };
+    });
+    assert.equal(appearance.dots.length, 3);
+    assert.ok(appearance.dots.every((width) => Math.abs(parseFloat(width) - 4) < 0.02));
+    assert.equal(appearance.outline, 'none');
+    assert.equal(appearance.background, 'rgba(0, 0, 0, 0)');
+    assert.equal(appearance.layer, 'none');
+    assert.equal(appearance.weight, '500');
+    assert.equal(appearance.round, '50%');
+    assert.equal(appearance.pointBeforeText, true);
+    assert.ok(
+      Math.abs(appearance.numberedLeft - appearance.childLeft) < 1,
+      'numbered child alignment uses CSS geometry under zoom',
+    );
+  }
+  await outlineView.locator('[data-outline-id="outline-child"]').click();
+  assert.equal(actions.at(-1).data.kind, 'outline-jump');
+  assert.equal(actions.at(-1).data.id, 'outline-child');
+  await page.keyboard.press('Tab');
+  await outlineView.locator('[data-outline-id="outline-child"]').focus();
+  assert.equal(
+    await outlineView
+      .locator('[data-outline-id="outline-child"]')
+      .evaluate((node) => getComputedStyle(node).outlineStyle),
+    'solid',
+  );
+  await page.locator('#root').evaluate((node) => node.style.removeProperty('zoom'));
+  await page.setViewportSize({ width: 850, height: 700 });
+  await outlineView.locator('[data-outline-id="outline-long"]').evaluate((row) => {
+    const label = row.querySelector('.csw-outline-label');
+    const marker = row.querySelector('.csw-outline-heading-marker');
+    if (label.getBoundingClientRect().height <= parseFloat(getComputedStyle(label).lineHeight))
+      throw new Error('Long title must wrap at the narrow verification width');
+    if (Math.abs(label.getBoundingClientRect().top - marker.getBoundingClientRect().top) > 1)
+      throw new Error('Outline dot must align with the first line');
+  });
+  await page.screenshot({ path: join(output, 'outline-text-light.png'), animations: 'disabled' });
+  surfaceTheme = 'black';
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector('.csw-workbench')).color === 'rgb(238, 238, 238)',
+  );
+  await page.waitForFunction(() => {
+    const hosts = [...document.querySelectorAll('.csw-feature-content > div')];
+    return ['outline', 'next'].every((id) =>
+      hosts.some((host) => {
+        const label = host.shadowRoot?.querySelector(
+          id === 'outline' ? '.csw-outline-label' : '.csw-row-label',
+        );
+        return label && getComputedStyle(label).color === 'rgb(238, 238, 238)';
+      }),
+    );
+  });
+  await page.screenshot({ path: join(output, 'outline-text-dark.png'), animations: 'disabled' });
+  surfaceTheme = 'matte';
+  await page.setViewportSize(outlineViewport);
+  record(
+    'outline dots share next typography, preserve numbering under zoom and keep navigation accessible',
+  );
   projection.hostTypography = { baseItemFontSize: 13 };
   projection.display = { labelOnly: false, promptClickMode: 'fill', fontSize: 19.4 };
   for (const size of [19.4, 23.1]) {

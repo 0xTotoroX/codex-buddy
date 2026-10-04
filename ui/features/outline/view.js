@@ -1,5 +1,5 @@
 /* [INPUT]: Outline projection and guarded navigation callback.
- * [OUTPUT]: Original outline rows, hanging numbering and turn navigation shared by all surfaces.
+ * [OUTPUT]: Borderless dotted outline rows, hanging numbering and turn navigation shared by all surfaces.
  * [POS]: Content only; Codex parsing and scrolling stay in the adapter.
  * [PROTOCOL]: Keep features/outline/AGENTS.md in sync. */
 import { escapeAttr, escapeHtml, normalizeText } from '../../shared/text.js';
@@ -19,7 +19,12 @@ export function alignOutlineNestedText(root) {
       const prefix = row.querySelector('.csw-outline-prefix');
       numberedAncestors.push({
         level,
-        width: Math.max(0, (prefix?.getBoundingClientRect().width || 0) + 8 - OUTLINE_INDENT_STEP),
+        width: Math.max(
+          0,
+          (prefix ? parseFloat(getComputedStyle(prefix).width) || 0 : 0) +
+            (parseFloat(getComputedStyle(row).columnGap) || 0) -
+            OUTLINE_INDENT_STEP,
+        ),
       });
       return;
     }
