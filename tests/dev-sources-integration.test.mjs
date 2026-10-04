@@ -312,6 +312,7 @@ test(
       assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
       await navigation.getByRole('link', { name: '大纲', exact: true }).click();
       await outlineSwitch.waitFor();
+      await until(() => outlineSwitch.isEnabled(), 'settings remain usable after switching');
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
       await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'settings must still render after switching source');
