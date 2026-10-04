@@ -4,7 +4,7 @@
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { titles } from '../../shared/features';
 import { installArrangement } from './arrangement.js';
-import { bindSeparator } from './separator.js';
+import { bindSeparator, elementScale } from './separator.js';
 import { layoutGroups, layoutMinimum, arrangeFeatureLayout } from './layout-tree.js';
 
 // Settings and the workspace must interpret an old two-feature layout identically.
@@ -100,6 +100,27 @@ export function installFeatureLayout(root, { save, error }) {
       target,
       items.filter((item) => item.active).map((item) => item.id),
     );
+  function splitFits(section, id, action) {
+    const axis = ['left', 'right'].includes(action) ? 'horizontal' : 'vertical';
+    const size = axis === 'horizontal' ? 'width' : 'height';
+    const parent = section.parentElement;
+    const scale = elementScale(parent)[axis === 'horizontal' ? 'x' : 'y'];
+    let available = section.getBoundingClientRect()[size] / scale;
+    const source = panes.querySelector(`[data-pane-tab="${id}"]`)?.closest('section[data-pane]');
+    const group = layoutGroups(layout).find((g) => g.ids.includes(id));
+    const siblings = [...parent.children].filter(
+      (node) => !node.hidden && !node.matches('[role="separator"]'),
+    );
+    if (
+      group?.ids.filter((entry) => items.some((item) => item.id === entry && item.active))
+        .length === 1 &&
+      source?.parentElement === parent &&
+      parent.dataset.axis === axis &&
+      Math.abs(siblings.indexOf(source) - siblings.indexOf(section)) === 1
+    )
+      available += source.getBoundingClientRect()[size] / scale + 8;
+    return available >= layoutMinimum({ ids: [id], active: id, weight: 1 })[size] * 2 + 8;
+  }
   const arrangement = installArrangement(root, {
     read: () => layout,
     write: (next) => {
@@ -131,6 +152,7 @@ export function installFeatureLayout(root, { save, error }) {
                   ? 'top'
                   : 'bottom';
         const target = section.dataset.pane;
+        if (action !== 'merge' && !splitFits(section, id, action)) continue;
         if (arrange(layout, id, action, width, height, target)) return { action, box, id: target };
       }
       return null;
@@ -177,9 +199,11 @@ export function installFeatureLayout(root, { save, error }) {
         const { groups } = containers.get(container);
         const axis = container.dataset.axis;
         const size = axis === 'horizontal' ? 'width' : 'height';
+        const scale = elementScale(container)[axis === 'horizontal' ? 'x' : 'y'];
         return {
-          first: container.children[(index - 1) * 2].getBoundingClientRect()[size],
-          second: container.children[index * 2].getBoundingClientRect()[size],
+          first: container.children[(index - 1) * 2].getBoundingClientRect()[size] / scale,
+          second: container.children[index * 2].getBoundingClientRect()[size] / scale,
+          scale,
           previous: groups[index - 1].original,
           next: groups[index].original,
           minimumFirst: layoutMinimum(groups[index - 1])[size],

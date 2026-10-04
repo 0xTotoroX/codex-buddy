@@ -1,5 +1,14 @@
-/* [INPUT]: Separator, axis and value callbacks. [OUTPUT]: Shared pointer/keyboard resizing.
+/* [INPUT]: Separator, axis and value callbacks with optional CSS-coordinate scale.
+ * [OUTPUT]: Element scale and shared pointer/keyboard resizing.
  * [POS]: Business-independent interaction. [PROTOCOL]: Keep workspace/AGENTS.md in sync. */
+export function elementScale(element) {
+  const rect = element.getBoundingClientRect();
+  return {
+    x: element.offsetWidth ? rect.width / element.offsetWidth : 1,
+    y: element.offsetHeight ? rect.height / element.offsetHeight : 1,
+  };
+}
+
 export function bindSeparator(handle, axis, read, change, save = () => {}) {
   handle.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
@@ -10,7 +19,10 @@ export function bindSeparator(handle, axis, read, change, save = () => {}) {
     const origin = direction === 'x' ? event.clientX : event.clientY;
     const value = read();
     const move = (event) =>
-      change(value, (direction === 'x' ? event.clientX : event.clientY) - origin);
+      change(
+        value,
+        ((direction === 'x' ? event.clientX : event.clientY) - origin) / (value.scale || 1),
+      );
     const finish = () => {
       delete handle.dataset.resizing;
       handle.removeEventListener('pointermove', move);

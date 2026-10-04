@@ -456,6 +456,137 @@ const cases = [
     },
   ],
   [
+    'scaled feature arrangement preserves preview, allocations and CSS resize limits',
+    async (page) => {
+      const { build } = await import('esbuild');
+      const result = await build({
+        stdin: {
+          contents:
+            "import { installFeatureLayout } from './ui/surfaces/workspace/layout.js'; window.installScaledLayout = installFeatureLayout;",
+          resolveDir: root,
+        },
+        bundle: true,
+        write: false,
+        format: 'iife',
+      });
+      await page.addScriptTag({ content: result.outputFiles[0].text });
+      await page.setViewportSize({ width: 1500, height: 1000 });
+      const scope = page.locator('#scaled-feature-fixture');
+      const startDrag = async (name, destination, right = false) => {
+        const source = await scope.getByRole('tab', { name, exact: true }).boundingBox();
+        const target = await scope.locator(destination).boundingBox();
+        await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(
+          target.x + (right ? target.width - 12 : target.width / 2),
+          target.y + target.height / 2,
+          { steps: 10 },
+        );
+        return target;
+      };
+      for (const zoom of [0.8, 1, 1.2]) {
+        await page.evaluate((zoom) => {
+          const root = document.createElement('div');
+          root.id = 'scaled-feature-fixture';
+          root.className = 'csw-workbench';
+          root.style.cssText =
+            'position:fixed;left:12px;top:12px;width:1000px;height:700px;z-index:999999;display:flex;flex-direction:column;border:2px solid transparent;box-sizing:border-box;background:#fff;';
+          root.style.zoom = String(zoom);
+          document.body.append(root);
+          const layout = window.installScaledLayout(root, {
+            save: async (_surface, value) => {
+              window.scaledSaved = structuredClone(value);
+            },
+            error: (error) => {
+              throw error;
+            },
+          });
+          const panes = root.querySelector('.csw-feature-panes');
+          panes.style.padding = '0';
+          const items = ['outline', 'board', 'next'].map((id) => ({
+            id,
+            active: true,
+            node: document.createElement('div'),
+          }));
+          window.scaledLayout = layout;
+          window.scaledItems = items;
+          window.scaledSaved = null;
+          layout.update(items, 'desktop', {
+            axis: 'vertical',
+            groups: items.map(({ id }) => ({ ids: [id], active: id, weight: 1 })),
+          });
+        }, zoom);
+        await settle(page);
+        const before = await scope.locator('[data-pane="next"]').boundingBox();
+        const target = await startDrag('看板', '[data-pane="outline"]');
+        const preview = await scope.locator('.csw-drop-preview:not([hidden])').boundingBox();
+        for (const key of ['x', 'y', 'width', 'height'])
+          near(preview[key], target[key], `zoom ${zoom}: preview ${key}`);
+        await page.mouse.up();
+        await page.waitForFunction(() => window.scaledSaved?.groups.length === 2);
+        assert.deepEqual(
+          await page.evaluate(() => window.scaledSaved.groups.map((g) => g.weight)),
+          [2, 1],
+        );
+        const after = await scope.locator('[data-pane="next"]').boundingBox();
+        near(
+          (after.height - before.height) / zoom,
+          8 / 3,
+          'unrelated allocation only recovers its share of the removed separator',
+        );
+        const divider = scope.locator('.csw-feature-panes > [role="separator"]');
+        await divider.focus();
+        const first = await scope.locator('[data-pane="board"]').boundingBox();
+        await divider.press('ArrowDown');
+        const grown = await scope.locator('[data-pane="board"]').boundingBox();
+        near((grown.height - first.height) / zoom, 16, 'keyboard resize uses CSS pixels');
+        await divider.press('ArrowUp');
+        const handle = await divider.boundingBox();
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + 400 * zoom, { steps: 10 });
+        await page.mouse.up();
+        const minimum = await scope.locator('[data-pane="next"]').boundingBox();
+        near(minimum.height / zoom, 180, 'pointer resize protects the CSS minimum');
+        await page.evaluate(() => {
+          window.scaledLayout.destroy();
+          const root = document.getElementById('scaled-feature-fixture');
+          const layout = window.installScaledLayout(root, {
+            save: async (_surface, value) => {
+              window.scaledSaved = structuredClone(value);
+            },
+            error: (error) => {
+              throw error;
+            },
+          });
+          root.querySelector('.csw-feature-panes').style.padding = '0';
+          window.scaledSaved = null;
+          window.scaledLayout = layout;
+          layout.update(window.scaledItems, 'desktop', {
+            axis: 'horizontal',
+            groups: [
+              { ids: ['outline'], active: 'outline', weight: 1 },
+              { ids: ['board', 'next'], active: 'board', weight: 4 },
+            ],
+          });
+        });
+        await settle(page);
+        await startDrag('下一步', '[data-pane="outline"]', true);
+        assert.equal(
+          await scope.locator('.csw-drop-preview').isVisible(),
+          false,
+          'a too-small target cannot squeeze unrelated panes',
+        );
+        await page.mouse.up();
+        assert.equal(await page.evaluate(() => window.scaledSaved), null);
+        await page.evaluate(() => {
+          window.scaledLayout.destroy();
+          document.getElementById('scaled-feature-fixture').remove();
+        });
+      }
+    },
+  ],
+  [
     'rail launcher replaces capsule and survives navigation without duplicating the workspace',
     async (page) => {
       await mode(page, true);

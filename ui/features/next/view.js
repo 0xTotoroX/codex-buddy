@@ -90,8 +90,6 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
       <section class="csw-prompt-preview" data-preview-index="${previewIndex}" aria-label="建议完整内容">
         <div class="csw-prompt-preview-scroll" tabindex="0">
           <div class="csw-prompt-preview-content">
-            <span class="csw-prompt-preview-kicker">${previewIndex + 1} / ${read().prompts.length}</span>
-            <span class="csw-prompt-preview-title">${escapeHtml(previewItem.label || previewItem.prompt)}</span>
             <span class="csw-prompt-preview-body">${escapeHtml(previewItem.prompt)}</span>
           </div>
         </div>
@@ -208,12 +206,8 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
         row.dataset.previewActive = String(active);
         row.setAttribute('aria-current', active ? 'true' : 'false');
       });
-      const title = preview.querySelector('.csw-prompt-preview-title');
-      const kicker = preview.querySelector('.csw-prompt-preview-kicker');
       const body = preview.querySelector('.csw-prompt-preview-body');
       const scroll = preview.querySelector('.csw-prompt-preview-scroll');
-      if (kicker) kicker.textContent = `${index + 1} / ${read().prompts.length}`;
-      if (title) title.textContent = item.label || item.prompt;
       if (body) body.textContent = item.prompt;
       if (scroll) scroll.scrollTop = 0;
       preview.dataset.previewIndex = String(index);

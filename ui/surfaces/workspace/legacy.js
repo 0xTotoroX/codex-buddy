@@ -51,7 +51,7 @@ import { setOpen } from '../embedded/shell/geometry.js';
 
 import { installAssociation, updateAssociation } from '../../codex/association.js';
 import { installArrangement } from './arrangement.js';
-import { bindSeparator as bindSharedSeparator } from './separator.js';
+import { bindSeparator as bindSharedSeparator, elementScale } from './separator.js';
 const bindSeparator = (handle, axis, read, change) =>
   bindSharedSeparator(handle, axis, read, change, saveWorkbench);
 
@@ -198,7 +198,14 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       () => (panel.querySelector('.csw-workbench-panes').dataset.axis === 'horizontal' ? 'x' : 'y'),
       () => {
         const split = currentSplit();
-        return { axis: split.axis, ratio: split.ratio, available: split.available };
+        return {
+          axis: split.axis,
+          ratio: split.ratio,
+          available: split.available,
+          scale: elementScale(panel.querySelector('.csw-workbench-panes'))[
+            split.axis === 'horizontal' ? 'x' : 'y'
+          ],
+        };
       },
       (start, delta) => {
         const split = currentSplit();

@@ -284,6 +284,7 @@
   outline-offset: -2px;
 }
 .csw-drop-preview {
+  box-sizing: border-box;
   position: absolute;
   z-index: 25;
   pointer-events: none;

@@ -1,10 +1,11 @@
 /*
- * [INPUT]: 工作台 DOM、当前布局与统一提交回调、功能可用状态。
+ * [INPUT]: 工作台 DOM、当前布局与统一提交回调、功能可用状态及定位父级的页面缩放。
  * [OUTPUT]: 标题/标签拖动、双击及键盘放大、隐藏编排命令、可取消落位预览与标签导航。
  * [POS]: 只编排现有视图；不创建窗口、不读取正文、不发业务请求。
  * [PROTOCOL]: 变更时核对 workspace/AGENTS.md。
  */
 import { arrangeWorkbench } from './legacy-layout.js';
+import { elementScale } from './separator.js';
 
 export function installArrangement(
   root,
@@ -235,7 +236,9 @@ export function installArrangement(
       preview.hidden = !drag.target;
       if (!drag.target) return;
       const { action, box } = drag.target;
-      const origin = root.getBoundingClientRect();
+      const parent = preview.offsetParent || root;
+      const origin = parent.getBoundingClientRect();
+      const scale = elementScale(parent);
       let { width, height } = box;
       let left = box.left - origin.left,
         top = box.top - origin.top;
@@ -248,10 +251,10 @@ export function installArrangement(
         if (action === 'bottom') top += height;
       }
       Object.assign(preview.style, {
-        left: `${left}px`,
-        top: `${top}px`,
-        width: `${width}px`,
-        height: `${height}px`,
+        left: `${left / scale.x - parent.clientLeft + parent.scrollLeft}px`,
+        top: `${top / scale.y - parent.clientTop + parent.scrollTop}px`,
+        width: `${width / scale.x}px`,
+        height: `${height / scale.y}px`,
       });
       preview.textContent = action === 'merge' ? '合并为标签' : '分栏';
     },

@@ -534,18 +534,34 @@ export function independentFeatureCases({ mode, syncSettings }) {
             prompts: [
               {
                 label: '第一条合成建议：检查长标题换行后箭头和文字是否仍然对齐',
+                summary: '标题与摘要模式下，概述需要检查的界面边界。',
                 prompt: 'SYNTHETIC_FIRST',
               },
               {
                 label: '第二条合成建议',
+                summary: '确认完整预览可以独立滚动，并保留阅读位置。',
                 prompt: 'SYNTHETIC_SECOND\n' + '合成的长预览内容，用于验证阅读位置。\n'.repeat(50),
               },
             ],
-            display: { labelOnly: true, promptClickMode: 'fill' },
+            display: { labelOnly: false, promptClickMode: 'fill' },
             bridgeStatus: 'ok',
           };
         });
         await next.locator('.csw-row[data-index="1"]').waitFor();
+        assert.equal(
+          await next.locator('.csw-prompt-preview-kicker,.csw-prompt-preview-title').count(),
+          0,
+          'the full prompt preview has no duplicate heading or item counter',
+        );
+        assert.equal(
+          await next
+            .locator('.csw-row-label')
+            .evaluateAll(
+              (labels) => new Set(labels.map((label) => getComputedStyle(label).color)).size,
+            ),
+          1,
+          'all suggestion titles remain readable regardless of preview selection',
+        );
         await next.locator('.csw-row[data-index="0"]').hover();
         const suggestionGeometry = await next
           .locator('.csw-row[data-index="0"]')

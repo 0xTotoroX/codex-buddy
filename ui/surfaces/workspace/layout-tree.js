@@ -1,5 +1,5 @@
 /* [INPUT]: Saved flat or nested feature layouts and drag destinations.
- * [OUTPUT]: Leaf traversal, minimum geometry and local split/merge transformations.
+ * [OUTPUT]: Leaf traversal, minimum geometry and local split/merge with released visible allocations.
  * [POS]: Pure workspace geometry shared by rendering and settings; no business state.
  * [PROTOCOL]: Keep workspace/AGENTS.md in sync. */
 /** @typedef {import('../../shared/features').FeatureLayout} FeatureLayout */
@@ -28,12 +28,37 @@ export function layoutMinimum(node, visibleIds = null) {
     : { width: max('width'), height: sum('height') };
 }
 
-/** Remove empty groups and redundant branches without changing their parent's allocation.
+/** Transfer released visible space locally, retaining closed feature preferences before compacting.
  * @param {FeatureLayout} layout */
-function compact(layout) {
+function compact(layout, target, visibleIds, previouslyVisible) {
+  const present = (node) => ('groups' in node ? node.groups.length : node.ids.length);
+  const visible = (node) =>
+    present(node) &&
+    (!visibleIds ||
+      ('groups' in node ? layoutGroups(node) : [node]).some((g) =>
+        g.ids.some((id) => visibleIds.includes(id)),
+      ));
+  const contains = (node) =>
+    node &&
+    present(node) &&
+    ('groups' in node ? layoutGroups(node) : [node]).some((g) => g.ids.includes(target));
+  layout.groups.forEach((node) => {
+    if ('groups' in node) compact(node, target, visibleIds, previouslyVisible);
+  });
+  layout.groups.forEach((node, index, groups) => {
+    if (present(node) && (!previouslyVisible.has(node) || visible(node))) return;
+    const previous = groups.slice(0, index).findLast(visible);
+    const following = groups.slice(index + 1).find(visible);
+    const receiver =
+      [previous, following].find(contains) ||
+      following ||
+      previous ||
+      (!present(node) &&
+        (groups.slice(index + 1).find(present) || groups.slice(0, index).findLast(present)));
+    if (receiver) receiver.weight += node.weight;
+  });
   layout.groups = layout.groups.flatMap((node) => {
     if (!('groups' in node)) return node.ids.length ? [node] : [];
-    compact(node);
     if (!node.groups.length) return [];
     if (node.groups.length === 1) return [{ ...node.groups[0], weight: node.weight }];
     return [node];
@@ -53,6 +78,14 @@ export function arrangeFeatureLayout(value, id, action, width, height, target, v
   if (!['left', 'right', 'top', 'bottom', 'merge'].includes(action)) return null;
   const destination = leaves.find((group) => group.ids.includes(target));
   if (!destination || (source === destination && source.ids.length === 1)) return null;
+  const previouslyVisible = new Set();
+  const rememberVisible = (node) => {
+    if ('groups' in node) node.groups.forEach(rememberVisible);
+    const groups = 'groups' in node ? layoutGroups(node) : [node];
+    if (!visibleIds || groups.some((group) => group.ids.some((id) => visibleIds.includes(id))))
+      previouslyVisible.add(node);
+  };
+  rememberVisible(next);
   source.ids = source.ids.filter((entry) => entry !== id);
   if (source.active === id) source.active = source.ids[0];
   if (action === 'merge') {
@@ -81,7 +114,7 @@ export function arrangeFeatureLayout(value, id, action, width, height, target, v
     };
     split(next);
   }
-  compact(next);
+  compact(next, target, visibleIds, previouslyVisible);
   while (next.groups.length === 1 && 'groups' in next.groups[0]) {
     const branch = next.groups[0];
     next.axis = branch.axis;

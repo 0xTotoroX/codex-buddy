@@ -6,6 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { arrangeFeatureLayout } from '../ui/surfaces/workspace/layout-tree.js';
 import {
   arrangeWorkbench,
   activeWorkbenchPanels,
@@ -126,5 +127,140 @@ test('nested split geometry ignores hidden features without deleting their prefe
   assert.equal(
     arrangeFeatureLayout(saved, 'next', 'right', 300, 500, 'outline', ['outline', 'next']),
     null,
+  );
+});
+
+const featureGroup = (id, weight = 1) => ({ ids: [id], active: id, weight });
+
+test('adjacent merge transfers the source allocation without rebalancing other groups', () => {
+  const before = {
+    axis: 'vertical',
+    groups: ['outline', 'board', 'next'].map((id) => featureGroup(id)),
+  };
+  const unchanged = structuredClone(before);
+  const after = arrangeFeatureLayout(before, 'board', 'merge', 800, 1000, 'outline');
+  assert.deepEqual(
+    after.groups.map((g) => g.weight),
+    [2, 1],
+  );
+  assert.deepEqual(after.groups[0].ids, ['outline', 'board']);
+  assert.deepEqual(before, unchanged);
+});
+
+test('cross-parent merge preserves the enclosing allocation and compacts its remaining sibling', () => {
+  const before = {
+    axis: 'vertical',
+    groups: [
+      {
+        axis: 'horizontal',
+        weight: 3,
+        groups: [featureGroup('outline'), featureGroup('board', 2)],
+      },
+      featureGroup('next', 2),
+    ],
+  };
+  const after = arrangeFeatureLayout(before, 'board', 'merge', 1000, 1200, 'next');
+  assert.deepEqual(after.groups, [
+    featureGroup('outline', 3),
+    { ids: ['next', 'board'], active: 'board', weight: 2 },
+  ]);
+});
+
+test('an emptied nested branch transfers its parent allocation to the nearest surviving sibling', () => {
+  const before = {
+    axis: 'vertical',
+    groups: [
+      { axis: 'horizontal', weight: 2, groups: [featureGroup('outline')] },
+      featureGroup('board'),
+      featureGroup('next', 2),
+    ],
+  };
+  const after = arrangeFeatureLayout(before, 'outline', 'merge', 1000, 1200, 'next');
+  assert.deepEqual(
+    after.groups.map((g) => g.weight),
+    [3, 2],
+  );
+  assert.deepEqual(after.groups[0].ids, ['board']);
+});
+
+test('hidden neighboring features keep their preferences but do not absorb visible released space', () => {
+  const before = {
+    axis: 'vertical',
+    groups: ['outline', 'board', 'next', 'model'].map((id) => featureGroup(id)),
+  };
+  const after = arrangeFeatureLayout(before, 'outline', 'merge', 1000, 1200, 'model', [
+    'outline',
+    'next',
+    'model',
+  ]);
+  assert.deepEqual(
+    after.groups.map((g) => g.weight),
+    [1, 2, 1],
+  );
+  assert.deepEqual(after.groups[0], featureGroup('board'));
+  assert.deepEqual(after.groups[2].ids, ['model', 'outline']);
+});
+
+test('same-group tab moves keep allocation and splitting still creates two equal children', () => {
+  const before = {
+    axis: 'vertical',
+    groups: [{ ids: ['outline', 'board'], active: 'outline', weight: 7 }],
+  };
+  const merged = arrangeFeatureLayout(before, 'board', 'merge', 800, 1000, 'outline');
+  assert.equal(merged.groups[0].weight, 7);
+  assert.equal(merged.groups[0].active, 'board');
+  const split = arrangeFeatureLayout(before, 'board', 'right', 800, 1000, 'outline');
+  assert.equal(split.axis, 'horizontal');
+  assert.deepEqual(
+    split.groups.map((g) => g.weight),
+    [1, 1],
+  );
+  assert.deepEqual(
+    split.groups.map((g) => g.ids),
+    [['outline'], ['board']],
+  );
+});
+
+test('moving the last visible tab releases its budget while preserving a closed tab slot', () => {
+  const before = {
+    axis: 'vertical',
+    groups: [
+      { ids: ['outline', 'board'], active: 'outline', weight: 1 },
+      featureGroup('next'),
+      featureGroup('model'),
+    ],
+  };
+  const after = arrangeFeatureLayout(before, 'outline', 'merge', 1000, 1200, 'next', [
+    'outline',
+    'next',
+    'model',
+  ]);
+  assert.deepEqual(after.groups[0], featureGroup('board'));
+  assert.deepEqual(
+    after.groups.map((g) => g.weight),
+    [1, 2, 1],
+  );
+  assert.deepEqual(after.groups[1].ids, ['next', 'outline']);
+  assert.equal(after.groups[2].weight, 1);
+});
+
+test('a branch becoming hidden releases only its parent budget to visible siblings', () => {
+  const before = {
+    axis: 'vertical',
+    groups: [
+      { axis: 'horizontal', weight: 3, groups: [featureGroup('outline'), featureGroup('board')] },
+      featureGroup('next', 2),
+      featureGroup('model'),
+    ],
+  };
+  const after = arrangeFeatureLayout(before, 'outline', 'merge', 1000, 1200, 'next', [
+    'outline',
+    'next',
+    'model',
+  ]);
+  assert.deepEqual(after.groups[0], featureGroup('board', 3));
+  assert.deepEqual(
+    after.groups.map((g) => g.weight),
+    [3, 5, 1],
   );
 });
