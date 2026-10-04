@@ -528,10 +528,13 @@ try {
   );
   for (const name of ['大纲', '看板', '下一步', '模型快切']) {
     assert.deepEqual(
-      await settingsPage
-        .getByLabel(`${name}默认位置`, { exact: true })
-        .locator('option')
-        .evaluateAll((nodes) => nodes.map((n) => n.value)),
+      await waitFor(async () => {
+        const options = await settingsPage
+          .getByLabel(`${name}默认位置`, { exact: true })
+          .locator('option')
+          .evaluateAll((nodes) => nodes.map((n) => n.value));
+        return options[0] === 'overlay' ? options : null;
+      }, `${name} placement options updated`),
       ['overlay', 'edge'],
     );
   }

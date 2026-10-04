@@ -2,8 +2,8 @@
  * [INPUT]: 官方 DOM 菜单、稳定聊天标记/新聊天输入区和关联的 model/list 消息；不依赖工作台锁定。
  * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 presence/cancel/dispose。
  * [POS]: include_str / Page.addScriptToEvaluateOnNewDocument 可独立安装的宿主边界。
- * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、存储或发送模型请求。
- * snapshot(false) 不操作 DOM；refresh=true 显式探测菜单。target 无法确认时 id/title 为空。
+ * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、持久存储或发送模型请求。
+ * snapshot(false) 不操作 DOM；refresh=true 显式探测菜单，限时等待能力后完整回读。target 无法确认时 id/title 为空。
  * apply 返回 {status,message,snapshot,previous,diagnostic}；status 为 success/partial/failed。
  * 显式 snapshot/apply 附有界阶段诊断，不含目标、聊天正文或 DOM；被动读取不产生诊断。
  * restore 是调用方恢复意图标记；selection 仍须完整且通过全部校验，无隐式回滚。
@@ -34,6 +34,7 @@
 (() => {
   'use strict';
   const KEY = '__codexBuddyModelControl';
+  const CAPABILITIES = Symbol.for('codexBuddy.modelCapabilities');
   window[KEY]?.dispose?.();
   const OWN = '[data-companion-stepwise-root],[data-codex-buddy-dock],[data-codexpp-qmp-root]';
   const EDITOR = '.ProseMirror,[contenteditable="true"],textarea';
@@ -148,14 +149,24 @@
   }
   function accept(records) {
     const next = projectModels(records);
+    // Keep only validated capabilities across adapter reloads in this document.
+    // Current selection, request correlation and revisions belong to each instance.
+    document[CAPABILITIES] = next.map(({ id, label, reasoning, fast }) => ({
+      model: id,
+      displayName: label,
+      supportedReasoningEfforts: [...reasoning],
+      serviceTiers: fast ? ['priority'] : [],
+    }));
     if (JSON.stringify(next) !== JSON.stringify(models)) {
       models = next;
       capabilityVersion++;
       cache = null;
     }
   }
+  accept(document[CAPABILITIES]);
   try {
-    accept(window.__codexPlusQuickModelPresets?.getModelListCache?.());
+    const inherited = window.__codexPlusQuickModelPresets?.getModelListCache?.();
+    if (Array.isArray(inherited)) accept(inherited);
   } catch {}
   const originalDispatch = window.dispatchEvent;
   function wrappedDispatch(event) {
@@ -1023,7 +1034,17 @@
       // A hot injection can provoke a normal host capability fetch by opening its menu.
       const main = await simpleMain(op);
       guard(op, main);
-      const current = models.length ? readMain(op, main) : null;
+      if (!models.length) {
+        phase(op, '等待可用模型');
+        try {
+          await waitFor(op, () => models.length > 0, 3500);
+        } catch {
+          guard(op);
+          throw new Error('未收到官方模型列表，请稍后重新刷新');
+        }
+      }
+      guard(op, main);
+      const current = readMain(op, main);
       await closeMenu(op);
       if (current) remember(op, current);
     } catch (cause) {
@@ -1036,8 +1057,7 @@
     result.diagnostic = diagnostic(op);
     if (error) {
       result.message = error;
-      if (models.length && ['ready', 'waiting'].includes(result.status))
-        result.status = 'unavailable';
+      if (['ready', 'waiting'].includes(result.status)) result.status = 'unavailable';
     }
     return result;
   }
