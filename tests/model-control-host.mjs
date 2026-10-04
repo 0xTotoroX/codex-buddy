@@ -636,13 +636,22 @@ try {
     { noCapabilities: true },
   );
   await check(
-    'hot injection refresh waiting; capabilities can arrive during explicit refresh without restart',
+    'empty refresh reports timeout and a retry waits for delayed capabilities before readback',
     async (page) => {
-      assert.equal((await snapshot(page, true)).status, 'waiting');
+      const empty = await snapshot(page, true);
+      assert.equal(empty.status, 'unavailable');
+      assert.match(empty.message, /未收到官方模型列表/);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
       await page.evaluate(() => {
-        host.onOpen = () => capability('late');
+        host.onOpen = () => setTimeout(() => capability('late'), 400);
       });
-      assert.equal((await snapshot(page, true)).status, 'ready');
+      const recovered = await snapshot(page, true);
+      assert.equal(recovered.status, 'ready');
+      assert.equal(recovered.models.length, 2);
+      assert.deepEqual(recovered.current, { model: 'alpha', reasoning: 'low', speed: 'standard' });
+      assert.equal(recovered.diagnostic.mutated, false);
+      assert.deepEqual(await page.evaluate(() => host.changes), []);
+      assert.equal(await page.locator('[role="menu"]').count(), 0);
     },
     { noCapabilities: true },
   );
@@ -792,17 +801,30 @@ try {
     },
   );
   await check(
-    'reinjection rotates nonce and cancels previous instance without touching host menus',
+    'reinjection preserves capabilities, resets current and revision, and new documents start empty',
     async (page) => {
-      const before = await snapshot(page);
+      const before = await snapshot(page, true);
+      assert.ok(before.current);
+      await page.evaluate(() => {
+        host.clicks.length = 0;
+        host.triggerEvents = 0;
+        window.__codexBuddyModelControl.dispose();
+      });
       await page.addScriptTag({ content: source });
-      await page.evaluate(() => capability('reinjected'));
-      assert.notEqual((await snapshot(page)).revision, before.revision);
+      const reloaded = await snapshot(page);
+      assert.deepEqual(reloaded.models, before.models);
+      assert.equal(reloaded.current, null);
+      assert.notEqual(reloaded.revision, before.revision);
       assert.equal(
         (await apply(page, targetBeta, { expectedRevision: before.revision })).status,
         'failed',
       );
       assert.equal(await page.evaluate(() => host.triggerEvents), 0);
+      assert.deepEqual((await snapshot(page, true)).current, before.current);
+      assert.deepEqual(await page.evaluate(() => host.changes), []);
+      await fixture(page, { early: true, noCapabilities: true });
+      assert.equal((await snapshot(page)).models.length, 0);
+      assert.equal((await snapshot(page)).current, null);
     },
   );
   await check('capability change after selection aborts without more menu events', async (page) => {
