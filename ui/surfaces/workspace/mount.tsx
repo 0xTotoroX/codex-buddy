@@ -65,7 +65,6 @@ export function mountFeature(
     `
 .feature-view{--csw-text:var(--ink);--csw-muted:var(--muted);--csw-accent:var(--accent);--csw-hover:var(--hover);--csw-surface-opaque:var(--surface);--csw-item-font:1em;--csw-chrome-font:1em;--csw-label-weight:600;--csw-divider:var(--line);}
 .feature-projection button{border:0}.feature-projection svg{width:18px;height:18px}.feature-view:hover .csw-outline-toolbar,.csw-outline-toolbar:focus-within{opacity:1;pointer-events:auto;transform:none}
-.csw-row:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.csw-prompt-preview{transition:none}}`;
   const root = isolatedRoot(element, css);
   let prepareReload: (() => Promise<boolean>) | undefined;

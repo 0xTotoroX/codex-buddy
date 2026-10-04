@@ -1,5 +1,5 @@
 /* [INPUT]: Suggestion projection, display preferences and guarded action callback.
- * [OUTPUT]: Original list/preview and hover/focus; quick prompts share suggestion single/double-click rules.
+ * [OUTPUT]: List/preview with leading turn arrows and hover/focus; quick prompts share suggestion single/double-click rules.
  * [POS]: Content interaction only; generation and input validation stay in Codex/backend services.
  * [PROTOCOL]: Keep features/next/AGENTS.md in sync. */
 import { escapeAttr, escapeHtml, normalizeText, clamp } from '../../shared/text.js';
@@ -78,11 +78,11 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
         .prompts.map(
           (item, index) => `
         <button class="csw-row" type="button" data-index="${index}" data-preview-active="${index === previewIndex}" aria-current="${index === previewIndex ? 'true' : 'false'}">
+          <span class="csw-row-arrow" aria-hidden="true">${iconSvg('return')}</span>
           <span class="csw-row-copy">
             <span class="csw-row-label">${escapeHtml(item.label || item.prompt)}</span>
             ${(read().display?.labelOnly ?? true) ? '' : `<span class="csw-row-prompt">${escapeHtml(item.summary || item.prompt)}</span>`}
           </span>
-          <span class="csw-row-arrow" aria-hidden="true">${iconSvg('chevron-right')}</span>
         </button>
       `,
         )

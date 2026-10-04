@@ -532,7 +532,10 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.evaluate(() => {
           window.workbenchFixture.nextProjection = {
             prompts: [
-              { label: '第一条合成建议', prompt: 'SYNTHETIC_FIRST' },
+              {
+                label: '第一条合成建议：检查长标题换行后箭头和文字是否仍然对齐',
+                prompt: 'SYNTHETIC_FIRST',
+              },
               {
                 label: '第二条合成建议',
                 prompt: 'SYNTHETIC_SECOND\n' + '合成的长预览内容，用于验证阅读位置。\n'.repeat(50),
@@ -543,6 +546,39 @@ export function independentFeatureCases({ mode, syncSettings }) {
           };
         });
         await next.locator('.csw-row[data-index="1"]').waitFor();
+        await next.locator('.csw-row[data-index="0"]').hover();
+        const suggestionGeometry = await next
+          .locator('.csw-row[data-index="0"]')
+          .evaluate((row) => {
+            const arrow = row.querySelector('.csw-row-arrow').getBoundingClientRect();
+            const label = row.querySelector('.csw-row-label');
+            const text = label.getBoundingClientRect();
+            const preview = row
+              .closest('.csw-next-layout')
+              .querySelector('.csw-prompt-preview-body');
+            return {
+              arrowWidth: arrow.width,
+              arrowRight: arrow.right,
+              textLeft: text.left,
+              firstLineCenter: text.top + parseFloat(getComputedStyle(label).lineHeight) / 2,
+              arrowCenter: arrow.top + arrow.height / 2,
+              previewLeft: preview.getBoundingClientRect().left,
+              outlineStyle: getComputedStyle(row).outlineStyle,
+              background: getComputedStyle(row).backgroundColor,
+            };
+          });
+        assert.equal(suggestionGeometry.arrowWidth, 18);
+        assert.ok(suggestionGeometry.arrowRight < suggestionGeometry.textLeft);
+        assert.ok(
+          Math.abs(suggestionGeometry.arrowCenter - suggestionGeometry.firstLineCenter) < 1,
+          'leading arrow aligns with the first line of a wrapping title',
+        );
+        assert.ok(
+          Math.abs(suggestionGeometry.textLeft - suggestionGeometry.previewLeft) < 1,
+          'suggestion and full preview text share the same left edge',
+        );
+        assert.equal(suggestionGeometry.outlineStyle, 'none', 'hover never frames a suggestion');
+        assert.equal(suggestionGeometry.background, 'rgba(0, 0, 0, 0)');
         await next.locator('.csw-row[data-index="1"]').focus();
         await page.waitForTimeout(1800);
         assert.equal(

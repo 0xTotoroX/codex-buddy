@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 大纲和建议 DOM、状态属性与共享变量。
- * [OUTPUT]: 建议列表、预览、大纲和内容状态的布局与外观，定位按钮透明无底块，鼠标离开后仅键盘聚焦保留导航。
+ * [OUTPUT]: 无框建议列表与预览、大纲和内容状态的布局与外观，定位按钮透明无底块，鼠标离开后仅键盘聚焦保留导航。
  * [POS]: 功能内容样式，由 workspace/mount 与 shell/install-styles 共用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -37,7 +37,7 @@
   align-content: start;
   align-self: start;
   flex: 0 0 auto;
-  gap: 6px;
+  gap: 12px;
   grid-auto-rows: max-content;
   height: max-content;
   min-height: max-content;
@@ -51,64 +51,27 @@
   appearance: none;
   background: transparent;
   border: 0;
-  border-top: 0;
-  border-radius: 13px;
-  color: inherit;
+  border-radius: 4px;
+  color: var(--csw-muted);
   cursor: pointer;
   display: grid;
-  gap: var(--buddy-space-3);
-  grid-template-columns: minmax(0, 1fr) 18px;
-  isolation: isolate;
+  gap: 12px;
+  grid-template-columns: 18px minmax(0, 1fr);
   box-sizing: border-box;
   min-height: 64px;
   min-width: 0;
   overflow: hidden;
-  padding: 13px 10px;
+  padding: 14px 8px;
   position: relative;
   text-align: left;
   width: 100%;
 }
 
-.csw-row::before {
-  background: var(--csw-row-surface);
-  border-radius: inherit;
-  content: '';
-  inset: 0;
-  opacity: 0;
-  pointer-events: none;
-  position: absolute;
-  z-index: -1;
-}
-
-.csw-row:first-child {
-  border-top: 0;
-}
-
 .csw-row:hover,
 .csw-row:focus-visible,
-.csw-row:focus-within {
-  background: transparent;
-  color: var(--csw-text);
-  outline: 1px solid color-mix(in srgb, var(--csw-text) 12%, transparent);
-  outline-offset: -1px;
-}
-
-.csw-row:hover::before,
-.csw-row:focus-visible::before,
-.csw-row:focus-within::before {
-  opacity: 1;
-}
-
 .csw-row[data-preview-active='true'] {
   background: transparent;
   color: var(--csw-text);
-  outline: 1px solid color-mix(in srgb, var(--csw-accent) 34%, transparent);
-  outline-offset: -1px;
-}
-
-.csw-row[data-preview-active='true']::before {
-  background: var(--csw-row-selected);
-  opacity: 1;
 }
 
 .csw-row:active {
@@ -122,10 +85,11 @@
 }
 
 .csw-row-label {
-  color: var(--csw-text);
+  color: inherit;
   display: block;
   font-size: var(--csw-item-font);
-  font-weight: var(--csw-label-weight, 600);
+  font-weight: 400;
+  letter-spacing: 0.01em;
   line-height: 1.3;
   margin-bottom: 3px;
   overflow-wrap: anywhere;
@@ -134,7 +98,7 @@
 .csw-row-prompt {
   color: var(--csw-muted);
   display: -webkit-box;
-  font-size: max(10px, calc(var(--csw-item-font) - 1px));
+  font-size: max(13px, calc(var(--csw-item-font) - 1px));
   line-height: 1.46;
   max-height: 2.92em;
   overflow: hidden;
@@ -149,71 +113,38 @@
 }
 
 .csw-list[data-label-only='true'] .csw-row {
-  align-items: center;
-  min-height: 44px;
-  padding-block: 10px;
+  min-height: 48px;
+  padding-block: 14px;
 }
 
 .csw-list[data-label-only='true'] .csw-row-label {
   margin-bottom: 0;
 }
 
-.csw-list[data-label-only='true'] .csw-row-arrow {
-  align-self: center;
-}
-
 .csw-row-arrow {
-  color: var(--csw-faint);
-  font-size: 17px;
+  align-items: center;
+  color: var(--csw-muted);
+  display: flex;
+  height: calc(var(--csw-item-font) * 1.3);
+  justify-content: center;
   line-height: 1;
-  text-align: center;
+  width: 18px;
 }
 
 .csw-row:hover .csw-row-arrow,
 .csw-row:focus-visible .csw-row-arrow,
 .csw-row[data-preview-active='true'] .csw-row-arrow {
-  color: var(--csw-accent);
-  transform: translateX(2px);
+  color: var(--csw-text);
 }
 
 .csw-prompt-preview {
-  --csw-prompt-edge-fade-size: clamp(36px, 16%, 64px);
   background: transparent;
   border: 0;
   border-radius: 20px;
   box-shadow: none;
-  isolation: isolate;
   min-height: 0;
   overflow: hidden;
   position: relative;
-}
-
-.csw-prompt-preview::before {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    #000 0,
-    #000 calc(100% - var(--csw-prompt-edge-fade-size)),
-    transparent 100%
-  );
-  -webkit-mask-repeat: no-repeat;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--csw-text) 4.5%, transparent), transparent),
-    color-mix(in srgb, var(--csw-surface-opaque) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--csw-text) 7%, transparent);
-  border-radius: inherit;
-  box-sizing: border-box;
-  content: '';
-  inset: 0;
-  mask-image: linear-gradient(
-    to bottom,
-    #000 0,
-    #000 calc(100% - var(--csw-prompt-edge-fade-size)),
-    transparent 100%
-  );
-  mask-repeat: no-repeat;
-  pointer-events: none;
-  position: absolute;
-  z-index: 0;
 }
 
 .csw-prompt-preview-scroll {
@@ -222,7 +153,7 @@
   mask-image: none;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 16px 18px 28px;
+  padding: 16px 10px 28px 40px;
   position: relative;
   scrollbar-color: color-mix(in srgb, var(--csw-text) 20%, transparent) transparent;
   scrollbar-width: thin;
@@ -582,18 +513,19 @@
 }
 .csw-quick-prompt {
   font: inherit;
-  color: inherit;
+  color: var(--csw-muted);
   background: transparent;
-  border: 1px solid var(--csw-border, #8884);
-  border-radius: 8px;
-  padding: 4px 10px;
+  border: 0;
+  border-radius: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
   cursor: pointer;
 }
 .csw-quick-prompt:hover {
-  background: var(--csw-hover, #8882);
+  color: var(--csw-text);
 }
 .csw-quick-prompt:focus-visible {
-  outline: 2px solid var(--csw-accent);
+  outline: 1px solid color-mix(in srgb, var(--csw-text) 45%, transparent);
   outline-offset: 2px;
 }
 .csw-next-content > .csw-empty,
@@ -602,7 +534,7 @@
 }
 
 .csw-row:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--csw-accent) 72%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--csw-text) 45%, transparent);
   outline-offset: 2px;
 }
 
@@ -614,28 +546,20 @@
 
 @container csw-panel (max-width: 440px) {
   .csw-row {
-    gap: var(--buddy-space-2);
-    grid-template-columns: minmax(0, 1fr) 16px;
-    padding: 11px 8px;
-  }
-}
-
-@container csw-panel (max-width: 440px) {
-  .csw-row-arrow {
-    font-size: 16px;
+    gap: 10px;
+    padding: 14px 8px;
   }
 }
 
 @container csw-panel (max-width: 440px) {
   .csw-prompt-preview-scroll {
-    padding: 14px 14px 26px;
+    padding: 14px 10px 26px 36px;
   }
 }
 
 @container csw-panel (max-width: 320px) {
   .csw-row {
-    gap: 6px;
-    grid-template-columns: minmax(0, 1fr) 14px;
+    gap: 8px;
     padding-inline: 6px;
   }
 }
@@ -643,6 +567,9 @@
 @container csw-panel (max-width: 320px) {
   .csw-prompt-preview {
     border-radius: 16px;
+  }
+  .csw-prompt-preview-scroll {
+    padding-left: 32px;
   }
 }
 
@@ -674,21 +601,16 @@
 
 .csw-row {
   transition:
-    background 140ms ease-out,
-    color 140ms ease-out,
+    color 120ms ease,
     transform 90ms ease-out;
 }
 
-.csw-row::before {
-  transition:
-    background 180ms ease-out,
-    opacity 160ms ease-out;
+.csw-row-arrow svg {
+  transform: scaleX(-1);
 }
 
 .csw-row-arrow {
-  transition:
-    color 160ms ease,
-    transform 160ms ease;
+  transition: color 120ms ease;
 }
 
 .csw-prompt-preview-content {
@@ -731,6 +653,13 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .csw-row,
+  .csw-row-arrow {
+    transition: none;
+  }
+  .csw-row:active {
+    transform: none;
+  }
   .csw-progress-title {
     animation: none !important;
     background: none;
@@ -756,7 +685,7 @@
 }
 
 :is(.csw-workbench, .feature-projection) .csw-row {
-  padding: 9px 8px;
+  padding-block: 14px;
   min-height: 48px;
 }
 :is(.csw-workbench, .feature-projection) .csw-row-prompt {
