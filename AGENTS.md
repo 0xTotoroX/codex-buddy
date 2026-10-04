@@ -91,12 +91,12 @@ Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + 
 - `.cargo/config.toml`：macOS 14.0 最低部署目标。
 - `.github/workflows/ci.yml`：普通推送与 PR 运行 macOS 26 全套检查，手动 full 运行全部兼容组合；不生成发布包。
 - `.github/workflows/verify.yml`：CI/CD 共用验证矩阵；完整模式覆盖 macOS 14 最低工具链、macOS 15 浮窗与 macOS 26，全部通过才允许发布。
-- `.github/workflows/release.yml`：版本标签或手动指定标签触发共用完整验证；打包阶段不重复测试，三个资产上传到草稿后才公开；拒绝覆盖已有 Release。
+- `.github/workflows/release.yml`：版本标签或手动指定标签触发共用完整验证；打包阶段不重复测试，仅上传 macOS arm64 程序 tar.gz，归档摘要追加到原发行说明，上传到草稿后才公开；拒绝覆盖已有 Release。
 - `.github/release-notes/v*.md`：对应标签的公开发行说明；CD 要求版本、标签和说明文件一致。
 - `.gitignore`：隔离构建产物、测试证据和私有运行数据。
 - `LICENSE`：自有源码 MIT 许可。
 
-分发生成物不提交 Git：`npm run notices` 在 `dist/licenses/` 生成第三方许可与依赖清单；`npm run package` 自动在分发目录生成，并重新导出通过公开检查的当前源码归档及 SHA-256 校验文件；不复用旧源码包。源码检查和打包支持 Git 工作树与不含 .git 的源码解压目录，共用公开文件清单。递归收集依赖包内许可与署名，保留相对路径并合入固定来源补充；缺少元数据、许可文档或文档为空时停止。清单包含其他平台和开发依赖，不证明最终链接范围或源码内许可已穷尽。
+分发生成物不提交 Git：`npm run notices` 在 `dist/licenses/` 生成第三方许可与依赖清单；`npm run package` 自动在分发目录生成，保留包内程序 SHA256SUMS 与 manifest；另生成仅用于追加到 Release 正文的归档校验说明，不上传独立源码包或 SHA256SUMS。源码分发使用 GitHub 标签自动归档。源码检查和打包支持 Git 工作树与不含 .git 的源码解压目录，共用公开文件清单。递归收集依赖包内许可与署名，保留相对路径并合入固定来源补充；缺少元数据、许可文档或文档为空时停止。清单包含其他平台和开发依赖，不证明最终链接范围或源码内许可已穷尽。
 
 ## Map 系统：架构同步约定
 

@@ -112,7 +112,7 @@ block-beta
 
 准备好 ChatGPT / Codex 桌面应用，以及 Node.js 22.16+、Rust 1.88+、Xcode Command Line Tools。
 
-从 [Releases](https://github.com/0xTotoroX/codex-buddy/releases) 下载并解压源码包，在项目目录执行：
+从 [Releases](https://github.com/0xTotoroX/codex-buddy/releases) 下载并解压 GitHub 自动生成的 **Source code (zip)** 或 **Source code (tar.gz)**，在项目目录执行：
 
 ```sh
 npm ci
