@@ -42,6 +42,22 @@
   display: grid;
   gap: 8px;
 }
+.model-preset-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 0;
+}
+.model-preset-editor input {
+  flex: 1 1 120px;
+  min-width: 0;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+}
 .model-scroll {
   overflow-x: auto;
 }

@@ -233,6 +233,40 @@ export function independentFeatureCases({ mode, syncSettings }) {
         assert.ok(
           Math.abs(emptyTitle.x + emptyTitle.width / 2 - emptyArea.x - emptyArea.width / 2) < 2,
         );
+        const originalViewport = page.viewportSize();
+        for (const [zoom, width, height] of [
+          [1.2, 1600, 900],
+          [0.8, 1320, 850],
+          [1.5, 1800, 1100],
+          [1, originalViewport.width, originalViewport.height],
+        ]) {
+          await page.setViewportSize({ width, height });
+          await page.evaluate((zoom) => {
+            document.querySelector('.workspace').style.zoom = zoom;
+          }, zoom);
+          await page.waitForFunction(() => {
+            const slot = document.querySelector('[data-codex-buddy-dock]');
+            const panel = slot?.querySelector('.csw-panel');
+            if (!panel) return false;
+            const available = slot.getBoundingClientRect();
+            const actual = panel.getBoundingClientRect();
+            return (
+              Math.abs(actual.width - available.width) < 2 &&
+              Math.abs(actual.bottom - available.bottom) < 2
+            );
+          });
+          const title = await outline.locator('.csw-empty-title').boundingBox();
+          const pane = await page.locator('.csw-workbench-pane[data-pane="outline"]').boundingBox();
+          const area = await outline.locator('.feature-projection').boundingBox();
+          assert.ok(
+            Math.abs(title.x + title.width / 2 - pane.x - pane.width / 2) < 2,
+            `outline empty title horizontally centered at ${zoom * 100}% zoom`,
+          );
+          assert.ok(
+            Math.abs(title.y + title.height / 2 - area.y - area.height / 2) < 2,
+            `outline empty title vertically centered at ${zoom * 100}% zoom`,
+          );
+        }
         await page.evaluate(() => {
           window.workbenchFixture.outlineProjection = window.workbenchFixture.populatedOutline;
         });

@@ -537,7 +537,13 @@ try {
     const placement = settingsPage.getByLabel(`${name}默认位置`, { exact: true });
     await placement.locator('option[value="overlay"]').waitFor({ state: 'attached' });
     assert.deepEqual(
-      await placement.locator('option').evaluateAll((nodes) => nodes.map((n) => n.value)),
+      await waitFor(async () => {
+        const options = await settingsPage
+          .getByLabel(`${name}默认位置`, { exact: true })
+          .locator('option')
+          .evaluateAll((nodes) => nodes.map((n) => n.value));
+        return options[0] === 'overlay' ? options : null;
+      }, `${name} placement options updated`),
       ['overlay', 'edge'],
     );
   }
