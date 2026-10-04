@@ -112,7 +112,7 @@ With the eyes focused, **Alt+Enter** is equivalent to a double-click. Floating a
 
 You need the ChatGPT / Codex desktop app, Node.js 22.16+, Rust 1.88+, and Xcode Command Line Tools.
 
-Download and extract the source archive from [Releases](https://github.com/0xTotoroX/codex-buddy/releases), then run these commands in the project directory:
+Download and extract GitHub’s **Source code (zip)** or **Source code (tar.gz)** from [Releases](https://github.com/0xTotoroX/codex-buddy/releases), then run these commands in the project directory:
 
 ```sh
 npm ci

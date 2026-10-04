@@ -1,12 +1,11 @@
 /*
- * [INPUT]: release 程序、source-audit 共用清单与公开检查、LICENSE 与锁定依赖。
- * [OUTPUT]: macOS arm64 程序包、当前公开源码包及校验和。
+ * [INPUT]: release 程序、source-audit 公开检查、LICENSE 与锁定依赖。
+ * [OUTPUT]: macOS arm64 程序包及供 Release 正文追加的归档校验说明。
  * [POS]: 本地打包入口，校验最低系统版本并携带许可。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import { prepareTestBinary } from './verify.mjs';
-import { publicSourceFiles } from './source-audit.mjs';
 import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
@@ -81,7 +80,7 @@ macOS 15+ 的弹出窗口始终展开，可拖动、调整尺寸和置顶，默�
 - 磨砂：内嵌为 CSS 模糊；弹出为原生 HUDWindow，保持激活外观，使用圆角浅阴影。
 - 液态：内嵌使用自有 SVG 折射；弹出使用 macOS 26+ Liquid Glass。外观框内星星切换 Regular/Clear，点亮为 Clear；macOS 15–25 的弹出液态回退哑光。弹出液态仍有系统焦点变化。
 
-解压此包不会替换已有安装或配置；源码安装和开发说明见源码包 README。
+解压此包不会替换已有安装或配置；源码安装和开发说明见 GitHub Release 的 Source code 归档内 README。
 
 ## 文件
 
@@ -121,23 +120,23 @@ const packed = spawnSync('tar', ['-czf', archive, '-C', join(root, 'dist'), name
   stdio: 'inherit',
 });
 if (packed.error || packed.status !== 0) throw new Error('tar 打包失败；单文件产物仍在 dist 目录');
-// Source exports follow the audited working tree, including new files awaiting a commit.
-const sourceFiles = publicSourceFiles(root);
-const sourceArchive = join(root, 'dist', `codex-buddy-${version}-source.tar.gz`);
-const sourcePacked = spawnSync('tar', ['-czf', sourceArchive, '--null', '-T', '-'], {
-  cwd: root,
-  input: sourceFiles.join('\0') + '\0',
-  encoding: 'utf8',
-});
-if (sourcePacked.error || sourcePacked.status !== 0)
-  throw new Error(`源码打包失败：${sourcePacked.stderr || sourcePacked.error}`);
-const sourceHash = createHash('sha256').update(readFileSync(sourceArchive)).digest('hex');
 const archiveHash = createHash('sha256').update(readFileSync(archive)).digest('hex');
-rmSync(`${sourceArchive}.sha256`, { force: true });
+const checksumNotes = join(root, 'dist', 'release-checksums.md');
 writeFileSync(
-  join(root, 'dist', 'SHA256SUMS'),
-  `${archiveHash}  ${name}.tar.gz\n${sourceHash}  codex-buddy-${version}-source.tar.gz\n`,
+  checksumNotes,
+  `\n\n## 下载与校验
+
+\`${name}.tar.gz\` 是 macOS 14.0+ Apple Silicon 预编译命令行程序包，无需 Node.js 或 Rust；不包含 App / DMG。源码使用本页 GitHub 自动生成的 Source code (zip / tar.gz)。
+
+在下载目录执行以下命令校验程序归档：
+
+\`\`\`sh
+printf '%s\\n' '${archiveHash}  ${name}.tar.gz' | shasum -a 256 -c -
+\`\`\`
+
+解压后，在包内执行 \`shasum -a 256 -c SHA256SUMS\` 校验可执行程序。包内保留 LICENSE、THIRD_PARTY_NOTICES.md、dependencies.json 和 manifest.json。CLI 更新的 \`--sha256\` 参数使用包内程序摘要，不使用上述归档摘要。
+`,
 );
 console.log(
-  `产物：${archive}\n源码包：${sourceArchive}（${sourceFiles.length} 个公开文件）\n归档校验：${join(root, 'dist', 'SHA256SUMS')}\n二进制 SHA-256：${hash}`,
+  `产物：${archive}\nRelease 校验说明：${checksumNotes}\n归档 SHA-256：${archiveHash}\n二进制 SHA-256：${hash}`,
 );
