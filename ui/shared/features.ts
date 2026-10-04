@@ -1,5 +1,5 @@
 /* [INPUT]: Authenticated feature transport and shared business DTOs.
- * [OUTPUT]: Four-feature placement, default content fonts, recursive split geometry and transient view contracts.
+ * [OUTPUT]: Four-feature placement, main ownership, default fonts, recursive split geometry and transient view contracts.
  * [POS]: Presentation boundary. [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import type { BoardView } from '../features/board/app';
 export const titles = { outline: '大纲', board: '看板', next: '下一步', model: '模型快切' };
@@ -48,6 +48,7 @@ export type LayoutGroup = { ids: string[]; active: string; weight: number };
 export type LayoutNode = LayoutGroup | (FeatureLayout & { weight: number });
 export type FeatureLayout = { axis: string; groups: LayoutNode[] };
 export type FeatureState = {
+  mainManaged?: boolean;
   layouts?: Record<string, FeatureLayout>;
   legacyLayouts?: Record<string, import('./contracts').WorkbenchLayout>;
   activeFeature?: string;

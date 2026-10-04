@@ -1,5 +1,5 @@
 // [INPUT]: Fixed feature identities, authenticated UI requests and existing business services.
-// [OUTPUT]: One main placement, independent edge membership, checked per-surface layouts and view handoff.
+// [OUTPUT]: One main placement, main ownership independent of edge membership, checked layouts and view handoff.
 // [POS]: Presentation lifecycle only; business validation remains in tasks/codex/model_control.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -141,8 +141,17 @@ impl Features {
             &serde_json::to_vec_pretty(&json!({"main":self.main.pref,"features":prefs}))?,
         )
     }
+    fn main_managed(&self) -> bool {
+        // The old model bar can coexist with an unmigrated workbench. Managed content
+        // must not revive legacy UI when closed or moved to the edge.
+        self.entries.iter().any(|(id, e)| {
+            id != "model"
+                || e.pref.placement != "edge"
+                || e.pending.as_ref().is_some_and(|p| p.placement != "edge")
+        })
+    }
     fn snapshot(&self) -> Value {
-        json!({"layouts":self.main.pref.layouts,"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"closing":e.closing.is_some(),"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
+        json!({"mainManaged":self.main_managed(),"layouts":self.main.pref.layouts,"activeFeature":self.main.active,"mainPlacement":self.main.pref.placement,"returnPlacement":self.main.pref.return_placement,"pendingPlacement":self.main.target,"mainWindow":{"lease":self.main.lease,"pid":self.main.child.as_ref().map(|c|c.id()),"size":self.main.pref.size},"features":self.entries.iter().map(|(id,e)|json!({"id":id,"desktopSupported":crate::panel::popout_supported(),"placement":e.pref.placement,"returnPlacement":e.pref.return_placement,"open":e.pref.open,"closing":e.closing.is_some(),"size":e.pref.size,"owner":e.owner,"view":e.view,"reveal":e.reveal,"pending":e.pending.as_ref().map(|p|json!({"placement":p.placement,"owner":p.owner,"ready":p.source_ready}))})).collect::<Vec<_>>()})
     }
     fn validate(&self, id: &str, owner: &str) -> Result<()> {
         let e = self.entries.get(id).context("功能尚未打开")?;
@@ -215,8 +224,8 @@ impl App {
         f.retire_desktop();
         Ok(())
     }
-    pub async fn features_active(&self) -> bool {
-        !self.features.lock().await.entries.is_empty()
+    pub async fn main_features_managed(&self) -> bool {
+        self.features.lock().await.main_managed()
     }
     pub async fn feature_managed(&self, id: &str) -> bool {
         self.features.lock().await.entries.contains_key(id)
@@ -738,6 +747,48 @@ impl App {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn model_edge_restore_does_not_take_ownership_of_legacy_main() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        assert!(!Features::load(&paths).main_managed());
+        std::fs::write(
+            paths.root.join("model-control.json"),
+            br#"{"enabled":true}"#,
+        )
+        .unwrap();
+        let mut restored = Features::load(&paths);
+        assert_eq!(restored.snapshot()["mainManaged"], false);
+        assert!(restored.entries["model"].pref.open);
+        restored.entries.get_mut("model").unwrap().pending = Some(Pending {
+            placement: "sidebar".into(),
+            owner: "target".into(),
+            started: Instant::now(),
+            source_ready: true,
+            target_ready: false,
+            grouped: false,
+        });
+        assert!(restored.main_managed());
+        for (id, placement, expected) in [
+            ("model", "edge", false),
+            ("model", "sidebar", true),
+            ("outline", "edge", true),
+            ("next", "edge", true),
+            ("board", "edge", true),
+        ] {
+            // Closed managed views still own their content; do not show a legacy duplicate.
+            std::fs::write(
+                paths.root.join("features.json"),
+                json!({id: {"placement":placement,"open":false}}).to_string(),
+            )
+            .unwrap();
+            assert_eq!(
+                Features::load(&paths).main_managed(),
+                expected,
+                "{id}/{placement}"
+            );
+        }
+    }
     async fn app() -> (tempfile::TempDir, std::sync::Arc<App>) {
         let dir = tempfile::tempdir().unwrap();
         let app = App::new(

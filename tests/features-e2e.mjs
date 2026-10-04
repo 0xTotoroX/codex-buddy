@@ -80,6 +80,11 @@ try {
     }),
   );
   const env = { ...process.env };
+  writeFileSync(join(directory, 'model-control.json'), JSON.stringify({ enabled: true }));
+  writeFileSync(
+    join(directory, 'panel.json'),
+    JSON.stringify({ ui: { layoutMode: 'workbench', dockOpen: true } }),
+  );
   for (const key of Object.keys(env)) if (/^(CODEX_BUDDY_|COMPANION_)/.test(key)) delete env[key];
   env.CODEX_BUDDY_PANEL_TEST = '1';
   service = spawn(
@@ -109,6 +114,12 @@ try {
     entry = async (id) => (await state()).features.find((e) => e.id === id);
   await page.waitForFunction(() => window.__companionFloatingPanel?.state.runtimeActive);
   await page.waitForFunction(() => window.__companionFloatingPanel?.state.outlineItems.length > 0);
+  await page.waitForFunction(() => window.__companionFloatingPanel?.state.dockStatus === 'open');
+  assert.equal((await state()).mainManaged, false);
+  assert.equal((await entry('model')).placement, 'edge');
+  assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 1);
+  assert.ok(await page.locator('.csw-panel').isVisible());
+  record('restored model edge window preserves the legacy sidebar before main content migration');
   let tasks = await api('tasks/state');
   await api('tasks/command', {
     op: 'modules',

@@ -416,7 +416,7 @@ impl App {
     }
 
     pub async fn detach_panel(&self, ui: Option<Ui>) -> Result<()> {
-        if self.features_active().await {
+        if self.main_features_managed().await {
             bail!("请在独立功能标题旁选择桌面窗口");
         }
         let activate = ui.is_some();

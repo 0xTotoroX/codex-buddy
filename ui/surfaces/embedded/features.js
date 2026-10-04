@@ -1,4 +1,4 @@
-/* [INPUT]: Feature owners, saved placements, checked layout snapshots and the existing capsule/dock.
+/* [INPUT]: Feature owners, main ownership, saved placements and the existing capsule/dock.
  * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, and reveal of the existing main window.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
@@ -188,6 +188,9 @@ function updateDock() {
 /** @param {import('../../shared/features').FeatureState} next */
 function render(next) {
   if (!next.features.length) return;
+  // A restored model edge window does not own the legacy outline/next workbench.
+  // Older backends omit the flag; retain their existing takeover behavior.
+  if (!independent && next.mainManaged === false) return;
   const previous = state;
   if (
     previous &&
