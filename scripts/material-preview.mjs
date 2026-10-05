@@ -1,5 +1,5 @@
 /*
- * [INPUT]: Swift/AppKit 材质对照源码与本机 Xcode Command Line Tools。
+ * [INPUT]: Swift/AppKit 材质对照源码、完整项目许可包与本机 Xcode Command Line Tools。
  * [OUTPUT]: target/material-preview 中的开发工具；--check 验证同步控制，--package 生成 App 与可独立重建的源码 ZIP。
  * [POS]: npm run dev:materials 入口；不连接宿主、不修改安装版或产品偏好。
  * [PROTOCOL]: 变更时检查 scripts/AGENTS.md。
@@ -7,6 +7,7 @@
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
+import { PROJECT_LICENSE, copyProjectLicenses } from './project-licenses.mjs';
 
 if (process.platform !== 'darwin') throw new Error('材质对照需要 macOS。');
 const root = resolve(import.meta.dirname, '..');
@@ -45,7 +46,7 @@ writeFileSync(
 `,
 );
 mkdirSync(join(contents, 'Resources'), { recursive: true });
-copyFileSync(join(root, 'LICENSE'), join(contents, 'Resources/LICENSE'));
+copyProjectLicenses(root, join(contents, 'Resources'));
 if (process.argv.includes('--package')) {
   const output = join(root, 'dist/material-preview');
   const name = 'CodexBuddy Materials.app';
@@ -57,10 +58,10 @@ if (process.argv.includes('--package')) {
   run(join(app, 'Contents/MacOS/material-preview'), ['--check']);
   const source = join(output, 'source');
   mkdirSync(join(source, 'scripts'), { recursive: true });
-  for (const file of ['material-preview.swift', 'material-preview.mjs']) {
+  for (const file of ['material-preview.swift', 'material-preview.mjs', 'project-licenses.mjs']) {
     copyFileSync(join(root, 'scripts', file), join(source, 'scripts', file));
   }
-  copyFileSync(join(root, 'LICENSE'), join(source, 'LICENSE'));
+  copyProjectLicenses(root, source);
   writeFileSync(
     join(source, 'package.json'),
     JSON.stringify(
@@ -68,7 +69,7 @@ if (process.argv.includes('--package')) {
         name: 'codex-buddy-materials',
         version,
         private: true,
-        license: 'MIT',
+        license: PROJECT_LICENSE,
         type: 'module',
         engines: { node: '>=22.16.0' },
         scripts: {
@@ -92,7 +93,10 @@ if (process.argv.includes('--package')) {
 - scripts/material-preview.swift：14 种材质、对照背景、控制界面和同步验证。
 - scripts/material-preview.mjs：Swift 编译、App 组装、本地签名及带源码的 ZIP 打包。
 - package.json：版本与运行命令；仅用 Node 内置模块，没有 npm 依赖。
-- LICENSE：MIT 许可。
+- scripts/project-licenses.mjs：固定 GPL 正文及历史 MIT 原文的许可校验与复制。
+- LICENSE：GPL-3.0-only 完整许可。
+- LICENSING.md：许可范围与旧 MIT 授权说明。
+- licenses/LICENSE-MIT-legacy：变更前 MIT 历史原文。
 
 ## 修改与运行
 
@@ -120,7 +124,7 @@ App 自带可执行程序，使用者无需开发工具。macOS 14 为构建最�
 双击 CodexBuddy Materials.app 即可打开 14 种原生材质对照。
 可将整个 App 拖入“应用程序”，或放在任意长期保存的文件夹。
 App 自带可执行程序，不需要 Node.js、Rust、开发工具或 CodexBuddy 项目。
-source 文件夹包含完整预览源码、MIT 许可和独立构建入口；二次开发见 source/README.md。
+source 文件夹包含完整预览源码、GPL-3.0-only 许可包和独立构建入口；二次开发见 source/README.md。
 
 顶部可以统一切换背景、浅色/深色、跟随焦点/保持激活/模拟失焦。
 “真实桌面”隐藏对照背景，拖动窗口可观察实际桌面效果。
@@ -129,7 +133,7 @@ source 文件夹包含完整预览源码、MIT 许可和独立构建入口；二
 
 平台要求：macOS 14+、Apple Silicon。构建目标不等于所有旧系统均已实测。
 从其他电脑或网络下载时，macOS 可能要求额外确认。
-许可证随 App 保存在 Contents/Resources/LICENSE。
+完整 GPL 许可、范围说明和 MIT 历史原文随 App 保存在 Contents/Resources/。
 `,
   );
   const archive = join(root, `dist/codex-buddy-materials-${version}-macos-arm64.zip`);

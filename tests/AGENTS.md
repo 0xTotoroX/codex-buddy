@@ -57,7 +57,7 @@ model-control-host 覆盖能力延迟到达、空列表刷新超时及重试、�
 - [native-probe.swift](native-probe.swift)：原生验收的合成背景窗口、指定测试进程窗口几何、合成窗口的真实鼠标拖拽及截图颜色读取器，只编译到临时目录。
 
 - [host-fixture.html](host-fixture.html)：e2e 和弹出测试的宿主 fixture，不包含真实聊天；共享胶囊可交互的桌面宿主 DOM。
-- [source-audit.test.mjs](source-audit.test.mjs)：公开边界、递归许可与真实依赖声明的行为测试；覆盖嵌套署名、显式路径、来源补充和原文引用，以及无 Git 源码清单和私有文件/符号链接拒绝。
+- [source-audit.test.mjs](source-audit.test.mjs)：公开边界、固定 GPL 元数据/正文、历史 MIT 保留、打包许可与真实依赖声明的行为测试；覆盖嵌套署名、显式路径、来源补充和原文引用，以及无 Git 源码清单和私有文件/符号链接拒绝。
 
 - [popout-preferences.test.mjs](popout-preferences.test.mjs)：位置写入延迟时并发置顶/外观串行推进修订号，真实外部冲突仍拒绝。
 - [workbench-actions.mjs](workbench-actions.mjs)：端到端检查通过标题/标签双击或 Esc 选择内容；showRetainedSettings 显式调用隐藏旧入口，仅供保留模板的兼容回归，不代表产品入口。

@@ -1,11 +1,12 @@
 /*
- * [INPUT]: Git 或解压源码目录的公开文件、包元数据与 LICENSE。
- * [OUTPUT]: publicSourceFiles 共用文件清单及公开源码的包名/许可元数据、私有路径和凭据检查结果。
+ * [INPUT]: Git 或解压源码目录的公开文件、包元数据、GPL 正文与历史 MIT 许可。
+ * [OUTPUT]: publicSourceFiles 共用文件清单、固定 GPL 许可与历史原文、排除标记及公开内容检查结果。
  * [POS]: 开发与打包共用的公开文件检查，不读取维护者资料。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import assert from 'node:assert/strict';
+import { PROJECT_LICENSE, verifyProjectLicenses } from './project-licenses.mjs';
 import { readFileSync, existsSync, readdirSync, lstatSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -43,13 +44,13 @@ export function publicSourceFiles(root) {
 }
 
 export function auditSource(root) {
-  assert.match(readFileSync(join(root, 'LICENSE'), 'utf8'), /^MIT License\n/);
-  assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).license, 'MIT');
+  verifyProjectLicenses(root);
+  assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).license, PROJECT_LICENSE);
   assert.equal(
     JSON.parse(readFileSync(join(root, 'package-lock.json'))).packages[''].license,
-    'MIT',
+    PROJECT_LICENSE,
   );
-  assert.match(readFileSync(join(root, 'Cargo.toml'), 'utf8'), /^license = "MIT"$/m);
+  assert.match(readFileSync(join(root, 'Cargo.toml'), 'utf8'), /^license = "GPL-3.0-only"$/m);
   const metadata = JSON.parse(readFileSync(join(root, 'package.json')));
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json')));
   assert.equal(metadata.name, 'codex-buddy', 'Product name mismatch');
@@ -72,6 +73,9 @@ export function auditSource(root) {
     const bytes = readFileSync(join(root, path));
     if (bytes.includes(0)) continue;
     const text = bytes.toString();
+    // Preserve the known reviewed exclusion; this is a regression guard, not proof of ownership.
+    if (/^(?:src|ui)\//.test(path) && /\.(?:rs|js|ts|tsx|css|html)$/.test(path))
+      assert.ok(!text.includes('bridge:generate-request'), `Excluded upstream marker in ${path}`);
     assert.ok(
       !/\b(?:gh[pousr]_|github_pat_|sk-(?:proj-|ant-)?)[A-Za-z0-9_-]{20,}/.test(text),
       `Possible credential in ${path}`,

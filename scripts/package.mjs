@@ -1,5 +1,5 @@
 /*
- * [INPUT]: release 程序、source-audit 公开检查、LICENSE 与锁定依赖。
+ * [INPUT]: release 程序、source-audit 公开检查、项目完整许可包与锁定依赖。
  * [OUTPUT]: macOS arm64 程序包及供 Release 正文追加的归档校验说明。
  * [POS]: 本地打包入口，校验最低系统版本并携带许可。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -19,6 +19,7 @@ import {
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { generateNotices } from './third-party-notices.mjs';
+import { PROJECT_LICENSE, copyProjectLicenses } from './project-licenses.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 if (process.platform !== 'darwin' || process.arch !== 'arm64')
@@ -80,19 +81,21 @@ macOS 15+ 的弹出窗口始终展开，可拖动、调整尺寸和置顶，默�
 - 磨砂：内嵌为 CSS 模糊；弹出为原生 HUDWindow，保持激活外观，使用圆角浅阴影。
 - 液态：内嵌使用自有 SVG 折射；弹出使用 macOS 26+ Liquid Glass。外观框内星星切换 Regular/Clear，点亮为 Clear；macOS 15–25 的弹出液态回退哑光。弹出液态仍有系统焦点变化。
 
-解压此包不会替换已有安装或配置；源码安装和开发说明见 GitHub Release 的 Source code 归档内 README。
+解压此包不会替换已有安装或配置。此 GPL 版本的分发须按许可提供与程序精确修订对应的完整源码及必要构建、安装材料；GitHub 标签 Source code 归档只有在该修订实际可用且内容满足要求时才能作为源码入口，旧版归档不能代替新增改动的源码。
 
 ## 文件
 
 - [codex-buddy](codex-buddy)：可执行程序。
-- [LICENSE](LICENSE)：项目 MIT 许可。
+- [LICENSE](LICENSE)：项目 GPL-3.0-only 完整许可。
+- [LICENSING.md](LICENSING.md)：许可范围、免费商用、对应源码义务及旧 MIT 授权说明。
+- [licenses/LICENSE-MIT-legacy](licenses/LICENSE-MIT-legacy)：变更前 MIT 历史原文。
 - [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)：第三方许可与引用。
 - [dependencies.json](dependencies.json)：第三方依赖清单。
 - [manifest.json](manifest.json)：版本、平台及构建摘要。
 - [SHA256SUMS](SHA256SUMS)：程序校验和，可运行 \`shasum -a 256 -c SHA256SUMS\` 验证。
 `,
 );
-copyFileSync(join(root, 'LICENSE'), join(folder, 'LICENSE'));
+copyProjectLicenses(root, folder);
 generateNotices(folder);
 const hash = createHash('sha256').update(readFileSync(destination)).digest('hex');
 writeFileSync(join(folder, 'SHA256SUMS'), `${hash}  ${file}\n`);
@@ -102,7 +105,7 @@ writeFileSync(
     {
       name: 'codex-buddy',
       version,
-      license: 'MIT',
+      license: PROJECT_LICENSE,
       platform: process.platform,
       arch: process.arch,
       minimumOSVersion: '14.0',
@@ -126,7 +129,7 @@ writeFileSync(
   checksumNotes,
   `\n\n## 下载与校验
 
-\`${name}.tar.gz\` 是 macOS 14.0+ Apple Silicon 预编译命令行程序包，无需 Node.js 或 Rust；不包含 App / DMG。源码使用本页 GitHub 自动生成的 Source code (zip / tar.gz)。
+\`${name}.tar.gz\` 是 macOS 14.0+ Apple Silicon 预编译命令行程序包，无需 Node.js 或 Rust；不包含 App / DMG。源码必须对应本次分发的精确修订并包含许可所需构建、安装材料；使用本页 GitHub 自动生成的 Source code (zip / tar.gz) 前须确认标签归档确实满足这些要求。
 
 在下载目录执行以下命令校验程序归档：
 
@@ -134,7 +137,7 @@ writeFileSync(
 printf '%s\\n' '${archiveHash}  ${name}.tar.gz' | shasum -a 256 -c -
 \`\`\`
 
-解压后，在包内执行 \`shasum -a 256 -c SHA256SUMS\` 校验可执行程序。包内保留 LICENSE、THIRD_PARTY_NOTICES.md、dependencies.json 和 manifest.json。CLI 更新的 \`--sha256\` 参数使用包内程序摘要，不使用上述归档摘要。
+解压后，在包内执行 \`shasum -a 256 -c SHA256SUMS\` 校验可执行程序。包内保留 LICENSE、LICENSING.md、licenses/LICENSE-MIT-legacy、THIRD_PARTY_NOTICES.md、dependencies.json 和 manifest.json。CLI 更新的 \`--sha256\` 参数使用包内程序摘要，不使用上述归档摘要。
 `,
 );
 console.log(

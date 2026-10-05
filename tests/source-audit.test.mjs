@@ -1,12 +1,13 @@
 /*
  * [INPUT]: 公开文件副本、临时 Git 仓库、已安装的 Cargo/npm 依赖与第三方许可生成器。
- * [OUTPUT]: 公开内容边界、递归许可、署名补充和生成引用的行为测试。
+ * [OUTPUT]: 固定 GPL、历史 MIT、分发许可包、来源排除标记、公开边界及第三方原文的行为测试。
  * [POS]: 发布文件检查与许可回归，不依赖维护者的私人资料。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import test from 'node:test';
 import { publicSourceFiles } from '../scripts/source-audit.mjs';
+import { PROJECT_LICENSE_FILES, copyProjectLicenses } from '../scripts/project-licenses.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
@@ -49,6 +50,61 @@ test('public source passes without private documentation and rejects inconsisten
   metadata.license = 'UNLICENSED';
   writeFileSync(file, JSON.stringify(metadata));
   assert.notEqual(audit(directory).status, 0);
+});
+
+test('license checks reject later-version and alternative project metadata in every manifest', (t) => {
+  const directory = fixture(t);
+  for (const invalid of ['MIT', 'GPL-3.0-or-later', 'GPL-3.0-only OR LicenseRef-Commercial']) {
+    for (const name of ['package.json', 'package-lock.json', 'Cargo.toml']) {
+      const file = join(directory, name);
+      const original = readFileSync(file, 'utf8');
+      if (name === 'Cargo.toml') {
+        writeFileSync(file, original.replace('license = "GPL-3.0-only"', `license = "${invalid}"`));
+      } else {
+        const value = JSON.parse(original);
+        if (name === 'package.json') value.license = invalid;
+        else value.packages[''].license = invalid;
+        writeFileSync(file, JSON.stringify(value));
+      }
+      assert.notEqual(audit(directory).status, 0, `${name} accepted ${invalid}`);
+      writeFileSync(file, original);
+    }
+  }
+  assert.equal(audit(directory).status, 0);
+});
+
+test('modified GPL text or historical MIT notice fails before packaging', (t) => {
+  const directory = fixture(t);
+  for (const name of ['LICENSE', 'licenses/LICENSE-MIT-legacy']) {
+    const file = join(directory, name);
+    const original = readFileSync(file);
+    writeFileSync(file, Buffer.concat([original, Buffer.from('changed')]));
+    assert.notEqual(audit(directory).status, 0);
+    assert.throws(() => copyProjectLicenses(directory, join(directory, 'target/license-bundle')));
+    writeFileSync(file, original);
+  }
+});
+
+test('program, material App and independent source bundles preserve the complete license package', (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'buddy-project-license-bundle-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  for (const destination of ['program', 'material/Contents/Resources', 'material/source']) {
+    const output = join(directory, destination);
+    copyProjectLicenses(root, output);
+    for (const file of PROJECT_LICENSE_FILES)
+      assert.deepEqual(readFileSync(join(output, file)), readFileSync(join(root, file)));
+  }
+});
+
+test('the known excluded upstream diagnostic cannot be reintroduced in runtime source', (t) => {
+  const directory = fixture(t);
+  writeFileSync(
+    join(directory, 'ui/excluded-marker-fixture.js'),
+    "const fixture = 'bridge:generate-request';\n",
+  );
+  const result = audit(directory);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Excluded upstream marker/);
 });
 
 test('private documentation cannot be published even when force staged', (t) => {
@@ -160,6 +216,13 @@ test('generated notices preserve nested licenses and pinned authors alongside pa
   );
   assert.ok(text.includes('Copyright (c) 2014 Mathijs van de Nes'));
   assert.ok(text.includes('Massachusetts Institute of Technology'));
+  assert.equal(component('model-deck host adapter').license, 'MIT');
+  assert.equal(component('shadcn/ui').license, 'MIT');
+  assert.equal(component('openai/apps-sdk-ui icons').license, 'MIT');
+  assert.ok(text.includes('Project-owned code is GPL-3.0-only'));
+  assert.ok(!text.includes('Project-owned code has a separate MIT license'));
+  for (const name of ['model-deck host adapter', 'shadcn/ui', 'openai/apps-sdk-ui icons'])
+    assert.ok(component(name).files.some((file) => file.startsWith('LICENSE')));
   const anchors = new Set(
     [...text.matchAll(/^### (license-[a-f0-9]+)$/gm)].map((match) => match[1]),
   );

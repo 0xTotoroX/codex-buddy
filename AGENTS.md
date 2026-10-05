@@ -25,7 +25,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 - `npm run dev` 只连接已开启调试端口的真实 Codex，默认内嵌；开发配置在 target/dev/real，首次复制日常模型配置并采用手动生成，不写回日常配置。占用同一窗口的安装版连接会暂停，退出后恢复；不重启或另开 ChatGPT。CSS 原位更新，胶囊逻辑清理后重新加载，Rust 编译成功后重启开发后台；release 忽略开发资源环境变量。示例宿主和模拟数据仅用于 tests 下的自动测试。
 - 应用最低目标为 macOS 14.0+ Apple Silicon；桌面弹出功能由后台单独检测 macOS 15.0+ Apple Silicon。不满足弹出条件时禁用界面入口、拒绝弹出请求及窗口子进程启动，并跳过旧弹出偏好的自动恢复，内嵌面板仍可使用。Windows 暂不适配，其他平台不宣称已支持。最低版本与实测版本分开记录。
 - 源码构建最低 Rust 1.88、Node.js 22.16；分别由 Cargo `rust-version` 和 npm `engines.node` 声明，CI 覆盖最低组合。release 的构建辅助库不 strip，避免 macOS 加载失败；最终程序仍 strip。
-- 自有源码采用 MIT；第三方依赖保留各自的版权与许可原文。维护者在私人资料中保留来源审计记录。
+- 自有源码采用 GPL-3.0-only（固定第三版）；第三方保留各自版权与许可原文。旧 MIT 授权不追溯撤回，历史原文保存在 licenses/LICENSE-MIT-legacy；LICENSING.md 定义适用范围。维护者的来源审计记录保持原样，不随包公开。
 - 应用独立构建与运行，通过本机协议连接宿主，不修改官方应用包。macOS 本地安装生成 CodexBuddy.app 作为双击入口，调用已安装 CLI 连接和弹出；已有普通宿主无可用连接时，启动器通过 --restart-running 按 hostRestartPolicy 处理：默认 ask 询问后正常退出，force 显式保存后直接强制退出；两者都等待旧进程退出后再重开。取消、拒绝退出、超时或身份变化停止，不从正常退出升级为强退；不创建隔离实例。先从现有进程参数发现调试端口，不能因保存端口过期就重启。此策略独立于模型配置，不取消生成；Dev App 冷启动复用此策略；普通 npm run dev 仍仅接入现有调试连接，显式 --restart-running 才启用宿主准备。
 - 产品名称为 CodexBuddy，源码目录、Cargo/npm 包、CLI 和分发前缀为 `codex-buddy`。默认数据目录为 `codex-buddy`，环境变量使用 `CODEX_BUDDY_*`；安装器迁移旧默认目录并保留配置，内部页面存储键暂保持兼容。启动器默认安装到 `/Applications/CodexBuddy.app`。
 - `src/` 为 Rust 应用源码，包含后台、CLI 与系统窗口；网页相关源码统一在 `ui/`：`panel/` 为内嵌与弹出共用的胶囊，`bridge/` 为受限 CDP binding，`settings/` 为 React 设置页。`scripts/` 保存开发、构建与分发工具，`tests/` 集中保存独立测试、测试辅助和合成数据；Rust 单元测试保留在源码旁。`ui/icon.png` 是用户选定的产品图标源图。开发计划、验收报告、设计过程图片、讨论及审计材料不在公开仓库维护。
@@ -60,7 +60,7 @@ Map 系统用项目地图、模块地图和文件契约说明职责与依赖；�
 
 开发材质对照：`npm run dev:materials` 打开独立 AppKit 窗口，同步比较 14 种传统原生材质的背景、明暗及焦点效果；仅用于选材，不替代真实 Codex 调试，不扩展产品三材质菜单。Swift 工具不连接宿主、不修改系统外观或产品偏好，构建产物位于 `target/material-preview/`。
 
-对照工具通过 `npm run dev:materials -- --package` 在 `dist/material-preview/` 生成自带可执行程序、许可和使用说明的独立 App，并在 dist 输出 ZIP；ZIP 的 source/ 附带 Swift、原构建脚本、独立 package.json、README 与 MIT 许可，可脱离主仓库重建。运行该 App 无需开发依赖，不与 CodexBuddy 产品启动器混淆。
+对照工具通过 `npm run dev:materials -- --package` 在 `dist/material-preview/` 生成自带可执行程序、许可和使用说明的独立 App，并在 dist 输出 ZIP；ZIP 的 source/ 附带 Swift、原构建脚本、独立 package.json、README 与 GPL-3.0-only 完整许可包，可脱离主仓库重建。运行该 App 无需开发依赖，不与 CodexBuddy 产品启动器混淆。
 
 Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + Tailwind CSS v4/shadcn/ui 设置页。
 
@@ -83,7 +83,7 @@ Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + 
 - `AGENTS.md`：项目约定和 L1 地图的唯一正文。
 - `README.md` / `README.zh-CN.md`：默认英文与中文版，互设语言入口；只说明功能、安装使用、更新卸载、二次开发入口及必要的隐私/兼容限制；材质实现、内部机制、详细验收和维护过程留在 Obsidian。全量文档同步不扩大公开 README。
 - `build.rs`：拒绝非 macOS arm64 构建目标，调用 `scripts/build-panel.mjs` 解析胶囊模块并生成 Rust 内嵌脚本。
-- `Cargo.toml`：Rust 包、最低编译器版本、MIT 元数据、按平台依赖及 release 配置。
+- `Cargo.toml`：Rust 包、最低编译器版本、GPL-3.0-only 元数据、按平台依赖及 release 配置。
 - `Cargo.lock`：固定 Rust 依赖解析结果。
 - `package.json`：最低 Node 版本、网页依赖和开发命令。
 - `package-lock.json`：固定 npm 依赖解析结果。
@@ -95,9 +95,10 @@ Rust + Tokio/Axum + Tao/Wry + JavaScript 共享胶囊 + React/TypeScript/Vite + 
 - `.github/workflows/release.yml`：版本标签或手动指定标签触发共用完整验证；打包阶段不重复测试，仅上传 macOS arm64 程序 tar.gz，归档摘要追加到原发行说明，上传到草稿后才公开；拒绝覆盖已有 Release。
 - `.github/release-notes/v*.md`：对应标签的公开发行说明；CD 要求版本、标签和说明文件一致。
 - `.gitignore`：隔离构建产物、测试证据和私有运行数据。
-- `LICENSE`：自有源码 MIT 许可。
+- `LICENSE`：完整未修改的 GPL 第三版正文；自有源码仅授权 GPL-3.0-only。
+- `LICENSING.md` 与 `licenses/LICENSE-MIT-legacy`：当前授权范围、版权、历史 MIT 授权及第三方边界；随程序和独立材质工具打包。
 
-分发生成物不提交 Git：`npm run notices` 在 `dist/licenses/` 生成第三方许可与依赖清单；`npm run package` 自动在分发目录生成，保留包内程序 SHA256SUMS 与 manifest；另生成仅用于追加到 Release 正文的归档校验说明，不上传独立源码包或 SHA256SUMS。源码分发使用 GitHub 标签自动归档。源码检查和打包支持 Git 工作树与不含 .git 的源码解压目录，共用公开文件清单。递归收集依赖包内许可与署名，保留相对路径并合入固定来源补充；缺少元数据、许可文档或文档为空时停止。清单包含其他平台和开发依赖，不证明最终链接范围或源码内许可已穷尽。
+分发生成物不提交 Git：`npm run notices` 在 `dist/licenses/` 生成第三方许可与依赖清单；`npm run package` 自动在分发目录生成，保留包内程序 SHA256SUMS 与 manifest；另生成仅用于追加到 Release 正文的归档校验说明，不上传独立源码包或 SHA256SUMS。GPL 分发须提供与产物精确修订对应的完整源码及必要构建、安装材料；GitHub 标签自动归档仅在对应修订实际可用且内容满足要求时作为源码入口，旧标签和本地未推送分支不能替代该交付。源码检查和打包支持 Git 工作树与不含 .git 的源码解压目录，共用公开文件清单。递归收集依赖包内许可与署名，保留相对路径并合入固定来源补充；缺少元数据、许可文档或文档为空时停止。清单包含其他平台和开发依赖，不证明最终链接范围或源码内许可已穷尽。
 
 ## Map 系统：架构同步约定
 

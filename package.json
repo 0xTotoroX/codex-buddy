@@ -2,7 +2,7 @@
   "name": "codex-buddy",
   "version": "0.9.0",
   "private": true,
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "type": "module",
   "engines": {
     "node": ">=22.16.0"

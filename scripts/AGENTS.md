@@ -8,7 +8,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 
 - [dev-launcher.mjs](dev-launcher.mjs)：install:dev 生成独立 CodexBuddy Dev.app，首次后台执行带 --restart-running 的开发流程，日志写入 launcher.log；按开发配置（首次回退日常配置）的策略准备无连接宿主；重复打开按 session 中所选来源唤起工作台，dev:settings 打开固定开发设置地址；失联重连原目标，失败显式提示，并发启动的失败记录不干扰已取得占用的会话；--stop 校验进程身份后正常退出后台会话。Applet 启动期间显示 Dock 图标，经 AppKit 协作交接焦点后退出；连接成功后的前台切换失败仅发系统通知，通知异常不升级为弹窗；不更新日常安装，复用 launcher 的图标生成。
 - [dev.mjs](dev.mjs)：真实 Codex 开发入口，管理独立后台、源码监听和编译失败回退，独立模型控制资源变化随原生后台重建；持有宿主目标与所选 worktree 租约，先绑定统一设置服务地址再传给开发后台齿轮，每个来源独立 Vite 缓存并去重 React；先编译后交接来源、失败回退，切换 Vite/监听/后台而不重启宿主；启动前先发现可调试宿主；显式 --restart-running 时先构建当前 CLI，再通过 host-only 模式准备宿主，仅在接管安装版后启用退出恢复，含占用获取和初始化在内的失败原因与进程 ID 写入私有 launcher-error.json，退出只清理本次会话记录；Ctrl+C 清理自身进程并恢复安装版连接。
-- [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 MIT 许可的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
+- [material-preview.mjs](material-preview.mjs)：`dev:materials` 入口，将 Swift 对照工具编译到 target/material-preview 后打开；`--check` 验证同步控制，`--package` 在 dist/material-preview 生成自带程序和 GPL-3.0-only 完整许可包的独立 App，并输出 ZIP；source/ 同时导出源码、独立构建入口和说明，可脱离主仓库二次开发；不修改安装版或产品偏好。
 - [material-preview.swift](material-preview.swift)：14 种 NSVisualEffectView 材质的原生并排对照；独立背景窗口提供重复图案，统一切换外观、焦点状态与背景，支持真实桌面采样；标题栏固定不透明底色并跟随预览明暗。
 - [dev-host.mjs](dev-host.mjs)：选择真实窗口与宿主启动配置（开发优先、首次继承日常），仅无宿主且显式授权自动准备时调用共享启动器，指定目标或歧义不触发重开；首次复制独立开发配置，暂停并恢复安装版连接；新目标已发现且旧目标不可用时将旧恢复记录保留为带唯一后缀的归档，不将安装版改连新聊天；API 错误保留后端原因；不创建浏览器或修改官方应用。
 - [dev-panel.mjs](dev-panel.mjs)：原子发布开发资源快照，CSS 更新保留实例，逻辑更新销毁并恢复胶囊，页面引导变化重载窗口页面；共享 measurePanel 仅采集两端几何、材质能力和实例计数。
@@ -21,7 +21,8 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 - [install.mjs](install.mjs)：源码安装入口，不修改 shell PATH；本地 CLI / .app 启动器安装、旧默认数据目录迁移、旧程序保留和服务恢复；App 默认位于 /Applications。
 - [launcher.mjs](launcher.mjs)：为安装器生成带本地签名的 CodexBuddy.app；从 ui/icon.png 生成多尺寸 ICNS 并绑定应用图标；双击调用 launch --restart-running 按设置处理缺少连接的宿主，取消不再弹错误；连接后在受支持系统弹出，以后台应用方式运行、不显示运行中的 Dock 图标；macOS 14 遇到浮窗门槛时保留内嵌，其他错误用系统对话框显示。
 - [package.mjs](package.mjs)：本地打包入口，构建并校验当前 release、最低系统版本及许可；归档自带与其文件匹配的使用说明；生成 macOS arm64 分发目录、manifest、包内程序 SHA256SUMS、程序 tar.gz 与供 Release 正文追加的 release-checksums.md；不生成独立源码包或归档校验附件，源码使用 GitHub 标签自动归档。
-- [source-audit.mjs](source-audit.mjs)：Git 与无 Git 源码目录共用文件清单，供审计、打包和测试复用；无 Git 时排除构建目录，拒绝私有文件与符号链接。核对包名及许可元数据并拒绝私有文档、运行配置、凭据和个人绝对路径。
+- [project-licenses.mjs](project-licenses.mjs)：验证完整 GPL 原文、历史 MIT 原文及授权范围，并为主程序与独立材质工具复制统一许可包。
+- [source-audit.mjs](source-audit.mjs)：Git 与无 Git 源码目录共用文件清单，供审计、打包和测试复用；无 Git 时排除构建目录，拒绝私有文件与符号链接。核对包名、固定 GPL-3.0-only 元数据、完整许可与历史原文，并拒绝历史排除的上游诊断标记并拒绝私有文档、运行配置、凭据和个人绝对路径。
 - [license-texts.json](license-texts.json)：依赖包未附带的公开许可、署名原文与固定来源 URL，供许可生成器离线使用。
 - [third-party-notices.mjs](third-party-notices.mjs)：collectLicenseFiles 递归收集包内许可与署名；generateNotices 合入固定补充与本地 shadcn/ui、OpenAI apps-sdk-ui 图标及 Model Deck 宿主适配许可并生成 THIRD_PARTY_NOTICES.md 和 dependencies.json，保留相对路径，只合并相同原文。
 

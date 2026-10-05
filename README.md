@@ -206,4 +206,4 @@ The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync w
 
 Configuration is stored locally. When generating suggestions, the latest question and answer are sent to your chosen model service, subject to your input-context setting. Smart mode also sends that exchange to the configured Jev service after explicit consent. CodexBuddy does not persist chat bodies or modify the official application bundle. Host updates may affect compatibility.
 
-Original source code is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
+Project-owned source code is licensed under the [GNU GPL version 3 only](LICENSE) (`GPL-3.0-only`). Commercial use is permitted without a separate license fee; conveying covered software requires compliance with GPLv3, including applicable Corresponding Source obligations. Earlier MIT grants remain valid. Third-party notices retain their original terms; see [LICENSING.md](LICENSING.md) for the scope and historical license.

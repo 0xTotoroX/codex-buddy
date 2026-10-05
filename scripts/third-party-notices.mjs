@@ -119,7 +119,7 @@ export function generateNotices(directory = join(root, 'dist/licenses')) {
     '',
     'Generated from Cargo.lock, the installed production npm dependencies and vendored UI source. The Cargo inventory includes target-specific and development dependencies; this is a conservative inventory, not a claim that every package is linked into this binary.',
     '',
-    'These are the original package license expressions and license/notice/attribution documents collected recursively within each package, plus pinned upstream supplements. Paths are relative to each package. Embedded source comments are not a separate scan. Copyright and license terms remain with their respective owners. Identical texts are stored once and linked from every covered package. Project-owned code has a separate MIT license.',
+    'These are the original package license expressions and license/notice/attribution documents collected recursively within each package, plus pinned upstream supplements. Paths are relative to each package. Embedded source comments are not a separate scan. Copyright and license terms remain with their respective owners. Identical texts are stored once and linked from every covered package. Project-owned code is GPL-3.0-only; LICENSING.md explains its scope and preserves earlier MIT grants. These dependency and vendored-source licenses are unchanged.',
     '',
   ];
   const inventory = [];
