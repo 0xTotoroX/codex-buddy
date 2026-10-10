@@ -54,21 +54,13 @@ test('inline expanding menu preserves eyes hit target and has stable hover, keyb
     await host.getByRole('menuitem', { name: '在桌面打开' }).hover();
     await page.waitForTimeout(220);
     assert.equal(await host.getAttribute('data-open'), '');
-    assert.equal(await host.getAttribute('data-glass-backend'), 'svg');
-    assert.match(
-      await host.locator('.glass').evaluate((node) => getComputedStyle(node).backdropFilter),
-      /url.*blur\(0\.3px\)/,
+    assert.equal(await host.locator('.glass,.rim,[data-csw-optics]').count(), 0);
+    assert.equal(
+      await host.evaluate((node) => getComputedStyle(node).backgroundColor),
+      'rgba(0, 0, 0, 0)',
     );
     await mkdir('target/reports', { recursive: true });
     await page.screenshot({ path: 'target/reports/launcher-menu-light.png' });
-    await page.evaluate(() => {
-      document.body.style.background =
-        'repeating-linear-gradient(30deg,#355472 0 18px,#729997 18px 36px,#d3ac7e 36px 54px)';
-    });
-    const glassPixels = await page.screenshot({ path: 'target/reports/launcher-menu-liquid.png' });
-    await host.locator('.glass').evaluate((node) => (node.style.backdropFilter = 'none'));
-    const flatPixels = await page.screenshot();
-    assert.notDeepEqual(glassPixels, flatPixels, 'glass must alter the live background');
     await page.evaluate(() => {
       window.menu.close();
     });

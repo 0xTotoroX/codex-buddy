@@ -2,7 +2,6 @@
  * [OUTPUT]: An inline sidebar menu with cancellable hover and keyboard access.
  * [POS]: Launcher presentation only; actions remain in the runtime coordinator.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
-import { createSvgGlass } from '../theme/glass/svg.js';
 import { iconSvg } from '../../shared/icons/index.js';
 const actions = [
   ['inside', '内', '在聊天内打开', 'dock'],
@@ -20,15 +19,6 @@ export function createLauncherMenu(anchor, options) {
     :host {font-family:system-ui,sans-serif;color:var(--menu-fg,#292929);width:56px;max-width:100%;height:0;margin-bottom:-8px;overflow:hidden;transition:height 220ms cubic-bezier(.2,.8,.2,1),margin-bottom 220ms cubic-bezier(.2,.8,.2,1);}
     :host([data-open]) {height:176px;margin-bottom:-4px;}
     .menu-shell {position:absolute;left:0;bottom:0;width:56px;max-width:100%;height:176px;pointer-events:none;}
-    .shape {position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;
-      transform:translateY(var(--enter-y,10px)) scale(.95);transform-origin:center bottom;
-      transition:opacity 130ms ease-out,transform 180ms cubic-bezier(.2,.8,.2,1);}
-    .glass {clip-path:inset(0 round 18px);background:color-mix(in srgb,var(--menu-bg,#f9f9f9) 6%,transparent);backdrop-filter:blur(12px);}
-    :host([data-theme='dark']) .glass {background:color-mix(in srgb,var(--menu-bg,#202020) 6%,transparent);}
-    .glass::after {content:'';position:absolute;inset:0;background:linear-gradient(135deg,#ffffff3b,transparent 62%);pointer-events:none;}
-    .glass>svg {position:absolute;width:0;height:0;}
-    .rim {box-shadow:inset 0 1px 0 #ffffffa6,inset 0 -1px 0 #ffffff40,inset 0 0 0 1px #ffffff36;}
-    :host([data-reduced-transparency]) .glass {background:var(--menu-bg,#f9f9f9);backdrop-filter:none;}
     .hit {position:absolute;inset:0;border-radius:18px;pointer-events:none;}
     button {position:absolute;left:6px;top:var(--top);display:flex;flex-direction:column;align-items:center;justify-content:center;
       width:44px;height:50px;box-sizing:border-box;padding:4px;border:0;border-radius:12px;background:transparent;color:inherit;
@@ -39,34 +29,13 @@ export function createLauncherMenu(anchor, options) {
     button:focus-visible {outline:2px solid currentColor;outline-offset:1px;}
     button[aria-current='true']::after {content:'';position:absolute;right:4px;top:5px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.5;}
     button:disabled {opacity:.3!important;cursor:default;}
-    :host([data-open]) .shape {opacity:1;transform:translateY(0) scale(1);}
     :host([data-open]) .hit {pointer-events:auto;}
     :host([data-open]) button {opacity:1;pointer-events:auto;transform:translateY(0);transition-delay:var(--delay,0ms);}
     :host([data-keyboard]),:host([data-keyboard]) * {transition:none!important;}
     .status {position:absolute;left:34px;top:-30px;width:210px;font-size:12px;}
     @media(prefers-reduced-motion:reduce) {:host,*{transition:none!important;}}
-  </style><div class="menu-shell"><div class="shape glass"></div><div class="shape rim"></div><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--top:${6 + i * 57}px;--delay:${(2 - i) * 20}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
+  </style><div class="menu-shell"><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--top:${6 + i * 57}px;--delay:${(2 - i) * 20}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
   anchor.before(host);
-  let glass = null;
-  const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)');
-  function refreshGlass() {
-    host.toggleAttribute('data-reduced-transparency', reducedTransparency.matches);
-    if (reducedTransparency.matches) {
-      host.dataset.glassBackend = 'solid';
-      glass?.destroy();
-      glass = null;
-      return;
-    }
-    if (!glass) {
-      try {
-        glass = createSvgGlass(shadow.querySelector('.glass'));
-        host.dataset.glassBackend = 'svg';
-      } catch {
-        host.dataset.glassBackend = 'fallback';
-      }
-    }
-    glass?.refresh('clear');
-  }
   let open = false,
     enterTimer = 0,
     leaveTimer = 0,
@@ -82,7 +51,6 @@ export function createLauncherMenu(anchor, options) {
     const colors = options().colors || {};
     host.dataset.theme = options().theme || 'light';
     host.style.setProperty('--menu-fg', colors.text || style.color);
-    host.style.setProperty('--menu-bg', colors['surface-opaque'] || '#f9f9f9');
     host.style.setProperty(
       '--menu-hover',
       colors.hover || `color-mix(in srgb, ${style.color} 8%, transparent)`,
@@ -110,7 +78,6 @@ export function createLauncherMenu(anchor, options) {
     if (destroyed || !anchor.isConnected) return;
     place();
     update();
-    refreshGlass();
     open = true;
     host.inert = false;
     host.toggleAttribute('data-keyboard', keyboard);
@@ -180,9 +147,6 @@ export function createLauncherMenu(anchor, options) {
   listen(document, 'pointerdown', (e) => {
     if (!e.composedPath().includes(anchor) && !e.composedPath().includes(host)) close();
   });
-  listen(reducedTransparency, 'change', () => {
-    if (open) refreshGlass();
-  });
   listen(window, 'blur', () => close());
   listen(window, 'resize', () => close());
   listen(document, 'scroll', () => {
@@ -213,7 +177,6 @@ export function createLauncherMenu(anchor, options) {
       destroyed = true;
       close();
       events.abort();
-      glass?.destroy();
       host.remove();
       anchor.removeAttribute('aria-haspopup');
       anchor.removeAttribute('aria-expanded');
