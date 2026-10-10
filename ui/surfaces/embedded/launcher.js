@@ -1,5 +1,5 @@
 /* [INPUT]: 主界面开合状态及共用表情手势。
- * [OUTPUT]: 唯一左栏图标；默认保留旧手势；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
+ * [OUTPUT]: 优先复用官方插件按钮并移除重复入口；默认保留旧手势；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
 import { DEVELOPMENT } from '../../shared/constants.js';
@@ -7,10 +7,73 @@ import { createPluginTabLink } from '../../codex/plugin-tab.js';
 let pluginLink = null;
 let pluginStatus = '';
 let entry = null;
+let official = null;
 let observer = null;
 let frame = 0;
 let current = null;
 const previewEnabled = () => DEVELOPMENT && current?.pluginTabPreview === true;
+
+function isOfficialButton(node) {
+  if (
+    !(node instanceof HTMLElement) ||
+    !node.closest('nav[class~="group/sidebar-rail"]') ||
+    node.closest('[data-codex-buddy-launcher]')
+  )
+    return false;
+  const name = (
+    node.getAttribute('aria-label') ||
+    node.getAttribute('title') ||
+    node.textContent ||
+    ''
+  ).trim();
+  return ['CodexBuddy 看板', 'CodexBuddy'].includes(name) && node.getBoundingClientRect().width > 0;
+}
+function canReuseOfficial() {
+  return isOfficialButton(official) && current?.canUseOfficial?.() === true;
+}
+function officialPointer(event) {
+  if (!canReuseOfficial() || event.button !== 0 || event.metaKey || event.ctrlKey) return;
+  event.stopImmediatePropagation();
+  current?.pointerDown(event);
+}
+function officialClick(event) {
+  if (!canReuseOfficial() || event.button !== 0 || event.metaKey || event.ctrlKey) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  current?.click(event);
+}
+function officialKey(event) {
+  if (canReuseOfficial() && event.altKey && event.key === 'Enter') {
+    event.stopImmediatePropagation();
+    current?.keyDown(event);
+  }
+}
+function officialDouble(event) {
+  if (canReuseOfficial()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}
+function bindOfficial(button) {
+  if (official === button) return;
+  if (official) {
+    official.removeEventListener('pointerdown', officialPointer, true);
+    official.removeEventListener('click', officialClick, true);
+    official.removeEventListener('keydown', officialKey, true);
+    official.removeEventListener('dblclick', officialDouble, true);
+  }
+  official = button;
+  if (official) {
+    official.addEventListener('pointerdown', officialPointer, true);
+    official.addEventListener('click', officialClick, true);
+    official.addEventListener('keydown', officialKey, true);
+    official.addEventListener('dblclick', officialDouble, true);
+  }
+}
+function findOfficial(rail) {
+  const buttons = [...rail.querySelectorAll('button,a')].filter(isOfficialButton);
+  return buttons.length === 1 ? buttons[0] : null;
+}
 
 function schedule() {
   if (!frame)
@@ -21,6 +84,7 @@ function schedule() {
 }
 
 export function stopLauncher() {
+  bindOfficial(null);
   pluginLink?.stop();
   pluginLink = null;
   pluginStatus = '';
@@ -36,10 +100,11 @@ export function stopLauncher() {
 }
 
 export function launcherButton() {
+  if (official?.isConnected) return official;
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void,pluginTabPreview?:boolean}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
 export function syncLauncher(options) {
   current = options;
   if (!previewEnabled()) {
@@ -60,7 +125,12 @@ export function syncLauncher(options) {
     observer = new MutationObserver((records) => {
       if (records.some((record) => !entry?.contains(record.target))) schedule();
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label', 'title'],
+    });
     window.addEventListener('resize', schedule);
   }
   const rail = [...document.querySelectorAll('nav[class~="group/sidebar-rail"]')].find(
@@ -68,8 +138,16 @@ export function syncLauncher(options) {
       node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility !== 'hidden',
   );
   if (!rail) {
+    bindOfficial(null);
     entry?.remove();
     if (options.root) delete options.root.dataset.launcher;
+    return;
+  }
+  bindOfficial(findOfficial(rail));
+  if (official && !previewEnabled()) {
+    entry?.remove();
+    entry = null;
+    if (options.root) options.root.dataset.launcher = 'rail';
     return;
   }
   if (!entry) {

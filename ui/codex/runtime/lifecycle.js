@@ -32,6 +32,7 @@ import {
 import {
   assistantMessageId,
   chatBusy,
+  chatRoot,
   bindingSourceReady,
   chatSurfaceReady,
   contextMatches,
@@ -544,6 +545,7 @@ function install() {
           shellState.detached ||
           (independentFeatures() && featurePlacement() === 'desktop'),
         root: shellState.root,
+        canUseOfficial: () => Boolean(chatRoot()),
         pluginOpened: () => {
           cancelFaceClick();
           if (independentFeatures()) toggleFeatureDock(false);

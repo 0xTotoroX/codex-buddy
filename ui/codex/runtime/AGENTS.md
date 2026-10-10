@@ -32,3 +32,5 @@ lifecycle 同时安装/销毁独立功能嵌入适配器；扫描忽略自有功
 lifecycle 为 embedded/launcher 接入共用表情手势与设置操作，停用时回收导航入口；presentation 统一使用左栏图标作为窗口往返锚点（无图标栏时沿用旧锚点）。不再读取旧 launcher 选择字段。
 
 Dev 官方插件页签联动仅在 launcher 成功确认选中后通过 lifecycle 收起旧注入侧栏，不关闭已有桌面/贴边窗口或迁移业务 owner。
+
+通过 canUseOfficial 将 chatRoot 的有效性供 launcher 校验，生成中仍可收放；非聊天页保留官方按钮默认导航。
