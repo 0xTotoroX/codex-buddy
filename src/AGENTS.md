@@ -66,4 +66,4 @@ App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 
 
 功能状态的 mainManaged 区分主界面接管与独立贴边：仅恢复模型贴边时保留旧大纲/下一步工作台及窗口往返；已登记的内容即使关闭或全部移到贴边，也不恢复重复旧界面。
 
-panel::Preferences.settings_target 默认 plugin，兼容旧配置缺省；appearance 设置接口仅接收 plugin/web，并按修订号保存。/settings/open 的 configuredTarget=true 请求遵循该选择：plugin 返回路由，web 沿用原浏览器打开；未传参数的旧客户端行为不变。
+panel::Preferences.settings_target 默认 plugin，兼容旧配置缺省；appearance 设置接口仅接收 plugin/web，并按修订号保存。/settings/open 的 configuredTarget=true 请求遵循该选择：plugin 返回路由，web 返回本机地址交给宿主内置浏览器侧边页签；未传参数的旧客户端行为不变。

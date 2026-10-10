@@ -33,4 +33,4 @@
 
 [PROTOCOL]: 结构或契约变化时更新本文，并核对父级地图。
 
-`settings-entry.tsx` 在总览提供“设置按钮打开方式”：插件侧栏或网页，保存 appearance.settingsTarget，使用既有 revision 校验与错误回读；切换选项本身不打开页面。
+`settings-entry.tsx` 在总览提供“设置按钮打开方式”：插件侧栏或内置浏览器网页，保存 appearance.settingsTarget，使用既有 revision 校验与错误回读；切换选项本身不打开页面。

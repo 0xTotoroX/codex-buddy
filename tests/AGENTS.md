@@ -116,3 +116,5 @@ workbench 的 scaled feature arrangement 用例在 80%/100%/120% 页面缩放下
 `official-launcher.test.mjs` 核对右键打开官方右侧页签而不触发全局导航，切换聊天不自动展开；左键只收放旧工作台、不调用外部设置，停止适配后恢复原生菜单。
 
 settings-entry.test.mjs 验证仅顶栏悬停显示齿轮、键盘可见、眼睛居中和 28px 按钮；official-launcher 验证恢复原生右键、显式设置动作仍打开侧边页签。Rust appearance 测试覆盖目标保存、持久化和非法值拒绝。
+
+settings-browser.test.mjs 用合成宿主核对本机地址进入官方地址栏、Enter 导航、分屏恢复、非本机地址拒绝与零外部 window.open；不替代真实宿主浏览器加载验收。

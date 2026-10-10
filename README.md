@@ -204,7 +204,7 @@ Building or packaging does not update an installed application. When reporting a
 
 The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync when updating user-facing documentation.
 
-The settings gear sits on the right of the embedded workbench header and appears when that row is hovered or keyboard-focused. Choose **Settings button destination** in settings overview: the official plugin side panel (default) or a web page. The official sidebar button keeps its native right-click menu.
+The settings gear sits on the right of the embedded workbench header and appears when that row is hovered or keyboard-focused. Choose **Settings button destination** in settings overview: the official plugin side panel (default) or a web page in the host’s built-in browser side panel. The official sidebar button keeps its native right-click menu.
 
 ## Privacy and license
 

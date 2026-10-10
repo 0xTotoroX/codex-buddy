@@ -254,3 +254,68 @@ export function createPluginTabLink({ onOpened, onStatus, follow = true }) {
     },
   };
 }
+
+/** Open only the local settings URL in the host's own browser tab. No external fallback. */
+export async function openSettingsBrowser(url) {
+  const target = new URL(url);
+  if (target.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(target.hostname))
+    throw Error('设置地址必须是本机服务。');
+  const key = sessionKey();
+  if (!key) throw Error('请从当前聊天打开设置。');
+  const check = () => {
+    if (sessionKey() && sessionKey() !== key) throw new SourceChanged();
+    if (document.visibilityState !== 'visible') throw Error('当前窗口不可见。');
+  };
+  const wait = async (read) => {
+    for (let i = 0; i < 50; i++) {
+      check();
+      const result = read();
+      if (result) return result;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    throw Error('未找到宿主浏览器入口，未打开外部浏览器。');
+  };
+  const activate = (node) => {
+    check();
+    if (!visible(node) || node.matches(':disabled,[aria-disabled="true"]'))
+      throw Error('宿主浏览器入口不可用。');
+    node.click();
+  };
+  const address = () =>
+    unique('input', ['搜索或输入网址', 'Search or enter a URL']) ||
+    (() => {
+      const inputs = [
+        ...document.querySelectorAll(
+          'input[placeholder="搜索或输入网址"],input[placeholder="Search or enter a URL"]',
+        ),
+      ].filter(visible);
+      if (inputs.length > 1) throw Error('无法唯一识别浏览器地址栏。');
+      return inputs[0] || null;
+    })();
+  const split = unique('button', ['进入分屏视图', 'Enter split view']);
+  if (split && split.getAttribute('aria-pressed') !== 'true') activate(split);
+  const next = await wait(() => unique('button', ['新标签页', 'New tab', '新建标签页']));
+  activate(next);
+  const entry = await wait(
+    () =>
+      address() ||
+      unique('button', ['新标签页', 'New tab']) ||
+      unique('[role="menuitem"]', ['浏览器', 'Browser']),
+  );
+  if (!(entry instanceof HTMLInputElement)) activate(entry);
+  const input = await wait(address);
+  check();
+  input.focus();
+  // Use the standard input/Enter events of the visible host address bar.
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, url);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await new Promise((resolve) => requestAnimationFrame(resolve));
+  check();
+  input.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true }),
+  );
+  input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+  const restore = unique('button', ['进入分屏视图', 'Enter split view']);
+  if (restore && restore.getAttribute('aria-pressed') !== 'true') activate(restore);
+}

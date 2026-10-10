@@ -45,7 +45,7 @@ export function SettingsEntry({ value }: { value?: AppearanceSettings }) {
           onChange={(e) => void change(e.target.value)}
         >
           <option value="plugin">插件侧栏</option>
-          <option value="web">网页</option>
+          <option value="web">网页（内置浏览器）</option>
         </NativeSelect>
       </Field>
       <Feedback text={error} failed />

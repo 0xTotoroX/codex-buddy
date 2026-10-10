@@ -1,3 +1,4 @@
+import { openSettingsBrowser } from '../plugin-tab.js';
 import { bridgeCall } from './state.js';
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
@@ -594,6 +595,7 @@ function install() {
           if (result.error || result.status !== 'ok')
             throw Error(result.error || result.message || '打开设置失败');
           if (result.target === 'plugin') openPluginSettings();
+          else if (result.target === 'web') return openSettingsBrowser(result.url);
         })
         .catch((error) => {
           const button = shellState.panel?.querySelector('[data-settings-entry]');

@@ -139,6 +139,9 @@ pub(crate) async fn dispatch(
                 return Ok(json!({"status":"ok", "target":"plugin"}));
             }
             let runtime = crate::lifecycle::Runtime::read(&app.paths)?;
+            if request.payload["configuredTarget"] == true {
+                return Ok(json!({"status":"ok", "target":"web", "url":runtime.url()}));
+            }
             webbrowser::open(&runtime.url()).context("无法打开浏览器，请运行 codex-buddy start")?;
             Ok(json!({"status":"ok"}))
         }

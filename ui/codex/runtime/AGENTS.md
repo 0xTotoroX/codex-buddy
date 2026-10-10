@@ -35,4 +35,4 @@ Dev 官方插件页签联动仅在 launcher 成功确认选中后通过 lifecycl
 
 通过 canUseOfficial 将 chatRoot 的有效性供 launcher 校验，生成中仍可收放；非聊天页保留官方按钮默认导航。
 
-openSettings 信号来自内嵌工作台头部，lifecycle 请求后台按 settingsTarget 选择网页或插件侧边页签；不将该点击传递给表情收放。
+openSettings 信号来自内嵌工作台头部，lifecycle 请求后台按 settingsTarget 选择内置浏览器网页或插件侧边页签；不将该点击传递给表情收放。
