@@ -1,5 +1,5 @@
 /* [INPUT]: Real launcher adapter in a synthetic host rail with delegated navigation.
- * [OUTPUT]: Official button toggles only the old workbench; cleanup and settings remain native.
+ * [OUTPUT]: Official button toggles only the old workbench; right-click invokes the native settings entry once; cleanup restores native behavior.
  * [POS]: Isolated integration test, no real host or plugin calls.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import { test } from 'node:test';
@@ -38,7 +38,7 @@ async function fixture() {
   await page.addScriptTag({ content: result.outputFiles[0].text });
   return { page, browser };
 }
-test('official entry toggles without navigation, removes duplicate icon and preserves native settings', async () => {
+test('official entry toggles without navigation, removes duplicate icon and opens internal plugin settings on right-click', async () => {
   const { page, browser } = await fixture();
   try {
     assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
@@ -53,12 +53,16 @@ test('official entry toggles without navigation, removes duplicate icon and pres
       await page.evaluate(() => ({
         native: window.nativeSettings,
         external: window.externalSettings,
+        navigation: window.navigation,
+        toggles: window.toggles,
       })),
-      { native: 1, external: 0 },
+      { native: 0, external: 0, navigation: 1, toggles: 2 },
     );
     await page.evaluate(() => window.stopLauncher());
     await page.locator('#official').click();
-    assert.equal(await page.evaluate(() => window.navigation), 1);
+    assert.equal(await page.evaluate(() => window.navigation), 2);
+    await page.locator('#official').click({ button: 'right' });
+    assert.equal(await page.evaluate(() => window.nativeSettings), 1);
   } finally {
     await browser.close();
   }
