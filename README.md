@@ -77,6 +77,8 @@ Before first moving a legacy standalone board into independent mode, save its dr
 
 Hover over the eyes entry to reveal a background-free menu that expands upward within the sidebar: **Inside**, **Desktop**, and **Settings**. The settings overview lets you choose the default single-click action; existing configurations default to toggling the in-chat workbench. Arrow keys open and navigate the menu, and Esc closes it. Alt+Enter retains window handoff. Motion follows the reduced-motion preference.
 
+The eyes entry reflects the original capsule states, including blinking at idle, generation, completion and errors. With multiple visible chats, a small edge dot indicates the linked chat’s direction; it is hidden for a single chat or an unavailable source. This does not add another capsule or change the entry’s click/menu actions.
+
 ## Operations and state transitions
 
 Single-click and double-click below refer to **the eyes on the capsule or at the top of the workbench**.

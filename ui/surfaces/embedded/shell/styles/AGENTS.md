@@ -9,3 +9,5 @@ install-styles 安装 ui/shared/tokens.css、theme/tokens、外壳样式、featu
 - [motion.css](motion.css)：过渡、关键帧和减少动态效果规则（关闭过渡，不以 1ms 意外激活宽高动画）；完成扫光 900ms，胶囊就绪表情仅播放一次，展开阅读不循环；手势几何由 geometry.js 管理，内嵌展开节奏由 shared/constants 限定为 320–420ms。
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
+
+表情形状、状态动画与关键帧已提取到上级 face-styles.js，由 install-styles 按原顺序插入；layout/motion 保留外壳几何和收放动效。独立入口共享同一表情样式，不恢复旧紧凑胶囊显示。

@@ -4,6 +4,7 @@
  * [POS]: 胶囊样式装配层，通过版本标记复用或替换样式节点；开发时 force 原位更新。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { faceStyles } from './face-styles.js';
 import sharedTokens from '../../../shared/tokens.css?inline';
 import tokensCss from '../../theme/tokens.css?inline';
 import layoutCss from './styles/layout.css?inline';
@@ -51,6 +52,7 @@ export function installStyle(force = false) {
     sharedTokens +
     tokensCss +
     layoutCss +
+    faceStyles +
     contentCss +
     controlsCss +
     materialsCss +

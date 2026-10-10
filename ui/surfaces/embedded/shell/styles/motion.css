@@ -51,53 +51,6 @@
   transition: none !important;
 }
 
-.csw-fab-eye {
-  transition:
-    background 170ms ease,
-    border-color 170ms ease,
-    height 170ms ease,
-    transform 170ms ease,
-    width 170ms ease;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='idle'] .csw-fab-eye {
-  animation: csw-face-blink 4.8s infinite;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='answering'] .csw-fab-eye {
-  transition-duration: 70ms;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='surprise'] .csw-fab-eye {
-  animation: csw-face-star 1.25s ease-in-out infinite;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='generating'] .csw-fab-eye {
-  animation: csw-face-generate-bob 0.92s cubic-bezier(0.45, 0, 0.2, 1) infinite;
-  animation-delay: 0s;
-}
-
-.csw-fab[data-expression='ready'] .csw-fab-eye {
-  animation: csw-face-happy-lift 720ms cubic-bezier(0.2, 0.72, 0.2, 1) 1 both;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='empty'] .csw-fab-eye {
-  animation: csw-face-calm-breathe 3.6s ease-in-out infinite;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='error'] .csw-fab-eye {
-  animation: csw-face-error-breathe 3.8s ease-in-out infinite;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='curious'] .csw-fab-eye {
-  animation: none;
-}
-
-:is(.csw-fab, .csw-head-face)[data-expression='curious'] .csw-fab-eye::after {
-  animation: none;
-  transition: transform 90ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
 .csw-panel {
   transition: none !important;
 }
@@ -147,72 +100,6 @@
 
 .csw-command-icon[data-busy='true'] svg {
   animation: csw-progress-spin 0.9s linear infinite;
-}
-
-@keyframes csw-face-blink {
-  0%,
-  45%,
-  49%,
-  100% {
-    transform: scaleY(1);
-  }
-  47% {
-    transform: scaleY(0.12);
-  }
-}
-
-@keyframes csw-face-star {
-  0%,
-  100% {
-    transform: scale(0.9) rotate(0deg);
-  }
-  50% {
-    transform: scale(1.08) rotate(8deg);
-  }
-}
-
-@keyframes csw-face-generate-bob {
-  0%,
-  100% {
-    transform: translate3d(0, 2px, 0) scaleY(0.9);
-  }
-  50% {
-    transform: translate3d(0, -4px, 0) scaleY(1.06);
-  }
-}
-
-@keyframes csw-face-happy-lift {
-  0%,
-  100% {
-    transform: translate3d(0, 1px, 0) scale(0.97);
-  }
-  50% {
-    transform: translate3d(0, -1px, 0) scale(1.03);
-  }
-}
-
-@keyframes csw-face-calm-breathe {
-  0%,
-  100% {
-    opacity: 0.74;
-    transform: scaleX(0.94);
-  }
-  50% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-}
-
-@keyframes csw-face-error-breathe {
-  0%,
-  100% {
-    opacity: 0.78;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 @keyframes csw-status-breathe {

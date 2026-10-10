@@ -42,3 +42,5 @@ openSettings 信号可显式携带 web，用于 Option+右键；此时请求 inH
 产品设置统一由 settings-sync.openSettings 调用后台 inHostBrowser 路径，并在内置侧边浏览器打开；单飞防止连续点击创建多个标签，runtime generation 变化后不继续导航。头部、眼睛右键和 Option+右键共用该入口，lifecycle 不再调用插件设置工具或按 settingsTarget 分流。
 
 lifecycle 统一执行 launcherAction：内在宿主显示/收放，外使用现有整组桌面交接或唤起，设置复用内置浏览器。presentation 接收 cdp 传来的默认动作并刷新入口，不重置业务数据；主功能 owner 与旧窗口分别走现有协议。
+
+lifecycle 每次渲染使用原 resolveFabExpression/fabExpressionLabel 和 activePaneCue 更新独立入口；来源沿用原关联身份与几何判断，单聊天或来源无效时不显示小点，不为图标另行读取聊天。

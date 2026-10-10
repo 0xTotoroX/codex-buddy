@@ -56,7 +56,7 @@ function pointerInsideRect(pointer, rect) {
   );
 }
 
-function eyeOffset(pointer, rect, maxX, maxY, reachDistance) {
+export function eyeOffset(pointer, rect, maxX, maxY, reachDistance) {
   const dx = pointer.x - (rect.left + rect.width / 2);
   const dy = pointer.y - (rect.top + rect.height / 2);
   const distance = Math.hypot(dx, dy);

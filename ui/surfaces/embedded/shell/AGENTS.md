@@ -25,3 +25,5 @@ views 组合功能视图，settings-view 负责设置控件；几何、交互、
 views 复用唯一原壳和 geometry 动效，只由 embedded/features 替换内容；主界面提交到桌面后隐藏宿主根并释放 dock。currentAppearance 接收当前形式的材质覆盖，不改写历史本地偏好。interaction 保留原单击/双击识别，通过 composedPath 避让功能输入；展开外壳不重新打开已关闭功能。
 
 独立眼睛默认动作非“内”时，连续双击不会额外触发另一窗口动作；默认“内”保持原双击往返，Alt+Enter 始终沿用原切换能力。菜单显式动作取消旧表情点击计时器。
+
+- `face-styles.js`：从原 layout/motion 提取的唯一表情形状、关键帧与减少动态效果样式，install-styles 与独立入口 Shadow DOM 共用，旧胶囊/工作台不另维护一份。effects.eyeOffset 导出原视线计算供入口复用。

@@ -24,3 +24,5 @@ Option+右键仅在当前聊天入口可用且已提供 settingsBrowser 回调�
 - `launcher-menu.js`：独立眼睛的栏内快捷菜单，内/外/设置竖排；节点放在眼睛同一 Shadow DOM 内并参与侧栏布局，不使用 body portal 或 fixed 定位。110ms 悬停打开、180ms 离开缓冲，220ms 高度伸缩配合按钮错峰显现；菜单居中位于眼睛上方，栏内自动让位，按钮仍44×50；键盘/Esc、inert、减少动态效果、动作单飞及销毁清理沿用。默认单击动作来自后台 launcherAction。
 
 菜单不再绘制独立背景、玻璃、边框或阴影，直接沿用宿主侧栏底色；保留按钮 hover、按下、焦点反馈与栏内伸缩动画。其他容器的材质偏好不受影响。
+
+- `launcher-face.js`：独立眼睛复用 statusStageHtml 与共享 faceStyles；只接收 runtime 派生表情及 activePaneCue，36px按钮内适配原表情，合法多聊天来源以边缘小点标记并沿圆周平滑移动。保留按钮/菜单节点与事件，不读取正文或重选聊天；隐藏/模糊/销毁清理视线和动画帧。

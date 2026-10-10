@@ -32,6 +32,7 @@ import {
 } from '../../shared/constants.js';
 import {
   assistantMessageId,
+  activePaneCue,
   chatBusy,
   chatRoot,
   bindingSourceReady,
@@ -64,6 +65,7 @@ import {
 import {
   cancelViewAnimation,
   resolveFabExpression,
+  fabExpressionLabel,
   scheduleExpressionRefresh,
   triggerCompletionBeam,
 } from '../../surfaces/embedded/shell/shell.js';
@@ -561,6 +563,7 @@ function install() {
     onSignal('render', (options) => {
       renderFloat(options);
       if (IS_POPOUT || !runtimeState.runtimeActive) return;
+      const expression = resolveFabExpression();
       syncLauncher({
         open:
           shellState.open ||
@@ -573,6 +576,9 @@ function install() {
           if (independentFeatures()) toggleFeatureDock(false);
           else if (!shellState.detached) setOpen(false);
         },
+        expression,
+        expressionLabel: fabExpressionLabel(expression),
+        sourceCue: activePaneCue(),
         defaultAction: shellState.launcherAction,
         colors: panelAppearance().colors,
         theme: shellState.theme,

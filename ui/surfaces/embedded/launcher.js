@@ -2,6 +2,7 @@
  * [OUTPUT]: 默认使用独立眼睛入口；官方按钮适配代码仅供显式试验；单击保留旧手势、普通右键保留官方菜单、Option+右键打开内置浏览器设置；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
+import { createLauncherFace, launcherFaceHtml, launcherFaceStyles } from './launcher-face.js';
 import { createLauncherMenu } from './launcher-menu.js';
 import { DEVELOPMENT } from '../../shared/constants.js';
 import { createPluginTabLink } from '../../codex/plugin-tab.js';
@@ -9,6 +10,7 @@ let pluginLink = null;
 let pluginStatus = '';
 let entry = null;
 let radial = null;
+let face = null;
 let official = null;
 let settingsLink = null;
 let observer = null;
@@ -109,6 +111,8 @@ function schedule() {
 }
 
 export function stopLauncher() {
+  face?.destroy();
+  face = null;
   radial?.destroy();
   radial = null;
   bindOfficial(null);
@@ -133,7 +137,7 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,defaultAction?:string,outsideAvailable?:boolean,theme?:string,colors?:Record<string,string>,action?:(action:string)=>Promise<void>|void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,defaultAction?:string,outsideAvailable?:boolean,theme?:string,colors?:Record<string,string>,expression?:string,expressionLabel?:string,sourceCue?:{direction:string,angle:number|null},action?:(action:string)=>Promise<void>|void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
 export function syncLauncher(options) {
   current = options;
   if (!previewEnabled()) {
@@ -167,6 +171,8 @@ export function syncLauncher(options) {
       node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility !== 'hidden',
   );
   if (!rail) {
+    face?.destroy();
+    face = null;
     radial?.destroy();
     radial = null;
     bindOfficial(null);
@@ -176,6 +182,8 @@ export function syncLauncher(options) {
   }
   bindOfficial(options.reuseOfficial === true ? findOfficial(rail) : null);
   if (official && !previewEnabled()) {
+    face?.destroy();
+    face = null;
     radial?.destroy();
     radial = null;
     entry?.remove();
@@ -197,9 +205,10 @@ export function syncLauncher(options) {
       button:hover { background:color-mix(in srgb,currentColor 10%,transparent); }
       button:focus-visible { outline:2px solid currentColor;outline-offset:2px; }
       svg { width:20px;height:20px;fill:currentColor; }
+      ${launcherFaceStyles}
     </style><div class="entry"><div class="divider" aria-hidden="true"></div>
-      <button type="button" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter" title="单击收放 · 双击窗口往返 · 右键设置">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg>
+      <button type="button" class="csw-launcher-face csw-fab" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter" title="单击收放 · 双击窗口往返 · 右键设置">
+        ${launcherFaceHtml()}
       </button></div>`;
     const button = shadow.querySelector('button');
     button.addEventListener('pointerdown', (event) => {
@@ -230,6 +239,8 @@ export function syncLauncher(options) {
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
   if (!previewEnabled() && options.action && !radial)
     radial = createLauncherMenu(entry.shadowRoot.querySelector('button'), () => current);
+  if (!face) face = createLauncherFace(entry.shadowRoot.querySelector('button'));
+  face.update(options);
   radial?.update();
   entry.shadowRoot.querySelector('button').title = previewEnabled()
     ? pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）'
