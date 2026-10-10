@@ -7,16 +7,22 @@ const NAME = 'CodexBuddy';
 const OWN =
   '[data-codex-buddy-launcher],[data-companion-stepwise-root],[data-codex-buddy-features-root]';
 const RIGHT = '[data-app-shell-focus-area="right-panel"]';
-const visible = (node) =>
-  node instanceof HTMLElement &&
-  node.getClientRects().length > 0 &&
-  getComputedStyle(node).visibility !== 'hidden' &&
-  !node.closest('[hidden],[inert],[aria-hidden="true"]') &&
-  node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
-  node.getBoundingClientRect().right > 0 &&
-  node.getBoundingClientRect().bottom > 0 &&
-  node.getBoundingClientRect().left < innerWidth &&
-  node.getBoundingClientRect().top < innerHeight;
+const visible = (node) => {
+  if (
+    !(node instanceof HTMLElement) ||
+    node.closest('[hidden],[inert],[aria-hidden="true"]') ||
+    !node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })
+  )
+    return false;
+  const box = node.getBoundingClientRect();
+  const left = Math.max(0, box.left),
+    right = Math.min(innerWidth, box.right);
+  const top = Math.max(0, box.top),
+    bottom = Math.min(innerHeight, box.bottom);
+  if (right <= left || bottom <= top) return false;
+  const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
+  return !!hit && node.contains(hit);
+};
 const label = (node) =>
   (node.getAttribute('aria-label') || node.textContent || '').trim().replace(/\s+/g, ' ');
 function unique(selector, names) {
@@ -34,6 +40,11 @@ function tab() {
   );
 }
 const sessionKey = () => mainChatSessionId();
+class SourceChanged extends Error {
+  constructor() {
+    super('聊天正在切换，旧操作已取消。');
+  }
+}
 
 /** @param {{onOpened:()=>void,onStatus:(message:string)=>void}} options */
 export function createPluginTabLink({ onOpened, onStatus }) {
@@ -45,12 +56,32 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     candidateAt = 0;
   let interval = 0;
   let stage = '识别聊天';
+  const attempts = new Map();
   const check = (key) => {
-    if (stopped || sessionKey() !== key) throw Error('聊天已切换，已停止旧操作。');
+    if (stopped || sessionKey() !== key) throw new SourceChanged();
     if (document.visibilityState !== 'visible') throw Error('当前窗口不可见，未切换页签。');
   };
-  const wait = async (key, read) => {
+  const wait = async (key, read, recoverSplit = false) => {
+    let splitRequested = false;
     for (let i = 0; i < 50; i++) {
+      if (stopped) throw new SourceChanged();
+      const current = sessionKey();
+      if (current && current !== key) throw new SourceChanged();
+      if (!current) {
+        if (recoverSplit && !splitRequested && tab()) {
+          const split = unique('button', ['进入分屏视图', 'Enter split view']);
+          if (
+            split &&
+            split.getAttribute('aria-pressed') !== 'true' &&
+            !split.matches(':disabled,[aria-disabled="true"]')
+          ) {
+            splitRequested = true;
+            split.click();
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        continue;
+      }
       check(key);
       const value = read();
       if (value) return value;
@@ -78,8 +109,9 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     }
     node.click();
   };
-  async function open() {
+  async function open(expectedKey) {
     stage = '恢复分屏';
+    if (expectedKey && sessionKey() && sessionKey() !== expectedKey) throw new SourceChanged();
     if (document.visibilityState !== 'visible') throw Error('当前窗口不可见，未切换页签。');
     const split = unique('button', ['进入分屏视图', 'Enter split view']);
     if (split && split.getAttribute('aria-pressed') !== 'true') {
@@ -92,6 +124,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     stage = '识别聊天';
     const key = sessionKey();
     if (!key) throw Error('无法唯一识别当前聊天，未打开插件。');
+    if (expectedKey && key !== expectedKey) throw new SourceChanged();
     check(key);
     if ([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(visible))
       throw Error('请先关闭当前对话框，再打开 Buddy。');
@@ -148,23 +181,50 @@ export function createPluginTabLink({ onOpened, onStatus }) {
         }
       }
       stage = '确认官方插件页签';
-      existing = await wait(key, tab);
+      existing = await wait(key, tab, true);
     }
     if (existing.getAttribute('aria-selected') !== 'true') click(existing, key);
-    await wait(key, () => tab()?.getAttribute('aria-selected') === 'true');
+    // 官方标签切换可能带入该聊天保存的完整视图；选择后再核对并恢复分屏。
+    const finalSplit = unique('button', ['进入分屏视图', 'Enter split view']);
+    if (finalSplit && finalSplit.getAttribute('aria-pressed') !== 'true') {
+      const current = sessionKey();
+      if (current && current !== key) throw new SourceChanged();
+      if (!finalSplit.matches(':disabled,[aria-disabled="true"]')) finalSplit.click();
+    }
+    let confirmations = 0;
+    await wait(key, () => {
+      const split = unique('button', ['进入分屏视图', 'Enter split view']);
+      const ready =
+        tab()?.getAttribute('aria-selected') === 'true' &&
+        (!split || split.getAttribute('aria-pressed') === 'true');
+      confirmations = ready ? confirmations + 1 : 0;
+      return confirmations >= 2;
+    });
     check(key);
     onOpened();
     enabled = true;
-    last = key;
+    last = candidate = key;
+    attempts.delete(key);
     onStatus('官方 Buddy 页签已选中；切换聊天时自动恢复。');
   }
-  function request() {
+  function request(expectedKey = sessionKey(), automatic = false) {
     if (stopped) return Promise.resolve();
     if (running) return running;
+    if (!automatic) attempts.delete(expectedKey);
+    const attempt = (attempts.get(expectedKey) || 0) + 1;
+    attempts.set(expectedKey, attempt);
+    if (attempts.size > 32) attempts.delete(attempts.keys().next().value);
     onStatus('正在打开官方 Buddy 插件页签…');
-    running = open()
+    running = open(expectedKey)
       .catch((error) => {
-        enabled = false;
+        if (stopped) return;
+        // 切换取消不等于关闭跟随；新聊天稳定后继续。相同聊天最多重试一次。
+        if (error instanceof SourceChanged) {
+          if (enabled && attempt < 2 && (!sessionKey() || sessionKey() === expectedKey)) {
+            last = null;
+            candidateAt = Date.now();
+          }
+        }
         onStatus(`${stage}：${error.message}`);
       })
       .finally(() => {
@@ -183,10 +243,10 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     }
     if (!next || next === last || Date.now() - candidateAt < 750) return;
     last = next;
-    void request();
+    void request(next, true);
   }, 250);
   return {
-    open: request,
+    open: () => request(),
     stop() {
       stopped = true;
       enabled = false;

@@ -161,7 +161,7 @@ test('unrelated menus and in-flight session changes are not adopted', async () =
       document
         .querySelector('[data-codex-buddy-launcher]')
         .shadowRoot.querySelector('button')
-        .title.includes('聊天已切换'),
+        .title.includes('聊天正在切换'),
     );
     assert.equal(await page.evaluate(() => window.opened), 0);
   } finally {
@@ -276,6 +276,79 @@ test('empty official panel opens through New tab and keyboard-operated More tool
     await page.waitForFunction(() => window.opened === 1);
     assert.equal(await page.evaluate(() => window.menuClicks), 1);
     assert.equal(await page.evaluate(() => window.legacyClicks), 0);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('following stays armed after an interrupted session and a later session can recover', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await button.click();
+    await page.waitForFunction(() => window.opened === 1);
+    // B never finishes loading its plugin. Navigation to C must cancel B, not disable follow.
+    await page.evaluate(() => {
+      window.pluginAvailable = false;
+      window.switchSession('B');
+    });
+    await page.waitForFunction(() => window.menuClicks === 2);
+    await page.evaluate(() => {
+      document.querySelectorAll('[role="menu"]').forEach((n) => n.remove());
+      window.pluginAvailable = true;
+      window.switchSession('C');
+    });
+    await page.waitForFunction(() => window.opened === 2);
+    assert.equal(await page.evaluate(() => window.menuClicks), 3);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('plugin selection that hides the chat in full view is restored to split before success', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await page.evaluate(() => {
+      const plus = document.getElementById('new');
+      const openMenu = plus.onclick;
+      plus.onclick = (event) => {
+        openMenu.call(plus, event);
+        const item = document.querySelector('[role="menuitem"]');
+        const select = item.onclick;
+        item.onclick = (event) => {
+          document.querySelector('.app-shell-main-content-frame').setAttribute('hidden', '');
+          const split = document.createElement('button');
+          split.textContent = '进入分屏视图';
+          split.setAttribute('aria-pressed', 'false');
+          split.onclick = () => {
+            document.querySelector('.app-shell-main-content-frame').removeAttribute('hidden');
+            split.setAttribute('aria-pressed', 'true');
+          };
+          document.body.append(split);
+          select.call(item, event);
+        };
+      };
+    });
+    await button.click();
+    await page.waitForFunction(() => window.opened === 1);
+    assert.equal(await page.locator('.app-shell-main-content-frame').isVisible(), true);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('occluded duplicate controls do not block the active official control', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await page.evaluate(() => {
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position:fixed;left:0;top:400px;width:220px;height:60px';
+      holder.innerHTML =
+        '<button aria-label="显示/隐藏侧边面板" aria-pressed="false">covered</button><div style="position:absolute;inset:0;background:gray"></div>';
+      document.body.append(holder);
+    });
+    await button.click();
+    await page.waitForFunction(() => window.opened === 1);
+    assert.equal(await page.evaluate(() => window.menuClicks), 1);
   } finally {
     await browser.close();
   }
