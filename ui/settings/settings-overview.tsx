@@ -272,12 +272,7 @@ export function SettingsOverview({
           <h2>
             <a href="#settings-board">看板</a>
           </h2>
-          <span className="overview-muted">
-            {!enabled.board && '已停用 · '}
-            <a href="#settings-board/reminders-enabled">
-              {tasks.store.syncEnabled ? 'Apple 提醒事项同步' : '本地保存'}
-            </a>
-          </span>
+          <span className="overview-muted">{enabled.board ? '已启用' : '已停用'}</span>
         </header>
         <dl className="overview-board-columns">
           {boardColumns.map((column) => (

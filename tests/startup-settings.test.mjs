@@ -145,7 +145,10 @@ test(
       await input.fill('9000');
       await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
-      await page.getByRole('link', { name: '大纲', exact: true }).click();
+      await page
+        .getByRole('navigation', { name: '设置分类' })
+        .getByRole('link', { name: '总览', exact: true })
+        .click();
       await page.getByRole('link', { name: '下一步', exact: true }).click();
       assert.equal(await input.inputValue(), '9000');
       await input.fill('10000');

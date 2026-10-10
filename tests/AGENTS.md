@@ -142,3 +142,5 @@ launcher-face.test.mjs 通过原状态派生和真实合成聊天几何核对空
 `window-controls-native.mjs` 使用临时数据和合成页面驱动真实AppKit窗口，检查隐藏/恢复、放大/还原、放大后隐藏再恢复、同PID/草稿保留和收回消息；只读窗口几何，不截图、不接入用户聊天。输出target/reports/window-controls-native.json。
 
 workbench的closed independent views定向用例检查全部视图关闭后释放侧栏且点击不自动重开；settings-entry检查自有工具栏无title/tooltip，插件试验错误通过aria-description核对。
+
+设置导航用例改为总览承载大纲/模型快切开关，保留草稿切换及保存并发检查；旧分类锚点仍需定位到总览相应控件。

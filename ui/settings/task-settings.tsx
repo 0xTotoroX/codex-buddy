@@ -14,6 +14,8 @@ import {
   type Bindings,
   type Calendar,
 } from '../features/board/api';
+// Retain the integration UI for later; no authorization/list controls are mounted today.
+const remindersSettingsVisible = false;
 export function TaskSettings() {
   const { state, error, busy, command } = useTasks(true);
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
@@ -121,94 +123,108 @@ export function TaskSettings() {
           </form>
         </div>
       </details>
-      <div className="flex items-center justify-between gap-4">
-        <label htmlFor="reminders-enabled" className="text-sm">
-          Apple 提醒事项同步
-        </label>
-        <Switch
-          id="reminders-enabled"
-          checked={state?.store.syncEnabled ?? false}
-          disabled={busy || !state || !!state.error}
-          onCheckedChange={(syncEnabled) => void command({ op: 'modules', syncEnabled })}
-        />
-      </div>
-      <p role="status" className="text-[14px] text-muted-foreground">
-        {state?.status ?? '正在读取任务设置…'}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => void load('authorize')}>
-          {busy ? '处理中…' : '授权并选择列表'}
-        </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={() => void load('calendars')}>
-          刷新列表
-        </Button>
-      </div>
-      <p className="text-[14px] text-muted-foreground">
-        一个列表，只同步标题、备注和完成状态。待办、进行中和归档仅在 Buddy
-        内管理；归档不会删除提醒事项。
-      </p>
-      {!currentId && hasLinks && (
-        <p className="text-[14px] text-muted-foreground">
-          旧同步已暂停，所有任务和关联已保留。请先在 Apple
-          提醒事项中将原列表的任务移入一个列表，再在这里选择它。未找到的任务保留本地，不会自动重建。
-        </p>
-      )}
-      {state?.store.inflight?.action === 'create' && (
-        <p className="text-[14px] text-muted-foreground">
-          此前创建结果尚未确认，请先在看板中核对恢复记录。
-        </p>
-      )}
-      {calendars.length > 0 && (
-        <div className="space-y-3">
-          <label className="flex items-center justify-between gap-4 text-sm">
-            同步列表
-            <NativeSelect
-              aria-label="同步列表"
-              disabled={busy || locked}
-              value={chosen.calendarId}
-              onChange={(e) => {
-                setBindings({ calendarId: e.target.value });
-                setConfirmed(false);
-              }}
+      {remindersSettingsVisible && (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="reminders-enabled" className="text-sm">
+              Apple 提醒事项同步
+            </label>
+            <Switch
+              id="reminders-enabled"
+              checked={state?.store.syncEnabled ?? false}
+              disabled={busy || !state || !!state.error}
+              onCheckedChange={(syncEnabled) => void command({ op: 'modules', syncEnabled })}
+            />
+          </div>
+          <p role="status" className="text-[14px] text-muted-foreground">
+            {state?.status ?? '正在读取任务设置…'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onClick={() => void load('authorize')}
             >
-              <option value="">选择提醒事项列表</option>
-              {calendars
-                .filter((c) => c.writable)
-                .map((list) => (
-                  <option key={list.id} value={list.id}>
-                    {list.sourceTitle} / {list.title}
-                  </option>
-                ))}
-            </NativeSelect>
-          </label>
-          {!locked && (
-            <>
-              <label className="flex items-start gap-2 text-[14px]">
-                <input
-                  type="checkbox"
-                  checked={confirmed}
-                  onChange={(e) => setConfirmed(e.target.checked)}
-                />
-                我确认这是要同步的 iCloud 列表；启用后会导入其中的任务，并同步本地未归档任务。
-              </label>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={busy || !confirmed || !chosen.calendarId}
-                onClick={() =>
-                  void command({
-                    op: needsRepair ? 'repairBindings' : 'bindings',
-                    bindings: chosen,
-                    iCloudConfirmed: true,
-                    confirmRepair: needsRepair,
-                  })
-                }
-              >
-                {needsRepair ? '保存替代列表' : '保存列表'}
-              </Button>
-            </>
+              {busy ? '处理中…' : '授权并选择列表'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => void load('calendars')}
+            >
+              刷新列表
+            </Button>
+          </div>
+          <p className="text-[14px] text-muted-foreground">
+            一个列表，只同步标题、备注和完成状态。待办、进行中和归档仅在 Buddy
+            内管理；归档不会删除提醒事项。
+          </p>
+          {!currentId && hasLinks && (
+            <p className="text-[14px] text-muted-foreground">
+              旧同步已暂停，所有任务和关联已保留。请先在 Apple
+              提醒事项中将原列表的任务移入一个列表，再在这里选择它。未找到的任务保留本地，不会自动重建。
+            </p>
           )}
-        </div>
+          {state?.store.inflight?.action === 'create' && (
+            <p className="text-[14px] text-muted-foreground">
+              此前创建结果尚未确认，请先在看板中核对恢复记录。
+            </p>
+          )}
+          {calendars.length > 0 && (
+            <div className="space-y-3">
+              <label className="flex items-center justify-between gap-4 text-sm">
+                同步列表
+                <NativeSelect
+                  aria-label="同步列表"
+                  disabled={busy || locked}
+                  value={chosen.calendarId}
+                  onChange={(e) => {
+                    setBindings({ calendarId: e.target.value });
+                    setConfirmed(false);
+                  }}
+                >
+                  <option value="">选择提醒事项列表</option>
+                  {calendars
+                    .filter((c) => c.writable)
+                    .map((list) => (
+                      <option key={list.id} value={list.id}>
+                        {list.sourceTitle} / {list.title}
+                      </option>
+                    ))}
+                </NativeSelect>
+              </label>
+              {!locked && (
+                <>
+                  <label className="flex items-start gap-2 text-[14px]">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                    />
+                    我确认这是要同步的 iCloud 列表；启用后会导入其中的任务，并同步本地未归档任务。
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy || !confirmed || !chosen.calendarId}
+                    onClick={() =>
+                      void command({
+                        op: needsRepair ? 'repairBindings' : 'bindings',
+                        bindings: chosen,
+                        iCloudConfirmed: true,
+                        confirmRepair: needsRepair,
+                      })
+                    }
+                  >
+                    {needsRepair ? '保存替代列表' : '保存列表'}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </>
       )}
       {error && (
         <p role="alert" className="text-[14px] text-destructive">

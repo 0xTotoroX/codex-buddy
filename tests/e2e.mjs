@@ -54,7 +54,7 @@ async function waitFor(check, message, timeout = 12000) {
 }
 async function checkSettingsNavigation(page, context, base, runtime) {
   const nav = page.getByRole('navigation', { name: '设置分类' });
-  const names = ['总览', '大纲', '下一步', '看板', '模型快切', '显示与布局', '启动与连接'];
+  const names = ['总览', '下一步', '看板', '显示与布局', '启动与连接'];
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await nav.getByRole('link', { name: '总览', exact: true }).click();
   const overview = page.locator('.settings-overview');
@@ -132,14 +132,14 @@ async function checkSettingsNavigation(page, context, base, runtime) {
   );
   await page.getByLabel('输入上下文', { exact: true }).scrollIntoViewIfNeeded();
   const top = await page.evaluate(() => scrollY);
-  await nav.getByRole('link', { name: '大纲', exact: true }).click();
+  await nav.getByRole('link', { name: '总览', exact: true }).click();
   await nav.getByRole('link', { name: '下一步', exact: true }).click();
   assert.ok(
     Math.abs((await page.evaluate(() => scrollY)) - top) < 2,
     'category scroll position is retained',
   );
   await page.goBack();
-  await page.getByRole('heading', { name: '大纲', exact: true, level: 1 }).waitFor();
+  await page.getByRole('heading', { name: '总览', exact: true, level: 1 }).waitFor();
   await page.goForward();
   await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).waitFor();
   const gated = await context.newPage();
@@ -440,7 +440,9 @@ try {
       ['board', '看板'],
       ['model', '模型快切'],
     ]) {
-      await nav.getByRole('link', { name, exact: true }).click();
+      await nav
+        .getByRole('link', { name: ['outline', 'model'].includes(id) ? '总览' : name, exact: true })
+        .click();
       const control = page.getByRole('switch', { name: `启用${name}`, exact: true });
       await waitFor(() => control.isEnabled(), `${name} switch unavailable`);
       if (!(await featureFlags())[id]) {
@@ -492,7 +494,7 @@ try {
     await page.goto(`${base}/#settings-next/max-output`);
     const limit = page.getByLabel('输出 token 上限', { exact: true });
     await limit.fill('1');
-    await nav.getByRole('link', { name: '大纲', exact: true }).click();
+    await nav.getByRole('link', { name: '总览', exact: true }).click();
     await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
     await waitFor(
       async () => !(await settings()).answerOutlineEnabled,
@@ -506,7 +508,7 @@ try {
     );
     await limit.fill(String((await settings()).maxOutputTokens));
     await limit.blur();
-    await nav.getByRole('link', { name: '大纲', exact: true }).click();
+    await nav.getByRole('link', { name: '总览', exact: true }).click();
     await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
     await waitFor(async () => (await settings()).answerOutlineEnabled, 'outline did not restore');
     await waitFor(

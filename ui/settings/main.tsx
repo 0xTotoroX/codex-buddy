@@ -92,18 +92,7 @@ function App() {
           )}
           <Feedback text={notice.text} failed={notice.failed} />
           <div hidden={page !== 'overview'}>
-            <LauncherSettings
-              value={view?.panelPreferences}
-              outsideAvailable={editor.saved?.popoutSupported === true}
-            />
-            <SettingsOverview active={page === 'overview'} live={live} view={view} />
-          </div>
-          <SettingsForm
-            editor={editor}
-            notify={notify}
-            active={['outline', 'next', 'connection'].includes(page)}
-          >
-            <div hidden={page !== 'outline'}>
+            <section id="settings-outline" className="settings-section" aria-label="大纲设置">
               <FeatureSwitch
                 name="大纲"
                 checked={editor.form?.answerOutlineEnabled ?? false}
@@ -115,7 +104,19 @@ function App() {
                   )
                 }
               />
-            </div>
+            </section>
+            <ModelControlSettings live={live} />
+            <LauncherSettings
+              value={view?.panelPreferences}
+              outsideAvailable={editor.saved?.popoutSupported === true}
+            />
+            <SettingsOverview active={page === 'overview'} live={live} view={view} />
+          </div>
+          <SettingsForm
+            editor={editor}
+            notify={notify}
+            active={['next', 'connection'].includes(page)}
+          >
             <div hidden={page !== 'next'}>
               <NextSettings editor={editor} appearance={view?.panelPreferences} notify={notify} />
             </div>
@@ -125,9 +126,6 @@ function App() {
           </SettingsForm>
           <div hidden={page !== 'board'}>
             <TaskSettings />
-          </div>
-          <div hidden={page !== 'model'}>
-            <ModelControlSettings live={live} />
           </div>
           <div hidden={page !== 'surfaces'}>
             <SurfaceSettings

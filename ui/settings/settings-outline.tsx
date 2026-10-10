@@ -5,10 +5,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 export const pageTitles = {
   overview: '总览',
-  outline: '大纲',
   next: '下一步',
   board: '看板',
-  model: '模型快切',
   surfaces: '显示与布局',
   connection: '启动与连接',
   dev: '开发',
@@ -16,7 +14,8 @@ export const pageTitles = {
 export type SettingsPage = keyof typeof pageTitles;
 const aliases: Record<string, SettingsPage> = {
   'settings-tasks': 'board',
-  'settings-model-control': 'model',
+  'settings-outline': 'overview',
+  'settings-model-control': 'overview',
   'settings-capsule': 'surfaces',
   'settings-features': 'next',
   'settings-model': 'next',
@@ -141,8 +140,8 @@ export function SettingsOutline({
               event.preventDefault();
               navigate(id, event.currentTarget.hash);
             }}
-            className={id === 'surfaces' || id === 'outline' ? 'settings-nav-divider' : ''}
-            href={`#settings-${id === 'model' ? 'model-control' : id}`}
+            className={id === 'surfaces' ? 'settings-nav-divider' : ''}
+            href={`#settings-${id}`}
             aria-current={page === id ? 'page' : undefined}
           >
             {pageTitles[id]}

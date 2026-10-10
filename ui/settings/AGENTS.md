@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../../AGENTS.md)
 
-设置包含只读总览，并按大纲、下一步、看板、模型快切、显示与布局、启动与连接分类，Dev 另有开发来源。分类切换隐藏而不卸载内容，保留草稿和阅读位置；窄屏用顶部横向导航。功能设置调用各自后台服务，形式、主题和布局分别写入 features/surfaces/appearance，不在设置页实现业务。模型表单失焦或选项切换自动保存，失败保留草稿；串行队列及 configurationRevision 沿用 use-settings-form。
+设置总览集中大纲/模型快切开关、入口偏好及只读信息；独立分类为下一步、看板、显示与布局、启动与连接，Dev 另有开发来源。分类切换隐藏而不卸载内容，保留草稿和阅读位置；窄屏用顶部横向导航。功能设置调用各自后台服务，形式、主题和布局分别写入 features/surfaces/appearance，不在设置页实现业务。模型表单失焦或选项切换自动保存，失败保留草稿；串行队列及 configurationRevision 沿用 use-settings-form。
 
 成员清单：
 
@@ -18,7 +18,7 @@
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
 - [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
 - [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关与打开操作，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；不持有位置或主题。
-- [task-settings.tsx](task-settings.tsx)：看板分组管理、看板/同步独立开关、显式授权、唯一 iCloud 列表及旧同步配置恢复；不修改同步规则。
+- [task-settings.tsx](task-settings.tsx)：看板分组管理及看板开关；同步授权/列表界面保留源码但不挂载；不修改同步规则。
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
 - [styles.css](styles.css)：Tailwind v4、语义主题、分类导航、设置行和窄屏布局、焦点及减少动效规则；只扫描本目录，不注入宿主。
@@ -40,3 +40,5 @@
 - `launcher-settings.tsx`：总览中的眼睛默认单击动作（内/外/设置），保存 appearance.launcherAction 并保留修订冲突校验；不支持桌面浮窗时禁用外选项，切换默认值本身不移动工作台。
 
 所有动作图标通过shared/icons/react读取同一公开SVG目录，统一18px。页面保留桌面16px、窄屏12px额外顶部留白及底部边距。
+
+大纲和模型快切不再占独立分类；旧settings-outline/settings-model-control锚点映射总览并定位对应开关。窄屏布局align-content:start避免多余高度拉开导航和正文。Apple提醒事项暂不展示入口、授权或同步状态，总览看板只显示启停；后台能力和已存数据保留。
