@@ -11,14 +11,20 @@ const visible = (node) =>
   node instanceof HTMLElement &&
   node.getClientRects().length > 0 &&
   getComputedStyle(node).visibility !== 'hidden' &&
-  !node.closest('[hidden],[inert]');
+  !node.closest('[hidden],[inert],[aria-hidden="true"]') &&
+  node.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }) &&
+  node.getBoundingClientRect().right > 0 &&
+  node.getBoundingClientRect().bottom > 0 &&
+  node.getBoundingClientRect().left < innerWidth &&
+  node.getBoundingClientRect().top < innerHeight;
 const label = (node) =>
   (node.getAttribute('aria-label') || node.textContent || '').trim().replace(/\s+/g, ' ');
 function unique(selector, names) {
   const nodes = [...document.querySelectorAll(selector)].filter(
     (node) => visible(node) && !node.closest(OWN) && names.includes(label(node)),
   );
-  if (nodes.length > 1) throw Error('发现多个同名入口，未自动选择。');
+  if (nodes.length > 1)
+    throw Error(`发现多个同名入口（${names.join(' / ')}，${nodes.length}个），未自动选择。`);
   return /** @type {HTMLElement|null} */ (nodes[0] || null);
 }
 function tab() {
@@ -56,6 +62,20 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     check(key);
     if (!visible(node) || node.matches(':disabled,[aria-disabled="true"]'))
       throw Error('官方入口当前不可用。');
+    if (node.getAttribute('aria-haspopup') === 'menu') {
+      const handled = !node.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      node.dispatchEvent(
+        new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }),
+      );
+      if (handled) return;
+    }
     node.click();
   };
   async function open() {
@@ -95,9 +115,11 @@ export function createPluginTabLink({ onOpened, onStatus }) {
         () =>
           tab() ||
           unique('button', ['打开侧边面板标签页', 'Open side panel tab']) ||
+          unique('button', ['新建标签页', 'New tab']) ||
           unique(`${RIGHT} button`, ['新标签页', 'New tab']) ||
           unique('button', ['新标签页', 'New tab']) ||
-          unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']),
+          unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']) ||
+          unique('button', ['更多工具…', 'More tools…']),
       );
       if (next.getAttribute('role') !== 'tab') {
         if ([...document.querySelectorAll('[role="menu"]')].some(visible))
@@ -117,7 +139,8 @@ export function createPluginTabLink({ onOpened, onStatus }) {
             key,
             () =>
               unique('[role="menuitem"]', [NAME]) ||
-              unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']),
+              unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']) ||
+              unique('button', ['更多工具…', 'More tools…']),
           );
           click(item, key);
           if (label(item) !== NAME)

@@ -235,3 +235,48 @@ test('two visible main conversations remain ambiguous instead of choosing the fi
     await browser.close();
   }
 });
+
+test('empty official panel opens through New tab and keyboard-operated More tools, ignoring hidden duplicates', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await page.evaluate(() => {
+      const plus = document.getElementById('new');
+      const right = document.getElementById('right');
+      const originalMenu = plus.onclick;
+      document.getElementById('toggle').remove();
+      plus.remove();
+      const start = document.createElement('button');
+      start.textContent = '新建标签页';
+      start.onclick = () => {
+        start.remove();
+        right.hidden = false;
+        const more = document.createElement('button');
+        more.textContent = '更多工具…';
+        more.setAttribute('aria-haspopup', 'menu');
+        // Match the host's menu primitive: a naked click is not its activation event.
+        more.onkeydown = (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            originalMenu.call(plus, event);
+          }
+        };
+        right.append(more);
+      };
+      document.body.append(start);
+      const hidden = document.createElement('div');
+      hidden.setAttribute('aria-hidden', 'true');
+      hidden.innerHTML = '<button aria-label="新建标签页">hidden duplicate</button>';
+      document.body.append(hidden);
+      const offscreen = document.createElement('button');
+      offscreen.textContent = '新建标签页';
+      offscreen.style.cssText = 'position:absolute;left:-2000px';
+      document.body.append(offscreen);
+    });
+    await button.click();
+    await page.waitForFunction(() => window.opened === 1);
+    assert.equal(await page.evaluate(() => window.menuClicks), 1);
+    assert.equal(await page.evaluate(() => window.legacyClicks), 0);
+  } finally {
+    await browser.close();
+  }
+});
