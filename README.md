@@ -43,7 +43,7 @@ In Web settings, choose **下一步 → 高级生成设置 → 输入上下文 �
 
 Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
-When the CodexBuddy plugin is installed, its official sidebar button toggles the original workbench inside recognized chats without navigating to the plugin page or adding a duplicate eyes entry. Option-right-click opens web settings in the built-in browser without changing the saved preference. The native right-click menu remains available; the workbench header gear opens settings in the selected destination. If no unique plugin button is found, the original eyes entry remains, including its Web settings shortcut. Double-click and Alt+Enter keep the existing window handoff behavior.
+CodexBuddy uses its own eyes entry in the left rail and does not require the plugin. Click to toggle the workbench; double-click or Alt+Enter keeps the existing window handoff. Right-click or Option-right-click opens settings in ChatGPT’s built-in browser side panel.
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face for returning to the chat.
 
@@ -204,7 +204,7 @@ Building or packaging does not update an installed application. When reporting a
 
 The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync when updating user-facing documentation.
 
-The settings gear sits on the right of the embedded workbench header and appears when that row is hovered or keyboard-focused. Choose **Settings button destination** in settings overview: the official plugin side panel (default) or a web page in the host’s built-in browser side panel. The official sidebar button keeps its native right-click menu.
+The header settings gear appears when the eyes row is hovered or keyboard-focused. All in-host settings entries open the same complete settings page in ChatGPT’s built-in browser. Plugin code remains available on the plugin development branch, but is not required to use the workbench.
 
 ## Privacy and license
 

@@ -21,9 +21,13 @@ test('web settings use native browser address controls and return to split view'
   const page = await browser.newPage();
   try {
     await page.setContent(
-      '<div class="app-shell-main-content-frame" data-conversation-id="fixture-A"><div class="thread-scroll-container">Chat</div></div><button id="new" aria-label="新标签页">New</button><div id="browser"></div>',
+      '<div class="app-shell-main-content-frame" data-conversation-id="fixture-A"><div class="thread-scroll-container">Chat</div></div><button id="show" aria-label="显示标签页">Show tabs</button><button id="new" aria-label="新标签页" hidden>New</button><div id="browser"></div>',
     );
     await page.evaluate(() => {
+      document.querySelector('#show').onclick = () => {
+        document.querySelector('#new').hidden = false;
+        document.querySelector('#show').hidden = true;
+      };
       window.externalCalls = 0;
       window.open = () => window.externalCalls++;
       document.querySelector('#new').onclick = () => {

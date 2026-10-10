@@ -8,7 +8,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 const result = await build({
   stdin: {
-    contents: `import {syncLauncher,stopLauncher,launcherButton,openPluginSettings} from './ui/surfaces/embedded/launcher.js';window.openSettings=openPluginSettings;window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settingsBrowser:()=>window.browserSettings++,settings:()=>window.externalSettings++});window.refresh();`,
+    contents: `import {syncLauncher,stopLauncher,launcherButton,openPluginSettings} from './ui/surfaces/embedded/launcher.js';window.openSettings=openPluginSettings;window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({reuseOfficial:window.reuseOfficial!==false,open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settingsBrowser:()=>window.browserSettings++,settings:()=>window.externalSettings++});window.refresh();`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -159,6 +159,30 @@ test('ambiguous official buttons are not intercepted', async () => {
     await page.locator('#official').click();
     assert.equal(await page.evaluate(() => window.navigation), 1);
     assert.equal(await page.evaluate(() => window.toggles), 0);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('default product entry works independently with the plugin button present or absent', async () => {
+  const { page, browser } = await fixture();
+  try {
+    await page.evaluate(() => {
+      window.reuseOfficial = false;
+      window.refresh();
+    });
+    const eye = page
+      .locator('[data-codex-buddy-launcher]')
+      .getByRole('button', { name: 'CodexBuddy', exact: true });
+    await eye.click();
+    assert.equal(await page.evaluate(() => window.toggles), 1);
+    await page.locator('#official').click();
+    assert.equal(await page.evaluate(() => window.navigation), 1);
+    await page.locator('#official').evaluate((node) => node.remove());
+    await eye.click();
+    assert.equal(await page.evaluate(() => window.toggles), 2);
+    await eye.click({ button: 'right', modifiers: ['Alt'] });
+    assert.equal(await page.evaluate(() => window.browserSettings), 1);
   } finally {
     await browser.close();
   }

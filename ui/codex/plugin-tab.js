@@ -294,12 +294,17 @@ export async function openSettingsBrowser(url) {
     })();
   const split = unique('button', ['进入分屏视图', 'Enter split view']);
   if (split && split.getAttribute('aria-pressed') !== 'true') activate(split);
+  const showTabs = unique('button', ['显示标签页', 'Show tabs']);
+  if (showTabs) activate(showTabs);
   const next = await wait(() => unique('button', ['新标签页', 'New tab', '新建标签页']));
   activate(next);
   const entry = await wait(
     () =>
       address() ||
-      unique('button', ['新标签页', 'New tab']) ||
+      (() => {
+        const button = unique('button', ['新标签页', 'New tab']);
+        return button !== next ? button : null;
+      })() ||
       unique('[role="menuitem"]', ['浏览器', 'Browser']),
   );
   if (!(entry instanceof HTMLInputElement)) activate(entry);

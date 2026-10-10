@@ -20,6 +20,7 @@ import {
   stepwiseEnabled,
   stepwiseGenerationMode,
 } from './state.js';
+import { openSettingsBrowser } from '../plugin-tab.js';
 import { emitSignal } from './signals.js';
 import { resetStepwiseFeature } from '../next.js';
 import { pushDiagnostic } from './diagnostics.js';
@@ -256,16 +257,29 @@ async function testSettings() {
   emitSignal('render', undefined);
 }
 
+let settingsOpening = false;
 async function openSettings() {
-  if (!isCurrentRuntime()) return;
+  if (!isCurrentRuntime() || settingsOpening) return;
   const generation = runtimeState.runtimeGeneration;
-  runtimeState.settingsStatus = '正在打开配置网页…';
-  emitSignal('render', undefined);
-  const payload = await bridgeCall('/settings/open', {});
-  if (!isCurrentRuntime(generation)) return;
-  runtimeState.settingsStatus =
-    payload?.status === 'ok' ? '已打开配置网页' : payload?.message || '打开失败';
-  emitSignal('render', undefined);
+  settingsOpening = true;
+  runtimeState.settingsStatus = '正在打开内置浏览器设置…';
+  try {
+    const payload = await bridgeCall('/settings/open', { inHostBrowser: true });
+    if (!isCurrentRuntime(generation)) return;
+    if (payload?.status !== 'ok' || payload.target !== 'web' || !payload.url)
+      throw Error(payload?.message || '当前后台尚未提供内置浏览器设置入口。');
+    await openSettingsBrowser(payload.url);
+    runtimeState.settingsStatus = '已打开内置浏览器设置';
+  } catch (error) {
+    runtimeState.settingsStatus = String(error);
+  } finally {
+    settingsOpening = false;
+    if (isCurrentRuntime(generation)) {
+      const button = shellState.panel?.querySelector('[data-settings-entry]');
+      if (button) button.title = runtimeState.settingsStatus;
+      emitSignal('render', undefined);
+    }
+  }
 }
 
 export {

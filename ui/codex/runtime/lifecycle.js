@@ -1,5 +1,3 @@
-import { openSettingsBrowser } from '../plugin-tab.js';
-import { bridgeCall } from './state.js';
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
  * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合，Dev 插件页签选中后收起旧侧栏；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
@@ -15,11 +13,7 @@ import {
   featurePlacement,
   revealMainFeature,
 } from '../../surfaces/embedded/features.js';
-import {
-  syncLauncher,
-  stopLauncher,
-  openPluginSettings,
-} from '../../surfaces/embedded/launcher.js';
+import { syncLauncher, stopLauncher } from '../../surfaces/embedded/launcher.js';
 import { panelAppearance } from '../../surfaces/embedded/shell/panel-appearance.js';
 
 import {
@@ -589,22 +583,9 @@ function install() {
     }),
     onSignal('complete', (count) => triggerCompletionBeam(count)),
     onSignal('preview', () => clearPromptInteractionTimers()),
-    onSignal('openSettings', (target) => {
+    onSignal('openSettings', () => {
       cancelFaceClick();
-      void bridgeCall(
-        '/settings/open',
-        target === 'web' ? { inHostBrowser: true } : { configuredTarget: true },
-      )
-        .then((result) => {
-          if (result.error || result.status !== 'ok')
-            throw Error(result.error || result.message || '打开设置失败');
-          if (result.target === 'plugin') openPluginSettings();
-          else if (result.target === 'web') return openSettingsBrowser(result.url);
-        })
-        .catch((error) => {
-          const button = shellState.panel?.querySelector('[data-settings-entry]');
-          if (button) button.title = String(error);
-        });
+      void openSettings();
     }),
     onSignal('settings', () => {
       void reloadSettings();

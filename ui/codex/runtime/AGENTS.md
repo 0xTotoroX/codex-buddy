@@ -38,3 +38,5 @@ Dev 官方插件页签联动仅在 launcher 成功确认选中后通过 lifecycl
 openSettings 信号来自内嵌工作台头部，lifecycle 请求后台按 settingsTarget 选择内置浏览器网页或插件侧边页签；不将该点击传递给表情收放。
 
 openSettings 信号可显式携带 web，用于 Option+右键；此时请求 inHostBrowser=true，不读取或修改保存的默认打开方式。
+
+产品设置统一由 settings-sync.openSettings 调用后台 inHostBrowser 路径，并在内置侧边浏览器打开；单飞防止连续点击创建多个标签，runtime generation 变化后不继续导航。头部、眼睛右键和 Option+右键共用该入口，lifecycle 不再调用插件设置工具或按 settingsTarget 分流。
