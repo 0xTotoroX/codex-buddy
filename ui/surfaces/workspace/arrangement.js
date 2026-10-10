@@ -328,7 +328,7 @@ export function installArrangement(
           'aria-label',
           `${title.textContent}：${expanded ? '恢复原布局' : '放大查看'}`,
         );
-        title.title = expanded ? '双击恢复；Esc 退出放大' : '拖动调整位置；双击放大';
+        title.removeAttribute('title');
         title.setAttribute('aria-pressed', String(expanded));
       }
     },

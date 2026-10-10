@@ -114,7 +114,7 @@ import { renderWorkbench } from '../../workspace/legacy.js';
 function viewTabHtml(view) {
   const isNext = view === 'next';
   const active = shellState.activeTab === view;
-  return `<button class="csw-icon" type="button" data-view="${view}" data-reorderable="true" data-active="${active}" role="tab" aria-selected="${active}" title="${isNext ? '下一步建议' : '回答大纲'}" aria-label="${isNext ? '下一步建议' : '回答大纲'}">${iconSvg(isNext ? 'next' : 'outline')}</button>`;
+  return `<button class="csw-icon" type="button" data-view="${view}" data-reorderable="true" data-active="${active}" role="tab" aria-selected="${active}" aria-label="${isNext ? '下一步建议' : '回答大纲'}">${iconSvg(isNext ? 'next' : 'outline')}</button>`;
 }
 
 function sourceTrackHtml(
@@ -343,12 +343,7 @@ function renderFloat(options = {}) {
   shellState.fabExpression = expression;
   shellState.fab.dataset.expression = expression;
   shellState.fab.dataset.count = String(expressionCount);
-  const faceHint = IS_POPOUT
-    ? '双击收回 Codex；拖动移动窗口'
-    : runtimeState.settings?.popoutSupported === true
-      ? '单击展开或收起；双击弹出到桌面；拖动移动'
-      : '单击展开或收起；拖动移动';
-  shellState.fab.title = `${featureLabel} · ${expressionLabel} · ${faceHint}`;
+  shellState.fab.removeAttribute('title');
   shellState.fab.setAttribute(
     'aria-label',
     shellState.open
@@ -380,11 +375,11 @@ function renderFloat(options = {}) {
             ${viewTabs}
           </div>
         </div>
-        <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" title="${faceHint}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
+        <button class="csw-head-face" type="button" data-action="${IS_POPOUT ? 'panel-face' : 'collapse'}" data-expression="${escapeAttr(headExpression)}" data-tone="${tone}" aria-label="${IS_POPOUT ? '拖动窗口' : '收起'}">${statusStageHtml()}${sourceTrackHtml(paneCue, 32)}</button>
         <div class="csw-head-side csw-head-right">
           ${panelWindowControls()}
-          ${IS_POPOUT ? '' : `<button class="csw-icon" data-action="workbench" title="停靠工作台" aria-label="停靠工作台">${iconSvg('dock')}</button>`}
-          <button class="csw-icon" type="button" data-action="refresh" title="${escapeAttr(refreshTitle)}" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
+          ${IS_POPOUT ? '' : `<button class="csw-icon" data-action="workbench" aria-label="停靠工作台">${iconSvg('dock')}</button>`}
+          <button class="csw-icon" type="button" data-action="refresh" aria-label="${escapeAttr(refreshTitle)}" ${refreshBlocked ? 'disabled' : ''}>${iconSvg('refresh')}</button>
         </div>
       </div>
       <div class="csw-body" data-view-body="${shellState.activeTab}">
@@ -433,7 +428,7 @@ function renderFloat(options = {}) {
   installPanelDrag();
   syncEyeTracking();
   if (!options.preserveMorph && !shellState.morphAnimation) settleMorph(shellState.open ? 1 : 0);
-  if (compactDock) shellState.fab.title = '单击展开侧栏；双击移到独立窗口';
+  if (compactDock) shellState.fab.removeAttribute('title');
 }
 
 function installFloat() {
@@ -453,7 +448,7 @@ function installFloat() {
   shellState.fab = document.createElement('button');
   shellState.fab.className = 'csw-fab';
   shellState.fab.type = 'button';
-  shellState.fab.title = '下一步';
+  shellState.fab.removeAttribute('title');
   shellState.fab.setAttribute('aria-controls', POPOVER_ID);
   shellState.fab.innerHTML = `${statusStageHtml()}${sourceTrackHtml()}`;
 

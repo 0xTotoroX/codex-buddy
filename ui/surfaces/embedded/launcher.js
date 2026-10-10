@@ -151,7 +151,7 @@ export function syncLauncher(options) {
       onStatus: (message) => {
         pluginStatus = message;
         const button = launcherButton();
-        if (button) button.title = message;
+        if (button) button.setAttribute('aria-description', message);
       },
     });
   if (!observer) {
@@ -207,7 +207,7 @@ export function syncLauncher(options) {
       svg { width:20px;height:20px;fill:currentColor; }
       ${launcherFaceStyles}
     </style><div class="entry"><div class="divider" aria-hidden="true"></div>
-      <button type="button" class="csw-launcher-face csw-fab" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter" title="单击收放 · 双击窗口往返 · 右键设置">
+      <button type="button" class="csw-launcher-face csw-fab" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter">
         ${launcherFaceHtml()}
       </button></div>`;
     const button = shadow.querySelector('button');
@@ -242,9 +242,10 @@ export function syncLauncher(options) {
   if (!face) face = createLauncherFace(entry.shadowRoot.querySelector('button'));
   face.update(options);
   radial?.update();
-  entry.shadowRoot.querySelector('button').title = previewEnabled()
-    ? pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）'
-    : `单击：${{ inside: '内', outside: '外', settings: '设置' }[options.defaultAction || 'inside']} · 悬停展开快捷菜单 · 右键设置`;
+  entry.shadowRoot.querySelector('button').removeAttribute('title');
+  entry.shadowRoot
+    .querySelector('button')
+    .setAttribute('aria-description', previewEnabled() ? pluginStatus : '');
   if (!radial)
     entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
   if (options.root) options.root.dataset.launcher = 'rail';

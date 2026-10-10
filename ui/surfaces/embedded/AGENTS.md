@@ -26,3 +26,5 @@ Option+右键仅在当前聊天入口可用且已提供 settingsBrowser 回调�
 菜单不再绘制独立背景、玻璃、边框或阴影，直接沿用宿主侧栏底色；保留按钮 hover、按下、焦点反馈与栏内伸缩动画。其他容器的材质偏好不受影响。
 
 - `launcher-face.js`：独立眼睛复用 statusStageHtml 与共享 faceStyles；只接收 runtime 派生表情及 activePaneCue，36px按钮内适配原表情，合法多聊天来源以边缘小点标记并沿圆周平滑移动。保留按钮/菜单节点与事件，不读取正文或重选聊天；隐藏/模糊/销毁清理视线和动画帧。
+
+features.updateDock仅统计open或pending的功能；已关闭条目只保留配置，不占侧栏空间，也不因单击入口自动重开。

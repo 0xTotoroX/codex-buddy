@@ -140,3 +140,5 @@ launcher-face.test.mjs 通过原状态派生和真实合成聊天几何核对空
 头部去表情后的工作台/端到端用例改用独立入口收放和弹出；桌面回程改用保留的Alt+Enter。settings-entry定向检查无可见胶囊图形、侧栏16px顶部留白、桌面44px工具条及四个右侧按钮的实际尺寸/对齐。本轮未执行全套原生窗口回归。
 
 `window-controls-native.mjs` 使用临时数据和合成页面驱动真实AppKit窗口，检查隐藏/恢复、放大/还原、放大后隐藏再恢复、同PID/草稿保留和收回消息；只读窗口几何，不截图、不接入用户聊天。输出target/reports/window-controls-native.json。
+
+workbench的closed independent views定向用例检查全部视图关闭后释放侧栏且点击不自动重开；settings-entry检查自有工具栏无title/tooltip，插件试验错误通过aria-description核对。

@@ -63,7 +63,7 @@ const paneContent = new WeakMap();
 const layoutKey = IS_POPOUT ? 'popoutLayout' : 'dockLayout';
 const layoutPreference = () => shellState[layoutKey];
 function layoutMenu() {
-  return `<details class="csw-layout-menu" hidden><summary class="csw-icon" role="button" aria-label="${IS_POPOUT ? '窗口选项' : '显示位置'}" title="${IS_POPOUT ? '窗口选项' : '显示位置'}">${iconSvg('layout')}</summary><div class="csw-layout-options" role="group" aria-label="工作台布局">
+  return `<details class="csw-layout-menu" hidden><summary class="csw-icon" role="button" aria-label="${IS_POPOUT ? '窗口选项' : '显示位置'}">${iconSvg('layout')}</summary><div class="csw-layout-options" role="group" aria-label="工作台布局">
     <div hidden>
     <button data-layout-mode="auto">自动</button><button data-layout-mode="vertical">上下</button><button data-layout-mode="horizontal">左右</button>
     <span class="csw-layout-hint" hidden>空间不足，暂以上下排列</span>
@@ -124,7 +124,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       ${workbenchHeadHtml(IS_POPOUT)}
       <div class="csw-workbench-panes">
         <div class="csw-workbench-tabs" role="tablist" aria-label="工作台面板" hidden>${registry.map((pane) => `<button type="button" role="tab" id="csw-tab-${pane.id}" data-pane-tab="${pane.id}" aria-controls="csw-pane-${pane.id}">${pane.title}</button>`).join('')}</div>
-        ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong data-pane-focus="${pane.id}" role="button" tabindex="0" title="拖动调整位置；双击放大">${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" title="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><span class="csw-pane-menu" hidden>${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}" title="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
+        ${registry.map((pane, index) => `${index ? '<div class="csw-workbench-split" role="separator" tabindex="0" aria-label="调整大纲与下一步比例" aria-orientation="horizontal" aria-valuemin="20" aria-valuemax="80"></div>' : ''}<section class="csw-workbench-pane" id="csw-pane-${pane.id}" data-pane="${pane.id}" aria-label="${pane.title}"><header><strong data-pane-focus="${pane.id}" role="button" tabindex="0">${pane.title}</strong><button class="csw-icon" data-refresh="${pane.id}" aria-label="${pane.id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}">${iconSvg('refresh')}</button><span class="csw-pane-menu" hidden>${iconSvg('more')}<select class="csw-pane-arrange" data-pane-arrange="${pane.id}" aria-label="编排${pane.title}"><option value="">编排</option><option value="left">移到左侧</option><option value="right">移到右侧</option><option value="top">移到上方</option><option value="bottom">移到下方</option><option value="merge">合并为标签</option><option value="split">拆回分栏</option><option value="reorder">调整标签顺序</option></select></span></header><div class="csw-body" data-view-body="${pane.id}" tabindex="0"></div></section>`).join('')}
       </div>
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section><button hidden data-legacy-settings aria-label="旧版内置设置"></button>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical"></div>
@@ -235,13 +235,11 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   const face = panel.querySelector('.csw-workbench-face');
   face.dataset.expression = resolveFabExpression();
   const windowGesture = IS_POPOUT || runtimeState.settings?.popoutSupported === true;
-  face.title = IS_POPOUT
-    ? '双击放回聊天；Alt+Enter 同样可用；拖动移动窗口'
-    : `单击收起${windowGesture ? '；双击弹出；Alt+Enter 同样可用' : ''}`;
+  face.removeAttribute('title');
   if (windowGesture) face.setAttribute('aria-keyshortcuts', 'Alt+Enter');
   else face.removeAttribute('aria-keyshortcuts');
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span>`;
+  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close aria-label="收起工作台">${iconSvg('minus')}</button>`}</span>`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
     paneContent.set(controls, controlsHtml);

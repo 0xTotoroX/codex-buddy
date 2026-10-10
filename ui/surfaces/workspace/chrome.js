@@ -5,5 +5,5 @@
 import { windowControlsHtml } from './window-controls.js';
 export function workbenchHeadHtml(desktop = false) {
   const label = desktop ? '双击收回 Codex' : '单击收起 · 双击弹出到桌面';
-  return `<header class="csw-head csw-workbench-head" data-window="${desktop ? 'desktop' : 'embedded'}"><button hidden tabindex="-1" type="button" class="csw-head-face csw-workbench-face" aria-label="${label}" title="${label}"></button>${desktop ? windowControlsHtml() : ''}<span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>`;
+  return `<header class="csw-head csw-workbench-head" data-window="${desktop ? 'desktop' : 'embedded'}"><button hidden tabindex="-1" type="button" class="csw-head-face csw-workbench-face" aria-label="${label}"></button>${desktop ? windowControlsHtml() : ''}<span class="csw-workbench-source"></span><div class="csw-workbench-controls"></div></header>`;
 }

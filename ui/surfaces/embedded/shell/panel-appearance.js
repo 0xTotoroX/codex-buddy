@@ -315,8 +315,7 @@ function applyMaterial(options = {}) {
     variant.hidden = mode !== 'native-glass';
     const icon = appearance.liquidVariant === 'clear' ? 'star-filled' : 'star';
     if (variant.querySelector('svg')?.dataset.icon !== icon) variant.innerHTML = iconSvg(icon);
-    variant.title =
-      appearance.liquidVariant === 'clear' ? '已开启通透液态，点击恢复标准' : '开启通透液态';
+    variant.removeAttribute('title');
     variant.setAttribute('aria-pressed', String(appearance.liquidVariant === 'clear'));
   }
   const nativeGlass = Boolean(window.__companionNativeGlass);
@@ -349,7 +348,7 @@ function applyMaterial(options = {}) {
     if (button instanceof HTMLSelectElement) button.value = mode;
     button.removeAttribute('aria-pressed');
     button.setAttribute('aria-label', materialButtonLabel());
-    button.setAttribute('title', materialButtonLabel());
+    button.removeAttribute('title');
     const value = button.querySelector('[data-material-value]');
     const fallback = IS_POPOUT && mode !== effective && !effective.startsWith('native-');
     if (button instanceof HTMLSelectElement) {
@@ -359,7 +358,11 @@ function applyMaterial(options = {}) {
     if (value)
       value.textContent = fallback ? `${materialLabel()}（当前哑光）` : materialValueLabel();
     if (fallback)
-      button.title = '当前系统不支持液态玻璃，暂用哑光；液态需 macOS 26+，磨砂仍可使用。';
+      button.setAttribute(
+        'aria-description',
+        '当前系统不支持液态玻璃，暂用哑光；液态需 macOS 26+，磨砂仍可使用。',
+      );
+    else button.removeAttribute('aria-description');
   }
   resetGlassPointer();
   if (!IS_POPOUT) window.dispatchEvent(new Event('codex-buddy:appearance'));

@@ -123,7 +123,8 @@ test('missing plugin stops with an error and never opens legacy UI or loops', as
         document
           .querySelector('[data-codex-buddy-launcher]')
           .shadowRoot.querySelector('button')
-          .title.includes('未找到官方 Buddy'),
+          .getAttribute('aria-description')
+          .includes('未找到官方 Buddy'),
       {},
       { timeout: 7000 },
     );
@@ -150,7 +151,8 @@ test('unrelated menus and in-flight session changes are not adopted', async () =
       document
         .querySelector('[data-codex-buddy-launcher]')
         .shadowRoot.querySelector('button')
-        .title.includes('请先关闭当前菜单'),
+        .getAttribute('aria-description')
+        .includes('请先关闭当前菜单'),
     );
     assert.equal(await page.evaluate(() => window.menuClicks), 0);
     await page.locator('#unrelated').evaluate((n) => n.remove());
@@ -164,7 +166,8 @@ test('unrelated menus and in-flight session changes are not adopted', async () =
       document
         .querySelector('[data-codex-buddy-launcher]')
         .shadowRoot.querySelector('button')
-        .title.includes('聊天正在切换'),
+        .getAttribute('aria-description')
+        .includes('聊天正在切换'),
     );
     assert.equal(await page.evaluate(() => window.opened), 0);
   } finally {
@@ -231,7 +234,8 @@ test('two visible main conversations remain ambiguous instead of choosing the fi
       document
         .querySelector('[data-codex-buddy-launcher]')
         .shadowRoot.querySelector('button')
-        .title.includes('无法唯一识别'),
+        .getAttribute('aria-description')
+        .includes('无法唯一识别'),
     );
     assert.equal(await page.evaluate(() => window.menuClicks), 0);
   } finally {
@@ -366,7 +370,7 @@ test('normal Dev entry keeps the legacy workbench and does not activate the reta
     await page.evaluate(() => window.switchSession('B'));
     await page.waitForTimeout(1100);
     assert.equal(await page.evaluate(() => window.menuClicks), 0);
-    assert.equal(await button.getAttribute('title'), '单击收放 · 双击窗口往返 · 右键设置');
+    assert.equal(await button.getAttribute('title'), null);
   } finally {
     await browser.close();
   }

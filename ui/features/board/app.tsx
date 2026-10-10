@@ -108,7 +108,6 @@ export function Board({
   );
   const searchButton = (
     <button
-      title="搜索任务"
       aria-label="搜索任务"
       aria-expanded={searchOpen}
       onClick={() => {

@@ -31,6 +31,10 @@ test('workbench preserves top breathing room and aligns desktop controls on the 
     assert.equal(await page.locator('[data-settings-entry]').count(), 0);
     assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
     assert.equal(await page.locator('.csw-fab-eye').count(), 0);
+    assert.equal(
+      await page.locator('.csw-workbench [title], .csw-workbench [role=tooltip]').count(),
+      0,
+    );
     await page.evaluate(() => window.renderHeader(true));
     await page
       .locator('.csw-workbench-controls')
@@ -48,6 +52,10 @@ test('workbench preserves top breathing room and aligns desktop controls on the 
       }),
     );
     assert.equal(actions.length, 4);
+    assert.equal(
+      await page.locator('.csw-workbench [title], .csw-workbench [role=tooltip]').count(),
+      0,
+    );
     const bounds = await head.boundingBox();
     assert.equal(bounds.height, 44);
     assert.ok(actions[0].x > bounds.x + bounds.width / 2);

@@ -458,7 +458,7 @@ function settleMorph(progress, focusTarget = '') {
   shellState.panel.setAttribute('aria-hidden', String(!expanded));
   shellState.fab.setAttribute('aria-expanded', String(expanded));
   if (!expanded) {
-    shellState.fab.title = '展开胶囊';
+    shellState.fab.removeAttribute('title');
     shellState.fab.setAttribute('aria-label', '展开胶囊');
   }
   applyMorphProgress(expanded ? 1 : 0);

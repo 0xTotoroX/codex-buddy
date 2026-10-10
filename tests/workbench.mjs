@@ -405,6 +405,53 @@ async function chooseLayout(page, action) {
 
 const cases = [
   [
+    'closed independent views release sidebar space without reopening features',
+    async (page) => {
+      await mode(page, true);
+      await page.evaluate(() => {
+        const original = window.__companionHostRequest;
+        window.__companionHostRequest = (raw) => {
+          const { id, path, payload } = JSON.parse(raw);
+          if (path !== '/features' || payload.op !== 'state') return original(raw);
+          queueMicrotask(() =>
+            window.__companionDesktop.complete(id, {
+              mainManaged: true,
+              mainPlacement: 'sidebar',
+              pendingPlacement: null,
+              features: ['outline', 'next', 'board'].map((id) => ({
+                id,
+                placement: 'sidebar',
+                open: false,
+                pending: null,
+                owner: id,
+                reveal: 0,
+              })),
+              appearance: { themes: { sidebar: { theme: 'matte' } } },
+            }),
+          );
+        };
+      });
+      await page.waitForFunction(
+        () =>
+          ![...document.querySelectorAll('[data-codex-buddy-dock]')].some(
+            (n) => n.getBoundingClientRect().width > 0,
+          ),
+      );
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await settle(page);
+      assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
+      assert.ok(
+        await page.evaluate(
+          () =>
+            ![...document.querySelectorAll('[data-codex-buddy-dock]')].some(
+              (n) => n.getBoundingClientRect().width > 0,
+            ),
+        ),
+      );
+    },
+  ],
+
+  [
     '大纲保留编号后单字与空格开头的混排标题',
     async (page) => {
       const headings = [
@@ -2763,7 +2810,7 @@ const cases = [
           'collapsed slot has zero width',
         );
         const entry = page.getByRole('button', { name: 'CodexBuddy', exact: true });
-        assert.doesNotMatch(await entry.getAttribute('title'), /空间不足|选择打开方式/);
+        assert.equal(await entry.getAttribute('title'), null);
         const anchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),
         );

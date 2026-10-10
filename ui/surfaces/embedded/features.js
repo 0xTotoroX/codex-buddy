@@ -156,7 +156,8 @@ export function renderFeatureShell(faceClick) {
 }
 function updateDock() {
   if (!state || !shellState.root) return;
-  const entries = primary === 'sidebar' ? group('sidebar') : [];
+  const entries =
+    primary === 'sidebar' ? group('sidebar').filter((entry) => entry.open || entry.pending) : [];
   if (primary !== 'sidebar' && dock) {
     dock.destroy();
     dock = null;

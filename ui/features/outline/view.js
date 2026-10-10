@@ -66,8 +66,8 @@ export function outlineHtml(snapshot) {
         .join('')}
       </div>
       <div class="csw-outline-toolbar" role="toolbar" aria-label="本轮导航">
-        <button class="csw-outline-nav-button" type="button" data-outline-anchor="start" title="本轮开头" aria-label="定位到本轮开头">${iconSvg('turn-start')}</button>
-        <button class="csw-outline-nav-button" type="button" data-outline-anchor="end" title="本轮结尾" aria-label="定位到本轮结尾">${iconSvg('turn-end')}</button>
+        <button class="csw-outline-nav-button" type="button" data-outline-anchor="start" aria-label="定位到本轮开头">${iconSvg('turn-start')}</button>
+        <button class="csw-outline-nav-button" type="button" data-outline-anchor="end" aria-label="定位到本轮结尾">${iconSvg('turn-end')}</button>
       </div>
     </div>`;
 }

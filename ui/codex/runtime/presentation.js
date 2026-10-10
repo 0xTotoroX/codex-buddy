@@ -623,10 +623,10 @@ function panelWindowControls({ includePin = true, includeToggle = true } = {}) {
   const pinTitle = shellState.pinnedOnTop ? '取消窗口置顶' : '窗口置顶';
   const pin =
     IS_POPOUT && includePin
-      ? `<button class="csw-icon csw-desktop-pin" type="button" data-action="pin" aria-pressed="${shellState.pinnedOnTop}" title="${pinTitle}" aria-label="${pinTitle}">${iconSvg('pin')}</button>`
+      ? `<button class="csw-icon csw-desktop-pin" type="button" data-action="pin" aria-pressed="${shellState.pinnedOnTop}" aria-label="${pinTitle}">${iconSvg('pin')}</button>`
       : '';
   if (!includeToggle) return pin;
-  return `${pin}<button class="csw-icon" type="button" data-action="detach" title="${label}" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
+  return `${pin}<button class="csw-icon" type="button" data-action="detach" aria-label="${label}" ${unsupported || shellState.detachPending ? 'disabled' : ''}>${popIcon}</button>`;
 }
 
 async function togglePanelWindow(options = {}) {

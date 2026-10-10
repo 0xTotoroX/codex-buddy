@@ -48,7 +48,7 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
     const buttons = (read().settings?.quickPrompts || [])
       .map(
         (item, index) =>
-          `<button type="button" class="csw-quick-prompt" data-quick-prompt="${index}" title="${escapeAttr(item.prompt)}">${escapeHtml(item.label)}</button>`,
+          `<button type="button" class="csw-quick-prompt" data-quick-prompt="${index}">${escapeHtml(item.label)}</button>`,
       )
       .join('');
     return `<div class="csw-next-content">${buttons ? `<div class="csw-quick-prompts" aria-label="常用提示词">${buttons}</div>` : ''}${nextSuggestionsHtml()}</div>`;

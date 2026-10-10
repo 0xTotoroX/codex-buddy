@@ -709,7 +709,7 @@ try {
         settings.popoutSupported = supported;
         panel.renderFloat();
         const button = document.querySelector('[data-action="detach"]');
-        results.push({ disabled: button.disabled, title: button.title });
+        results.push({ disabled: button.disabled, label: button.getAttribute('aria-label') });
         if (!supported) {
           // Even a synthetic click cannot bypass the capability check.
           button.dispatchEvent(new MouseEvent('click'));
@@ -725,7 +725,7 @@ try {
       gated.map((item) => item.disabled),
       [true, true, false],
     );
-    assert.match(gated[0].title, /macOS 15/);
+    assert.match(gated[0].label, /macOS 15/);
     record('内嵌弹出入口按后台能力禁用，缺失能力默认禁用且点击不能绕过');
 
     // Replacing the bundle must invalidate the old instance, pending callbacks and DOM together.

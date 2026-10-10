@@ -276,7 +276,7 @@ async function openSettings() {
     settingsOpening = false;
     if (isCurrentRuntime(generation)) {
       const button = shellState.panel?.querySelector('[data-settings-entry]');
-      if (button) button.title = runtimeState.settingsStatus;
+      if (button) button.removeAttribute('title');
       emitSignal('render', undefined);
     }
   }

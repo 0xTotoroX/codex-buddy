@@ -134,7 +134,6 @@ export function ModelView({
       >
         <div className="model-name">
           <strong
-            title={`${label(m.label)} · 拖动排序`}
             draggable={!busy && prefs.enabled}
             onDragStart={(event) => {
               event.stopPropagation();
@@ -150,7 +149,6 @@ export function ModelView({
             data-pinned={prefs.pinned.includes(m.id)}
             disabled={busy || !prefs.enabled}
             aria-label={`${prefs.pinned.includes(m.id) ? '隐藏' : '设为常用'} ${label(m.label)}`}
-            title={prefs.pinned.includes(m.id) ? '收进其他模型' : '移到常用模型'}
             onClick={() =>
               void save({
                 pinned: prefs.pinned.includes(m.id)
@@ -171,11 +169,6 @@ export function ModelView({
                 key={reasoning}
                 disabled={busy || !allowed || !supported}
                 aria-label={`${label(m.label)} · ${label(reasoning) || '选择'}`}
-                title={
-                  supported
-                    ? `${label(m.label)} · ${label(reasoning) || '选择'}`
-                    : '此模型不支持此推理强度'
-                }
                 data-model={m.id}
                 data-reasoning={reasoning}
                 aria-pressed={
@@ -194,7 +187,6 @@ export function ModelView({
     <button
       data-refresh="model"
       aria-label="刷新可用模型"
-      title="刷新可用模型"
       disabled={busy || !prefs.enabled}
       onClick={() => void action({}, 'refresh')}
     >
@@ -215,7 +207,6 @@ export function ModelView({
         <button
           className="model-fast"
           aria-label="Fast"
-          title="Fast"
           aria-pressed={s.current?.speed === 'fast'}
           disabled={
             busy || !allowed || !s.current || !s.models.find((m) => m.id === s.current?.model)?.fast
@@ -241,7 +232,6 @@ export function ModelView({
         {!!prefs.presets.length && (
           <button
             aria-label="模型工具"
-            title="模型工具"
             aria-expanded={tools}
             onClick={() => setTools((reading.modelTools = !tools))}
           >
@@ -251,7 +241,6 @@ export function ModelView({
         {headerActions ? createPortal(refreshButton, headerActions) : refreshButton}
         <button
           aria-label="保存预设"
-          title="保存当前预设"
           disabled={busy || !allowed || !s.current}
           onClick={() => {
             if (s.current)

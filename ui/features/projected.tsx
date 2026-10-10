@@ -101,7 +101,6 @@ export function ProjectedContent({
     <button
       data-refresh={id}
       aria-label={id === 'outline' ? '刷新大纲' : '重新生成建议'}
-      title={id === 'outline' ? '刷新大纲（本地）' : '重新生成建议'}
       disabled={
         disabled || snapshot.scanBusy || (id === 'next' && snapshot.bridgeStatus === 'pending')
       }

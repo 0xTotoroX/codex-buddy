@@ -11,7 +11,7 @@ export function windowControlsHtml() {
   ]
     .map(
       ([action, label, icon]) =>
-        `<button type="button" class="csw-icon" data-window-control="${action}" aria-label="${label}" title="${label}"${action === 'maximize' ? ' aria-pressed="false"' : ''}>${iconSvg(icon)}</button>`,
+        `<button type="button" class="csw-icon" data-window-control="${action}" aria-label="${label}"${action === 'maximize' ? ' aria-pressed="false"' : ''}>${iconSvg(icon)}</button>`,
     )
     .join('')}</div>`;
 }
@@ -32,7 +32,7 @@ export function installWindowControls(
     if (zoom) {
       const label = state.maximized ? '还原' : '放大';
       zoom.setAttribute('aria-label', label);
-      zoom.title = label;
+      zoom.removeAttribute('title');
       zoom.setAttribute('aria-pressed', String(state.maximized));
       zoom.innerHTML = iconSvg(state.maximized ? 'restore' : 'focus');
     }

@@ -108,7 +108,7 @@ function settingsRuntimePresentation(settings) {
 
 function settingsCommandHtml(action, icon, label, title, options = {}) {
   return `
-      <button class="csw-command-button" type="button" data-action="${escapeAttr(action)}" title="${escapeAttr(title)}" aria-label="${escapeAttr(title)}" ${options.disabled ? 'disabled' : ''}>
+      <button class="csw-command-button" type="button" data-action="${escapeAttr(action)}" aria-label="${escapeAttr(title)}" ${options.disabled ? 'disabled' : ''}>
         <span class="csw-command-icon" data-busy="${options.busy === true}" aria-hidden="true">${iconSvg(icon)}</span>
         <span class="csw-command-label">${escapeHtml(label)}</span>
       </button>
@@ -134,7 +134,7 @@ function appearanceSettingsHtml() {
         <div class="csw-control-group">
           <span class="csw-control-label">外观</span>
           <span class="csw-control-row">
-            <select class="csw-control-button" data-action="material" aria-label="外观" title="选择外观">${[
+            <select class="csw-control-button" data-action="material" aria-label="外观">${[
               ['matte', '哑光'],
               ['frosted', '磨砂'],
               ['native-glass', '液态'],
@@ -144,15 +144,15 @@ function appearanceSettingsHtml() {
                   `<option value="${value}" ${appearance.material === value ? 'selected' : ''}>${label}</option>`,
               )
               .join('')}</select>
-            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${appearance.liquidVariant === 'clear'}" title="Regular 标准 / Clear 通透" ${appearance.material === 'native-glass' ? '' : 'hidden'}>${iconSvg(appearance.liquidVariant === 'clear' ? 'star-filled' : 'star')}</button>
+            <button class="csw-control-button csw-liquid-star" type="button" data-action="liquid-variant" aria-label="通透液态（Clear）" aria-pressed="${appearance.liquidVariant === 'clear'}" ${appearance.material === 'native-glass' ? '' : 'hidden'}>${iconSvg(appearance.liquidVariant === 'clear' ? 'star-filled' : 'star')}</button>
           </span>
         </div>
         <div class="csw-control-group">
-          <span class="csw-control-label" title="同时调整下一步与大纲内容字号">字号</span>
+          <span class="csw-control-label">字号</span>
           <span class="csw-stepper" aria-label="下一步与大纲内容字号">
-            <button class="csw-step-button" type="button" data-action="font-dec" title="减小字体" aria-label="减小字体" ${effectiveFontSize() <= MIN_FONT ? 'disabled' : ''}>${iconSvg('minus')}</button>
+            <button class="csw-step-button" type="button" data-action="font-dec" aria-label="减小字体" ${effectiveFontSize() <= MIN_FONT ? 'disabled' : ''}>${iconSvg('minus')}</button>
             <span class="csw-step-value" aria-live="polite">${fontSizeLabel()}</span>
-            <button class="csw-step-button" type="button" data-action="font-inc" title="增大字体" aria-label="增大字体" ${effectiveFontSize() >= MAX_FONT ? 'disabled' : ''}>${iconSvg('plus')}</button>
+            <button class="csw-step-button" type="button" data-action="font-inc" aria-label="增大字体" ${effectiveFontSize() >= MAX_FONT ? 'disabled' : ''}>${iconSvg('plus')}</button>
           </span>
         </div>
         <div class="csw-control-group">
@@ -177,7 +177,7 @@ function settingsHtml() {
         <section class="csw-settings-surface" data-loading="${!settings}" aria-label="悬浮球设置" aria-busy="${!settings}">
           <div class="csw-settings-hero">
             <div class="csw-model-pane">
-              <strong class="csw-model-value" title="${escapeAttr(settings?.model || model)}">${escapeHtml(model)}</strong>
+              <strong class="csw-model-value">${escapeHtml(model)}</strong>
               <span class="csw-runtime-line">
                 <span class="csw-runtime-dot" data-tone="${escapeAttr(runtime.tone)}" aria-hidden="true"></span>
                 <span class="csw-runtime-copy">${escapeHtml(runtime.label)}</span>
@@ -267,7 +267,7 @@ function writePromptClickMode(value) {
   const label = '建议点击行为';
   if (trigger) {
     trigger.value = shellState.promptClickMode;
-    trigger.title = label;
+    trigger.removeAttribute('title');
     trigger.setAttribute('aria-label', label);
   }
   return shellState.promptClickMode;
@@ -279,7 +279,7 @@ function updateGenerationModeControl(value = stepwiseGenerationMode(), busy = fa
   const label = '生成模式';
   if (trigger) {
     trigger.value = mode;
-    trigger.title = label;
+    trigger.removeAttribute('title');
     trigger.setAttribute('aria-label', label);
     trigger.setAttribute('aria-busy', String(busy));
     trigger.disabled = busy;

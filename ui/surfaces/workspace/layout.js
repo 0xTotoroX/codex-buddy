@@ -171,7 +171,7 @@ export function installFeatureLayout(root, { save, error }) {
       tab.dataset.paneTab = id;
       tab.setAttribute('role', 'tab');
       tab.textContent = titles[id];
-      tab.title = '拖动分栏或合并；双击放大';
+      tab.removeAttribute('title');
       tabs.append(tab);
     }
     const body = document.createElement('div');

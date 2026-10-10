@@ -68,7 +68,6 @@ export function TaskCard({
         type="button"
         className="card-delete"
         aria-label={`删除任务：${task.fields.title}`}
-        title="删除任务"
         disabled={disabled}
         draggable={false}
         onPointerDown={(event) => event.stopPropagation()}

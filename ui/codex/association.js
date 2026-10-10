@@ -40,7 +40,7 @@ export function updateAssociation(header, source) {
   const menu = header.querySelector('.csw-association-menu');
   const label = header.querySelector('.csw-workbench-source');
   label.textContent = source?.sourceLabel || 'Codex · 等待聊天';
-  label.title = label.textContent;
+  label.removeAttribute('title');
   const locked = status?.mode === 'locked';
   const available = status?.available !== false;
   menu.dataset.unavailable = String(!available);
