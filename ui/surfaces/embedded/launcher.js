@@ -23,8 +23,8 @@ function isOfficialButton(node) {
     return false;
   const name = (
     node.getAttribute('aria-label') ||
-    node.getAttribute('title') ||
     node.textContent ||
+    node.getAttribute('title') ||
     ''
   ).trim();
   return ['CodexBuddy 看板', 'CodexBuddy'].includes(name) && node.getBoundingClientRect().width > 0;
@@ -64,7 +64,7 @@ function officialContext(event) {
       follow: false,
       onOpened: () => {},
       onStatus: (message) => {
-        if (official) official.title = message;
+        if (official) official.dataset.buddySettingsStatus = message;
       },
     });
   void settingsLink.open();
@@ -80,6 +80,9 @@ function bindOfficial(button) {
   }
   official = button;
   if (official) {
+    // Remove only status text left by the previous Buddy adapter.
+    if (['正在打开官方 Buddy 插件页签…', '设置已在官方侧边页签打开。'].includes(official.title))
+      official.removeAttribute('title');
     official.addEventListener('pointerdown', officialPointer, true);
     official.addEventListener('click', officialClick, true);
     official.addEventListener('keydown', officialKey, true);

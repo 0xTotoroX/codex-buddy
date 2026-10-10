@@ -69,11 +69,20 @@ test('official entry toggles without navigation, removes duplicate icon and open
       await page.evaluate(() => ({ toggles: window.toggles, navigation: window.navigation })),
       { toggles: 2, navigation: 0 },
     );
+    await page.locator('#official').evaluate((node) => {
+      node.removeAttribute('aria-label');
+      node.textContent = 'CodexBuddy';
+      node.title = 'CodexBuddy';
+    });
     await page.locator('#official').click({ button: 'right' });
     await page.waitForFunction(
-      () => document.querySelector('#official').title === '设置已在官方侧边页签打开。',
+      () =>
+        document.querySelector('#official').dataset.buddySettingsStatus ===
+        '设置已在官方侧边页签打开。',
     );
     assert.equal(await page.locator('#right').isVisible(), true);
+    assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
+    assert.equal(await page.locator('#official').getAttribute('title'), 'CodexBuddy');
     assert.deepEqual(
       await page.evaluate(() => ({
         native: window.nativeSettings,
