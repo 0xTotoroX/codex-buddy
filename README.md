@@ -75,7 +75,7 @@ Return an existing desktop workbench before entering independent mode. Moving pr
 
 Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 
-Hover over the eyes entry to reveal a radial menu: **Inside**, **Desktop**, and **Settings**. The settings overview lets you choose the default single-click action; existing configurations default to toggling the in-chat workbench. Arrow keys open and navigate the menu, and Esc closes it. Alt+Enter retains window handoff. Motion follows the reduced-motion preference.
+Hover over the eyes entry to reveal an upward-opening menu: **Inside**, **Desktop**, and **Settings**. The settings overview lets you choose the default single-click action; existing configurations default to toggling the in-chat workbench. Arrow keys open and navigate the menu, and Esc closes it. Alt+Enter retains window handoff. Motion follows the reduced-motion preference.
 
 ## Operations and state transitions
 

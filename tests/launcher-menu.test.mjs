@@ -1,4 +1,4 @@
-/* [INPUT]: Radial launcher UI in a synthetic browser with no host or native window.
+/* [INPUT]: Vertical launcher UI in a synthetic browser with no host or native window.
  * [OUTPUT]: Hover travel, quick-click hit area, action identity, focus and cleanup checks.
  * [POS]: Isolated interaction/render verification; only synthetic screenshots.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
@@ -15,7 +15,7 @@ const compiled = await build({
   bundle: true,
   write: false,
 });
-test('radial menu preserves eyes hit target and has stable hover, keyboard and cleanup', async () => {
+test('upward menu preserves eyes hit target and has stable hover, keyboard and cleanup', async () => {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     viewport: { width: 520, height: 460 },
@@ -37,6 +37,9 @@ test('radial menu preserves eyes hit target and has stable hover, keyboard and c
       document.querySelector('[data-codex-buddy-launcher-menu]').hasAttribute('data-open'),
     );
     const rect = await eye.boundingBox();
+    const menuBox = await host.locator('.menu-shell').boundingBox();
+    assert.equal(Math.round(rect.y - menuBox.y - menuBox.height), 4);
+    assert.equal(Math.round(menuBox.x + menuBox.width / 2), Math.round(rect.x + rect.width / 2));
     assert.equal(
       await page.evaluate(({ x, y }) => document.elementFromPoint(x, y).closest('button')?.id, {
         x: rect.x + rect.width - 2,
