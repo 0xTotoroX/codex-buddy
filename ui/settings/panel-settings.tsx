@@ -4,7 +4,7 @@
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { DOCK_MIN_WIDTH } from '../surfaces/embedded/width.js';
 import { useEffect, useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Icon } from '../shared/icons/react';
 import { Button } from './components/ui/button';
 import { titles, defaultFontSizes, featureFontSize, type FeatureId } from '../shared/features';
 import { Input } from './components/ui/input';
@@ -120,7 +120,7 @@ export function PanelSettings({
                   if (next !== value) commit(next);
                 }}
               >
-                {delta < 0 ? <Minus size={16} /> : <Plus size={16} />}
+                {delta < 0 ? <Icon name="minus" /> : <Icon name="plus" />}
               </button>
             ))}
         </div>

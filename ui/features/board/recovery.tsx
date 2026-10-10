@@ -1,7 +1,7 @@
 /* [INPUT]: Task sync conflict or missing-remote snapshot and command handler.
  * [OUTPUT]: Conditional inline recovery choices; no task detail editor.
  * [POS]: Board-only exception handling. [PROTOCOL]: Keep board/AGENTS.md in sync. */
-import { AlertCircle } from 'lucide-react';
+import { Icon } from '../../shared/icons/react';
 import type { Fields, Task } from './api';
 export function Recovery({
   task,
@@ -17,7 +17,7 @@ export function Recovery({
   return (
     <details className="task-recovery">
       <summary className="attention">
-        <AlertCircle size={16} aria-hidden="true" />
+        <Icon name="warning" />
         需要处理
       </summary>
       {task.conflict && (

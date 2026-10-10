@@ -62,9 +62,11 @@ function onResize() {
         return;
       }
       if (shellState.popover?.dataset.resizing !== 'true' && !POPOUT.motionActive?.()) {
-        storage.set(WIDTH_KEY, String(shellState.width));
-        storage.set(HEIGHT_KEY, String(shellState.height));
-        POPOUT.save(panelPreferences());
+        if (!window.__buddyWindowControls?.geometryTransient()) {
+          storage.set(WIDTH_KEY, String(shellState.width));
+          storage.set(HEIGHT_KEY, String(shellState.height));
+          POPOUT.save(panelPreferences());
+        }
       }
     }
     shellState.position = defaultPosition();

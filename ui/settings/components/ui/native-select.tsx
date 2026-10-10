@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Icon } from '../../../shared/icons/react';
 import { cn } from '@/utils';
 import { inputStyles } from './input';
 export function NativeSelect({ className, ...props }: React.ComponentProps<'select'>) {
@@ -16,9 +16,9 @@ export function NativeSelect({ className, ...props }: React.ComponentProps<'sele
         className={cn(inputStyles, 'appearance-none pr-8', className)}
         {...props}
       />
-      <ChevronDown
-        aria-hidden="true"
-        className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+      <Icon
+        name="chevron-down"
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
       />
     </div>
   );

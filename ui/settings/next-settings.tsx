@@ -10,7 +10,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { Field, FeatureSwitch } from './settings-controls';
 import { request, type View, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
-import { Eye, EyeOff, Plug, RefreshCw, LoaderCircle } from 'lucide-react';
+import { Icon } from '../shared/icons/react';
 import { DirectionSettings } from './direction-settings';
 import { PanelSettings } from './panel-settings';
 export function NextSettings({
@@ -163,7 +163,7 @@ export function NextSettings({
                   aria-label={showKey ? '隐藏密钥' : '显示密钥'}
                   onClick={() => setShowKey(!showKey)}
                 >
-                  {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showKey ? <Icon name="eye-off" /> : <Icon name="eye" />}
                 </Button>
               </div>
             </Field>
@@ -226,8 +226,8 @@ export function NextSettings({
                 })
               }
             >
-              <RefreshCw
-                size={14}
+              <Icon
+                name="refresh"
                 className={busy === 'models' ? 'animate-spin [animation-duration:1.2s]' : ''}
               />
               读取模型
@@ -248,9 +248,9 @@ export function NextSettings({
             onClick={() => void run('test', test)}
           >
             {busy === 'test' ? (
-              <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={15} />
+              <Icon name="refresh" className="animate-spin [animation-duration:1.2s]" />
             ) : (
-              <Plug size={15} />
+              <Icon name="connection" />
             )}
             {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
           </Button>

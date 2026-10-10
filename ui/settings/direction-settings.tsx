@@ -5,7 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { useState } from 'react';
-import { ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import { Icon } from '../shared/icons/react';
 import { Card } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Button } from './components/ui/button';
@@ -130,7 +130,7 @@ export function DirectionSettings({
                 disabled={index === 0}
                 onClick={() => move(index, -1)}
               >
-                <ArrowUp size={16} />
+                <Icon name="arrow-up" />
               </Button>
               <Button
                 type="button"
@@ -140,7 +140,7 @@ export function DirectionSettings({
                 disabled={index === form.selectedDirections.length - 1}
                 onClick={() => move(index, 1)}
               >
-                <ArrowDown size={16} />
+                <Icon name="arrow-down" />
               </Button>
               <Button
                 type="button"
@@ -149,7 +149,7 @@ export function DirectionSettings({
                 aria-label={`移除方向位置 ${index + 1}`}
                 onClick={() => slots(form.selectedDirections.filter((_, i) => i !== index))}
               >
-                <Trash2 size={16} />
+                <Icon name="trash" />
               </Button>
             </div>
           ))}
@@ -229,7 +229,7 @@ export function DirectionSettings({
                     aria-label={`删除方向 ${item.name}`}
                     onClick={() => remove(item.id)}
                   >
-                    <Trash2 size={16} />
+                    <Icon name="trash" />
                   </Button>
                 </div>
                 <textarea

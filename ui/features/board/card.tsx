@@ -2,7 +2,7 @@
  * [POS]: Native drag events stay inside the board Shadow DOM; no document-level retargeting.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useState, type DragEvent, type ReactNode } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Icon } from '../../shared/icons/react';
 import type { Task } from './api';
 import { Recovery } from './recovery';
 const taskType = 'application/x-codex-buddy-task';
@@ -81,7 +81,7 @@ export function TaskCard({
           void command({ op: 'remove', id: task.id, expectedTask: task });
         }}
       >
-        <Trash2 size={18} aria-hidden="true" />
+        <Icon name="trash" />
       </button>
       {task.remote?.recurring && <div className="card-meta">重复 · 只读</div>}
       {(task.conflict || task.remoteMissing) && (

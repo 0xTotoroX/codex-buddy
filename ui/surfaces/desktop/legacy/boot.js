@@ -184,7 +184,14 @@
   }
   async function save(ui) {
     const fingerprint = JSON.stringify(ui);
-    if (!started || moving || docking || fingerprint === lastSaved) return;
+    if (
+      !started ||
+      moving ||
+      docking ||
+      window.__buddyWindowControls?.geometryTransient() ||
+      fingerprint === lastSaved
+    )
+      return;
     await savePreferences({ ui, expectedRevision: revision });
     lastSaved = fingerprint;
   }
@@ -198,6 +205,13 @@
       await saving;
       const panel = window.__companionFloatingPanel;
       const ui = panel?.panelPreferences();
+      const normalSize =
+        window.__buddyWindowControls?.geometryTransient() &&
+        window.__buddyWindowControls.normalSize();
+      if (ui && normalSize) {
+        ui.width = normalSize[0];
+        ui.height = normalSize[1];
+      }
       const expectedRevision = revision;
       const presentation = panel?.panelReadingState();
       const { anchor } = await request('anchor');
@@ -327,7 +341,7 @@
       pendingSizes.delete(id);
     },
     moved(position) {
-      if (moving || docking || stopped) return;
+      if (moving || docking || stopped || window.__buddyWindowControls?.geometryTransient()) return;
       clearTimeout(moveTimer);
       moveTimer = setTimeout(() => {
         void enqueueSave(() => savePreferences({ position })).catch(() => {});

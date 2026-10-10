@@ -5,6 +5,7 @@
 import { mountFeature } from '../workspace/mount';
 import { installFeatureLayout } from '../workspace/layout';
 import { installStyle } from '../embedded/shell/install-styles.js';
+import { installWindowControls } from '../workspace/window-controls.js';
 import { workbenchHeadHtml } from '../workspace/chrome.js';
 import { iconSvg } from '../../shared/icons/index.js';
 /** @param {import('../../shared/features').Request} request */
@@ -119,6 +120,12 @@ export function startDesktop(request, lease) {
     __companionFloatingPanel: { nativeGestureEnded: () => {} },
   });
   const head = root.querySelector('.csw-workbench-head');
+  const windowControls = installWindowControls(root, {
+    dock,
+    post: native,
+    isBusy: () => moving || !!state?.pendingPlacement,
+    error,
+  });
   head
     .querySelector('.csw-workbench-face')
     .addEventListener('dblclick', () => void dock().catch(error));
@@ -129,7 +136,12 @@ export function startDesktop(request, lease) {
     }
   });
   head.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || event.target.closest('[data-pin]')) return;
+    if (
+      event.button !== 0 ||
+      event.target.closest('button') ||
+      root.hasAttribute('data-window-maximized')
+    )
+      return;
     const x = event.clientX,
       y = event.clientY;
     const cleanup = () => {
@@ -304,6 +316,7 @@ export function startDesktop(request, lease) {
           mounts.delete(key);
         }
       renderContent();
+      windowControls.refresh();
       failures = 0;
     } catch (e) {
       error(e);
@@ -318,7 +331,7 @@ export function startDesktop(request, lease) {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = window.setTimeout(() => {
-      if (state && !moving && !state.pendingPlacement)
+      if (state && !moving && !state.pendingPlacement && !windowControls.geometryTransient())
         void call('size', { size: [innerWidth - 24, innerHeight - 24] }).catch(error);
       void poll();
     }, 350);

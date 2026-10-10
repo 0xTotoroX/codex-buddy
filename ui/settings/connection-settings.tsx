@@ -10,7 +10,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { Field } from './settings-controls';
 import { request, type View, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
-import { Plug, LoaderCircle, ChevronRight } from 'lucide-react';
+import { Icon } from '../shared/icons/react';
 export function ConnectionSettings({
   editor,
   view,
@@ -136,9 +136,9 @@ export function ConnectionSettings({
             onClick={() => void run('connect', connect)}
           >
             {busy === 'connect' ? (
-              <LoaderCircle className="animate-spin [animation-duration:1.2s]" size={15} />
+              <Icon name="refresh" className="animate-spin [animation-duration:1.2s]" />
             ) : (
-              <Plug size={15} />
+              <Icon name="connection" />
             )}
             {connected ? '重新连接' : '连接 Codex'}
           </Button>
@@ -174,7 +174,7 @@ export function ConnectionSettings({
               }
             >
               <code>codex-buddy launch</code>
-              <ChevronRight size={14} />
+              <Icon name="chevron-right" />
             </Button>
           </div>
         )}

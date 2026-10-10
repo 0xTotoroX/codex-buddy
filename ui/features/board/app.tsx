@@ -3,7 +3,7 @@
  * [POS]: Task-only application entry; no Codex/model dependencies.
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Search, X } from 'lucide-react';
+import { Icon } from '../../shared/icons/react';
 import { createPortal } from 'react-dom';
 import {
   columns as defaults,
@@ -116,7 +116,7 @@ export function Board({
         if (searchOpen) setSearch('');
       }}
     >
-      <Search size={18} />
+      <Icon name="search" />
     </button>
   );
   const addTask = (column: string) =>
@@ -165,7 +165,7 @@ export function Board({
         disabled={busy}
         onClick={() => setQuickAdd({ column, title: '' })}
       >
-        <Plus size={14} />
+        <Icon name="plus" />
         新建任务
       </button>
     );

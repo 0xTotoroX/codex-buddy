@@ -11,3 +11,5 @@
 仅摘取所用图标，去除 React 包装并转换 SVG 属性名；保留路径、24×24 画布和 currentColor。控制图标统一渲染为 18px、按钮命中区域至少 28px；表情属于状态控件，不套用图标尺寸。没有复制本机官方应用资源。
 
 [PROTOCOL]: 图标变更时同步语义映射与固定来源，保留许可原文。
+
+- `react.tsx`：设置和看板共用的React适配，固定18px，不引入第二套图标。新增语义映射：eye→Eye、eye-off→EyeOff、arrow-up→ArrowUp、arrow-down→ArrowDown、trash→Trash、search→Search、warning→ExclamationMarkCircle；均来自上述固定提交。加载动画复用refresh旋转。

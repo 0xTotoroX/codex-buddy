@@ -1,6 +1,6 @@
 // [INPUT]: Tao/Wry、Runtime、Preferences、共享 native_backdrop 与 AppKit 手势。
 // [OUTPUT]: 开发版整窗曲面神奇效果与空间动画回退、尊重减少动态效果的跨屏提起/落回、位置与尺寸接续、可取消原生动效和呈现确认、原生 resize 同步 WebView、实时背景和 macOS 原生手势。
-// [POS]: 窗口子进程实现，被 main.rs 调用。
+// [POS]: 窗口子进程实现，被 main.rs 调用；hide保留实例，toggle-maximize临时保存/恢复普通frame并回读网页。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 #[path = "window_warp.rs"]
@@ -192,6 +192,18 @@ mod macos {
         }
     }
 
+    pub fn maximized_pose(window: &Window) -> Option<super::Pose> {
+        let frame = native_window(window).screen()?.visibleFrame();
+        Some(super::Pose {
+            x: frame.origin.x,
+            y: frame.origin.y,
+            width: frame.size.width,
+            height: frame.size.height,
+            scale: 1.,
+            alpha: 1.,
+        })
+    }
+
     pub fn apply_pose(window: &Window, pose: super::Pose, backdrop: &Backdrop) {
         let native = native_window(window);
         CATransaction::begin();
@@ -375,6 +387,11 @@ mod macos {
     }
 }
 
+fn publish_window_controls(webview: &wry::WebView, normal: Option<Pose>, hidden: bool) {
+    let state = json!({"maximized":normal.is_some(),"hidden":hidden,"normalFrame":normal.map(|p|json!({"x":p.x,"y":p.y,"width":p.width,"height":p.height}))});
+    let _ = webview.evaluate_script(&format!("window.__buddyWindowControls?.update({state});"));
+}
+
 // 独立子进程在主线程运行系统窗口；后台退出会回收它。
 pub fn run(paths: &Paths, lease: &str, activate: bool) -> Result<()> {
     run_surface(paths, lease, activate, None)
@@ -486,6 +503,8 @@ pub fn run_surface(
     let mut motion_pose: Option<Pose> = None;
     let mut warp_source = macos::native_window(&window).frame().size;
     let mut next_motion_frame = std::time::Instant::now();
+    let mut normal_window_pose: Option<Pose> = None;
+    let mut window_hidden = true;
     event_loop.run(move |event, _, control| {
         *control = ControlFlow::Wait;
         match event {
@@ -501,10 +520,32 @@ pub fn run_surface(
                         ));
                     }
                 }
+                "window-state" => publish_window_controls(&webview, normal_window_pose, window_hidden),
+                "hide" => {
+                    if window_transition.is_none() && gesture.is_none() {
+                        window.set_visible(false);
+                        window_hidden = true;
+                    }
+                    publish_window_controls(&webview, normal_window_pose, window_hidden);
+                }
+                "toggle-maximize" => {
+                    if window_transition.is_none() && gesture.is_none() {
+                        if let Some(normal) = normal_window_pose.take() {
+                            macos::apply_pose(&window, normal, &backdrop);
+                            keep_on_screen(&window);
+                        } else if let Some(target) = macos::maximized_pose(&window) {
+                            normal_window_pose = Some(macos::pose(&window));
+                            macos::apply_pose(&window, target, &backdrop);
+                        }
+                    }
+                    publish_window_controls(&webview, normal_window_pose, window_hidden);
+                }
                 "reveal" => {
                     window.set_minimized(false);
                     window.set_visible(true);
                     window.set_focus();
+                    window_hidden = false;
+                    publish_window_controls(&webview, normal_window_pose, window_hidden);
                 }
                 "show" => {
                     let mut target = macos::pose(&window);
@@ -528,6 +569,8 @@ pub fn run_surface(
                     }
                     if !genie_entry { macos::apply_pose(&window, from, &backdrop); }
                     window.set_visible(true);
+                    window_hidden = false;
+                    publish_window_controls(&webview, normal_window_pose, window_hidden);
                     if activate { window.set_focus(); }
                     if macos::reduce_motion() {
                         presentation_reported = true;
@@ -580,6 +623,7 @@ pub fn run_surface(
                         window_transition = Some(WindowTransition::new(from, Pose { alpha: 0., ..from }, Motion::Close, false));
                     }
                 }
+                "drag" | "resize" if normal_window_pose.is_some() => {}
                 "drag" | "resize" => {
                     if let Some(warp) = &mut warp { warp.reset(); }
                     current_bend = [0., 0.];
@@ -601,12 +645,13 @@ pub fn run_surface(
                     }
                 }
                 "pin" => window.set_always_on_top(message["value"] == true),
+                "position" if normal_window_pose.is_some() => {}
                 "position" => {
                     if let (Some(x), Some(y)) = (message["x"].as_f64(), message["y"].as_f64()) {
                         window.set_outer_position(PhysicalPosition::new(x as i32, y as i32));
                     }
                 }
-                "size" if window_transition.is_some() => {
+                "size" if window_transition.is_some() || normal_window_pose.is_some() => {
                     let _ = webview.evaluate_script(&format!("window.__companionPopout?.resized({});", message["id"]));
                 }
                 "size" => {

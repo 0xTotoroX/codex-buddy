@@ -71,3 +71,5 @@ panel::Preferences.settings_target 默认 plugin，兼容旧配置缺省；appea
 /settings/open 支持 inHostBrowser=true 强制返回本机设置 URL，绕过保存的插件默认且不调用外部浏览器；响应仅通过受限 CDP binding 返回。
 
 panel::Preferences.launcher_action 默认 inside，可选 outside/settings；旧配置缺省兼容，appearance 显式校验并保存。state/cdp 在现有只读宿主同步中传递该默认动作，不混入 Ui 全量回写；/panel/return 验证当前宿主后复用原 dock 流程，以展开态返回旧浮窗。
+
+panel_window受限IPC新增window-state/hide/toggle-maximize：隐藏仅切换可见性；放大保存普通frame后使用当前NSScreen.visibleFrame，还原恢复普通frame；回读至__buddyWindowControls。放大期间拒绝网页position/size及拖动/缩放，旧reveal复用隐藏窗口。

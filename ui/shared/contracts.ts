@@ -199,6 +199,17 @@ export interface PopoutBridge {
 declare global {
   const CODEX_BUDDY_DEVELOPMENT: boolean;
   interface Window {
+    __buddyWindowControls?: {
+      destroy?(): void;
+      refresh(): void;
+      geometryTransient(): boolean;
+      normalSize(): number[] | null;
+      update(state: {
+        maximized?: boolean;
+        hidden?: boolean;
+        normalFrame?: { width: number; height: number } | null;
+      }): void;
+    };
     __companionNativeGlass?: boolean;
     __companionPopout?: PopoutBridge;
   }

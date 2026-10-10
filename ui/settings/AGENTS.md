@@ -38,3 +38,5 @@
 当前 main 设置固定在 ChatGPT 内置浏览器打开；main.tsx 不再显示目标选择器。settings-entry.tsx 与后端 settingsTarget 兼容字段保留，供插件分支/旧配置使用，不删除用户偏好。
 
 - `launcher-settings.tsx`：总览中的眼睛默认单击动作（内/外/设置），保存 appearance.launcherAction 并保留修订冲突校验；不支持桌面浮窗时禁用外选项，切换默认值本身不移动工作台。
+
+所有动作图标通过shared/icons/react读取同一公开SVG目录，统一18px。页面保留桌面16px、窄屏12px额外顶部留白及底部边距。

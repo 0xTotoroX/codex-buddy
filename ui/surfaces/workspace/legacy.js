@@ -6,6 +6,7 @@
  */
 import { bindDockResize } from '../embedded/width.js';
 import { dockWidthLimit } from '../embedded/dock.js';
+import { installWindowControls } from './window-controls.js';
 import { workbenchHeadHtml } from './chrome.js';
 import { IS_POPOUT, POPOUT } from '../../shared/constants.js';
 import {
@@ -128,6 +129,13 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
       <section class="csw-workbench-settings" aria-label="工作台设置" hidden></section><button hidden data-legacy-settings aria-label="旧版内置设置"></button>
       <div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical"></div>
     </div>`;
+    if (IS_POPOUT)
+      installWindowControls(panel.querySelector('.csw-workbench'), {
+        dock: () => window.__companionPopout.dock({ expand: true }),
+        post: (message) => window.__companionPopout.native(message),
+        isBusy: () => window.__companionPopout.motionActive?.(),
+        error: (e) => window.__companionPopout.notice(e.message),
+      });
     installFeatureControls(panel.querySelector('.csw-workbench'));
     installAssociation(panel.querySelector('.csw-workbench-head'));
     panel.querySelector('.csw-workbench-face').addEventListener('click', onWorkbenchFaceClick);

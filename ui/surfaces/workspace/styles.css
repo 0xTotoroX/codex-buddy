@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 工作台状态与共享材质/控件变量。
- * [OUTPUT]: 中轴表情、透明工具按钮、文字明暗的标签选中反馈、分隔线和各级菜单样式。
+ * [OUTPUT]: 顶部留白、右侧统一窗口操作、透明工具按钮、文字明暗的标签选中反馈、分隔线和各级菜单样式。
  * [POS]: 工作台布局覆盖；不改变宿主样式或主题配方。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -448,11 +448,14 @@
   display: none;
 }
 @media (hover: hover) and (pointer: fine) {
+  .csw-window-controls,
   .csw-workbench-controls,
   .csw-workbench-pane > header [data-refresh] {
     opacity: 0;
     transition: opacity 140ms ease-out;
   }
+  .csw-workbench:hover .csw-window-controls,
+  .csw-workbench-head:has(:focus-visible) .csw-window-controls,
   .csw-workbench:hover .csw-workbench-controls,
   .csw-workbench-head:has(:focus-visible) .csw-workbench-controls,
   .csw-workbench:hover .csw-workbench-pane > header [data-refresh],
@@ -461,6 +464,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .csw-window-controls,
   .csw-workbench-controls,
   .csw-workbench-pane > header [data-refresh] {
     transition: none;
@@ -616,11 +620,38 @@
   overflow: auto;
 }
 
-/* Only the desktop keeps an empty drag strip and its pin control. */
+/* Preserve breathing room without restoring the removed capsule. */
 .csw-workbench .csw-workbench-head[data-window='embedded'] {
-  display: none;
+  display: block;
+  flex: 0 0 16px;
+  height: 16px;
+  padding: 0;
 }
 .csw-workbench .csw-workbench-head[data-window='desktop'] {
-  flex-basis: 36px;
-  height: 36px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  flex-basis: 44px;
+  height: 44px;
+  padding: 8px 12px;
+}
+
+.csw-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+.csw-window-controls button {
+  width: 28px;
+  height: 28px;
+}
+[data-buddy-maximized] .csw-resize-handle {
+  display: none;
+}
+
+.csw-workbench-head[data-window='desktop'] .csw-icon svg {
+  width: 18px;
+  height: 18px;
 }
