@@ -206,7 +206,7 @@ Building or packaging does not update an installed application. When reporting a
 
 The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync when updating user-facing documentation.
 
-The header settings gear appears when the eyes row is hovered or keyboard-focused. All in-host settings entries open the same complete settings page in ChatGPT’s built-in browser. Plugin code remains available on the plugin development branch, but is not required to use the workbench.
+Open settings from the independent eyes menu or its right-click shortcut. The workbench header has no separate settings gear. Settings use the complete local page in ChatGPT’s built-in browser; the plugin remains optional.
 
 ## Privacy and license
 

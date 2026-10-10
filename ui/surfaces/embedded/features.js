@@ -11,7 +11,7 @@ import { IS_POPOUT } from '../../shared/constants.js';
 import { emitSignal } from '../../codex/runtime/signals.js';
 import { stopWorkbench } from './legacy.js';
 import { resolveFabExpression } from './shell/shell.js';
-import { workbenchHeadHtml, bindWorkbenchSettings } from '../workspace/chrome.js';
+import { workbenchHeadHtml } from '../workspace/chrome.js';
 let timer = 0,
   epoch = 0,
   polling = false,
@@ -93,7 +93,6 @@ function frame(container, faceClick) {
   root.className = 'csw-workbench';
   root.innerHTML = `${workbenchHeadHtml()}<p data-feature-error role="alert" hidden></p><div class="csw-workbench-resize" role="separator" tabindex="0" aria-label="调整工作台宽度" aria-orientation="vertical"></div>`;
   root.querySelector('.csw-workbench-face').addEventListener('click', faceClick);
-  bindWorkbenchSettings(root, () => emitSignal('openSettings', undefined));
   composition?.destroy();
   composition = installFeatureLayout(root, {
     save: async (placement, layout, expectedLayout) => {

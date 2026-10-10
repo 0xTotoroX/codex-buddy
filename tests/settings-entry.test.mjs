@@ -1,5 +1,5 @@
 /* [INPUT]: Shared header markup/styles in an isolated browser.
- * [OUTPUT]: Row-only hover, keyboard access and centered eyes geometry.
+ * [OUTPUT]: No redundant settings entry and centered eyes geometry.
  * [POS]: No real host, model or configuration operations.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import test from 'node:test';
@@ -7,10 +7,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
-test('settings gear follows only the header and stays keyboard accessible', async () => {
+test('workbench header retains centered eyes without a settings gear', async () => {
   const built = await build({
     stdin: {
-      contents: `import {workbenchHeadHtml,bindWorkbenchSettings} from './ui/surfaces/workspace/chrome.js';document.querySelector('.csw-workbench').innerHTML=workbenchHeadHtml()+"<div id='content' style='height:200px'>Content</div>";window.opens=0;bindWorkbenchSettings(document,()=>window.opens++);`,
+      contents: `import {workbenchHeadHtml} from './ui/surfaces/workspace/chrome.js';document.querySelector('.csw-workbench').innerHTML=workbenchHeadHtml()+"<div id='content' style='height:200px'>Content</div>";`,
       resolveDir: process.cwd(),
     },
     bundle: true,
@@ -25,25 +25,12 @@ test('settings gear follows only the header and stays keyboard accessible', asyn
     );
     await page.addStyleTag({ content: await readFile('ui/surfaces/workspace/styles.css', 'utf8') });
     await page.addScriptTag({ content: built.outputFiles[0].text });
-    const gear = page.locator('[data-settings-entry]');
-    await page.locator('#content').hover();
-    assert.equal(await gear.evaluate((n) => getComputedStyle(n).opacity), '0');
     const head = page.locator('.csw-workbench-head');
     await head.hover();
-    assert.equal(await gear.evaluate((n) => getComputedStyle(n).opacity), '1');
+    assert.equal(await page.locator('[data-settings-entry]').count(), 0);
     const h = await head.boundingBox(),
-      face = await page.locator('.csw-workbench-face').boundingBox(),
-      g = await gear.boundingBox();
+      face = await page.locator('.csw-workbench-face').boundingBox();
     assert.ok(Math.abs(face.x + face.width / 2 - h.x - h.width / 2) < 1);
-    assert.ok(g.x > face.x + face.width);
-    assert.equal(g.width, 28);
-    await gear.click();
-    assert.equal(await page.evaluate(() => window.opens), 1);
-    await page.locator('#content').hover();
-    await gear.focus();
-    await page.keyboard.press('Tab');
-    await page.keyboard.press('Shift+Tab');
-    assert.equal(await gear.evaluate((n) => getComputedStyle(n).opacity), '1');
   } finally {
     await browser.close();
   }
