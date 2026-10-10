@@ -113,6 +113,14 @@ pub(crate) async fn dispatch(
                 .await?;
             Ok(json!({"status":"ok","settings":settings}))
         }
+        "/prompt/enhance" => {
+            crate::prompt_enhancement::enhance(
+                app,
+                client.context("只能从关联的 Codex 优化提示词")?,
+                &request.payload,
+            )
+            .await
+        }
         "/stepwise/generate" => {
             generate(
                 app,

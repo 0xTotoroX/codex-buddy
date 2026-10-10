@@ -17,6 +17,7 @@ mod model_control;
 mod native_backdrop;
 mod panel;
 mod panel_window;
+mod prompt_enhancement;
 mod requests;
 mod server;
 mod settings;

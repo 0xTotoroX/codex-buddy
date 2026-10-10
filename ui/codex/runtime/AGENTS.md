@@ -44,3 +44,5 @@ openSettings 信号可显式携带 web，用于 Option+右键；此时请求 inH
 lifecycle 统一执行 launcherAction：内在宿主显示/收放，外使用现有整组桌面交接或唤起，设置复用内置浏览器。presentation 接收 cdp 传来的默认动作并刷新入口，不重置业务数据；主功能 owner 与旧窗口分别走现有协议。
 
 lifecycle 每次渲染使用原 resolveFabExpression/fabExpressionLabel 和 activePaneCue 更新独立入口；来源沿用原关联身份与几何判断，单聊天或来源无效时不显示小点，不为图标另行读取聊天。
+
+lifecycle在宿主安装/销毁prompt-enhancement，独立于工作台业务启停，不在桌面投影安装。其验证接口仅回答指定在途优化请求是否仍对应原草稿；不对外返回草稿。

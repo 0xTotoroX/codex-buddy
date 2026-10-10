@@ -16,6 +16,7 @@
     '/stepwise/settings',
     '/settings/set',
     '/stepwise/generate',
+    '/prompt/enhance',
     '/stepwise/test',
     '/settings/open',
     '/panel/detach',

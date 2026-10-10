@@ -199,6 +199,16 @@ export interface PopoutBridge {
 declare global {
   const CODEX_BUDDY_DEVELOPMENT: boolean;
   interface Window {
+    __codexBuddyModelControl?: {
+      inputTarget(): {
+        id: string;
+        root: HTMLElement;
+        scope: HTMLElement;
+        composer: HTMLElement;
+        trigger?: HTMLElement;
+      } | null;
+    };
+    __codexBuddyPromptEnhancer?: { verify(requestId: string): boolean; destroy(): void };
     __buddyWindowControls?: {
       destroy?(): void;
       refresh(): void;

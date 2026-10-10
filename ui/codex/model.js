@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 官方 DOM 菜单、稳定聊天标记/新聊天输入区和关联的 model/list 消息；不依赖工作台锁定。
- * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 presence/cancel/dispose。
+ * [OUTPUT]: window.__codexBuddyModelControl 的异步 snapshot/apply 和同步 presence/cancel/dispose/inputTarget；inputTarget只读当前唯一输入目标。
  * [POS]: include_str / Page.addScriptToEvaluateOnNewDocument 可独立安装的宿主边界。
  * [PROTOCOL]: 父任务维护集成和地图；本文件不写 React、持久存储或发送模型请求。
  * snapshot(false) 不操作 DOM；refresh=true 显式探测菜单，限时等待能力后完整回读。target 无法确认时 id/title 为空。
@@ -36,7 +36,8 @@
   const KEY = '__codexBuddyModelControl';
   const CAPABILITIES = Symbol.for('codexBuddy.modelCapabilities');
   window[KEY]?.dispose?.();
-  const OWN = '[data-companion-stepwise-root],[data-codex-buddy-dock],[data-codexpp-qmp-root]';
+  const OWN =
+    '[data-companion-stepwise-root],[data-codex-buddy-dock],[data-codexpp-qmp-root],[data-codex-buddy-prompt]';
   const EDITOR = '.ProseMirror,[contenteditable="true"],textarea';
   const MENU =
     '[role="menu"][data-state="open"],[role="listbox"],[data-radix-menu-content][data-state="open"]';
@@ -305,7 +306,7 @@
       .filter(Boolean);
     return [...chats, ...drafts];
   }
-  function resolveTarget() {
+  function resolveTarget(requireTrigger = true) {
     let choices = candidates();
     const dialogs = all(document, '[role="dialog"],dialog[open]').filter(
       (node) => visible(node) && !owned(node),
@@ -341,7 +342,7 @@
     const target = tracked || focused || one(choices);
     if (
       !target?.id ||
-      !target.trigger ||
+      (requireTrigger && !target.trigger) ||
       candidates().filter((entry) => entry.id === target.id).length !== 1
     )
       return null;
@@ -1151,6 +1152,13 @@
     visible: !disposed && document.visibilityState === 'visible',
     focused: !disposed && document.hasFocus(),
   });
-  const api = { snapshot, apply, cancel, dispose, presence };
+  const api = {
+    snapshot,
+    apply,
+    cancel,
+    dispose,
+    presence,
+    inputTarget: () => resolveTarget(false),
+  };
   window[KEY] = api;
 })();

@@ -144,3 +144,5 @@ launcher-face.test.mjs 通过原状态派生和真实合成聊天几何核对空
 workbench的closed independent views定向用例检查全部视图关闭后释放侧栏且点击不自动重开；settings-entry检查自有工具栏无title/tooltip，插件试验错误通过aria-description核对。
 
 设置导航用例改为总览承载大纲/模型快切开关，保留草稿切换及保存并发检查；旧分类锚点仍需定位到总览相应控件。
+
+`prompt-enhancement.test.mjs`：隔离浏览器检查优化/还原、取消、用户输入/IME、会话或输入节点变化、复杂引用、错误、单实例清理；原始换行与$字符完整。直接测试宿主inputTarget在无模型能力、新草稿和重复身份下的行为。Rust prompt_enhancement测试三种协议与完整输入、不依赖Stepwise开关/方向；ignored的live_prompt_enhancement需显式CODEX_BUDDY_PROMPT_SMOKE_DATA，只用合成草稿调用配置模型，不接触真实输入框。

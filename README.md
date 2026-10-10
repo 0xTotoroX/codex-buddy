@@ -51,6 +51,10 @@ Drag a panel heading or tab to another panel's edge to split the layout, or to i
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
+## Prompt enhancement
+
+Write a draft in the chat composer and click **优化** (Optimize). The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **下一步 → 生成模型**, and sends only the draft, without chat history.
+
 ## Task board and Apple Reminders
 
 Open **看板** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.

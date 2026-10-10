@@ -20,3 +20,5 @@ features.ts 的 mainManaged 是后台主界面归属投影，不持久化为另�
 AppearanceSettings 增加可选 settingsTarget（plugin/web），旧后台缺省按 plugin 展示。
 
 AppearanceSettings.launcherAction 保存独立眼睛的默认动作（inside/outside/settings）；与工作台布局及生成设置分离。
+
+contracts.ts声明宿主inputTarget只读目标和提示词优化verify/destroy生命周期接口；原文不进入持久化配置或窗口投影。

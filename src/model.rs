@@ -1,5 +1,5 @@
 // [INPUT]: 模型配置、受限 Codex CLI 或 HTTP 结构化接口。
-// [OUTPUT]: Model、ModelInfo、Suggestion 与生成/测试/模型查询。
+// [OUTPUT]: Model、ModelInfo、Suggestion、共用无工具结构化补全与生成/测试/模型查询。
 // [POS]: 模型适配层，三种方向来源共用生成与总超时；智谱请求/最终回答适配，保留方向和数量校验。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -287,13 +287,24 @@ impl Model {
     }
 
     async fn codex(&self, input: &str, directions: &[String]) -> Result<String> {
+        self.codex_completion(
+            input,
+            &self.instructions(),
+            &schema_for(self.options.max_items, directions),
+        )
+        .await
+    }
+
+    async fn codex_completion(
+        &self,
+        input: &str,
+        instructions: &str,
+        schema: &Value,
+    ) -> Result<String> {
         let dir = tempfile::tempdir().context("无法创建生成请求临时目录")?;
         let schema_path = dir.path().join("schema.json");
         let output_path = dir.path().join("response.json");
-        std::fs::write(
-            &schema_path,
-            schema_for(self.options.max_items, directions).to_string(),
-        )?;
+        std::fs::write(&schema_path, schema.to_string())?;
         let mut command =
             tokio::process::Command::new(self.binary.as_ref().context("Codex CLI 不可用")?);
         command
@@ -330,7 +341,7 @@ impl Model {
             .arg("-c")
             .arg(format!(
                 "developer_instructions={}",
-                toml_string(&self.instructions())
+                toml_string(instructions)
             ))
             .arg("--output-schema")
             .arg(&schema_path)
@@ -439,8 +450,13 @@ impl Model {
         api_base(&self.base_url).is_ok_and(|url| url.host_str() == Some("open.bigmodel.cn"))
     }
 
+    #[cfg(test)]
     fn chat_body(&self, input: &str, schema: &Value) -> Value {
-        let mut instructions = self.instructions();
+        self.chat_completion_body(input, schema, &self.instructions())
+    }
+
+    fn chat_completion_body(&self, input: &str, schema: &Value, instructions: &str) -> Value {
+        let mut instructions = instructions.to_owned();
         let mut body = json!({"model":self.name,"stream":false});
         if self.is_bigmodel() {
             // BigModel documents JSON mode for text models, not strict JSON Schema.
@@ -471,9 +487,43 @@ impl Model {
     }
 
     async fn api(&self, input: &str, directions: &[String]) -> Result<String> {
+        self.api_completion(
+            input,
+            &self.instructions(),
+            &schema_for(self.options.max_items, directions),
+        )
+        .await
+    }
+
+    /// One structured, tool-free completion. Does not run Stepwise directions or Jev.
+    pub async fn complete_json(
+        &self,
+        input: &str,
+        instructions: &str,
+        schema: &Value,
+    ) -> Result<String> {
+        let info = self.info();
+        if !info.available {
+            bail!("{}", info.reason);
+        }
+        tokio::time::timeout(Duration::from_millis(self.options.timeout_ms), async {
+            if self.provider == "api" {
+                self.api_completion(input, instructions, schema).await
+            } else {
+                self.codex_completion(input, instructions, schema).await
+            }
+        })
+        .await
+        .context("提示词优化超时，请重试")?
+    }
+
+    async fn api_completion(
+        &self,
+        input: &str,
+        instructions: &str,
+        schema: &Value,
+    ) -> Result<String> {
         let client = self.client()?;
-        let schema = schema_for(self.options.max_items, directions);
-        let instructions = self.instructions();
         let protocols = self.protocols();
         for (index, protocol) in protocols.iter().enumerate() {
             let (suffix, body) = match *protocol {
@@ -483,7 +533,10 @@ impl Model {
                     "input":input,"max_output_tokens":self.options.max_output_tokens,
                     "text":{"format":{"type":"json_schema","name":"stepwise","strict":true,"schema":schema}}}),
                 ),
-                "chat_completions" => ("chat/completions", self.chat_body(input, &schema)),
+                "chat_completions" => (
+                    "chat/completions",
+                    self.chat_completion_body(input, schema, instructions),
+                ),
                 "anthropic_messages" => (
                     "messages",
                     json!({"model":self.name,"stream":false,"system":instructions,
