@@ -214,9 +214,10 @@
   text-align: center;
 }
 
-.csw-empty-title {
-  color: var(--csw-text);
-  font-size: clamp(12px, calc(var(--csw-item-font) + 1px), 25px);
+.csw-empty-title,
+.csw-progress-title {
+  color: color-mix(in srgb, var(--csw-text) 62%, var(--csw-muted));
+  font-size: 14px;
   font-weight: 500;
   line-height: 1.25;
   max-width: 100%;
@@ -224,24 +225,17 @@
   overflow-wrap: anywhere;
 }
 
-.csw-empty[data-state='manual'] .csw-empty-title {
-  color: var(--csw-muted);
-  font-size: clamp(11px, var(--csw-item-font), 20px);
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
 .csw-progress {
   align-items: center;
   color: var(--csw-muted);
   display: flex;
   flex: 1 1 auto;
-  gap: clamp(10px, calc(var(--csw-item-font) - 1px), 18px);
+  gap: 10px;
   justify-content: center;
   min-height: 0;
   min-width: 0;
   max-width: 100%;
-  padding: 16px 5px;
+  padding: 24px 12px;
 }
 
 .csw-progress-ring {
@@ -249,8 +243,8 @@
   border-radius: var(--buddy-radius-pill);
   border-top-color: var(--csw-accent);
   flex: 0 0 auto;
-  height: clamp(18px, calc(var(--csw-item-font) + 7px), 31px);
-  width: clamp(18px, calc(var(--csw-item-font) + 7px), 31px);
+  height: 18px;
+  width: 18px;
 }
 
 .csw-progress-copy {
@@ -272,10 +266,6 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  font-size: clamp(11px, var(--csw-item-font), 24px);
-  font-weight: 500;
-  line-height: 1.25;
-  overflow-wrap: anywhere;
   -webkit-text-fill-color: transparent;
 }
 
@@ -632,10 +622,13 @@
   .csw-outline-row:active {
     transform: none;
   }
+  .csw-progress-ring {
+    animation: none !important;
+  }
   .csw-progress-title {
     animation: none !important;
     background: none;
-    color: var(--csw-text);
+    color: color-mix(in srgb, var(--csw-text) 62%, var(--csw-muted));
     -webkit-text-fill-color: currentColor;
   }
 

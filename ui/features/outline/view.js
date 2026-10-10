@@ -35,8 +35,9 @@ export function alignOutlineNestedText(root) {
 
 export function outlineHtml(snapshot) {
   if (snapshot.outlineStatus === 'pending' && !snapshot.outlineItems.length) {
-    return `<div class="csw-empty" data-kind="outline" role="status">
-        <div class="csw-empty-title">等待回答完成</div>
+    return `<div class="csw-progress" data-kind="outline" role="status" aria-label="等待回答完成">
+        <span class="csw-progress-ring" aria-hidden="true"></span>
+        <span class="csw-progress-copy"><span class="csw-progress-title">等待回答完成</span></span>
       </div>`;
   }
   if (snapshot.outlineStatus === 'error') {

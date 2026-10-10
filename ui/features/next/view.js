@@ -57,7 +57,7 @@ export function createNextView({ read, reading, command, changed = () => {} }) {
   function nextSuggestionsHtml() {
     const progress = nextProgressState();
     if (progress) {
-      return `<div class="csw-progress" aria-label="${progress.title}">
+      return `<div class="csw-progress" role="status" aria-label="${progress.title}">
         <span class="csw-progress-ring" aria-hidden="true"></span>
         <span class="csw-progress-copy">
           <span class="csw-progress-title">${progress.title}</span>
