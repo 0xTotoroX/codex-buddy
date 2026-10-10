@@ -22,6 +22,10 @@ test('radial menu preserves eyes hit target and has stable hover, keyboard and c
     reducedMotion: 'reduce',
   });
   try {
+    await page.route('http://localhost:12345/**', (route) =>
+      route.fulfill({ body: '<html></html>', contentType: 'text/html' }),
+    );
+    await page.goto('http://localhost:12345/');
     await page.setContent(
       `<body style="margin:0;background:#f4f4f4;font-family:system-ui"><aside style="width:64px;height:460px;background:#eee;border-right:1px solid #ddd"></aside><button id="eyes" aria-label="CodexBuddy" style="position:fixed;left:14px;top:340px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:#292929"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg></button></body>`,
     );
@@ -43,8 +47,34 @@ test('radial menu preserves eyes hit target and has stable hover, keyboard and c
     await host.getByRole('menuitem', { name: '在桌面打开' }).hover();
     await page.waitForTimeout(220);
     assert.equal(await host.getAttribute('data-open'), '');
+    assert.equal(await host.getAttribute('data-glass-backend'), 'svg');
+    assert.match(
+      await host.locator('.glass').evaluate((node) => getComputedStyle(node).backdropFilter),
+      /url/,
+    );
     await mkdir('target/reports', { recursive: true });
     await page.screenshot({ path: 'target/reports/launcher-menu-light.png' });
+    await page.evaluate(() => {
+      document.body.style.background =
+        'repeating-linear-gradient(30deg,#355472 0 18px,#729997 18px 36px,#d3ac7e 36px 54px)';
+    });
+    const glassPixels = await page.screenshot({ path: 'target/reports/launcher-menu-liquid.png' });
+    await host.locator('.glass').evaluate((node) => (node.style.backdropFilter = 'none'));
+    const flatPixels = await page.screenshot();
+    assert.notDeepEqual(glassPixels, flatPixels, 'glass must alter the live background');
+    await page.evaluate(() => {
+      window.menu.close();
+    });
+    await eye.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.evaluate(() => {
+      window.options.colors = { text: '#f5f5f5', 'surface-opaque': '#202020', hover: '#ffffff15' };
+      document.body.style.background = '#202020';
+      document.querySelector('aside').style.background = '#292929';
+      window.menu.update();
+    });
+    await page.screenshot({ path: 'target/reports/launcher-menu-dark.png' });
+
     await host.getByRole('menuitem', { name: '在桌面打开' }).click();
     assert.deepEqual(await page.evaluate(() => window.actions), ['outside']);
     assert.equal(await host.getAttribute('data-open'), null);

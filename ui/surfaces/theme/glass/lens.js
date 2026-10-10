@@ -7,16 +7,7 @@
 export function createLensMap(width, height, corner) {
   const radius = Math.min(corner, width / 2, height / 2);
   const band = Math.max(1, Math.min(60, radius, Math.min(width, height) * 0.15));
-  const thickness = (80 * band) / 60;
-  const profile = Float32Array.from({ length: 256 }, (_, i) => {
-    const t = (i + 0.5) / 256;
-    const crown = (1 - (1 - t) ** 4) ** 0.25;
-    const slope = (1 - t) ** 3 / crown ** 3;
-    const incident = Math.atan(slope);
-    const transmitted = Math.asin(Math.sin(incident) / 3);
-    return Math.tan(incident - transmitted) * (thickness + band * crown);
-  });
-  const peak = Math.max(...profile);
+  const { profile, peak } = createLensProfile(band);
   const map = document.createElement('canvas');
   map.width = width;
   map.height = height;
@@ -47,4 +38,18 @@ export function createLensMap(width, height, corner) {
   }
   context.putImageData(pixels, 0, 0);
   return { map, scale: -2 * peak };
+}
+
+export function createLensProfile(band) {
+  const thickness = (80 * band) / 60;
+  const profile = Float32Array.from({ length: 256 }, (_, i) => {
+    const t = (i + 0.5) / 256;
+    const crown = (1 - (1 - t) ** 4) ** 0.25;
+    const slope = (1 - t) ** 3 / crown ** 3;
+    const incident = Math.atan(slope);
+    const transmitted = Math.asin(Math.sin(incident) / 3);
+    return Math.tan(incident - transmitted) * (thickness + band * crown);
+  });
+  const peak = Math.max(...profile);
+  return { profile, peak };
 }

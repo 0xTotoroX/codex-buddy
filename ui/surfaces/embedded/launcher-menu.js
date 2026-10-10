@@ -2,7 +2,11 @@
  * [OUTPUT]: One viewport-aware radial menu with cancellable hover and keyboard access.
  * [POS]: Launcher presentation only; actions remain in the runtime coordinator.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
+import { createSvgGlass } from '../theme/glass/svg.js';
+import { createPathLensMap } from '../theme/glass/path-lens.js';
 import { iconSvg } from '../../shared/icons/index.js';
+const outline =
+  'M 4 92 L 4 10 Q 4 3 11 4 A 142 142 0 0 1 158 145 Q 158 154 149 154 L 52 154 A 53 53 0 0 0 4 92 Z';
 const actions = [
   ['inside', '内', '在聊天内打开', 'dock'],
   ['outside', '外', '在桌面打开', 'detach'],
@@ -14,6 +18,7 @@ export function createLauncherMenu(anchor, options) {
   host.inert = true;
   host.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;width:0;height:0;';
   const shadow = host.attachShadow({ mode: 'open' });
+  const highlightId = `fan-highlight-${crypto.randomUUID()}`;
   shadow.innerHTML = `<style>
     :host { font-family:system-ui,sans-serif; color:var(--fan-fg,#292929); }
     .fan { position:absolute;left:0;top:-144px;width:164px;height:164px;pointer-events:none;
@@ -21,8 +26,14 @@ export function createLauncherMenu(anchor, options) {
     .shape { position:absolute;inset:0;width:164px;height:164px;overflow:visible;pointer-events:none;
       opacity:0;transform:scale(.86);transform-origin:0 144px;
       transition:opacity 140ms ease-out,transform 200ms cubic-bezier(.2,.8,.2,1);
-      filter:drop-shadow(0 8px 16px #00000016); }
-    .shape path {fill:var(--fan-bg,#f9f9f9);stroke:var(--fan-border,#00000014);stroke-width:1;}
+      }
+    .glass {clip-path:path('${outline}');background:color-mix(in srgb,var(--fan-bg,#f9f9f9) 8%,transparent);backdrop-filter:blur(12px);}
+    .glass::after {content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 28% 10%,#ffffff42,transparent 64%);pointer-events:none;}
+    .glass>svg {position:absolute;width:0;height:0;}
+    .rim {filter:drop-shadow(0 5px 12px #00000028);}
+    .rim path {fill:#ffffff09;stroke:url(#${highlightId});stroke-width:1.2;}
+    :host([data-reduced-transparency]) .glass {background:var(--fan-bg,#f9f9f9);backdrop-filter:none;}
+
     .hit {position:absolute;inset:0;clip-path:polygon(0 0,164px 0,164px 164px,26px 164px,26px 118px,0 118px);pointer-events:none;}
     button {position:absolute;left:0;top:144px;display:flex;flex-direction:column;align-items:center;justify-content:center;
       width:44px;height:50px;box-sizing:border-box;padding:4px;border:0;border-radius:13px;
@@ -47,8 +58,30 @@ export function createLauncherMenu(anchor, options) {
     :host([data-flip-x][data-flip-y]) button>* {transform:scale(-1);}
     .status {position:absolute;left:20px;top:20px;width:210px;font-size:12px;}
     @media(prefers-reduced-motion:reduce) {*{transition:none!important;}}
-  </style><div class="fan"><svg class="shape" viewBox="0 0 164 164" aria-hidden="true"><path d="M 4 115 L 4 10 Q 4 3 11 4 A 142 142 0 0 1 158 145 Q 158 154 149 154 L 28 154 A 30 30 0 0 0 4 115 Z"/></svg><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--x:${[33, 83, 121][i]}px;--y:${[-108, -80, -26][i]}px;--delay:${i * 22}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
+  </style><div class="fan"><div class="shape glass"></div><svg class="shape rim" viewBox="0 0 164 164" aria-hidden="true"><defs><linearGradient id="${highlightId}" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="white" stop-opacity=".9"/><stop offset=".42" stop-color="white" stop-opacity=".2"/><stop offset="1" stop-color="white" stop-opacity=".6"/></linearGradient></defs><path d="${outline}"/></svg><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--x:${[33, 83, 121][i]}px;--y:${[-108, -80, -26][i]}px;--delay:${i * 22}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
   document.body.append(host);
+  let glass = null;
+  const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)');
+  function refreshGlass() {
+    host.toggleAttribute('data-reduced-transparency', reducedTransparency.matches);
+    if (reducedTransparency.matches) {
+      host.dataset.glassBackend = 'solid';
+      glass?.destroy();
+      glass = null;
+      return;
+    }
+    if (!glass) {
+      try {
+        glass = createSvgGlass(shadow.querySelector('.glass'), (width, height) =>
+          createPathLensMap(width, height, outline),
+        );
+        host.dataset.glassBackend = 'svg';
+      } catch {
+        host.dataset.glassBackend = 'fallback';
+      }
+    }
+    glass?.refresh('clear');
+  }
   let open = false,
     enterTimer = 0,
     leaveTimer = 0,
@@ -98,6 +131,7 @@ export function createLauncherMenu(anchor, options) {
     if (destroyed || !anchor.isConnected) return;
     place();
     update();
+    refreshGlass();
     open = true;
     host.inert = false;
     host.toggleAttribute('data-keyboard', keyboard);
@@ -167,6 +201,9 @@ export function createLauncherMenu(anchor, options) {
   listen(document, 'pointerdown', (e) => {
     if (!e.composedPath().includes(anchor) && !e.composedPath().includes(host)) close();
   });
+  listen(reducedTransparency, 'change', () => {
+    if (open) refreshGlass();
+  });
   listen(window, 'blur', () => close());
   listen(window, 'resize', () => close());
   listen(document, 'scroll', () => {
@@ -197,6 +234,7 @@ export function createLauncherMenu(anchor, options) {
       destroyed = true;
       close();
       events.abort();
+      glass?.destroy();
       host.remove();
       anchor.removeAttribute('aria-haspopup');
       anchor.removeAttribute('aria-expanded');

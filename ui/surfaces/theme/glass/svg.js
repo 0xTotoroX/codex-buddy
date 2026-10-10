@@ -6,7 +6,7 @@
  */
 import { createLensMap } from './lens.js';
 
-export function createSvgGlass(surface) {
+export function createSvgGlass(surface, mapFactory = createLensMap) {
   if (
     !/Chrome|Chromium|Edg/.test(navigator.userAgent) ||
     !CSS.supports('backdrop-filter', 'url(#x)')
@@ -37,7 +37,7 @@ export function createSvgGlass(surface) {
       surface.style.setProperty('--buddy-liquid-radius', `${radius}px`);
       const next = `${width}:${height}:${radius}`;
       if (dimensions === next) return;
-      const { map, scale } = createLensMap(width, height, radius);
+      const { map, scale } = mapFactory(width, height, radius);
       displacement.setAttribute('scale', String(scale));
       image.setAttribute('href', map.toDataURL());
       image.setAttribute('width', String(width));
