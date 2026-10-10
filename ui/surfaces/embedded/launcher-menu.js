@@ -1,5 +1,5 @@
 /* [INPUT]: The independent eyes anchor and current action/default/capability callbacks.
- * [OUTPUT]: One viewport-aware upward menu with cancellable hover and keyboard access.
+ * [OUTPUT]: An inline sidebar menu with cancellable hover and keyboard access.
  * [POS]: Launcher presentation only; actions remain in the runtime coordinator.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { createSvgGlass } from '../theme/glass/svg.js';
@@ -13,24 +13,23 @@ export function createLauncherMenu(anchor, options) {
   const host = document.createElement('div');
   host.setAttribute('data-codex-buddy-launcher-menu', '');
   host.inert = true;
-  host.style.cssText = 'position:fixed;z-index:2147483646;pointer-events:none;width:0;height:0;';
+  host.style.cssText =
+    'position:relative;display:block;flex:none;align-self:center;pointer-events:none;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `<style>
-    :host {font-family:system-ui,sans-serif;color:var(--menu-fg,#292929);}
-    .menu-shell {position:absolute;left:var(--menu-left,-28px);top:var(--menu-top,-198px);width:56px;height:176px;pointer-events:none;}
+    :host {font-family:system-ui,sans-serif;color:var(--menu-fg,#292929);width:56px;max-width:100%;height:0;margin-bottom:-8px;overflow:hidden;transition:height 220ms cubic-bezier(.2,.8,.2,1),margin-bottom 220ms cubic-bezier(.2,.8,.2,1);}
+    :host([data-open]) {height:176px;margin-bottom:-4px;}
+    .menu-shell {position:absolute;left:0;bottom:0;width:56px;max-width:100%;height:176px;pointer-events:none;}
     .shape {position:absolute;inset:0;border-radius:18px;pointer-events:none;opacity:0;
       transform:translateY(var(--enter-y,10px)) scale(.95);transform-origin:center bottom;
       transition:opacity 130ms ease-out,transform 180ms cubic-bezier(.2,.8,.2,1);}
-    :host([data-flip-y]) .shape {transform-origin:center top;}
-    .glass {clip-path:inset(0 round 18px);background:color-mix(in srgb,var(--menu-bg,#f9f9f9) 28%,transparent);backdrop-filter:blur(12px);}
-    :host([data-theme='dark']) .glass {background:color-mix(in srgb,var(--menu-bg,#202020) 24%,transparent);}
+    .glass {clip-path:inset(0 round 18px);background:color-mix(in srgb,var(--menu-bg,#f9f9f9) 6%,transparent);backdrop-filter:blur(12px);}
+    :host([data-theme='dark']) .glass {background:color-mix(in srgb,var(--menu-bg,#202020) 6%,transparent);}
     .glass::after {content:'';position:absolute;inset:0;background:linear-gradient(135deg,#ffffff3b,transparent 62%);pointer-events:none;}
     .glass>svg {position:absolute;width:0;height:0;}
-    .rim {box-shadow:0 6px 18px #00000020,inset 0 1px 0 #ffffffa6,inset 0 -1px 0 #ffffff40,inset 0 0 0 1px #ffffff36;}
+    .rim {box-shadow:inset 0 1px 0 #ffffffa6,inset 0 -1px 0 #ffffff40,inset 0 0 0 1px #ffffff36;}
     :host([data-reduced-transparency]) .glass {background:var(--menu-bg,#f9f9f9);backdrop-filter:none;}
     .hit {position:absolute;inset:0;border-radius:18px;pointer-events:none;}
-    .hit::after {content:'';position:absolute;left:0;right:0;bottom:-4px;height:4px;}
-    :host([data-flip-y]) .hit::after {top:-4px;bottom:auto;}
     button {position:absolute;left:6px;top:var(--top);display:flex;flex-direction:column;align-items:center;justify-content:center;
       width:44px;height:50px;box-sizing:border-box;padding:4px;border:0;border-radius:12px;background:transparent;color:inherit;
       font:500 11px/1.3 system-ui;gap:4px;cursor:pointer;opacity:0;pointer-events:none;
@@ -43,11 +42,11 @@ export function createLauncherMenu(anchor, options) {
     :host([data-open]) .shape {opacity:1;transform:translateY(0) scale(1);}
     :host([data-open]) .hit {pointer-events:auto;}
     :host([data-open]) button {opacity:1;pointer-events:auto;transform:translateY(0);transition-delay:var(--delay,0ms);}
-    :host([data-keyboard]) * {transition:none!important;}
+    :host([data-keyboard]),:host([data-keyboard]) * {transition:none!important;}
     .status {position:absolute;left:34px;top:-30px;width:210px;font-size:12px;}
-    @media(prefers-reduced-motion:reduce) {*{transition:none!important;}}
+    @media(prefers-reduced-motion:reduce) {:host,*{transition:none!important;}}
   </style><div class="menu-shell"><div class="shape glass"></div><div class="shape rim"></div><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--top:${6 + i * 57}px;--delay:${(2 - i) * 20}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
-  document.body.append(host);
+  anchor.before(host);
   let glass = null;
   const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)');
   function refreshGlass() {
@@ -66,7 +65,7 @@ export function createLauncherMenu(anchor, options) {
         host.dataset.glassBackend = 'fallback';
       }
     }
-    glass?.refresh('regular');
+    glass?.refresh('clear');
   }
   let open = false,
     enterTimer = 0,
@@ -77,18 +76,6 @@ export function createLauncherMenu(anchor, options) {
   const listen = (node, event, handler) =>
     node.addEventListener(event, handler, { signal: events.signal });
   function place() {
-    const box = anchor.getBoundingClientRect();
-    const x = box.left + box.width / 2,
-      y = box.top + box.height / 2;
-    host.style.left = `${x}px`;
-    host.style.top = `${y}px`;
-    const below = box.top < 184;
-    const top = below ? Math.min(box.bottom + 4, innerHeight - 180) : box.top - 180;
-    const left = Math.max(4, Math.min(x - 28, innerWidth - 60));
-    host.toggleAttribute('data-flip-y', below);
-    host.style.setProperty('--menu-top', `${Math.max(4, top) - y}px`);
-    host.style.setProperty('--menu-left', `${left - x}px`);
-    host.style.setProperty('--enter-y', below ? '-10px' : '10px');
     const root = anchor.getRootNode();
     const rail = root instanceof ShadowRoot ? root.host.parentElement || anchor : anchor;
     const style = getComputedStyle(rail);

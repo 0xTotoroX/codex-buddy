@@ -15,7 +15,7 @@ const compiled = await build({
   bundle: true,
   write: false,
 });
-test('upward menu preserves eyes hit target and has stable hover, keyboard and cleanup', async () => {
+test('inline expanding menu preserves eyes hit target and has stable hover, keyboard and cleanup', async () => {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({
     viewport: { width: 520, height: 460 },
@@ -27,16 +27,20 @@ test('upward menu preserves eyes hit target and has stable hover, keyboard and c
     );
     await page.goto('http://localhost:12345/');
     await page.setContent(
-      `<body style="margin:0;background:#f4f4f4;font-family:system-ui"><aside style="width:64px;height:460px;background:#eee;border-right:1px solid #ddd"></aside><button id="eyes" aria-label="CodexBuddy" style="position:fixed;left:14px;top:340px;width:36px;height:36px;border:0;border-radius:10px;background:transparent;color:#292929"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg></button></body>`,
+      `<body style="margin:0;background:#f4f4f4;font-family:system-ui"><aside style="width:64px;height:460px;display:flex;flex-direction:column;align-items:center;gap:8px;background:#eee;border-right:1px solid #ddd"><div id="rail-content" style="flex:1;min-height:0"></div><div id="entry" style="display:flex;flex:none;flex-direction:column;align-items:center;gap:8px"><button id="eyes" aria-label="CodexBuddy" style="width:36px;height:36px;flex:none;border:0;border-radius:10px;background:transparent;color:#292929"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg></button></div><div style="height:48px;flex:none"></div></aside></body>`,
     );
     await page.addScriptTag({ content: compiled.outputFiles[0].text });
     const eye = page.locator('#eyes'),
       host = page.locator('[data-codex-buddy-launcher-menu]');
+    const initialEye = await eye.boundingBox();
     await eye.hover();
     await page.waitForFunction(() =>
       document.querySelector('[data-codex-buddy-launcher-menu]').hasAttribute('data-open'),
     );
     const rect = await eye.boundingBox();
+    assert.equal(Math.round(rect.y), Math.round(initialEye.y));
+    assert.equal(await host.evaluate((node) => node.parentElement.id), 'entry');
+    assert.notEqual(await host.evaluate((node) => getComputedStyle(node).position), 'fixed');
     const menuBox = await host.locator('.menu-shell').boundingBox();
     assert.equal(Math.round(rect.y - menuBox.y - menuBox.height), 4);
     assert.equal(Math.round(menuBox.x + menuBox.width / 2), Math.round(rect.x + rect.width / 2));
@@ -53,7 +57,7 @@ test('upward menu preserves eyes hit target and has stable hover, keyboard and c
     assert.equal(await host.getAttribute('data-glass-backend'), 'svg');
     assert.match(
       await host.locator('.glass').evaluate((node) => getComputedStyle(node).backdropFilter),
-      /url.*blur\(4px\)/,
+      /url.*blur\(0\.3px\)/,
     );
     await mkdir('target/reports', { recursive: true });
     await page.screenshot({ path: 'target/reports/launcher-menu-light.png' });
@@ -95,13 +99,14 @@ test('upward menu preserves eyes hit target and has stable hover, keyboard and c
       window.options.outsideAvailable = false;
       window.options.defaultAction = 'settings';
       window.menu.update();
-      document.querySelector('#eyes').style.top = '14px';
+      document.querySelector('aside').style.height = '340px';
     });
+    await page.mouse.move(300, 100);
     await eye.hover();
     await page.waitForFunction(() =>
       document.querySelector('[data-codex-buddy-launcher-menu]').hasAttribute('data-open'),
     );
-    assert.equal(await host.getAttribute('data-flip-y'), '');
+    assert.equal(await host.getAttribute('data-flip-y'), null);
     assert.equal(await host.getByRole('menuitem', { name: '在桌面打开' }).isDisabled(), true);
     for (const item of await host.getByRole('menuitem').all()) {
       const r = await item.boundingBox();
