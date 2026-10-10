@@ -45,7 +45,7 @@ Web settings include six editable directions and custom directions. Counts are m
 
 CodexBuddy uses its own eyes entry in the left rail and does not require the plugin. Click to toggle the workbench; double-click or Alt+Enter keeps the existing window handoff. Right-click or Option-right-click opens settings in ChatGPT’s built-in browser side panel.
 
-Hover over the independent eyes entry to choose inside, outside, or settings; configure its default click action in the settings overview. Workbench headers no longer repeat the face. The desktop window has return-to-chat, hide, maximize/restore, and pin controls at the top right. Choose outside to reveal a hidden window with its position and unfinished edits preserved. Maximize uses the available screen area; restore returns to the original position and size.
+Hover over the independent eyes entry to choose inside, outside, or settings; configure its default click action in the settings overview. Workbench headers no longer repeat the face. The desktop window has a horizontal-line return-to-chat button, maximize/restore, and pin controls at the top right. Maximize uses the available screen area; restore returns to the original position and size.
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Choose tabs, vertical, horizontal or automatic splits under **显示与布局 → 主界面布局** in Web settings. Press Esc during a drag to cancel it.
 

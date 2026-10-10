@@ -655,3 +655,13 @@
   width: 18px;
   height: 18px;
 }
+
+/* A pressed window control stays in the same neutral hierarchy as its neighbours. */
+.csw-workbench-head[data-window='desktop'] .csw-icon[aria-pressed='true'] {
+  color: color-mix(in srgb, var(--csw-muted) 65%, var(--csw-text));
+}
+.csw-workbench-head[data-window='desktop'] .csw-icon:hover,
+.csw-workbench-head[data-window='desktop'] .csw-icon:focus-visible,
+.csw-feature-header-actions button:hover {
+  color: var(--csw-text);
+}

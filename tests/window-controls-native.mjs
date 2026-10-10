@@ -32,7 +32,7 @@ post({kind:'show',anchor:null});
 async function poll(){
  try{const response=await fetch('/probe',{method:'POST',body:JSON.stringify({ready,returned,state,draft:document.querySelector('#draft').value,width:innerWidth,height:innerHeight,error:window.failure,zoomLabel:document.querySelector('[data-window-control="maximize"]').getAttribute('aria-label')})});
  for(const action of await response.json()){
-  if(action==='reveal')post({kind:'reveal'});
+  if(action==='hide'||action==='reveal')post({kind:action});
   else if(action==='close')post({kind:'close'});
   else document.querySelector('[data-window-control="'+action+'"]').click();
  }

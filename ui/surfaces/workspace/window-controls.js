@@ -1,13 +1,12 @@
 /* [INPUT]: Existing desktop return callback and restricted native window messages.
- * [OUTPUT]: Return/hide/maximize controls and native-confirmed state, without remounting content.
+ * [OUTPUT]: Return/maximize controls and native-confirmed state, without remounting content.
  * [POS]: Shared desktop header adapter; never owns task data or window leases.
  * [PROTOCOL]: Keep workspace/AGENTS.md in sync. */
 import { iconSvg } from '../../shared/icons/index.js';
 export function windowControlsHtml() {
   return `<div class="csw-window-controls" role="group" aria-label="窗口操作">${[
-    ['dock', '收回聊天', 'return'],
-    ['hide', '隐藏', 'minus'],
-    ['maximize', '放大', 'focus'],
+    ['dock', '收回聊天', 'minus'],
+    ['maximize', '放大', 'window-expand'],
   ]
     .map(
       ([action, label, icon]) =>
@@ -34,7 +33,7 @@ export function installWindowControls(
       zoom.setAttribute('aria-label', label);
       zoom.removeAttribute('title');
       zoom.setAttribute('aria-pressed', String(state.maximized));
-      zoom.innerHTML = iconSvg(state.maximized ? 'restore' : 'focus');
+      zoom.innerHTML = iconSvg(state.maximized ? 'window-restore' : 'window-expand');
     }
     root.toggleAttribute('data-window-maximized', state.maximized);
     document.documentElement.toggleAttribute('data-buddy-maximized', state.maximized);
@@ -76,7 +75,7 @@ export function installWindowControls(
             refresh();
             error(Error('窗口操作未确认，请重试。'));
           }, 2000);
-          post({ kind: button.dataset.windowControl === 'hide' ? 'hide' : 'toggle-maximize' });
+          post({ kind: 'toggle-maximize' });
         }
       } catch (e) {
         clearTimeout(timer);

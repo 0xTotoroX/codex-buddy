@@ -51,7 +51,12 @@ test('workbench preserves top breathing room and aligns desktop controls on the 
         return { x: r.x, y: r.y, width: r.width, height: r.height, icon: [s.width, s.height] };
       }),
     );
-    assert.equal(actions.length, 4);
+    assert.equal(actions.length, 3);
+    assert.equal(await page.locator('[data-window-control="hide"]').count(), 0);
+    assert.equal(
+      await page.locator('[data-window-control="dock"] svg').getAttribute('data-icon'),
+      'minus',
+    );
     assert.equal(
       await page.locator('.csw-workbench [title], .csw-workbench [role=tooltip]').count(),
       0,
@@ -65,7 +70,7 @@ test('workbench preserves top breathing room and aligns desktop controls on the 
       assert.equal(action.y, actions[0].y);
       if (index) assert.equal(action.x - (actions[index - 1].x + 28), 4);
     }
-    assert.equal(bounds.x + bounds.width - (actions[3].x + 28), 12);
+    assert.equal(bounds.x + bounds.width - (actions[2].x + 28), 12);
     assert.equal(await head.isVisible(), true);
     assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
   } finally {

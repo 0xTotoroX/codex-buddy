@@ -12,4 +12,4 @@
 
 [PROTOCOL]: 结构、职责或接口变化时更新本文；父级描述受影响时同步父级地图。
 
-桌面工作台不再显示胶囊眼睛；顶部右侧显示收回聊天、隐藏、放大/还原和置顶，Alt+Enter 仍可收回。共用 workspace/window-controls；隐藏后reveal显示同一窗口，放大期间不保存普通尺寸。
+桌面工作台不再显示胶囊眼睛；顶部右侧显示横线收回聊天、放大/还原和置顶，Alt+Enter 仍可收回。共用 workspace/window-controls；隐藏后reveal显示同一窗口，放大期间不保存普通尺寸。
