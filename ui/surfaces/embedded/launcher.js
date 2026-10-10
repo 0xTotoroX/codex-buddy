@@ -133,7 +133,7 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,defaultAction?:string,outsideAvailable?:boolean,colors?:Record<string,string>,action?:(action:string)=>Promise<void>|void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,defaultAction?:string,outsideAvailable?:boolean,theme?:string,colors?:Record<string,string>,action?:(action:string)=>Promise<void>|void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
 export function syncLauncher(options) {
   current = options;
   if (!previewEnabled()) {

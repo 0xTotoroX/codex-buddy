@@ -575,6 +575,7 @@ function install() {
         },
         defaultAction: shellState.launcherAction,
         colors: panelAppearance().colors,
+        theme: shellState.theme,
         outsideAvailable: runtimeState.settings?.popoutSupported === true,
         action: (action) => launcherAction(action),
         click: (event) =>

@@ -24,10 +24,11 @@ export function createLauncherMenu(anchor, options) {
     .fan { position:absolute;left:0;top:-144px;width:164px;height:164px;pointer-events:none;
       transform-origin:0 144px; }
     .shape { position:absolute;inset:0;width:164px;height:164px;overflow:visible;pointer-events:none;
-      opacity:0;transform:scale(.86);transform-origin:0 144px;
+      opacity:0;transform:scale(.78);transform-origin:0 144px;
       transition:opacity 140ms ease-out,transform 200ms cubic-bezier(.2,.8,.2,1);
       }
-    .glass {clip-path:path('${outline}');background:color-mix(in srgb,var(--fan-bg,#f9f9f9) 8%,transparent);backdrop-filter:blur(12px);}
+    .glass {clip-path:path('${outline}');background:color-mix(in srgb,var(--fan-bg,#f9f9f9) 28%,transparent);backdrop-filter:blur(12px);}
+    :host([data-theme='dark']) .glass {background:color-mix(in srgb,var(--fan-bg,#202020) 24%,transparent);}
     .glass::after {content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 28% 10%,#ffffff42,transparent 64%);pointer-events:none;}
     .glass>svg {position:absolute;width:0;height:0;}
     .rim {filter:drop-shadow(0 5px 12px #00000028);}
@@ -45,7 +46,7 @@ export function createLauncherMenu(anchor, options) {
     button:focus-visible {outline:2px solid currentColor;outline-offset:2px;}
     button[aria-current='true']::after {content:'';position:absolute;right:4px;top:5px;width:4px;height:4px;border-radius:50%;background:currentColor;opacity:.5;}
     button:disabled {opacity:.3!important;cursor:default;}
-    :host([data-open]) .shape {opacity:1;transform:scale(1);}
+    :host([data-open]) .shape {opacity:1;transform:scale(.9);}
     :host([data-open]) .hit {pointer-events:auto;}
     :host([data-open]) button {opacity:1;pointer-events:auto;transform:translate(calc(var(--x) - 22px),calc(var(--y) - 25px)) scale(1);transition-delay:var(--delay,0ms);}
     :host([data-keyboard]) * {transition:none!important;}
@@ -58,7 +59,7 @@ export function createLauncherMenu(anchor, options) {
     :host([data-flip-x][data-flip-y]) button>* {transform:scale(-1);}
     .status {position:absolute;left:20px;top:20px;width:210px;font-size:12px;}
     @media(prefers-reduced-motion:reduce) {*{transition:none!important;}}
-  </style><div class="fan"><div class="shape glass"></div><svg class="shape rim" viewBox="0 0 164 164" aria-hidden="true"><defs><linearGradient id="${highlightId}" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="white" stop-opacity=".9"/><stop offset=".42" stop-color="white" stop-opacity=".2"/><stop offset="1" stop-color="white" stop-opacity=".6"/></linearGradient></defs><path d="${outline}"/></svg><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--x:${[33, 83, 121][i]}px;--y:${[-108, -80, -26][i]}px;--delay:${i * 22}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
+  </style><div class="fan"><div class="shape glass"></div><svg class="shape rim" viewBox="0 0 164 164" aria-hidden="true"><defs><linearGradient id="${highlightId}" x1="0" y1="0" x2=".8" y2="1"><stop offset="0" stop-color="white" stop-opacity=".9"/><stop offset=".42" stop-color="white" stop-opacity=".2"/><stop offset="1" stop-color="white" stop-opacity=".6"/></linearGradient></defs><path d="${outline}"/></svg><div class="hit"></div><div role="menu" aria-label="CodexBuddy 快捷菜单">${actions.map(([id, label, title, icon], i) => `<button type="button" role="menuitem" data-action="${id}" aria-label="${title}" title="${title}" style="--x:${[28, 72, 105][i]}px;--y:${[-95, -69, -23][i]}px;--delay:${i * 22}ms" tabindex="-1">${iconSvg(icon)}<span>${label}</span></button>`).join('')}</div></div><span class="status" role="status"></span>`;
   document.body.append(host);
   let glass = null;
   const reducedTransparency = matchMedia('(prefers-reduced-transparency: reduce)');
@@ -80,7 +81,7 @@ export function createLauncherMenu(anchor, options) {
         host.dataset.glassBackend = 'fallback';
       }
     }
-    glass?.refresh('clear');
+    glass?.refresh('regular');
   }
   let open = false,
     enterTimer = 0,
@@ -102,6 +103,7 @@ export function createLauncherMenu(anchor, options) {
     const rail = root instanceof ShadowRoot ? root.host.parentElement || anchor : anchor;
     const style = getComputedStyle(rail);
     const colors = options().colors || {};
+    host.dataset.theme = options().theme || 'light';
     host.style.setProperty('--fan-fg', colors.text || style.color);
     host.style.setProperty('--fan-bg', colors['surface-opaque'] || '#f9f9f9');
     host.style.setProperty(

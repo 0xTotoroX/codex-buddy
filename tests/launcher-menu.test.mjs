@@ -50,7 +50,7 @@ test('radial menu preserves eyes hit target and has stable hover, keyboard and c
     assert.equal(await host.getAttribute('data-glass-backend'), 'svg');
     assert.match(
       await host.locator('.glass').evaluate((node) => getComputedStyle(node).backdropFilter),
-      /url/,
+      /url.*blur\(4px\)/,
     );
     await mkdir('target/reports', { recursive: true });
     await page.screenshot({ path: 'target/reports/launcher-menu-light.png' });
@@ -68,6 +68,7 @@ test('radial menu preserves eyes hit target and has stable hover, keyboard and c
     await eye.focus();
     await page.keyboard.press('ArrowRight');
     await page.evaluate(() => {
+      window.options.theme = 'dark';
       window.options.colors = { text: '#f5f5f5', 'surface-opaque': '#202020', hover: '#ffffff15' };
       document.body.style.background = '#202020';
       document.querySelector('aside').style.background = '#292929';
