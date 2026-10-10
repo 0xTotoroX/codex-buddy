@@ -15,7 +15,7 @@
 
 CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, generate follow-up questions, and keep your tools inside the conversation or in a desktop window.
 
-Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. Right-click the left navigation icon to open settings in your browser, organized by feature with separate display/layout and startup/connection categories. Category changes preserve drafts and reading positions. Desktop windows stay on top by default; use the pin in the window header to turn this off or on. Your choice is saved.
+Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. Right-click the fallback eyes entry to open settings in your browser, organized by feature with separate display/layout and startup/connection categories. Category changes preserve drafts and reading positions. Desktop windows stay on top by default; use the pin in the window header to turn this off or on. Your choice is saved.
 
 ## Features
 
@@ -209,4 +209,3 @@ The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync w
 Configuration is stored locally. When generating suggestions, the latest question and answer are sent to your chosen model service, subject to your input-context setting. Smart mode also sends that exchange to the configured Jev service after explicit consent. CodexBuddy does not persist chat bodies or modify the official application bundle. Host updates may affect compatibility.
 
 Project-owned source code is licensed under the [GNU GPL version 3 only](LICENSE) (`GPL-3.0-only`). Commercial use is permitted without a separate license fee; conveying covered software requires compliance with GPLv3, including applicable Corresponding Source obligations. Earlier MIT grants remain valid. Third-party notices retain their original terms; see [LICENSING.md](LICENSING.md) for the scope and historical license.
-
