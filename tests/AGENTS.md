@@ -113,4 +113,4 @@ workbench 的 scaled feature arrangement 用例在 80%/100%/120% 页面缩放下
 
 - `official-launcher.test.mjs`：官方左栏按钮的单击/键盘收放、阻止宿主导航、移除重复图标、原生设置菜单保留、停用恢复、导航重建/改名及歧义拒绝；不访问真实宿主。
 
-`official-launcher.test.mjs` 另核对右键恰好放行一次原生点击、左键仍只收放旧工作台、不调用外部设置，停止适配后恢复原生菜单。
+`official-launcher.test.mjs` 核对右键打开官方右侧页签而不触发全局导航，切换聊天不自动展开；左键只收放旧工作台、不调用外部设置，停止适配后恢复原生菜单。

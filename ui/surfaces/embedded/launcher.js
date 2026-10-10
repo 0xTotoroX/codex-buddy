@@ -1,5 +1,5 @@
 /* [INPUT]: 主界面开合状态及共用表情手势。
- * [OUTPUT]: 优先复用官方插件按钮并移除重复入口；单击保留旧手势、右键调用官方设置入口；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
+ * [OUTPUT]: 优先复用官方插件按钮并移除重复入口；单击保留旧手势、右键在官方侧边页签打开设置；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
 import { DEVELOPMENT } from '../../shared/constants.js';
@@ -8,7 +8,7 @@ let pluginLink = null;
 let pluginStatus = '';
 let entry = null;
 let official = null;
-let openingSettings = false;
+let settingsLink = null;
 let observer = null;
 let frame = 0;
 let current = null;
@@ -38,7 +38,6 @@ function officialPointer(event) {
   current?.pointerDown(event);
 }
 function officialClick(event) {
-  if (openingSettings) return;
   if (!canReuseOfficial() || event.button !== 0 || event.metaKey || event.ctrlKey) return;
   event.preventDefault();
   event.stopImmediatePropagation();
@@ -60,14 +59,15 @@ function officialContext(event) {
   if (!isOfficialButton(official)) return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  // Let the host's own global plugin entry open its settings resource.
-  // The bypass lasts only for this synchronous click; normal clicks still toggle Buddy.
-  openingSettings = true;
-  try {
-    official.click();
-  } finally {
-    openingSettings = false;
-  }
+  if (!settingsLink)
+    settingsLink = createPluginTabLink({
+      follow: false,
+      onOpened: () => {},
+      onStatus: (message) => {
+        if (official) official.title = message;
+      },
+    });
+  void settingsLink.open();
 }
 function bindOfficial(button) {
   if (official === button) return;
@@ -104,6 +104,8 @@ export function stopLauncher() {
   bindOfficial(null);
   pluginLink?.stop();
   pluginLink = null;
+  settingsLink?.stop();
+  settingsLink = null;
   pluginStatus = '';
   observer?.disconnect();
   observer = null;

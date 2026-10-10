@@ -1,5 +1,5 @@
 /* [INPUT]: 宿主公开 DOM 的右侧标签、插件菜单及当前聊天标识。
- * [OUTPUT]: Dev 手动启用的 Buddy 插件页签联动；只点现有控件，切换聊天后一次恢复。
+ * [OUTPUT]: Buddy 插件页签联动；设置入口只手动打开，Dev 试验可选择切换聊天后恢复。
  * [POS]: 最小宿主适配，不调用私有 IPC、不读取正文、不改变插件线程绑定。
  * [PROTOCOL]: 变更时同步 codex/AGENTS.md；真实宿主由用户手动验收。 */
 import { mainChatSessionId } from './context.js';
@@ -46,8 +46,8 @@ class SourceChanged extends Error {
   }
 }
 
-/** @param {{onOpened:()=>void,onStatus:(message:string)=>void}} options */
-export function createPluginTabLink({ onOpened, onStatus }) {
+/** @param {{onOpened:()=>void,onStatus:(message:string)=>void,follow?:boolean}} options */
+export function createPluginTabLink({ onOpened, onStatus, follow = true }) {
   let stopped = false,
     enabled = false,
     running = null,
@@ -205,7 +205,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     enabled = true;
     last = candidate = key;
     attempts.delete(key);
-    onStatus('官方 Buddy 页签已选中；切换聊天时自动恢复。');
+    onStatus(follow ? '官方 Buddy 页签已选中；切换聊天时自动恢复。' : '设置已在官方侧边页签打开。');
   }
   function request(expectedKey = sessionKey(), automatic = false) {
     if (stopped) return Promise.resolve();
@@ -234,7 +234,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
   }
   // 只在首次手动成功后运行；同一聊天内收起、切换别的标签均不抢回。
   interval = window.setInterval(() => {
-    if (stopped || !enabled || running || document.visibilityState !== 'visible') return;
+    if (!follow || stopped || !enabled || running || document.visibilityState !== 'visible') return;
     const next = sessionKey();
     if (next !== candidate) {
       candidate = next;

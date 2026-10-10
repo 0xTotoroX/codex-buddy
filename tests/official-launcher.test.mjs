@@ -1,5 +1,5 @@
 /* [INPUT]: Real launcher adapter in a synthetic host rail with delegated navigation.
- * [OUTPUT]: Official button toggles only the old workbench; right-click invokes the native settings entry once; cleanup restores native behavior.
+ * [OUTPUT]: Official button toggles only the old workbench; right-click opens the official side tab without global navigation; cleanup restores native behavior.
  * [POS]: Isolated integration test, no real host or plugin calls.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import { test } from 'node:test';
@@ -20,10 +20,31 @@ async function fixture() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await page.setContent(
-    '<nav class="group/sidebar-rail"><button id="official" aria-label="CodexBuddy 看板">Buddy</button><button id="other">Other</button></nav>',
+    '<nav class="group/sidebar-rail"><button id="official" aria-label="CodexBuddy 看板">Buddy</button><button id="other">Other</button></nav><div class="app-shell-main-content-frame" data-conversation-id="A"><div class="thread-scroll-container">Fixture</div></div><button id="toggle" aria-label="显示/隐藏侧边面板" aria-pressed="false">Panel</button><div id="right" data-app-shell-focus-area="right-panel" hidden><button id="new" aria-label="打开侧边面板标签页">New</button><div id="tabs"></div></div>',
   );
   await page.evaluate(() => {
     window.chatReady = true;
+    const right = document.getElementById('right'),
+      toggle = document.getElementById('toggle');
+    toggle.onclick = () => {
+      right.hidden = !right.hidden;
+      toggle.setAttribute('aria-pressed', String(!right.hidden));
+    };
+    document.getElementById('new').onclick = () => {
+      const menu = document.createElement('div');
+      menu.setAttribute('role', 'menu');
+      const item = document.createElement('button');
+      item.setAttribute('role', 'menuitem');
+      item.textContent = 'CodexBuddy';
+      item.onclick = () => {
+        menu.remove();
+        document.getElementById('tabs').innerHTML =
+          '<button role="tab" aria-selected="true">CodexBuddy</button>';
+      };
+      menu.append(item);
+      document.body.append(menu);
+    };
+
     window.toggles = window.navigation = window.nativeSettings = window.externalSettings = 0;
     document.body.addEventListener('click', (e) => {
       if (e.target.closest('#official')) window.navigation++;
@@ -49,6 +70,10 @@ test('official entry toggles without navigation, removes duplicate icon and open
       { toggles: 2, navigation: 0 },
     );
     await page.locator('#official').click({ button: 'right' });
+    await page.waitForFunction(
+      () => document.querySelector('#official').title === '设置已在官方侧边页签打开。',
+    );
+    assert.equal(await page.locator('#right').isVisible(), true);
     assert.deepEqual(
       await page.evaluate(() => ({
         native: window.nativeSettings,
@@ -56,11 +81,19 @@ test('official entry toggles without navigation, removes duplicate icon and open
         navigation: window.navigation,
         toggles: window.toggles,
       })),
-      { native: 0, external: 0, navigation: 1, toggles: 2 },
+      { native: 0, external: 0, navigation: 0, toggles: 2 },
     );
+    await page.evaluate(() => {
+      document.querySelector('[data-conversation-id]').setAttribute('data-conversation-id', 'B');
+      document.getElementById('tabs').replaceChildren();
+      document.getElementById('right').hidden = true;
+      document.getElementById('toggle').setAttribute('aria-pressed', 'false');
+    });
+    await page.waitForTimeout(1200);
+    assert.equal(await page.locator('#right').isVisible(), false);
     await page.evaluate(() => window.stopLauncher());
     await page.locator('#official').click();
-    assert.equal(await page.evaluate(() => window.navigation), 2);
+    assert.equal(await page.evaluate(() => window.navigation), 1);
     await page.locator('#official').click({ button: 'right' });
     assert.equal(await page.evaluate(() => window.nativeSettings), 1);
   } finally {
