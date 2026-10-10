@@ -1,5 +1,5 @@
 /* [INPUT]: 主界面开合状态及共用表情手势。
- * [OUTPUT]: 唯一左栏图标；Dev 手动启用官方插件页签联动，正式构建保留旧手势；导航重建后恢复，不回退胶囊。
+ * [OUTPUT]: 唯一左栏图标；默认保留旧手势；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
 import { DEVELOPMENT } from '../../shared/constants.js';
@@ -10,6 +10,7 @@ let entry = null;
 let observer = null;
 let frame = 0;
 let current = null;
+const previewEnabled = () => DEVELOPMENT && current?.pluginTabPreview === true;
 
 function schedule() {
   if (!frame)
@@ -38,10 +39,15 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void,pluginTabPreview?:boolean}} options */
 export function syncLauncher(options) {
   current = options;
-  if (DEVELOPMENT && !pluginLink)
+  if (!previewEnabled()) {
+    pluginLink?.stop();
+    pluginLink = null;
+    pluginStatus = '';
+  }
+  if (previewEnabled() && !pluginLink)
     pluginLink = createPluginTabLink({
       onOpened: () => current?.pluginOpened?.(),
       onStatus: (message) => {
@@ -86,16 +92,16 @@ export function syncLauncher(options) {
       </button></div>`;
     const button = shadow.querySelector('button');
     button.addEventListener('pointerdown', (event) => {
-      if (!DEVELOPMENT) current?.pointerDown(event);
+      if (!previewEnabled()) current?.pointerDown(event);
     });
     button.addEventListener('click', (event) => {
       event.stopPropagation();
-      if (DEVELOPMENT) {
+      if (previewEnabled()) {
         if (event.detail < 2) void pluginLink?.open();
       } else current?.click(event);
     });
     button.addEventListener('keydown', (event) => {
-      if (!DEVELOPMENT) current?.keyDown(event);
+      if (!previewEnabled()) current?.keyDown(event);
       else if (event.altKey && event.key === 'Enter') {
         event.preventDefault();
         void pluginLink?.open();
@@ -108,9 +114,9 @@ export function syncLauncher(options) {
     });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
-  if (DEVELOPMENT)
-    entry.shadowRoot.querySelector('button').title =
-      pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）';
+  entry.shadowRoot.querySelector('button').title = previewEnabled()
+    ? pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）'
+    : '单击收放 · 双击窗口往返 · 右键设置';
   entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
   if (options.root) options.root.dataset.launcher = 'rail';
 }

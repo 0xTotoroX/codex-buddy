@@ -9,7 +9,7 @@ import { chromium } from 'playwright';
 
 const compiled = await build({
   stdin: {
-    contents: `import {syncLauncher,stopLauncher} from './ui/surfaces/embedded/launcher.js';window.stopBuddy=stopLauncher;syncLauncher({open:false,root:null,click:()=>window.legacyClicks++,pointerDown:()=>{},keyDown:()=>{},settings:()=>window.settingsClicks++,pluginOpened:()=>window.opened++});`,
+    contents: `import {syncLauncher,stopLauncher} from './ui/surfaces/embedded/launcher.js';window.stopBuddy=stopLauncher;syncLauncher({pluginTabPreview:window.previewEnabled,open:false,root:null,click:()=>window.legacyClicks++,pointerDown:()=>{},keyDown:()=>{},settings:()=>window.settingsClicks++,pluginOpened:()=>window.opened++});`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -17,7 +17,7 @@ const compiled = await build({
   format: 'iife',
   define: { CODEX_BUDDY_DEVELOPMENT: 'true' },
 });
-async function fixture() {
+async function fixture(previewEnabled = true) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   await page.setContent(
@@ -64,6 +64,9 @@ async function fixture() {
       toggle.setAttribute('aria-pressed', 'false');
     };
   });
+  await page.evaluate((enabled) => {
+    window.previewEnabled = enabled;
+  }, previewEnabled);
   await page.addScriptTag({ content: compiled.outputFiles[0].text });
   return {
     browser,
@@ -349,6 +352,21 @@ test('occluded duplicate controls do not block the active official control', asy
     await button.click();
     await page.waitForFunction(() => window.opened === 1);
     assert.equal(await page.evaluate(() => window.menuClicks), 1);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('normal Dev entry keeps the legacy workbench and does not activate the retained plugin experiment', async () => {
+  const { browser, page, button } = await fixture(false);
+  try {
+    await button.click();
+    assert.equal(await page.evaluate(() => window.legacyClicks), 1);
+    assert.equal(await page.evaluate(() => window.menuClicks), 0);
+    await page.evaluate(() => window.switchSession('B'));
+    await page.waitForTimeout(1100);
+    assert.equal(await page.evaluate(() => window.menuClicks), 0);
+    assert.equal(await button.getAttribute('title'), '单击收放 · 双击窗口往返 · 右键设置');
   } finally {
     await browser.close();
   }
