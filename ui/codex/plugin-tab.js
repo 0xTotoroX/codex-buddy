@@ -22,7 +22,10 @@ function unique(selector, names) {
   return /** @type {HTMLElement|null} */ (nodes[0] || null);
 }
 function tab() {
-  return unique(`${RIGHT} [role="tab"]`, [NAME]);
+  return unique(
+    `${RIGHT} [role="tab"],[role="tablist"][aria-label="任务选项卡"] [role="tab"],[role="tablist"][aria-label="Task tabs"] [role="tab"],[data-tab-id] [role="tab"]`,
+    [NAME],
+  );
 }
 const sessionKey = () => mainChatSessionId();
 
@@ -31,7 +34,9 @@ export function createPluginTabLink({ onOpened, onStatus }) {
   let stopped = false,
     enabled = false,
     running = null,
-    last = sessionKey();
+    last = sessionKey(),
+    candidate = last,
+    candidateAt = 0;
   let interval = 0;
   let stage = '识别聊天';
   const check = (key) => {
@@ -54,6 +59,16 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     node.click();
   };
   async function open() {
+    stage = '恢复分屏';
+    if (document.visibilityState !== 'visible') throw Error('当前窗口不可见，未切换页签。');
+    const split = unique('button', ['进入分屏视图', 'Enter split view']);
+    if (split && split.getAttribute('aria-pressed') !== 'true') {
+      if (split.matches(':disabled,[aria-disabled="true"]'))
+        throw Error('官方分屏入口当前不可用。');
+      split.click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (stopped) return;
+    }
     stage = '识别聊天';
     const key = sessionKey();
     if (!key) throw Error('无法唯一识别当前聊天，未打开插件。');
@@ -63,14 +78,25 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     stage = '寻找右侧入口';
     let existing = tab();
     if (!existing) {
-      const toggle = unique('button', ['显示/隐藏侧边面板', 'Toggle side panel']);
-      if (toggle?.getAttribute('aria-pressed') === 'false') click(toggle, key);
+      const toggle = unique('button', [
+        '显示/隐藏侧边面板',
+        'Toggle side panel',
+        '显示标签页',
+        'Show tabs',
+      ]);
+      if (
+        toggle &&
+        (toggle.getAttribute('aria-pressed') === 'false' ||
+          ['显示标签页', 'Show tabs'].includes(label(toggle)))
+      )
+        click(toggle, key);
       const next = await wait(
         key,
         () =>
           tab() ||
           unique('button', ['打开侧边面板标签页', 'Open side panel tab']) ||
           unique(`${RIGHT} button`, ['新标签页', 'New tab']) ||
+          unique('button', ['新标签页', 'New tab']) ||
           unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']),
       );
       if (next.getAttribute('role') !== 'tab') {
@@ -125,12 +151,17 @@ export function createPluginTabLink({ onOpened, onStatus }) {
   }
   // 只在首次手动成功后运行；同一聊天内收起、切换别的标签均不抢回。
   interval = window.setInterval(() => {
+    if (stopped || !enabled || running || document.visibilityState !== 'visible') return;
     const next = sessionKey();
-    if (stopped || !enabled || running || document.visibilityState !== 'visible' || next === last)
+    if (next !== candidate) {
+      candidate = next;
+      candidateAt = Date.now();
       return;
+    }
+    if (!next || next === last || Date.now() - candidateAt < 750) return;
     last = next;
-    if (next) void request();
-  }, 500);
+    void request();
+  }, 250);
   return {
     open: request,
     stop() {

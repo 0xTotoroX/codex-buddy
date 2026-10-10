@@ -181,6 +181,21 @@ test('current host conversation marker and New tab context menu open the plugin 
       document.querySelector('.thread-scroll-container').append(marker);
       const plus = document.getElementById('new');
       plus.setAttribute('aria-label', '新标签页');
+      // 新版统一标签条位于主工具栏，不在旧 right-panel 容器内。
+      document.getElementById('right').removeAttribute('data-app-shell-focus-area');
+      const tabs = document.getElementById('tabs');
+      tabs.setAttribute('role', 'tablist');
+      tabs.setAttribute('aria-label', '任务选项卡');
+      document.getElementById('toggle').setAttribute('aria-label', '显示标签页');
+      const split = document.createElement('button');
+      split.setAttribute('aria-label', '进入分屏视图');
+      split.setAttribute('aria-pressed', 'false');
+      window.splitOpened = false;
+      split.onclick = () => {
+        window.splitOpened = true;
+        split.setAttribute('aria-pressed', 'true');
+      };
+      document.body.append(split);
       const menu = plus.onclick;
       window.browserPages = 0;
       plus.onclick = () => window.browserPages++;
@@ -192,6 +207,7 @@ test('current host conversation marker and New tab context menu open the plugin 
     await button.click();
     await page.waitForFunction(() => window.opened === 1);
     assert.equal(await page.evaluate(() => window.browserPages), 0);
+    assert.equal(await page.evaluate(() => window.splitOpened), true);
     assert.equal(await page.evaluate(() => window.menuClicks), 1);
   } finally {
     await browser.close();
