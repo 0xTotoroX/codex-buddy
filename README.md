@@ -43,7 +43,7 @@ In Web settings, choose **下一步 → 高级生成设置 → 输入上下文 �
 
 Web settings include six editable directions and custom directions. Counts are maximums, not quotas; empty results are valid. New configurations default to three suggestions; existing counts and generation timing are preserved. With an explicit input limit, the question takes priority and truncated context is marked. Jev and the generation model receive the same context snapshot. Jev's applicability cutoff is experimental and has not been calibrated for suggestion quality.
 
-When the CodexBuddy plugin is installed, its official sidebar button toggles the original workbench inside recognized chats without navigating to the plugin page or adding a duplicate eyes entry. Right-click opens internal plugin settings in the official right-hand panel (requires the settings-only plugin package connected to the existing backend); settings also remain available from plugin details. If no unique plugin button is found, the original eyes entry remains, including its Web settings shortcut. Double-click and Alt+Enter keep the existing window handoff behavior.
+When the CodexBuddy plugin is installed, its official sidebar button toggles the original workbench inside recognized chats without navigating to the plugin page or adding a duplicate eyes entry. The native right-click menu remains available; the workbench header gear opens settings in the selected destination. If no unique plugin button is found, the original eyes entry remains, including its Web settings shortcut. Double-click and Alt+Enter keep the existing window handoff behavior.
 
 Inside Codex, click the face to expand or collapse the workbench. Double-click it to pop out to the desktop; double-click again in the desktop window to return to the previous compact or expanded state. Split layouts, tabs, and focused panels retain the shared face for returning to the chat.
 
@@ -203,6 +203,8 @@ For the frontend pilot, run `npm ci` first and provide an installed Chromium thr
 Building or packaging does not update an installed application. When reporting an issue or contributing a change, include the version, OS, and reproduction steps, and remove credentials and private chat content.
 
 The default README is English. Keep [README.zh-CN.md](README.zh-CN.md) in sync when updating user-facing documentation.
+
+The settings gear sits on the right of the embedded workbench header and appears when that row is hovered or keyboard-focused. Choose **Settings button destination** in settings overview: the official plugin side panel (default) or a web page. The official sidebar button keeps its native right-click menu.
 
 ## Privacy and license
 

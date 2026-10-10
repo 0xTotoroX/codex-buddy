@@ -133,6 +133,11 @@ pub(crate) async fn dispatch(
         }
         "/stepwise/test" => app.test_settings().await,
         "/settings/open" => {
+            if request.payload["configuredTarget"] == true
+                && app.appearance().await.settings_target == "plugin"
+            {
+                return Ok(json!({"status":"ok", "target":"plugin"}));
+            }
             let runtime = crate::lifecycle::Runtime::read(&app.paths)?;
             webbrowser::open(&runtime.url()).context("无法打开浏览器，请运行 codex-buddy start")?;
             Ok(json!({"status":"ok"}))

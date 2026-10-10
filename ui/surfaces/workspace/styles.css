@@ -615,3 +615,22 @@
   min-height: 0;
   overflow: auto;
 }
+
+/* Settings belongs to the eyes row, not the whole workbench hover area. */
+@media (hover: hover) and (pointer: fine) {
+  .csw-settings-entry {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 140ms ease-out;
+  }
+  .csw-workbench-head:hover .csw-settings-entry,
+  .csw-workbench-head:has(:focus-visible) .csw-settings-entry {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .csw-settings-entry {
+    transition: none;
+  }
+}

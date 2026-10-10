@@ -8,7 +8,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 const result = await build({
   stdin: {
-    contents: `import {syncLauncher,stopLauncher,launcherButton} from './ui/surfaces/embedded/launcher.js';window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settings:()=>window.externalSettings++});window.refresh();`,
+    contents: `import {syncLauncher,stopLauncher,launcherButton,openPluginSettings} from './ui/surfaces/embedded/launcher.js';window.openSettings=openPluginSettings;window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settings:()=>window.externalSettings++});window.refresh();`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -59,7 +59,7 @@ async function fixture() {
   await page.addScriptTag({ content: result.outputFiles[0].text });
   return { page, browser };
 }
-test('official entry toggles without navigation, removes duplicate icon and opens internal plugin settings on right-click', async () => {
+test('official entry toggles without navigation, removes duplicate icon and keeps native right-click and opens settings through the explicit action', async () => {
   const { page, browser } = await fixture();
   try {
     assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
@@ -75,6 +75,9 @@ test('official entry toggles without navigation, removes duplicate icon and open
       node.title = 'CodexBuddy';
     });
     await page.locator('#official').click({ button: 'right' });
+    assert.equal(await page.evaluate(() => window.nativeSettings), 1);
+    assert.equal(await page.locator('#right').isVisible(), false);
+    await page.evaluate(() => window.openSettings());
     await page.waitForFunction(
       () =>
         document.querySelector('#official').dataset.buddySettingsStatus ===
@@ -90,7 +93,7 @@ test('official entry toggles without navigation, removes duplicate icon and open
         navigation: window.navigation,
         toggles: window.toggles,
       })),
-      { native: 0, external: 0, navigation: 0, toggles: 2 },
+      { native: 1, external: 0, navigation: 0, toggles: 2 },
     );
     await page.evaluate(() => {
       document.querySelector('[data-conversation-id]').setAttribute('data-conversation-id', 'B');
@@ -104,7 +107,7 @@ test('official entry toggles without navigation, removes duplicate icon and open
     await page.locator('#official').click();
     assert.equal(await page.evaluate(() => window.navigation), 1);
     await page.locator('#official').click({ button: 'right' });
-    assert.equal(await page.evaluate(() => window.nativeSettings), 1);
+    assert.equal(await page.evaluate(() => window.nativeSettings), 2);
   } finally {
     await browser.close();
   }

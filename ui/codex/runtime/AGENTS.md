@@ -34,3 +34,5 @@ lifecycle 为 embedded/launcher 接入共用表情手势与设置操作，停用
 Dev 官方插件页签联动仅在 launcher 成功确认选中后通过 lifecycle 收起旧注入侧栏，不关闭已有桌面/贴边窗口或迁移业务 owner。
 
 通过 canUseOfficial 将 chatRoot 的有效性供 launcher 校验，生成中仍可收放；非聊天页保留官方按钮默认导航。
+
+openSettings 信号来自内嵌工作台头部，lifecycle 请求后台按 settingsTarget 选择网页或插件侧边页签；不将该点击传递给表情收放。

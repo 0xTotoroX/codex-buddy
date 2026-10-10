@@ -16,3 +16,5 @@
 [PROTOCOL]: 结构、职责或接口变化时更新本文；父级描述受影响时同步父级地图。
 
 features.ts 的 mainManaged 是后台主界面归属投影，不持久化为另一份配置；旧快照可省略。
+
+AppearanceSettings 增加可选 settingsTarget（plugin/web），旧后台缺省按 plugin 展示。

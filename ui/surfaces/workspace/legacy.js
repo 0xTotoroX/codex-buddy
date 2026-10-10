@@ -6,7 +6,7 @@
  */
 import { bindDockResize } from '../embedded/width.js';
 import { dockWidthLimit } from '../embedded/dock.js';
-import { workbenchHeadHtml } from './chrome.js';
+import { workbenchHeadHtml, bindWorkbenchSettings, settingsEntryHtml } from './chrome.js';
 import { IS_POPOUT, POPOUT } from '../../shared/constants.js';
 import {
   clamp,
@@ -131,6 +131,7 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
     installFeatureControls(panel.querySelector('.csw-workbench'));
     installAssociation(panel.querySelector('.csw-workbench-head'));
     panel.querySelector('.csw-workbench-face').addEventListener('click', onWorkbenchFaceClick);
+    bindWorkbenchSettings(panel, () => emitSignal('openSettings', undefined));
     for (const pane of registry) {
       panel.querySelector(`[data-refresh="${pane.id}"]`).addEventListener('click', () => {
         if (pane.enabled()) void pane.refresh();
@@ -233,9 +234,10 @@ export function renderWorkbench(nextHtml, attachNextEvents, clearPromptTimers) {
   if (windowGesture) face.setAttribute('aria-keyshortcuts', 'Alt+Enter');
   else face.removeAttribute('aria-keyshortcuts');
   const controls = panel.querySelector('.csw-workbench-controls');
-  const controlsHtml = `${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span>`;
+  const controlsHtml = `${IS_POPOUT ? '' : settingsEntryHtml()}${layoutMenu()}${panelWindowControls({ includeToggle: false })}<span hidden>${panelWindowControls({ includePin: false })}${IS_POPOUT ? '' : `<button class="csw-icon" data-workbench-close title="收起工作台" aria-label="收起工作台">${iconSvg('minus')}</button>`}</span>`;
   if (paneContent.get(controls) !== controlsHtml) {
     controls.innerHTML = controlsHtml;
+    bindWorkbenchSettings(controls, () => emitSignal('openSettings', undefined));
     paneContent.set(controls, controlsHtml);
     bindPanelWindowControls();
     controls.onclick = (event) => {

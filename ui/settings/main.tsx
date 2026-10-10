@@ -15,6 +15,7 @@ import { TaskSettings } from './task-settings';
 import { ModelControlSettings } from './model-control-settings';
 import { SurfaceSettings } from './surface-settings';
 import { NextSettings } from './next-settings';
+import { SettingsEntry } from './settings-entry';
 import { SettingsOverview } from './settings-overview';
 import { ConnectionSettings } from './connection-settings';
 function editable(value: Settings): EditableSettings {
@@ -91,6 +92,7 @@ function App() {
           )}
           <Feedback text={notice.text} failed={notice.failed} />
           <div hidden={page !== 'overview'}>
+            <SettingsEntry value={view?.panelPreferences} />
             <SettingsOverview active={page === 'overview'} live={live} view={view} />
           </div>
           <SettingsForm

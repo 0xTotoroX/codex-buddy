@@ -55,10 +55,7 @@ function officialDouble(event) {
     event.stopImmediatePropagation();
   }
 }
-function officialContext(event) {
-  if (!isOfficialButton(official)) return;
-  event.preventDefault();
-  event.stopImmediatePropagation();
+export function openPluginSettings() {
   if (!settingsLink)
     settingsLink = createPluginTabLink({
       follow: false,
@@ -76,7 +73,6 @@ function bindOfficial(button) {
     official.removeEventListener('click', officialClick, true);
     official.removeEventListener('keydown', officialKey, true);
     official.removeEventListener('dblclick', officialDouble, true);
-    official.removeEventListener('contextmenu', officialContext, true);
   }
   official = button;
   if (official) {
@@ -87,7 +83,6 @@ function bindOfficial(button) {
     official.addEventListener('click', officialClick, true);
     official.addEventListener('keydown', officialKey, true);
     official.addEventListener('dblclick', officialDouble, true);
-    official.addEventListener('contextmenu', officialContext, true);
   }
 }
 function findOfficial(rail) {

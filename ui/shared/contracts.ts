@@ -205,6 +205,7 @@ declare global {
 }
 
 export interface AppearanceSettings {
+  settingsTarget?: 'plugin' | 'web';
   revision: number;
   webRevision: number;
   detached: boolean;

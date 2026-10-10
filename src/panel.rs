@@ -169,6 +169,7 @@ pub struct Preferences {
     pub detached: bool,
     pub return_open: Option<bool>,
     pub always_on_top: bool,
+    pub settings_target: String,
     pub position: Option<Position>,
     pub ui: Ui,
 }
@@ -180,6 +181,7 @@ impl Default for Preferences {
             detached: false,
             return_open: None,
             always_on_top: true,
+            settings_target: "plugin".into(),
             position: None,
             ui: Ui::default(),
         }
@@ -717,6 +719,13 @@ impl App {
                 next.ui.split_ratio = next.ui.dock_layout.as_ref().unwrap().vertical_ratio;
             }
             next.ui.validate()?;
+        }
+        if let Some(value) = input.get("settingsTarget") {
+            let target = value.as_str().context("设置打开方式无效")?;
+            if !["plugin", "web"].contains(&target) {
+                bail!("设置打开方式无效");
+            }
+            next.settings_target = target.into();
         }
         if let Some(value) = input.get("alwaysOnTop") {
             next.always_on_top = value.as_bool().context("置顶参数无效")?;
@@ -1312,12 +1321,22 @@ mod tests {
         let changed = app
             .save_appearance(json!({"expectedRevision":before.revision,
             "ui":{"material":"native-glass","fontOffset":2.,"fontSizes":{"outline":18.2,"board":17.4},"promptClickMode":"hybrid"},
-            "alwaysOnTop":true}))
+            "alwaysOnTop":true,"settingsTarget":"web"}))
             .await
             .unwrap();
         assert_eq!(changed.ui.width, before.ui.width);
         assert_eq!(changed.ui.material, "native-glass");
         assert!(changed.always_on_top);
+        assert_eq!(before.settings_target, "plugin");
+        assert_eq!(changed.settings_target, "web");
+        assert_eq!(Preferences::read(&app.paths).settings_target, "web");
+        assert!(
+            app.save_appearance(
+                json!({"expectedRevision":changed.revision,"settingsTarget":"invalid"})
+            )
+            .await
+            .is_err()
+        );
         assert!(
             app.save_appearance(
                 json!({"expectedRevision":before.revision,"ui":{"material":"frosted"}})
