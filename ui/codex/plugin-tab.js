@@ -2,6 +2,7 @@
  * [OUTPUT]: Dev 手动启用的 Buddy 插件页签联动；只点现有控件，切换聊天后一次恢复。
  * [POS]: 最小宿主适配，不调用私有 IPC、不读取正文、不改变插件线程绑定。
  * [PROTOCOL]: 变更时同步 codex/AGENTS.md；真实宿主由用户手动验收。 */
+import { mainChatSessionId } from './context.js';
 const NAME = 'CodexBuddy';
 const OWN =
   '[data-codex-buddy-launcher],[data-companion-stepwise-root],[data-codex-buddy-features-root]';
@@ -23,29 +24,7 @@ function unique(selector, names) {
 function tab() {
   return unique(`${RIGHT} [role="tab"]`, [NAME]);
 }
-function sessionKey() {
-  const route = location.pathname.match(/^\/(?:c|conversation|threads?)\/([^/]+)\/?$/);
-  if (route) return route[1];
-  const roots = [
-    ...document.querySelectorAll(
-      '.app-shell-main-content-frame .thread-scroll-container,[data-app-shell-tab-panel-controller] .thread-scroll-container',
-    ),
-  ].filter(visible);
-  const ids = new Set();
-  for (const root of roots) {
-    for (let node = root, depth = 0; node && depth < 8; node = node.parentElement, depth++) {
-      const id =
-        node.getAttribute('data-conversation-id') ||
-        node.getAttribute('data-thread-id') ||
-        node.getAttribute('data-session-id');
-      if (id) {
-        ids.add(id);
-        break;
-      }
-    }
-  }
-  return ids.size === 1 ? [...ids][0] : null;
-}
+const sessionKey = () => mainChatSessionId();
 
 /** @param {{onOpened:()=>void,onStatus:(message:string)=>void}} options */
 export function createPluginTabLink({ onOpened, onStatus }) {
@@ -54,6 +33,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     running = null,
     last = sessionKey();
   let interval = 0;
+  let stage = '识别聊天';
   const check = (key) => {
     if (stopped || sessionKey() !== key) throw Error('聊天已切换，已停止旧操作。');
     if (document.visibilityState !== 'visible') throw Error('当前窗口不可见，未切换页签。');
@@ -74,11 +54,13 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     node.click();
   };
   async function open() {
+    stage = '识别聊天';
     const key = sessionKey();
     if (!key) throw Error('无法唯一识别当前聊天，未打开插件。');
     check(key);
     if ([...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].some(visible))
       throw Error('请先关闭当前对话框，再打开 Buddy。');
+    stage = '寻找右侧入口';
     let existing = tab();
     if (!existing) {
       const toggle = unique('button', ['显示/隐藏侧边面板', 'Toggle side panel']);
@@ -88,13 +70,23 @@ export function createPluginTabLink({ onOpened, onStatus }) {
         () =>
           tab() ||
           unique('button', ['打开侧边面板标签页', 'Open side panel tab']) ||
+          unique(`${RIGHT} button`, ['新标签页', 'New tab']) ||
           unique(`${RIGHT} button`, [NAME, '更多工具…', 'More tools…']),
       );
       if (next.getAttribute('role') !== 'tab') {
         if ([...document.querySelectorAll('[role="menu"]')].some(visible))
           throw Error('请先关闭当前菜单，再打开 Buddy。');
-        click(next, key);
+        stage = '打开插件菜单';
+        if (['新标签页', 'New tab'].includes(label(next))) {
+          // 新版左击会创建浏览器页；右键才打开包含官方插件的标签菜单。
+          check(key);
+          if (next.matches(':disabled,[aria-disabled="true"]')) throw Error('官方入口当前不可用。');
+          next.dispatchEvent(
+            new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 }),
+          );
+        } else click(next, key);
         if (label(next) !== NAME) {
+          stage = '选择 CodexBuddy 插件';
           const item = await wait(
             key,
             () =>
@@ -106,6 +98,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
             click(await wait(key, () => unique('[role="menuitem"]', [NAME])), key);
         }
       }
+      stage = '确认官方插件页签';
       existing = await wait(key, tab);
     }
     if (existing.getAttribute('aria-selected') !== 'true') click(existing, key);
@@ -123,7 +116,7 @@ export function createPluginTabLink({ onOpened, onStatus }) {
     running = open()
       .catch((error) => {
         enabled = false;
-        onStatus(error.message);
+        onStatus(`${stage}：${error.message}`);
       })
       .finally(() => {
         running = null;

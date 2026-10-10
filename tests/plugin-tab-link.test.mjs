@@ -168,3 +168,54 @@ test('unrelated menus and in-flight session changes are not adopted', async () =
     await browser.close();
   }
 });
+
+test('current host conversation marker and New tab context menu open the plugin without a browser page', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await page.evaluate(() => {
+      const host = document.querySelector('.app-shell-main-content-frame');
+      host.className = 'current-host-layout';
+      host.removeAttribute('data-conversation-id');
+      const marker = document.createElement('div');
+      marker.setAttribute('data-above-composer-conversation-id', 'current-A');
+      document.querySelector('.thread-scroll-container').append(marker);
+      const plus = document.getElementById('new');
+      plus.setAttribute('aria-label', '新标签页');
+      const menu = plus.onclick;
+      window.browserPages = 0;
+      plus.onclick = () => window.browserPages++;
+      plus.oncontextmenu = (event) => {
+        event.preventDefault();
+        menu.call(plus, event);
+      };
+    });
+    await button.click();
+    await page.waitForFunction(() => window.opened === 1);
+    assert.equal(await page.evaluate(() => window.browserPages), 0);
+    assert.equal(await page.evaluate(() => window.menuClicks), 1);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('two visible main conversations remain ambiguous instead of choosing the first', async () => {
+  const { browser, page, button } = await fixture();
+  try {
+    await page.evaluate(() => {
+      const extra = document.createElement('div');
+      extra.setAttribute('data-conversation-id', 'other');
+      extra.innerHTML = '<div class="thread-scroll-container">another fixture</div>';
+      document.body.append(extra);
+    });
+    await button.click();
+    await page.waitForFunction(() =>
+      document
+        .querySelector('[data-codex-buddy-launcher]')
+        .shadowRoot.querySelector('button')
+        .title.includes('无法唯一识别'),
+    );
+    assert.equal(await page.evaluate(() => window.menuClicks), 0);
+  } finally {
+    await browser.close();
+  }
+});

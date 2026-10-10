@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主 DOM、上下文状态和基础可见性工具。
- * [OUTPUT]: 宿主交互目标记录、工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性；限定容器内的输入目标、完整相邻问答及上下文变更通知。
+ * [OUTPUT]: 宿主交互目标记录、工作台跟随/锁定策略、稳定聊天身份重绑与来源可用性、唯一可见主聊天身份；限定容器内的输入目标、完整相邻问答及上下文变更通知。
  * [POS]: 宿主读取边界，不修改 Stepwise 或大纲的内部状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -234,6 +234,15 @@ function lockableRoot(root) {
     root.querySelector(markers) ||
     root.closest('[data-conversation-id],[data-session-id],[data-thread-id]'),
   );
+}
+
+// 插件入口只跟随可见主聊天，不受工作台阅读锁定影响，也不采用位置或最近事件猜身份。
+function mainChatSessionId() {
+  const roots = threadRoots().filter(
+    (root) => !root.closest('section[role="dialog"],[data-app-shell-focus-area="right-panel"]'),
+  );
+  if (roots.length !== 1 || !lockableRoot(roots[0])) return null;
+  return sessionIdForRoot(roots[0]);
 }
 
 function sourceLabel(root) {
@@ -1164,6 +1173,7 @@ export {
   iconPathData,
   installContextTracking,
   labeledMessageContainer,
+  mainChatSessionId,
   mainComposerCandidate,
   nearbySubmitButton,
   paneCueForTrack,
