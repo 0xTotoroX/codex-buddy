@@ -108,3 +108,5 @@ panel-settings 复用逐项保存检查，核对内容/容器字段不会写入�
 features-e2e 冷启动覆盖启用模型贴边且尚无 features.json 的旧侧栏，再沿现有迁移流程检查唯一占位；Rust 覆盖主界面归属与关闭/贴边条目的区别。
 
 workbench 的 scaled feature arrangement 用例在 80%/100%/120% 页面缩放下检查落位预览、CSS 键盘步长、分栏最小尺寸和局部窄目标拒绝；workbench-layout 覆盖相邻/跨层空位配额转移、隐藏邻居与最后可见标签移走。independent-features 的标题/摘要样例核对无重复计数/标题、统一标题色、前置箭头与正文左边界，并继续验收完整阅读和草稿保护。
+
+- `plugin-tab-link.test.mjs`：隔离浏览器测试真实 Dev launcher 与官方页签适配；首次手动打开/复用、聊天变化恢复、同聊天不抢标签/收起、右键、销毁、缺插件及中途换聊天拒绝。不控制真实宿主，不能替代用户手动验收。

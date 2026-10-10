@@ -1,7 +1,11 @@
 /* [INPUT]: 主界面开合状态及共用表情手势。
- * [OUTPUT]: 左侧导航栏中的唯一 Buddy 图标；导航重建后重新挂载，缺少导航时等待重新挂载，不回退胶囊。
+ * [OUTPUT]: 唯一左栏图标；Dev 手动启用官方插件页签联动，正式构建保留旧手势；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
+import { DEVELOPMENT } from '../../shared/constants.js';
+import { createPluginTabLink } from '../../codex/plugin-tab.js';
+let pluginLink = null;
+let pluginStatus = '';
 let entry = null;
 let observer = null;
 let frame = 0;
@@ -16,6 +20,9 @@ function schedule() {
 }
 
 export function stopLauncher() {
+  pluginLink?.stop();
+  pluginLink = null;
+  pluginStatus = '';
   observer?.disconnect();
   observer = null;
   cancelAnimationFrame(frame);
@@ -31,9 +38,18 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void}} options */
 export function syncLauncher(options) {
   current = options;
+  if (DEVELOPMENT && !pluginLink)
+    pluginLink = createPluginTabLink({
+      onOpened: () => current?.pluginOpened?.(),
+      onStatus: (message) => {
+        pluginStatus = message;
+        const button = launcherButton();
+        if (button) button.title = message;
+      },
+    });
   if (!observer) {
     observer = new MutationObserver((records) => {
       if (records.some((record) => !entry?.contains(record.target))) schedule();
@@ -69,12 +85,22 @@ export function syncLauncher(options) {
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="7" width="4" height="10" rx="2"/><rect x="15" y="7" width="4" height="10" rx="2"/></svg>
       </button></div>`;
     const button = shadow.querySelector('button');
-    button.addEventListener('pointerdown', (event) => current?.pointerDown(event));
+    button.addEventListener('pointerdown', (event) => {
+      if (!DEVELOPMENT) current?.pointerDown(event);
+    });
     button.addEventListener('click', (event) => {
       event.stopPropagation();
-      current?.click(event);
+      if (DEVELOPMENT) {
+        if (event.detail < 2) void pluginLink?.open();
+      } else current?.click(event);
     });
-    button.addEventListener('keydown', (event) => current?.keyDown(event));
+    button.addEventListener('keydown', (event) => {
+      if (!DEVELOPMENT) current?.keyDown(event);
+      else if (event.altKey && event.key === 'Enter') {
+        event.preventDefault();
+        void pluginLink?.open();
+      }
+    });
     button.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -82,6 +108,9 @@ export function syncLauncher(options) {
     });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
+  if (DEVELOPMENT)
+    entry.shadowRoot.querySelector('button').title =
+      pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）';
   entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
   if (options.root) options.root.dataset.launcher = 'rail';
 }

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
- * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
+ * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合，Dev 插件页签选中后收起旧侧栏；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
  * [POS]: 模块组合入口；统一初始化并回收观察器、定时器和订阅。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -544,6 +544,11 @@ function install() {
           shellState.detached ||
           (independentFeatures() && featurePlacement() === 'desktop'),
         root: shellState.root,
+        pluginOpened: () => {
+          cancelFaceClick();
+          if (independentFeatures()) toggleFeatureDock(false);
+          else if (!shellState.detached) setOpen(false);
+        },
         click: (event) =>
           onLauncherClick(event, (expanded) => {
             if (independentFeatures() && featurePlacement() === 'desktop') void revealMainFeature();
