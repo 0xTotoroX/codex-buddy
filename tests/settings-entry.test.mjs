@@ -1,5 +1,5 @@
 /* [INPUT]: Shared header markup/styles in an isolated browser.
- * [OUTPUT]: No redundant settings entry and centered eyes geometry.
+ * [OUTPUT]: No redundant face/settings entry; desktop drag strip remains.
  * [POS]: No real host, model or configuration operations.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import test from 'node:test';
@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
-test('workbench header retains centered eyes without a settings gear', async () => {
+test('workbench surfaces omit the capsule face and retain only the desktop drag strip', async () => {
   const built = await build({
     stdin: {
       contents: `import {workbenchHeadHtml} from './ui/surfaces/workspace/chrome.js';document.querySelector('.csw-workbench').innerHTML=workbenchHeadHtml()+"<div id='content' style='height:200px'>Content</div>";`,
@@ -26,11 +26,13 @@ test('workbench header retains centered eyes without a settings gear', async () 
     await page.addStyleTag({ content: await readFile('ui/surfaces/workspace/styles.css', 'utf8') });
     await page.addScriptTag({ content: built.outputFiles[0].text });
     const head = page.locator('.csw-workbench-head');
-    await head.hover();
+    assert.equal(await head.isVisible(), false);
     assert.equal(await page.locator('[data-settings-entry]').count(), 0);
-    const h = await head.boundingBox(),
-      face = await page.locator('.csw-workbench-face').boundingBox();
-    assert.ok(Math.abs(face.x + face.width / 2 - h.x - h.width / 2) < 1);
+    assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
+    assert.equal(await page.locator('.csw-fab-eye').count(), 0);
+    await head.evaluate((node) => (node.dataset.window = 'desktop'));
+    assert.equal(await head.isVisible(), true);
+    assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
   } finally {
     await browser.close();
   }

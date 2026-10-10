@@ -41,7 +41,7 @@ export async function checkPopout({
     style.setProperty('--color-token-charts-blue', 'rgb(48, 164, 108)');
     return old;
   });
-  await desktop.locator('.csw-head-face').dblclick({ delay: 80 });
+  await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick({ delay: 80 });
   await waitFor(
     async () =>
       !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detachPending)),
@@ -739,7 +739,7 @@ export async function checkPopout({
     assert.equal(pop.viewportSize().height, popoutHeight + 24);
     const expandedViewport = pop.viewportSize();
     assert.equal(await pop.locator('[data-action=collapse]').count(), 0);
-    await pop.locator('.csw-head-face').click();
+    await pop.locator('.csw-workbench-head').click();
     await pop.keyboard.press('Escape');
     await pop.evaluate(() => window.__companionFloatingPanel.setOpen(false));
     await settle();
@@ -820,7 +820,7 @@ export async function checkPopout({
       window.__companionFloatingPanel.panelReadingState(),
     );
     await pop.locator('.csw-head').hover();
-    await pop.locator('.csw-head-face').dblclick({ delay: 80 });
+    await pop.locator('[data-action=pin]').press('Alt+Enter');
     await waitFor(
       async () =>
         (await desktop
@@ -910,7 +910,7 @@ export async function checkPopout({
     assert.equal(await pop.evaluate(() => window.__companionFloatingPanel.state.open), true);
     const chipAnchor = (await api('panel/anchor', { lease: chipLease })).body.anchor;
     assert.deepEqual(chipAnchor, await launcherAnchor(), 'Closed workspace returns to the rail');
-    await pop.locator('.csw-head-face').dblclick({ delay: 80 });
+    await pop.locator('[data-action=pin]').press('Alt+Enter');
     await waitFor(
       async () => !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detached)),
       'chip dock not restored',

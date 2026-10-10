@@ -627,7 +627,7 @@ try {
       ),
   );
   record('model tools, expanded rows and horizontal reading survive remount');
-  assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 2);
+  assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 0);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
   if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))
     await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
@@ -734,7 +734,7 @@ try {
       getComputedStyle(document.querySelector('#root')).getPropertyValue('--csw-text').trim() ===
       'rgb(30, 35, 40)',
   );
-  await page.locator('.csw-workbench-face').dblclick();
+  await page.locator('[data-pin]').press('Alt+Enter');
   await page.waitForFunction(() => window.nativeMessages.some((m) => m.kind === 'cancel-return'));
   await page.waitForFunction(
     () =>
@@ -745,7 +745,7 @@ try {
   const failedHandoffs = handoffs;
   assert.ok(failedHandoffs >= 1);
   rejectHandoff = false;
-  await page.locator('.csw-workbench-face').dblclick();
+  await page.locator('[data-pin]').press('Alt+Enter');
   await page.waitForFunction(
     () => window.nativeMessages.filter((m) => m.kind === 'return').length === 2,
   );

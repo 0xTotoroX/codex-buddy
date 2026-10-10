@@ -79,6 +79,8 @@ Hover over the eyes entry to reveal a background-free menu that expands upward w
 
 The eyes entry reflects the original capsule states, including blinking at idle, generation, completion and errors. With multiple visible chats, a small edge dot indicates the linked chat’s direction; it is hidden for a single chat or an unavailable source. This does not add another capsule or change the entry’s click/menu actions.
 
+The sidebar workbench and desktop window no longer duplicate the capsule eyes in their headers. Use the independent eyes entry for actions; the desktop retains its drag strip, pin control and Alt+Enter return shortcut.
+
 ## Operations and state transitions
 
 Single-click and double-click below refer to **the eyes on the capsule or at the top of the workbench**.

@@ -615,3 +615,12 @@
   min-height: 0;
   overflow: auto;
 }
+
+/* Only the desktop keeps an empty drag strip and its pin control. */
+.csw-workbench .csw-workbench-head[data-window='embedded'] {
+  display: none;
+}
+.csw-workbench .csw-workbench-head[data-window='desktop'] {
+  flex-basis: 36px;
+  height: 36px;
+}

@@ -1173,7 +1173,7 @@ try {
     );
     record('表情拖动不误收起或弹出');
 
-    await desktop.locator('.csw-workbench-face').click();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
     await settle();
     assert.equal((await panelState()).open, false);
     await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();

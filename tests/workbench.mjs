@@ -733,7 +733,7 @@ const cases = [
       const content = await box(page, '#fixture-host-content');
       const slot = await box(page, slotSelector);
       assert.ok(content.x + content.width <= slot.x + 1);
-      await page.locator('.csw-workbench-face').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
@@ -752,7 +752,7 @@ const cases = [
       await page.waitForFunction(() =>
         document.querySelector('#fixture-dock-row > [data-codex-buddy-dock]'),
       );
-      await page.locator('.csw-workbench-face').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
@@ -906,8 +906,10 @@ const cases = [
         false,
         'opening keeps capsule hidden',
       );
-      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
-      await page.locator('.csw-workbench-face').click();
+      await page
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.locator('.csw-popover[data-morphing=true]').waitFor();
       assert.equal(
         await page.locator('.csw-fab').isVisible(),
@@ -928,7 +930,7 @@ const cases = [
           queueMicrotask(() => window.__companionDesktop.complete(input.id, { ok: true }));
         };
       });
-      await page.locator('.csw-workbench-face').dblclick({ delay: 180 });
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick({ delay: 180 });
       assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), 1);
       assert.equal(await page.evaluate(() => window.workbenchFixture.detaches[0].dockOpen), true);
       assert.equal(
@@ -1012,14 +1014,16 @@ const cases = [
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-placement=floating]').evaluate((node) => node.click());
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await page.locator('.csw-workbench-face').click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await page.waitForFunction(
         () =>
           !window.__companionFloatingPanel.state.open &&
           !window.__companionFloatingPanel.state.morphAnimation,
       );
       await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
-      await page.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      await page
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
       const compact = await page.locator('.csw-fab').evaluate((node) => {
         const parent = node.parentElement.getBoundingClientRect();
         const style = getComputedStyle(node);
@@ -1067,7 +1071,7 @@ const cases = [
           queueMicrotask(() => window.__companionDesktop.complete(input.id, { ok: true }));
         };
       });
-      await host.locator('.csw-workbench-face').dblclick();
+      await host.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick();
       assert.equal(await host.evaluate(() => window.workbenchFixture.detaches.length), 1);
       assert.equal(
         await host.evaluate(() => window.__companionFloatingPanel.panelPreferences().dockOpen),
@@ -1075,7 +1079,7 @@ const cases = [
       );
       await host.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await host.locator('[data-placement=floating]').evaluate((node) => node.click());
-      await host.locator('.csw-workbench-face').click();
+      await host.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
       await host
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
@@ -1083,7 +1087,9 @@ const cases = [
       await host.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick();
       assert.equal(await host.evaluate(() => window.workbenchFixture.detaches.at(-1).open), false);
       await host.evaluate(() => window.__companionFloatingPanel.setOpen(true));
-      await host.locator('.csw-workbench-face').waitFor({ state: 'visible' });
+      await host
+        .getByRole('button', { name: 'CodexBuddy', exact: true })
+        .waitFor({ state: 'visible' });
       assert.equal(await host.locator('.csw-view-tabs').count(), 0);
       const { page, projection, errors } = await createPopout(host);
       projection.preferences.ui.layoutMode = 'capsule';

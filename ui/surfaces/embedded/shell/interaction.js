@@ -635,7 +635,7 @@ function onKeyDown(event) {
     event.altKey &&
     event.key === 'Enter' &&
     event.target instanceof Element &&
-    event.target.closest('.csw-fab,.csw-head-face') &&
+    (IS_POPOUT || event.target.closest('.csw-fab,.csw-head-face')) &&
     (IS_POPOUT || runtimeState.settings?.popoutSupported === true)
   ) {
     event.preventDefault();

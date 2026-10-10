@@ -302,7 +302,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 0);
         assert.equal(await outline.locator('.feature-pane-head strong').count(), 0);
-        await page.locator('.csw-workbench-face').click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
@@ -482,7 +482,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         });
         await board.waitFor({ state: 'detached' });
         assert.equal(await outline.count(), 1);
-        await page.locator('.csw-workbench-face').click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
