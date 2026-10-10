@@ -206,6 +206,7 @@ function createShellState(preferences) {
     remoteFingerprint: '',
     nativeSizeChanging: false,
     pinnedOnTop: true,
+    launcherAction: 'inside',
     detachPending: false,
     detachedRecoveryTimer: 0,
     handoffAnimation: null,

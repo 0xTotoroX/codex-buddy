@@ -15,6 +15,7 @@ import { TaskSettings } from './task-settings';
 import { ModelControlSettings } from './model-control-settings';
 import { SurfaceSettings } from './surface-settings';
 import { NextSettings } from './next-settings';
+import { LauncherSettings } from './launcher-settings';
 import { SettingsOverview } from './settings-overview';
 import { ConnectionSettings } from './connection-settings';
 function editable(value: Settings): EditableSettings {
@@ -91,6 +92,10 @@ function App() {
           )}
           <Feedback text={notice.text} failed={notice.failed} />
           <div hidden={page !== 'overview'}>
+            <LauncherSettings
+              value={view?.panelPreferences}
+              outsideAvailable={editor.saved?.popoutSupported === true}
+            />
             <SettingsOverview active={page === 'overview'} live={live} view={view} />
           </div>
           <SettingsForm

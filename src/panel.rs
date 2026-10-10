@@ -170,6 +170,7 @@ pub struct Preferences {
     pub return_open: Option<bool>,
     pub always_on_top: bool,
     pub settings_target: String,
+    pub launcher_action: String,
     pub position: Option<Position>,
     pub ui: Ui,
 }
@@ -182,6 +183,7 @@ impl Default for Preferences {
             return_open: None,
             always_on_top: true,
             settings_target: "plugin".into(),
+            launcher_action: "inside".into(),
             position: None,
             ui: Ui::default(),
         }
@@ -720,6 +722,13 @@ impl App {
             }
             next.ui.validate()?;
         }
+        if let Some(value) = input.get("launcherAction") {
+            let action = value.as_str().context("默认入口动作无效")?;
+            if !["inside", "outside", "settings"].contains(&action) {
+                bail!("默认入口动作无效");
+            }
+            next.launcher_action = action.into();
+        }
         if let Some(value) = input.get("settingsTarget") {
             let target = value.as_str().context("设置打开方式无效")?;
             if !["plugin", "web"].contains(&target) {
@@ -762,6 +771,10 @@ impl App {
     }
 
     pub async fn close_panel(&self) -> Result<Value> {
+        self.return_panel(false).await
+    }
+
+    pub async fn return_panel(&self, expand: bool) -> Result<Value> {
         let lease = self.panel.lock().await.lease.clone();
         if lease.is_empty() {
             let mut panel = self.panel.lock().await;
@@ -770,7 +783,7 @@ impl App {
             return Ok(json!({"ok":true}));
         }
         self.dock_panel(&Input {
-            expand: false,
+            expand,
             lease,
             expected_revision: None,
             ui: None,
@@ -1321,7 +1334,7 @@ mod tests {
         let changed = app
             .save_appearance(json!({"expectedRevision":before.revision,
             "ui":{"material":"native-glass","fontOffset":2.,"fontSizes":{"outline":18.2,"board":17.4},"promptClickMode":"hybrid"},
-            "alwaysOnTop":true,"settingsTarget":"web"}))
+            "alwaysOnTop":true,"settingsTarget":"web","launcherAction":"settings"}))
             .await
             .unwrap();
         assert_eq!(changed.ui.width, before.ui.width);
@@ -1329,6 +1342,16 @@ mod tests {
         assert!(changed.always_on_top);
         assert_eq!(before.settings_target, "plugin");
         assert_eq!(changed.settings_target, "web");
+        assert_eq!(before.launcher_action, "inside");
+        assert_eq!(changed.launcher_action, "settings");
+        assert_eq!(Preferences::read(&app.paths).launcher_action, "settings");
+        assert!(
+            app.save_appearance(
+                json!({"expectedRevision":changed.revision,"launcherAction":"invalid"})
+            )
+            .await
+            .is_err()
+        );
         assert_eq!(Preferences::read(&app.paths).settings_target, "web");
         assert!(
             app.save_appearance(

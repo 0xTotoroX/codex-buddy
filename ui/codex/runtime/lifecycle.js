@@ -1,3 +1,4 @@
+import { bridgeCall } from './state.js';
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
  * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合，Dev 插件页签选中后收起旧侧栏；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
@@ -497,6 +498,27 @@ async function start() {
   return runtimeState.startupPromise;
 }
 
+async function launcherAction(action, toggle = false) {
+  if (!toggle) cancelFaceClick();
+  if (action === 'settings') return openSettings();
+  if (action === 'outside') {
+    if (runtimeState.settings?.popoutSupported !== true) return;
+    if (independentFeatures()) {
+      if (featurePlacement() === 'desktop') await revealMainFeature();
+      else await popoutSelectedFeature();
+    } else if (!shellState.detached) await togglePanelWindow({ expand: true });
+    return;
+  }
+  if (independentFeatures() && featurePlacement() === 'desktop') {
+    await popoutSelectedFeature();
+    toggleFeatureDock(true);
+  } else if (shellState.detached) {
+    const result = await bridgeCall('/panel/return', {});
+    if (result.error) throw Error(result.error);
+  } else if (independentFeatures()) toggleFeatureDock(toggle ? !shellState.dockOpen : true);
+  else setOpen(toggle ? !shellState.open : true);
+}
+
 function install() {
   // Re-injection replaces stale instances instead of layering another UI on top.
   const previous = window[API_KEY];
@@ -551,10 +573,16 @@ function install() {
           if (independentFeatures()) toggleFeatureDock(false);
           else if (!shellState.detached) setOpen(false);
         },
+        defaultAction: shellState.launcherAction,
+        colors: panelAppearance().colors,
+        outsideAvailable: runtimeState.settings?.popoutSupported === true,
+        action: (action) => launcherAction(action),
         click: (event) =>
-          onLauncherClick(event, (expanded) => {
-            if (independentFeatures() && featurePlacement() === 'desktop') void revealMainFeature();
-            else if (!shellState.detached) setOpen(expanded);
+          onLauncherClick(event, () => {
+            void launcherAction(shellState.launcherAction, true).catch((error) => {
+              stepwiseState.bridgeError = String(error);
+              emitSignal('render', undefined);
+            });
           }),
         pointerDown: onLauncherPointerDown,
         keyDown: onLauncherKeyDown,

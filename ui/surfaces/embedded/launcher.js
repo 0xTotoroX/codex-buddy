@@ -2,11 +2,13 @@
  * [OUTPUT]: 默认使用独立眼睛入口；官方按钮适配代码仅供显式试验；单击保留旧手势、普通右键保留官方菜单、Option+右键打开内置浏览器设置；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
+import { createLauncherMenu } from './launcher-menu.js';
 import { DEVELOPMENT } from '../../shared/constants.js';
 import { createPluginTabLink } from '../../codex/plugin-tab.js';
 let pluginLink = null;
 let pluginStatus = '';
 let entry = null;
+let radial = null;
 let official = null;
 let settingsLink = null;
 let observer = null;
@@ -107,6 +109,8 @@ function schedule() {
 }
 
 export function stopLauncher() {
+  radial?.destroy();
+  radial = null;
   bindOfficial(null);
   pluginLink?.stop();
   pluginLink = null;
@@ -129,7 +133,7 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,defaultAction?:string,outsideAvailable?:boolean,colors?:Record<string,string>,action?:(action:string)=>Promise<void>|void,settingsBrowser?:()=>void,reuseOfficial?:boolean,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
 export function syncLauncher(options) {
   current = options;
   if (!previewEnabled()) {
@@ -163,6 +167,8 @@ export function syncLauncher(options) {
       node.getBoundingClientRect().width > 0 && getComputedStyle(node).visibility !== 'hidden',
   );
   if (!rail) {
+    radial?.destroy();
+    radial = null;
     bindOfficial(null);
     entry?.remove();
     if (options.root) delete options.root.dataset.launcher;
@@ -170,6 +176,8 @@ export function syncLauncher(options) {
   }
   bindOfficial(options.reuseOfficial === true ? findOfficial(rail) : null);
   if (official && !previewEnabled()) {
+    radial?.destroy();
+    radial = null;
     entry?.remove();
     entry = null;
     if (options.root) options.root.dataset.launcher = 'rail';
@@ -198,6 +206,7 @@ export function syncLauncher(options) {
       if (!previewEnabled()) current?.pointerDown(event);
     });
     button.addEventListener('click', (event) => {
+      radial?.close();
       event.stopPropagation();
       if (previewEnabled()) {
         if (event.detail < 2) void pluginLink?.open();
@@ -211,6 +220,7 @@ export function syncLauncher(options) {
       }
     });
     button.addEventListener('contextmenu', (event) => {
+      radial?.close();
       event.preventDefault();
       event.stopPropagation();
       if (event.altKey && current?.settingsBrowser) current.settingsBrowser();
@@ -218,9 +228,13 @@ export function syncLauncher(options) {
     });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
+  if (!previewEnabled() && options.action && !radial)
+    radial = createLauncherMenu(entry.shadowRoot.querySelector('button'), () => current);
+  radial?.update();
   entry.shadowRoot.querySelector('button').title = previewEnabled()
     ? pluginStatus || '打开官方 Buddy 插件页签 · 右键设置（Dev 验证）'
-    : '单击收放 · 双击窗口往返 · 右键设置';
-  entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
+    : `单击：${{ inside: '内', outside: '外', settings: '设置' }[options.defaultAction || 'inside']} · 悬停展开快捷菜单 · 右键设置`;
+  if (!radial)
+    entry.shadowRoot.querySelector('button').setAttribute('aria-expanded', String(options.open));
   if (options.root) options.root.dataset.launcher = 'rail';
 }

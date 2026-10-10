@@ -20,3 +20,5 @@ features.js 首次接管遵循后台 mainManaged；只有模型贴边时保留 l
 官方按钮识别优先 aria-label 与正文，再兼容 title；设置打开状态仅放 data-buddy-settings-status，不改写宿主标题，避免失去匹配后重复注入备用入口。
 
 Option+右键仅在当前聊天入口可用且已提供 settingsBrowser 回调时拦截；普通右键不拦截。兼容眼睛入口共用快捷动作，停止时清除官方 contextmenu 监听。
+
+- `launcher-menu.js`：独立眼睛的扇形快捷菜单，内/外/设置三个图标；110ms 悬停打开、180ms 离开缓冲，按钮位移/缩放错峰展开，保留眼睛点击区域；portal 避免导航栏裁切，靠边翻转并跟随宿主语义颜色；键盘箭头/Esc、隐藏时 inert、减少动态效果、动作单飞及销毁清理。入口通过 action 回调执行业务，默认单击动作来自后台 launcherAction。

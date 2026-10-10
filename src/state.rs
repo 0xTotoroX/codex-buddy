@@ -350,7 +350,10 @@ impl App {
     async fn refresh(&self) -> Result<()> {
         let client = self.desktop_client().await.context("尚未连接 Codex")?;
         let (detached, ui, revision, web_revision) = self.panel_host_state().await;
-        let result = client.desktop_status(detached, ui, web_revision).await?;
+        let launcher_action = json!(self.panel.lock().await.prefs.launcher_action);
+        let result = client
+            .desktop_status(detached, ui, web_revision, launcher_action)
+            .await?;
         self.observe_panel_ui(revision, result["ui"].clone())
             .await?;
         let desktop = serde_json::from_value(result["desktop"].clone())?;

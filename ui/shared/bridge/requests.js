@@ -19,6 +19,7 @@
     '/stepwise/test',
     '/settings/open',
     '/panel/detach',
+    '/panel/return',
     '/features',
     '/tasks/state',
     '/tasks/command',

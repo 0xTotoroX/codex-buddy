@@ -175,7 +175,14 @@ function applyPanelPreferences(ui) {
   emitSignal('render', undefined);
 }
 
-function syncPanelPreferences(ui, revision, detached) {
+function syncPanelPreferences(ui, revision, detached, launcherAction = 'inside') {
+  const nextAction = ['inside', 'outside', 'settings'].includes(launcherAction)
+    ? launcherAction
+    : 'inside';
+  if (shellState.launcherAction !== nextAction) {
+    shellState.launcherAction = nextAction;
+    emitSignal('render', undefined);
+  }
   if (preferencesRevision !== revision) {
     const initial = preferencesRevision === -1;
     preferencesRevision = revision;

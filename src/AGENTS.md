@@ -69,3 +69,5 @@ App 持有 Features、Surfaces 和业务操作门；/features 支持认证 HTTP 
 panel::Preferences.settings_target 默认 plugin，兼容旧配置缺省；appearance 设置接口仅接收 plugin/web，并按修订号保存。/settings/open 的 configuredTarget=true 请求遵循该选择：plugin 返回路由，web 返回本机地址交给宿主内置浏览器侧边页签；未传参数的旧客户端行为不变。
 
 /settings/open 支持 inHostBrowser=true 强制返回本机设置 URL，绕过保存的插件默认且不调用外部浏览器；响应仅通过受限 CDP binding 返回。
+
+panel::Preferences.launcher_action 默认 inside，可选 outside/settings；旧配置缺省兼容，appearance 显式校验并保存。state/cdp 在现有只读宿主同步中传递该默认动作，不混入 Ui 全量回写；/panel/return 验证当前宿主后复用原 dock 流程，以展开态返回旧浮窗。

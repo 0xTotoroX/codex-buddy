@@ -570,6 +570,10 @@ function onFabClick(event) {
 }
 
 export function onLauncherClick(event, activate) {
+  if (shellState.launcherAction !== 'inside') {
+    if (event.detail <= 1) activate(true);
+    return;
+  }
   onFaceClick(event, 'launcher', activate);
 }
 
@@ -578,7 +582,7 @@ export function onLauncherPointerDown(event) {
   shellState.suppressFabClick = shellState.suppressHeadFaceClick = false;
   event.currentTarget.blur();
   event.preventDefault();
-  onFaceSecondPress(event);
+  if (shellState.launcherAction === 'inside') onFaceSecondPress(event);
 }
 
 export function onLauncherKeyDown(event) {

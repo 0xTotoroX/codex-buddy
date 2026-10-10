@@ -36,3 +36,5 @@
 `settings-entry.tsx` 在总览提供“设置按钮打开方式”：插件侧栏或内置浏览器网页，保存 appearance.settingsTarget，使用既有 revision 校验与错误回读；切换选项本身不打开页面。
 
 当前 main 设置固定在 ChatGPT 内置浏览器打开；main.tsx 不再显示目标选择器。settings-entry.tsx 与后端 settingsTarget 兼容字段保留，供插件分支/旧配置使用，不删除用户偏好。
+
+- `launcher-settings.tsx`：总览中的眼睛默认单击动作（内/外/设置），保存 appearance.launcherAction 并保留修订冲突校验；不支持桌面浮窗时禁用外选项，切换默认值本身不移动工作台。

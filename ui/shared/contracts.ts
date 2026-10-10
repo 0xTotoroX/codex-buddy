@@ -205,6 +205,7 @@ declare global {
 }
 
 export interface AppearanceSettings {
+  launcherAction?: 'inside' | 'outside' | 'settings';
   settingsTarget?: 'plugin' | 'web';
   revision: number;
   webRevision: number;

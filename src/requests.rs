@@ -131,6 +131,14 @@ pub(crate) async fn dispatch(
                 .await?;
             Ok(json!({"ok":true}))
         }
+        "/panel/return" => {
+            let client = client.context("只能从关联的 Codex 收回工作台")?;
+            let current = app.desktop_client().await.context("Codex 已断开")?;
+            if !Arc::ptr_eq(client, &current) {
+                bail!("Codex 连接已变化");
+            }
+            app.return_panel(true).await
+        }
         "/stepwise/test" => app.test_settings().await,
         "/settings/open" => {
             if request.payload["configuredTarget"] == true
