@@ -133,7 +133,7 @@ import {
   openWorkbench,
   closeWorkbench,
 } from '../../surfaces/embedded/legacy.js';
-import { onSignal } from './signals.js';
+import { onSignal, emitSignal } from './signals.js';
 import { pushDiagnostic, readDiagnostics } from './diagnostics.js';
 import {
   readFontOffset,
@@ -564,6 +564,7 @@ function install() {
           }),
         pointerDown: onLauncherPointerDown,
         keyDown: onLauncherKeyDown,
+        settingsBrowser: () => emitSignal('openSettings', 'web'),
         settings: () => {
           cancelFaceClick();
           void openSettings();
@@ -588,9 +589,12 @@ function install() {
     }),
     onSignal('complete', (count) => triggerCompletionBeam(count)),
     onSignal('preview', () => clearPromptInteractionTimers()),
-    onSignal('openSettings', () => {
+    onSignal('openSettings', (target) => {
       cancelFaceClick();
-      void bridgeCall('/settings/open', { configuredTarget: true })
+      void bridgeCall(
+        '/settings/open',
+        target === 'web' ? { inHostBrowser: true } : { configuredTarget: true },
+      )
         .then((result) => {
           if (result.error || result.status !== 'ok')
             throw Error(result.error || result.message || '打开设置失败');

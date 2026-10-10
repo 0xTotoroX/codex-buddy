@@ -1,5 +1,5 @@
 /* [INPUT]: 主界面开合状态及共用表情手势。
- * [OUTPUT]: 优先复用官方插件按钮并移除重复入口；单击保留旧手势、右键在官方侧边页签打开设置；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
+ * [OUTPUT]: 优先复用官方插件按钮并移除重复入口；单击保留旧手势、普通右键保留官方菜单、Option+右键打开内置浏览器设置；官方插件页签联动仅供显式启用的 Dev 试验；导航重建后恢复，不回退胶囊。
  * [POS]: 嵌入式入口适配，不创建功能窗口、不修改业务数据。
  * [PROTOCOL]: 变更时同步 embedded/AGENTS.md。 */
 import { DEVELOPMENT } from '../../shared/constants.js';
@@ -66,6 +66,12 @@ export function openPluginSettings() {
     });
   void settingsLink.open();
 }
+function officialContext(event) {
+  if (!event.altKey || !canReuseOfficial() || !current?.settingsBrowser) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  current.settingsBrowser();
+}
 function bindOfficial(button) {
   if (official === button) return;
   if (official) {
@@ -73,6 +79,7 @@ function bindOfficial(button) {
     official.removeEventListener('click', officialClick, true);
     official.removeEventListener('keydown', officialKey, true);
     official.removeEventListener('dblclick', officialDouble, true);
+    official.removeEventListener('contextmenu', officialContext, true);
   }
   official = button;
   if (official) {
@@ -83,6 +90,7 @@ function bindOfficial(button) {
     official.addEventListener('click', officialClick, true);
     official.addEventListener('keydown', officialKey, true);
     official.addEventListener('dblclick', officialDouble, true);
+    official.addEventListener('contextmenu', officialContext, true);
   }
 }
 function findOfficial(rail) {
@@ -121,7 +129,7 @@ export function launcherButton() {
   return entry?.isConnected ? entry.shadowRoot.querySelector('button') : null;
 }
 
-/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
+/** @param {{open:boolean,root:HTMLElement|null,click:(event:MouseEvent)=>void,pointerDown:(event:PointerEvent)=>void,keyDown:(event:KeyboardEvent)=>void,settings:()=>void,settingsBrowser?:()=>void,pluginOpened?:()=>void,pluginTabPreview?:boolean,canUseOfficial?:()=>boolean}} options */
 export function syncLauncher(options) {
   current = options;
   if (!previewEnabled()) {
@@ -205,7 +213,8 @@ export function syncLauncher(options) {
     button.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      current?.settings();
+      if (event.altKey && current?.settingsBrowser) current.settingsBrowser();
+      else current?.settings();
     });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);

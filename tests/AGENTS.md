@@ -118,3 +118,5 @@ workbench 的 scaled feature arrangement 用例在 80%/100%/120% 页面缩放下
 settings-entry.test.mjs 验证仅顶栏悬停显示齿轮、键盘可见、眼睛居中和 28px 按钮；official-launcher 验证恢复原生右键、显式设置动作仍打开侧边页签。Rust appearance 测试覆盖目标保存、持久化和非法值拒绝。
 
 settings-browser.test.mjs 用合成宿主核对本机地址进入官方地址栏、Enter 导航、分屏恢复、非本机地址拒绝与零外部 window.open；不替代真实宿主浏览器加载验收。
+
+official-launcher 定向检查额外覆盖 Option+右键仅调用内置浏览器入口、不触发原生菜单或收放，普通右键仍保留原生行为。

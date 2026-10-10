@@ -8,7 +8,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 const result = await build({
   stdin: {
-    contents: `import {syncLauncher,stopLauncher,launcherButton,openPluginSettings} from './ui/surfaces/embedded/launcher.js';window.openSettings=openPluginSettings;window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settings:()=>window.externalSettings++});window.refresh();`,
+    contents: `import {syncLauncher,stopLauncher,launcherButton,openPluginSettings} from './ui/surfaces/embedded/launcher.js';window.openSettings=openPluginSettings;window.stopLauncher=stopLauncher;window.launcherButton=launcherButton;window.refresh=()=>syncLauncher({open:false,root:null,canUseOfficial:()=>window.chatReady,click:()=>window.toggles++,pointerDown:()=>{},keyDown:()=>{},settingsBrowser:()=>window.browserSettings++,settings:()=>window.externalSettings++});window.refresh();`,
     resolveDir: process.cwd(),
   },
   bundle: true,
@@ -45,7 +45,12 @@ async function fixture() {
       document.body.append(menu);
     };
 
-    window.toggles = window.navigation = window.nativeSettings = window.externalSettings = 0;
+    window.toggles =
+      window.navigation =
+      window.nativeSettings =
+      window.externalSettings =
+      window.browserSettings =
+        0;
     document.body.addEventListener('click', (e) => {
       if (e.target.closest('#official')) window.navigation++;
     });
@@ -77,6 +82,10 @@ test('official entry toggles without navigation, removes duplicate icon and keep
     await page.locator('#official').click({ button: 'right' });
     assert.equal(await page.evaluate(() => window.nativeSettings), 1);
     assert.equal(await page.locator('#right').isVisible(), false);
+    await page.locator('#official').click({ button: 'right', modifiers: ['Alt'] });
+    assert.equal(await page.evaluate(() => window.browserSettings), 1);
+    assert.equal(await page.evaluate(() => window.nativeSettings), 1);
+    assert.equal(await page.evaluate(() => window.toggles), 2);
     await page.evaluate(() => window.openSettings());
     await page.waitForFunction(
       () =>
