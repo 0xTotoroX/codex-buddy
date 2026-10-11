@@ -48,3 +48,5 @@ lifecycle 每次渲染使用原 resolveFabExpression/fabExpressionLabel 和 acti
 lifecycle在宿主安装/销毁prompt-enhancement，独立于工作台业务启停，不在桌面投影安装。其验证接口仅回答指定在途优化请求是否仍对应原草稿；不对外返回草稿。
 
 独立主界面的入口收放按当前承载分流：sidebar更新dockOpen，overlay更新open，desktop仍走整组返回；避免浮层误用停靠状态而无法收起。
+
+lifecycle 同时安装并销毁 terminology/host，复用活动聊天根、标题、一问一答及忙碌状态；不参与 Stepwise 建议缓存。

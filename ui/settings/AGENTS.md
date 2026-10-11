@@ -52,3 +52,5 @@
 - codex-host-settings.tsx：详细模式“启动与开发”内独立管理区域，分类可见时轮询codex-host API；启停保存独立revision，安装、更新、回退、启动及重启停用均为显式操作。旧settings-codex-host锚点仍可定位，不新增整页。
 
 View.connection.status支持unresponsive：主标题显示页面暂未响应，启动与连接仍保留断开/手动重连操作，不将短暂页面迟缓显示为凭据错误。
+
+- `terminology-settings.tsx`：详细功能设置中的标注开关、独立模型/联网选项、三个真实卡片预览、词库检索、已掌握恢复、手动自动分类、JSON 导入和两份中文文档导出。失败时保留输入，样式选择持久化。

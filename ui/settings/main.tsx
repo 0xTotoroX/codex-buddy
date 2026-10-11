@@ -3,6 +3,7 @@
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { StrictMode, useEffect, useState } from 'react';
+import { TerminologySettings } from './terminology-settings';
 import { createRoot } from 'react-dom/client';
 import '../shared/tokens.css';
 import './styles.css';
@@ -217,6 +218,9 @@ function App() {
               outsideAvailable={editor.saved?.popoutSupported === true}
             />
           </section>
+          <div hidden={simple || page !== 'features'}>
+            <TerminologySettings active={!simple && page === 'features'} />
+          </div>
           <SettingsForm
             editor={editor}
             notify={notify}

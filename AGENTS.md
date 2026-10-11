@@ -156,3 +156,7 @@ Buddy自有界面不使用Tooltip（包括原生title悬停提示）；保留ari
 CodexHost管理迁回main：独立src/codex_host.rs及codex_host子模块、认证/codex-host API和详细设置“启动与开发”内的管理区域。保留codexHost旧配置及独立revision；开关只保存意愿，显式启动/重启停用经身份校验与ask/force策略。不引入plugins聚合、MCP运行时或恢复官方插件入口。src/host.rs为启动与重连共用只读发现，Dev/显式窗口保持绑定。
 
 补齐四项工作台/Dev接续：模型排序通过原owner与revision校验保存modelOrder；已接管主界面只补登记未登记的已启用功能，不覆盖关闭状态、贴边归属、旧窗口或布局；CDP仍存活的响应超时进入unresponsive并保留界面，恢复响应回到connected，真正断线/不兼容才清理。Dev App新会话启用exit-with-host，按宿主PID/启动时间/路径观察退出并清理；断连不作为退出，终端Dev仍由Ctrl+C结束。
+
+## 术语释义
+
+[ui/terminology/AGENTS.md](ui/terminology/AGENTS.md) 管理独立文本标注与三种候选卡片；后台 terminology 管理私有词库、手动词条、已掌握与导出，terminology_lookup 管理独立模型识别和公共资料核对。复用 context 的活动聊天与一问一答，不写主聊天、不改宿主文字节点、不重新引入插件依赖。词库 JSON/Markdown 不随源码分发；设置页可导入、按模型分类手动添加、恢复提示及导出。当前联网补充只查询公共百科，来源无效时不入库。

@@ -28,6 +28,8 @@ mod state;
 mod stepwise_tests;
 mod surfaces;
 mod tasks;
+mod terminology;
+mod terminology_lookup;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};

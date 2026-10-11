@@ -82,3 +82,6 @@ panel_window受限IPC新增window-state/hide/toggle-maximize：隐藏仅切换�
 Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，server提供认证GET/POST /api/codex-host。cdp先安装只读Agent兼容适配，再安装模型菜单适配。
 
 features.task_command承接原server看板命令协调：主界面已接管时，未登记看板的打开/启用进入共享容器；旧窗口草稿仍按原规则保护。restore_unregistered_main_features在feature_operation内只补缺失条目。模型preferences白名单加入modelOrder，继续校验owner、唯一ID及revision。state.handle_refresh_failure保留仍存活客户端上的Elapsed；Connection.status新增unresponsive，下一次正常refresh即恢复connected。
+
+- `terminology.rs`：本机私有术语/手动词库、偏好及已掌握状态，认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
+- `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句与规范术语；未命中时仅向固定公共百科发送短术语，校验资料相关性与分类后新增，切换上下文或关闭功能拒绝迟到结果。

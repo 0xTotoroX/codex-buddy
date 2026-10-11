@@ -123,6 +123,7 @@ async fn termination() {
 fn router(service: Service) -> Router {
     let api = Router::new()
         .route("/features", post(features))
+        .route("/terminology", get(terminology_state).post(terminology))
         .route(
             "/codex-host",
             get(codex_host_status).post(codex_host_command),
@@ -803,4 +804,19 @@ async fn codex_host_command(
     Json(input): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.codex_host_command(input).await?))
+}
+
+async fn terminology(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        crate::terminology::command(&service.app, input).await?,
+    ))
+}
+
+async fn terminology_state(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(
+        crate::terminology::command(&service.app, json!({"action":"state"})).await?,
+    ))
 }

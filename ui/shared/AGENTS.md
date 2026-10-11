@@ -24,3 +24,5 @@ AppearanceSettings.launcherAction 保存独立眼睛的默认动作（inside/out
 contracts.ts声明宿主inputTarget只读目标和提示词优化verify/destroy生命周期接口；原文不进入持久化配置或窗口投影。
 
 codex-host.ts定义独立后台管理状态和重启进度，不扩展FeatureId或插件注册。contracts声明上游只读Agent探针。
+
+contracts 声明术语实例 verify/refresh/destroy 接口与无正文错误状态；正式词库不放入 shared。

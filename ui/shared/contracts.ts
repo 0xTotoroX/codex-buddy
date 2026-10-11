@@ -214,6 +214,12 @@ declare global {
         trigger?: HTMLElement;
       } | null;
     };
+    __codexBuddyTerminology?: {
+      verify(requestId: string): boolean;
+      refresh(): Promise<void>;
+      destroy(): void;
+      lastError: string;
+    };
     __codexBuddyPromptEnhancer?: { verify(requestId: string): boolean; destroy(): void };
     __buddyWindowControls?: {
       destroy?(): void;

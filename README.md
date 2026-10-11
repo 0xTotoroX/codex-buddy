@@ -17,6 +17,8 @@ CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, gen
 
 Click the face to expand or collapse the in-chat workbench using your saved placement. Double-click to move it to a desktop window or return it to the chat; Alt+Enter provides the keyboard equivalent. The desktop window stays expanded on a single click. Right-click the fallback eyes entry to open settings in your browser, organized by feature with separate display/layout and startup/connection categories. Category changes preserve drafts and reading positions. Desktop windows stay on top by default; use the pin in the window header to turn this off or on. Your choice is saved.
 
+Terminology annotations are available under detailed settings → Features and interactions. Import a local glossary to underline terms in chat, hover for Chinese definitions, and mark concepts as mastered. Three card styles, manual entries, and document export are included. Optional semantic detection sends the current question and answer to the configured model; online enrichment queries only short term names and does not write to the main chat. Glossaries stay in local data and are not bundled with releases.
+
 ## Features
 
 | Feature | What it does |

@@ -17,6 +17,8 @@
     '/settings/set',
     '/stepwise/generate',
     '/prompt/enhance',
+    '/terminology',
+    '/terminology/analyze',
     '/stepwise/test',
     '/settings/open',
     '/panel/detach',

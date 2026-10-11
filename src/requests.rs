@@ -113,6 +113,18 @@ pub(crate) async fn dispatch(
                 .await?;
             Ok(json!({"status":"ok","settings":settings}))
         }
+        "/terminology" => {
+            let client = client.context("宿主未连接")?;
+            let current = app.desktop_client().await.context("宿主已断开")?;
+            if !Arc::ptr_eq(client, &current) {
+                bail!("宿主连接已变化");
+            }
+            crate::terminology::command(app, request.payload.clone()).await
+        }
+        "/terminology/analyze" => {
+            crate::terminology_lookup::analyze(app, client.context("宿主未连接")?, &request.payload)
+                .await
+        }
         "/prompt/enhance" => {
             crate::prompt_enhancement::enhance(
                 app,

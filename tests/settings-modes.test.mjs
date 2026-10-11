@@ -199,9 +199,9 @@ test(
       await page.waitForFunction(
         () =>
           !document.querySelector('#main-placement button').disabled &&
-          [...document.querySelectorAll('[role=switch]')].every(
-            (n) => n.getAttribute('aria-checked') === 'true',
-          ),
+          [...document.querySelectorAll('[role=switch]')]
+            .filter((n) => n.checkVisibility())
+            .every((n) => n.getAttribute('aria-checked') === 'true'),
       );
       await mkdir('target/reports', { recursive: true });
       await page.screenshot({ path: 'target/reports/settings-simple-default.png', fullPage: true });

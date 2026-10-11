@@ -1,5 +1,6 @@
 import { bridgeCall } from './state.js';
 import { installPromptEnhancer } from '../prompt-enhancement.js';
+import { installTerminology } from '../../terminology/host.js';
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
  * [OUTPUT]: 只读 panelAppearance 接口； 扫描、启停与通知订阅，连接胶囊/左侧图标入口与停靠开合，Dev 插件页签选中后收起旧侧栏；切换聊天恢复有效建议缓存，来源失联保留只读结果并使异步请求失效。
@@ -467,6 +468,7 @@ function activateRuntime() {
 
 function destroy() {
   if (!IS_POPOUT) window.__codexBuddyPromptEnhancer?.destroy();
+  if (!IS_POPOUT) window.__codexBuddyTerminology?.destroy();
   shellState.featureCleanup?.();
   clearTimeout(shellState.detachedRecoveryTimer);
   if (!IS_POPOUT) sessionStorage.removeItem(DETACHED_KEY);
@@ -696,7 +698,23 @@ function install() {
     },
   };
 
-  if (!IS_POPOUT) installPromptEnhancer({ request: bridgeCall });
+  if (!IS_POPOUT) {
+    installPromptEnhancer({ request: bridgeCall });
+    installTerminology({
+      request: bridgeCall,
+      getRoot: chatRoot,
+      isBusy: chatBusy,
+      getExchange: () => {
+        const message = findLatestAssistantMessage();
+        return {
+          sessionId: contextSnapshot().sessionId,
+          title: document.title,
+          question: findPreviousUserText(message),
+          answer: message?.text || '',
+        };
+      },
+    });
+  }
   void start();
 }
 
