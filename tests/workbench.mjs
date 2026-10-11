@@ -437,7 +437,7 @@ const cases = [
             (n) => n.getBoundingClientRect().width > 0,
           ),
       );
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await settle(page);
       assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
       assert.ok(
@@ -685,17 +685,17 @@ const cases = [
       await mode(page, true);
       const icon = page.getByRole('button', { name: 'CodexBuddy', exact: true });
       await icon.waitFor();
-      assert.equal(await icon.getAttribute('aria-expanded'), 'true');
+      assert.equal(await page.evaluate(() => window.__companionFloatingPanel.state.open), true);
       assert.equal(await icon.getAttribute('aria-pressed'), null);
       await page.mouse.move(200, 0);
       assert.equal(
         await icon.evaluate((node) => getComputedStyle(node).backgroundColor),
         'rgba(0, 0, 0, 0)',
       );
-      await icon.click();
+      await icon.press('Enter');
       await page.waitForFunction(() => !window.__companionFloatingPanel.state.open);
-      assert.equal(await page.locator('.csw-fab').isVisible(), false);
-      assert.equal(await icon.getAttribute('aria-expanded'), 'false');
+      assert.equal(await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(), false);
+      assert.equal(await page.evaluate(() => window.__companionFloatingPanel.state.open), false);
       await icon.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       assert.equal(await page.locator('[data-companion-stepwise-root]').count(), 1);
@@ -707,7 +707,7 @@ const cases = [
       await icon.waitFor();
       assert.equal(await icon.count(), 1);
       await mode(page, false);
-      await icon.click();
+      await icon.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
       assert.equal(await page.locator(slotSelector).count(), 0);
       await icon.press('Space');
@@ -752,13 +752,13 @@ const cases = [
       });
       await icon.waitFor({ state: 'hidden' });
       assert.equal(
-        await page.locator('.csw-fab').isVisible(),
+        await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(),
         false,
         'missing navigation never restores capsule',
       );
       assert.equal(await page.locator('.csw-popover').isVisible(), false);
       await page.evaluate(() => document.body.append(window.workbenchFixture.rail));
-      await icon.click();
+      await icon.press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.open);
       await page.evaluate(() => window.__companionFloatingPanel.destroy());
       assert.equal(await page.locator('[data-codex-buddy-launcher]').count(), 0);
@@ -780,11 +780,11 @@ const cases = [
       const content = await box(page, '#fixture-host-content');
       const slot = await box(page, slotSelector);
       assert.ok(content.x + content.width <= slot.x + 1);
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       assert.equal(await page.locator(slotSelector).count(), 1);
     },
@@ -799,11 +799,11 @@ const cases = [
       await page.waitForFunction(() =>
         document.querySelector('#fixture-dock-row > [data-codex-buddy-dock]'),
       );
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(() =>
         document.querySelector('#fixture-dock-row > [data-codex-buddy-dock][data-expanded="true"]'),
       );
@@ -851,7 +851,8 @@ const cases = [
           await page.evaluate(() => window.__companionFloatingPanel.state.detached),
           false,
         );
-        const face = page.locator('.csw-workbench-face');
+        assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
+        const face = page.getByRole('button', { name: 'CodexBuddy', exact: true });
         near((await face.boundingBox()).height, 36, 'expanded expression shares slim geometry');
         await face.hover();
         await page.mouse.down();
@@ -873,13 +874,8 @@ const cases = [
           background: getComputedStyle(n).backgroundColor,
           outline: getComputedStyle(n).outlineStyle,
         }));
-        assert.deepEqual(focus, {
-          keyboard: true,
-          decoration: 'none',
-          eyes: 'matrix(1.12, 0, 0, 1.12, 0, 0)',
-          background: 'rgba(0, 0, 0, 0)',
-          outline: 'none',
-        });
+        assert.equal(focus.keyboard, true);
+        assert.notEqual(focus.outline, 'none');
         await page.screenshot({ path: resolve(output, `slim-${placement}.png`) });
       }
       assert.equal(
@@ -900,7 +896,7 @@ const cases = [
       const controls = page.locator('.csw-workbench-controls');
       const refresh = page.locator('[data-refresh="next"]');
       const opacity = (locator) => locator.evaluate((n) => Number(getComputedStyle(n).opacity));
-      const face = await box(page, '.csw-workbench-face');
+      const face = await box(page, '.csw-workbench-head');
       await page.mouse.move(10, 10);
       await page.waitForFunction(
         () => getComputedStyle(document.querySelector('.csw-workbench-controls')).opacity === '0',
@@ -916,9 +912,9 @@ const cases = [
       assert.equal(await opacity(page.locator('[data-refresh="outline"]')), 1);
       await page.locator('[data-refresh="outline"]').click();
       near(
-        (await box(page, '.csw-workbench-face')).x,
+        (await box(page, '.csw-workbench-head')).x,
         face.x,
-        'revealing controls never shifts the face',
+        'revealing controls never shifts the header',
       );
       await page.mouse.move(10, 10);
       await page.waitForFunction(() =>
@@ -946,20 +942,20 @@ const cases = [
     async (page) => {
       await mode(page, false);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.locator('.csw-popover[data-morphing=true]').waitFor();
       assert.equal(
-        await page.locator('.csw-fab').isVisible(),
+        await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(),
         false,
         'opening keeps capsule hidden',
       );
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.locator('.csw-popover[data-morphing=true]').waitFor();
       assert.equal(
-        await page.locator('.csw-fab').isVisible(),
+        await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(),
         false,
         'closing keeps capsule hidden',
       );
@@ -988,7 +984,7 @@ const cases = [
   ],
 
   [
-    'centered shared face settings choices and placement keep their geometry and business state',
+    'header spacing settings choices and placement keep their geometry and business state',
     async (page) => {
       await mode(page, true);
       const requestCount = () =>
@@ -1021,8 +1017,8 @@ const cases = [
         for (let i = 0; i < 16; i++) await widthHandle.press(key);
         await settle(page);
         const head = await box(page, '.csw-workbench-head');
-        const face = await box(page, '.csw-workbench-face');
-        near(face.x + face.width / 2, head.x + head.width / 2, 'face stays on shell center');
+        near(head.height, 16, 'embedded header retains breathing room');
+        assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
         for (const icon of await page
           .locator(
             '.csw-workbench-controls > .csw-icon svg, .csw-workbench-pane > header > button svg',
@@ -1061,51 +1057,31 @@ const cases = [
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-placement=floating]').evaluate((node) => node.click());
       assert.equal(await page.locator(slotSelector).count(), 0);
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(
         () =>
           !window.__companionFloatingPanel.state.open &&
           !window.__companionFloatingPanel.state.morphAnimation,
       );
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
-      const compact = await page.locator('.csw-fab').evaluate((node) => {
-        const parent = node.parentElement.getBoundingClientRect();
-        const style = getComputedStyle(node);
-        return {
-          x: parent.x + parseFloat(style.left),
-          y: parent.y + parseFloat(style.top),
-          width: parseFloat(style.width),
-          height: parseFloat(style.height),
-        };
-      });
-      const face = await box(page, '.csw-workbench-face');
-      near(
-        face.x + face.width / 2,
-        compact.x + compact.width / 2,
-        'morph endpoint horizontal continuity',
-      );
-      near(
-        face.y + face.height / 2,
-        compact.y + compact.height / 2,
-        'morph endpoint vertical continuity',
-      );
+      assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await page.locator('[data-placement=dock]').evaluate((node) => node.click());
-      await page.locator('.csw-workbench-face').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       assert.equal(await requestCount(), before, 'UI changes must not generate suggestions');
       await page.screenshot({ path: resolve(output, 'unified-icons-dock.png') });
     },
   ],
 
   [
-    'unified expanded shell retains face controls across capsule popout arrangements and materials',
+    'unified expanded shell retains window controls across capsule popout arrangements and materials',
     async (host) => {
       await mode(host, true);
       await host.evaluate(() => {
@@ -1126,7 +1102,7 @@ const cases = [
       );
       await host.locator('.csw-layout-menu summary').evaluate((node) => node.click());
       await host.locator('[data-placement=floating]').evaluate((node) => node.click());
-      await host.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await host.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await host
         .getByRole('button', { name: 'CodexBuddy', exact: true })
         .waitFor({ state: 'visible' });
@@ -1158,35 +1134,21 @@ const cases = [
             (material) => window.__companionFloatingPanel.setMaterial(material),
             material,
           );
-          const face = page.locator('.csw-workbench-face');
-          assert.equal(await face.count(), 1);
-          assert.equal(await face.isVisible(), true);
-          assert.equal(await page.locator('[data-action="detach"]').isVisible(), false);
-          await face.hover();
-          const chrome = await face.evaluate((node) => {
-            const style = getComputedStyle(node);
-            return {
-              background: style.backgroundColor,
-              border: style.borderTopWidth,
-              shadow: style.boxShadow,
-              outline: style.outlineStyle,
-            };
-          });
-          assert.deepEqual(chrome, {
-            background: 'rgba(0, 0, 0, 0)',
-            border: '0px',
-            shadow: 'none',
-            outline: 'none',
-          });
-          await face.click();
-          await settle(page);
+          assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
+          const dock = page.getByRole('button', { name: '收回聊天', exact: true });
+          assert.equal(await dock.isVisible(), true);
+          assert.equal(await dock.locator('svg').getAttribute('data-icon'), 'minus');
+          for (const button of await page.locator('.csw-window-controls button').all()) {
+            const rect = await button.boundingBox();
+            near(rect.width, 28, 'window control width');
+            near(rect.height, 28, 'window control height');
+          }
+          await dock.click();
           assert.equal(
             await page.evaluate(() => window.__companionFloatingPanel.state.open),
             true,
-            'desktop single click stays expanded',
+            'window remains expanded during return callback',
           );
-          await page.waitForTimeout(550);
-          await face.dblclick();
           assert.equal(await page.locator('.csw-workbench').count(), 1);
         }
       }
@@ -1197,27 +1159,6 @@ const cases = [
       );
       assert.equal(await page.locator('[data-workbench-close]').count(), 0);
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 9);
-      const face = page.locator('.csw-workbench-face');
-      // A new window can focus its first button without a pointer event.
-      await page.keyboard.press('Tab');
-      await face.focus();
-      assert.equal(await face.evaluate((node) => node.matches(':focus-visible')), true);
-      assert.deepEqual(
-        await face.evaluate((node) => ({
-          decoration: getComputedStyle(node, '::after').content,
-          eyes: getComputedStyle(node.querySelector('.csw-status-stage')).transform,
-        })),
-        { decoration: 'none', eyes: 'matrix(1.12, 0, 0, 1.12, 0, 0)' },
-        'focused pop-out eyes have no underline and retain keyboard feedback',
-      );
-      await face.click();
-      assert.equal(
-        await face
-          .locator('.csw-status-stage')
-          .evaluate((node) => getComputedStyle(node).transform),
-        'none',
-        'pointer input clears the keyboard feedback',
-      );
       const pin = page.locator('[data-action="pin"]');
       assert.equal(await pin.count(), 1);
       assert.equal(await pin.getAttribute('aria-pressed'), 'true');
@@ -1284,7 +1225,7 @@ const cases = [
         'keyboard focus elsewhere does not expose outline navigation',
       );
       await page.screenshot({ path: resolve(output, 'unified-shell-focus.png') });
-      await page.locator('.csw-workbench-face').press('Alt+Enter');
+      await page.locator('[data-window-control="dock"]').press('Alt+Enter');
       assert.equal(await page.evaluate(() => window.popoutFixture.docks), 10);
       assert.deepEqual(errors, []);
       await page.close();
@@ -1639,7 +1580,7 @@ const cases = [
     },
   ],
   [
-    '回答生成期间大纲静态等待，完成后恢复，弹出使用同一状态',
+    '回答生成期间大纲统一等待，完成后恢复，弹出使用同一状态',
     async (page) => {
       await mode(page, true);
       await page.evaluate(() => {
@@ -1655,7 +1596,7 @@ const cases = [
       await page.waitForFunction(() =>
         document.querySelector('[data-view-body="outline"]')?.textContent.includes('等待回答完成'),
       );
-      assert.equal(await body.locator('.csw-progress-ring').count(), 0);
+      assert.equal(await body.locator('.csw-progress-ring').count(), 1);
       assert.equal(
         await body.locator('[data-outline-id]').count(),
         0,
@@ -1669,7 +1610,7 @@ const cases = [
         );
         assert.equal(
           await popout.page.locator('[data-view-body="outline"] .csw-progress-ring').count(),
-          0,
+          1,
         );
         await page.bringToFront();
         await page.screenshot({ path: resolve(output, 'outline-waiting.png') });
@@ -1715,7 +1656,7 @@ const cases = [
         node.scrollTop = 120;
         window.workbenchFixture.outlineBody = node;
       });
-      await page.locator('.csw-workbench-face').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
@@ -1848,7 +1789,7 @@ const cases = [
       );
       for (const key of ['dockOpen', 'dockWidth', 'splitRatio'])
         assert.equal(collapsed[key], preferences[key], `${key} retains user intent`);
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(() => window.__companionFloatingPanel.state.dockStatus === 'open');
       await settle(page);
       await layout(page);
@@ -1903,7 +1844,7 @@ const cases = [
       );
       assert.deepEqual(errors, []);
       await page.locator('.csw-layout-menu summary').evaluate((node) => node.click());
-      await page.locator('.csw-workbench-face').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       const closed = await page.evaluate(() => window.__companionFloatingPanel.panelPreferences());
       assert.equal(closed.dockOpen, false, 'explicit close updates intent');
       await page.setViewportSize({ width: 1500, height: 960 });
@@ -2398,7 +2339,7 @@ const cases = [
     'collapsed capsule frees the sidebar without prompts when space is insufficient',
     async (page, baseline) => {
       await mode(page, true);
-      await page.locator('.csw-workbench-face').press('Enter');
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForFunction(
         () => window.__companionFloatingPanel.state.dockStatus === 'closed',
       );
@@ -2508,7 +2449,7 @@ const cases = [
       assert.equal(await page.locator('.csw-workbench').count(), 0);
       await page.getByRole('button', { name: 'CodexBuddy', exact: true }).boundingBox();
       await hostUnchanged(page, baseline);
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
       await page.waitForTimeout(150);
       assert.equal(
         await page.evaluate(() => window.__companionFloatingPanel.panelPreferences().layoutMode),
@@ -2944,7 +2885,7 @@ const cases = [
         const slot = await page.locator(slotSelector).boundingBox();
         const chat = await page.locator('#fixture-host-content').boundingBox();
         near(chat.width + slot.width, baseline.width, 'no empty slot consumes chat width');
-        assert.equal(await page.locator('.csw-fab').isVisible(), false);
+        assert.equal(await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(), false);
       }
     },
   ],

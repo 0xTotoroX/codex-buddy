@@ -1090,11 +1090,11 @@ try {
       return state.theme === 'light' && state.material === 'frosted';
     }, 'Theme and material did not restore before dragging');
     await settle();
-    await desktop.locator('.csw-head-face').waitFor({ state: 'visible' });
+    await desktop.locator('.csw-workbench-head').waitFor({ state: 'visible' });
     record('三材质 × 明暗模式的桌面视觉产物');
 
     const panelBox = await desktop.locator('.csw-panel').boundingBox();
-    const dragFace = await desktop.locator('.csw-head-face').boundingBox();
+    const dragFace = await desktop.locator('.csw-workbench-head').boundingBox();
     await desktop.mouse.move(dragFace.x + dragFace.width / 2, dragFace.y + dragFace.height / 2);
     await desktop.mouse.down();
     await desktop.mouse.move(
@@ -1155,7 +1155,7 @@ try {
     );
     record('浮窗拖拽、固定对角的 1:1 双向缩放和面板拖动排序');
 
-    const pendingFace = await desktop.locator('.csw-head-face').boundingBox();
+    const pendingFace = await desktop.locator('.csw-workbench-head').boundingBox();
     await desktop.mouse.move(
       pendingFace.x + pendingFace.width / 2,
       pendingFace.y + pendingFace.height / 2,
@@ -1185,7 +1185,7 @@ try {
     assert.equal((await panelState()).open, false);
     await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
     await settle();
-    await desktop.locator('.csw-workbench-face').focus();
+    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).focus();
     await desktop.keyboard.press('Enter');
     assert.equal(
       (await panelState()).open,
@@ -1327,7 +1327,8 @@ try {
       async () => (await desktop.locator('[data-companion-stepwise-root]').count()) === 1,
       'Runtime did not reactivate',
     );
-    await desktop.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+    // Re-enabling can restore an already-open preference; require open rather than toggle it.
+    await desktop.evaluate(() => window.__companionFloatingPanel.setOpen(true));
     await settle();
     record('桌面／网页设置双向同步与独立功能开关');
 

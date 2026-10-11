@@ -250,7 +250,7 @@ export async function checkPopout({
     // Shared controls keep the same geometry; pane sizes follow independent layouts.
     await settle();
     const geometry = () => {
-      const names = ['.csw-head', '.csw-head-face', '.csw-body', '.csw-icon'];
+      const names = ['.csw-head', '.csw-body', '[data-refresh="outline"]'];
       return names.map((name) => {
         const element = document.querySelector(name),
           style = getComputedStyle(element);
@@ -268,6 +268,11 @@ export async function checkPopout({
     const hostGeometry = await desktop.evaluate(geometry);
     const popGeometry = await pop.evaluate(geometry);
     for (let i = 0; i < hostGeometry.length; i++) {
+      if (hostGeometry[i].name === '.csw-head') {
+        assert.equal(Math.round(hostGeometry[i].height), 16, 'embedded breathing room');
+        assert.equal(Math.round(popGeometry[i].height), 44, 'desktop window toolbar');
+        continue;
+      }
       if (hostGeometry[i].name !== '.csw-body') {
         assert.ok(
           Math.abs(hostGeometry[i].width - popGeometry[i].width) < 1,

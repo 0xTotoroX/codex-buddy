@@ -280,7 +280,7 @@ test(
       const navigation = page.getByRole('navigation', { name: '设置分类' });
       await page.getByRole('heading', { name: '总览', exact: true }).waitFor();
       await page.getByLabel('当前配置总览', { exact: true }).waitFor();
-      await navigation.getByRole('link', { name: '大纲', exact: true }).click();
+      await navigation.getByRole('link', { name: '总览', exact: true }).click();
       const outlineSwitch = page.getByRole('switch', { name: '启用大纲', exact: true });
       await outlineSwitch.waitFor();
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings controls must be usable');
@@ -310,7 +310,7 @@ test(
       await page.getByText(/界面资源已确认/).waitFor();
       switchingSource = false;
       assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
-      await navigation.getByRole('link', { name: '大纲', exact: true }).click();
+      await navigation.getByRole('link', { name: '总览', exact: true }).click();
       await outlineSwitch.waitFor();
       await until(() => outlineSwitch.isEnabled(), 'settings remain usable after switching');
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
@@ -339,7 +339,7 @@ test(
       const unauthenticated = await browser.newPage();
       await unauthenticated.goto(`${session.url}/#settings-dev`);
       await unauthenticated.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
-      await unauthenticated.getByRole('alert').filter({ hasText: '缺少连接凭据' }).waitFor();
+      await unauthenticated.getByRole('alert').filter({ hasText: '尚未连接 Buddy' }).waitFor();
       assert.equal(await unauthenticated.getByText('等待本地服务…', { exact: true }).count(), 0);
       await unauthenticated.close();
       const expired = await browser.newPage();
@@ -349,7 +349,7 @@ test(
         .getByRole('link', { name: '开发', exact: true })
         .click();
       await expired.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
-      await expired.getByRole('alert').filter({ hasText: '连接凭据已过期' }).waitFor();
+      await expired.getByRole('alert').filter({ hasText: '设置连接已过期' }).waitFor();
       await expired.close();
       const events = readFileSync(join(base, 'events.jsonl'), 'utf8')
         .trim()

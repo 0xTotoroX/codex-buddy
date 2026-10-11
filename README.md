@@ -27,7 +27,7 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 | Desktop window | On macOS 15+, pop out and return to the embedded panel, move and resize the window, or keep it on top |
 | Model quick switch | Use the shared main interface or edge panel to select the official chat model, reasoning effort, and speed, and save complete presets; this does not change the model used for next-step suggestions |
 | Task board | To do, In progress and Done; editable groups, inline creation and drag-and-drop in wide columns or narrow tabs |
-| Apple Reminders sync | Optional title, notes and completion sync with one selected iCloud list; local stages and archive |
+| Apple Reminders integration | Implementation and existing data retained; settings entry temporarily hidden |
 | Reading and appearance | Choose materials, font size, and summary visibility, with saved preferences |
 | Your choice of model | Use an existing Codex login or connect your own model API |
 
@@ -55,17 +55,13 @@ Both panels share the same chat source. The source label and follow/lock menu ar
 
 Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **下一步 → 生成模型**, and sends only the draft, without chat history.
 
-## Task board and Apple Reminders
+## Task board
 
-Open **看板** in Web settings. Enable the board and click **打开看板**, or run `codex-buddy board`. Closing its window does not stop synchronization. Board, sync and model quick switch have independent switches.
+Open **看板** in Web settings, enable it, then click **打开看板**, or run `codex-buddy board`. The default groups are To do, In progress and Done; rename or add groups in settings. Narrow views use group tabs, while wide windows show columns.
 
-To sync, grant macOS access, select one writable iCloud Reminders list, confirm and save it, then enable sync. Only titles, notes and completion are synchronized. To do/Doing stages and archive remain local; archiving never deletes Apple reminders. Apple handles iCloud delivery.
+Apple Reminders authorization, list selection and sync controls are temporarily hidden. This release primarily uses the local board; integration code, existing bindings and task data are retained. Hiding the entry neither deletes Apple reminders nor automatically resets an existing sync configuration. Legacy Waiting tasks appear under To do while retaining their original stored stage.
 
-Narrow containers show group tabs; wide windows show columns. Legacy Waiting tasks appear under To do without changing their stored stage or content. Upgrading a three-list configuration pauses sync: move the old reminders into one list in Apple, then select it here to reconnect. Existing remote identities are retained; missing items are never automatically recreated.
-
-Edit recurring reminders in Apple. Dates, priorities, native sections, tags, attachments and ordering are outside the sync contract. Missing items keep local records, conflicting fields require a choice, and uncertain creates are not automatically repeated.
-
-Task content stays local and is never sent to a model. An internal **CodexBuddy Reminders** helper owns the system permission. Native helper input changes can require renewed authorization; UI-only rebuilds reuse the verified helper; production signing and cross-device delivery require separate release acceptance.
+Settings credentials are shared by browser tabs using the same backend address. New tabs, reloads and reopened pages reuse the connection. If credentials expire or the backend address changes, reopen settings once from the eyes menu; other tabs at that address recover automatically without remounting unfinished forms or replaying save operations.
 
 ### Feature display locations
 

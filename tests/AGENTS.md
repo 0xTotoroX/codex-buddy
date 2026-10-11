@@ -146,3 +146,7 @@ workbench的closed independent views定向用例检查全部视图关闭后释�
 设置导航用例改为总览承载大纲/模型快切开关，保留草稿切换及保存并发检查；旧分类锚点仍需定位到总览相应控件。
 
 `prompt-enhancement.test.mjs`：隔离浏览器检查优化/还原、取消、用户输入/IME、会话或输入节点变化、复杂引用、错误、单实例清理；原始换行与$字符完整。直接测试宿主inputTarget在无模型能力、新草稿和重复身份下的行为。Rust prompt_enhancement测试三种协议与完整输入、不依赖Stepwise开关/方向；ignored的live_prompt_enhancement需显式CODEX_BUDDY_PROMPT_SMOKE_DATA，只用合成草稿调用配置模型，不接触真实输入框。
+
+settings-connection.test.mjs验证多标签初次连接、旧页恢复、凭据轮换、关闭全部标签后重开、隔离浏览器存储、旧session迁移及写入不重试；不使用真实凭据。
+
+v0.9发布回归将旧胶囊表情/独立大纲设置页选择器同步为现有眼睛入口、窗口工具条和总览开关；区分入口菜单aria-expanded与工作台开合状态，保留双击、草稿往返和键盘验收。
