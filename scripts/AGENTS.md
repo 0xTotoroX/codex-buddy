@@ -45,3 +45,5 @@ Dev 来源识别和原生资源输入兼容新旧源码布局；旧路径仅作�
 CodexHost接续：findDevelopmentHost仅在选择启用、显式restart-running且未指定其他连接时委托当前源码CLI。dev.mjs记录supervisorPid、监听CodexHost兼容脚本构建；重启停用兼容旧owner记录。开发编排脚本更新在下次正常打开Dev入口使用。
 
 Dev生命周期修复：App入口串行openDevelopment、校验监督进程就绪，确认旧宿主退出后才清理旧Dev并启动一个替代；日志追加保留故障。dev-host按PID/启动时间/路径观察退出，连续缺失才清理，读取异常保留；dev.mjs在exit-with-host下调用统一且幂等的cleanup，回收后台、监听器和归属，终端默认不启用。脚本升级须正常停止现有Dev后台后重新打开入口，新会话生效。
+
+startBackgroundDevelopment可显式传入现有connection(endpoint/targetId)进行无宿主重启的接续；参数通过本机端点/窗口ID校验，以--cdp/--target固定目标。session.launchConnection用于stop校验完整进程参数，仍核对owner PID/nonce。CodexHost已选择但待启用时可用此路径重开Dev，不覆盖用户开关或隐式应用宿主重启。

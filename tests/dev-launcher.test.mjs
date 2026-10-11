@@ -373,6 +373,8 @@ test('background launch survives the launcher, logs privately, reuses its owner 
     import fs from 'node:fs';
     const lock = 'target/dev/owner.json';
     fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+    const at=process.argv.indexOf('--cdp');
+    if(at>=0)fs.writeFileSync('target/dev/session.json',JSON.stringify({launchConnection:{endpoint:process.argv[at+1],targetId:process.argv[at+3]}}));
     console.log('background ready');
     console.error('background stderr');
     const timer = setInterval(() => {}, 100);
@@ -424,6 +426,12 @@ test('background launch survives the launcher, logs privately, reuses its owner 
   assert.equal(readFileSync(join(root, 'target/dev/launcher.log'), 'utf8'), contents);
   await stopBackgroundDevelopment(root);
   assert.equal(readFileSync(join(root, 'target/dev/stopped'), 'utf8'), 'normal');
+  assert.equal(hasDevelopmentOwner(root), false);
+  pid = await startBackgroundDevelopment(root, {
+    connection: { endpoint: 'http://127.0.0.1:12345', targetId: 'fixture-original' },
+  });
+  for (let i = 0; i < 100 && !hasDevelopmentOwner(root); i++) await delay(20);
+  await stopBackgroundDevelopment(root);
   assert.equal(hasDevelopmentOwner(root), false);
   pid = undefined;
 });

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App，前台切换失败仅发通知；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；启动请求串行，确认原宿主退出后清理旧 Dev 再启动；日志追加到 launcher.log，唤起错误也保留；新会话按监督进程身份就绪，不复用旧记录。
+ * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App，前台切换失败仅发通知；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；启动请求串行，确认原宿主退出后清理旧 Dev 再启动；日志追加到 launcher.log，唤起错误也保留；新会话按监督进程身份就绪，不复用旧记录；允许固定已有连接以无宿主重启方式接续Dev。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -20,7 +20,13 @@ import { dirname, join, resolve } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { installIcon } from './launcher.mjs';
-import { readJson, requestRuntime, readHostProcess, sameHostProcess } from './dev-host.mjs';
+import {
+  readJson,
+  requestRuntime,
+  readHostProcess,
+  sameHostProcess,
+  endpointUrl,
+} from './dev-host.mjs';
 import { claimLease } from './dev-sources.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -62,8 +68,18 @@ export function hasDevelopmentOwner(directory) {
   }
 }
 
-export async function startBackgroundDevelopment(directory) {
+export async function startBackgroundDevelopment(directory, { connection } = {}) {
   if (hasDevelopmentOwner(directory)) return;
+  const pinned = [];
+  if (connection) {
+    const endpoint = endpointUrl(connection.endpoint);
+    if (
+      typeof connection.targetId !== 'string' ||
+      !/^[A-Za-z0-9_-]{1,256}$/.test(connection.targetId)
+    )
+      throw new Error('固定窗口身份无效');
+    pinned.push('--cdp', endpoint, '--target', connection.targetId);
+  }
   const data = join(directory, 'target/dev');
   mkdirSync(data, { recursive: true, mode: 0o700 });
   rmSync(join(data, 'launcher-error.json'), { force: true });
@@ -73,7 +89,13 @@ export async function startBackgroundDevelopment(directory) {
   try {
     child = spawn(
       process.execPath,
-      [join(directory, 'scripts/dev.mjs'), '--no-open', '--restart-running', '--exit-with-host'],
+      [
+        join(directory, 'scripts/dev.mjs'),
+        '--no-open',
+        '--restart-running',
+        '--exit-with-host',
+        ...pinned,
+      ],
       {
         cwd: directory,
         detached: true,
@@ -120,7 +142,14 @@ export async function stopBackgroundDevelopment(directory) {
     if (!hasDevelopmentOwner(directory)) return;
     throw error;
   }
-  if (![expected, `${expected} --exit-with-host`].includes(actual))
+  const session = readJson(join(controller, 'target/dev/session.json'));
+  const pin = session?.launchConnection;
+  const allowed = [expected, `${expected} --exit-with-host`];
+  if (pin && /^[A-Za-z0-9_-]{1,256}$/.test(pin.targetId || ''))
+    allowed.push(
+      `${expected} --exit-with-host --cdp ${endpointUrl(pin.endpoint)} --target ${pin.targetId}`,
+    );
+  if (!allowed.includes(actual))
     throw new Error('进程不是此入口启动的后台开发会话；未结束其他进程。');
   const current = readJson(join(directory, 'target/dev/owner.json'));
   if (current?.pid !== owner.pid || current?.nonce !== owner.nonce) return;

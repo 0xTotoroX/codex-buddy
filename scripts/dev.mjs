@@ -385,6 +385,8 @@ function saveSession() {
     controller: controllerRoot,
     sourceEpoch,
     exitWithHost: !!args['exit-with-host'],
+    launchConnection:
+      args.cdp && args.target ? { endpoint: host.endpoint, targetId: args.target } : undefined,
     hostProcess,
     supervisorPid: process.pid,
   });
