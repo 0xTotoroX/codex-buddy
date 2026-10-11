@@ -20,12 +20,13 @@ export function installPromptEnhancer({
   let composing = false;
   const host = document.createElement('span');
   host.dataset.codexBuddyPrompt = 'true';
-  host.style.cssText = 'display:inline-flex;align-items:center;flex:none;';
+  host.style.cssText =
+    'display:inline-flex;align-items:center;flex:none;gap:2px;margin-inline-end:4px;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `<style>
-    :host{color:inherit}button{font:inherit;font-size:12px;display:inline-flex;align-items:center;justify-content:center;gap:4px;min-height:28px;padding:0 6px;border:0;border-radius:7px;background:transparent;color:inherit;cursor:pointer;opacity:.75}
+    :host{color:inherit}button{font:inherit;display:inline-flex;align-items:center;justify-content:center;width:var(--buddy-composer-button-size,28px);height:var(--buddy-composer-button-size,28px);padding:0;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.75}
     button:hover,button:focus-visible{opacity:1}button:focus-visible{outline:1px solid currentColor;outline-offset:-1px}button:disabled{opacity:.35;cursor:default}svg{width:18px;height:18px;display:block}button[hidden]{display:none}
-  </style><button type="button" aria-label="优化提示词">${iconSvg('sparkles')}<span>优化</span></button><button type="button" data-restore aria-label="恢复原提示词" hidden>还原</button>`;
+  </style><button type="button" aria-label="优化提示词">${iconSvg('prompt-improve')}</button><button type="button" data-restore aria-label="恢复原提示词" hidden>${iconSvg('return')}</button>`;
   const button = shadow.querySelector('button');
   const restore = /** @type {HTMLButtonElement} */ (shadow.querySelector('button[data-restore]'));
   const message = document.createElement('div');
@@ -64,7 +65,7 @@ export function installPromptEnhancer({
   function matches(snapshot) {
     return sameTarget(snapshot) && !composing && signature(snapshot.editor) === snapshot.signature;
   }
-  function cancel(text = '已取消优化') {
+  function cancel(text = '') {
     pending = null;
     status(text);
     refresh();
@@ -79,7 +80,8 @@ export function installPromptEnhancer({
           .replace(/\u200b/g, '')
           .trim());
     button.setAttribute('aria-label', pending ? '取消优化' : '优化提示词');
-    button.querySelector('span').textContent = pending ? '取消' : '优化';
+    const icon = pending ? 'close' : 'prompt-improve';
+    if (button.querySelector('svg')?.dataset.icon !== icon) button.innerHTML = iconSvg(icon);
     button.setAttribute('aria-busy', String(!!pending));
     restore.hidden = !undo || !matches(undo);
   }
@@ -123,7 +125,7 @@ export function installPromptEnhancer({
     if (!snapshot.text.replace(/\u200b/g, '').trim()) return;
     undo = null;
     pending = snapshot;
-    status('正在优化…');
+    status('');
     refresh();
     try {
       const result = await request('/prompt/enhance', {
@@ -191,14 +193,40 @@ export function installPromptEnhancer({
       mounted = target;
     }
     if (!target) return;
-    // Reuse a verified composer toolbar; fall back to a small row owned by Buddy.
+    // Place beside the native voice/send actions, outside the model selector's wrapping span.
     const composerRoot = target.composer.closest('[data-codex-composer-root]') || target.scope;
-    const anchor = target.trigger?.parentElement;
-    const toolbar = anchor?.classList.contains('contents')
-      ? anchor.parentElement
-      : target.trigger?.parentElement;
-    const parent = toolbar && !toolbar.closest('[contenteditable="true"]') ? toolbar : composerRoot;
-    if (parent && host.parentElement !== parent) parent.append(host);
+    const actions = [...composerRoot.querySelectorAll('button[aria-label]')].filter(
+      (node) =>
+        !node.closest('[data-codex-buddy-prompt]') && node.getBoundingClientRect().width > 0,
+    );
+    const action =
+      actions.find((node) => /^(听写|dictate|dictation)$/i.test(node.getAttribute('aria-label'))) ||
+      actions.find((node) =>
+        /^(发送|发送消息|停止|send|send message|stop|语音|voice)$/i.test(
+          node.getAttribute('aria-label'),
+        ),
+      );
+    if (action) {
+      let anchor = action;
+      while (
+        anchor.parentElement !== composerRoot &&
+        anchor.parentElement &&
+        getComputedStyle(anchor.parentElement).display === 'contents'
+      )
+        anchor = anchor.parentElement;
+      // The send/stop control may have its own margin wrapper. Keep that wrapper intact.
+      if (
+        anchor === action &&
+        action.parentElement !== composerRoot &&
+        getComputedStyle(action.parentElement).display === 'flex'
+      )
+        anchor = action.parentElement;
+      const parent = anchor.parentElement;
+      const height = getComputedStyle(action).height;
+      if (parseFloat(height) >= 24) host.style.setProperty('--buddy-composer-button-size', height);
+      if (host.parentElement !== parent || host.nextSibling !== anchor)
+        parent.insertBefore(host, anchor);
+    } else if (host.parentElement !== composerRoot) composerRoot.append(host);
     if (composerRoot && message.parentElement !== composerRoot) composerRoot.append(message);
     refresh();
   }

@@ -17,3 +17,5 @@
 window-expand→ExpandMd、window-restore→CollapseSmall，来自同一固定提交；仅供窗口控件，不改变内容面板专注图标。
 
 sparkles→Sparkles，来自同一固定公开提交，供输入框“优化”按钮使用。
+
+prompt-improve→PencilSparkle，同一固定公开提交；提示词优化改用此笔形图标，保留sparkles资源供兼容。

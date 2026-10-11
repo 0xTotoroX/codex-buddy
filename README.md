@@ -53,7 +53,7 @@ Both panels share the same chat source. The source label and follow/lock menu ar
 
 ## Prompt enhancement
 
-Write a draft in the chat composer and click **优化** (Optimize). The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **下一步 → 生成模型**, and sends only the draft, without chat history.
+Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **下一步 → 生成模型**, and sends only the draft, without chat history.
 
 ## Task board and Apple Reminders
 

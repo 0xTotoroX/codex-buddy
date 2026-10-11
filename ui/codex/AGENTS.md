@@ -31,3 +31,5 @@ plugin-tab.js 的 openSettingsBrowser 仅接收本机 HTTP 地址，经当前聊
 - `prompt-enhancement.js`：在已确认输入区工具栏挂载优化/取消/还原，复用composer原始文本读取与受控写入。仅保存当前操作的临时原文、DOM与签名；输入变化/IME/会话变化/销毁取消，迟到结果不可覆盖；复杂引用节点拒绝替换，错误行内展示。
 
 model.js增加只读inputTarget()，复用唯一聊天身份与最近操作归属，不依赖模型能力/菜单触发器；已有snapshot/apply仍要求模型触发器。
+
+提示词优化入口位于当前输入框右侧语音/发送操作同排，避开模型选择器的折行容器。按钮只显示PencilSparkle图标，与原生按钮同高；处理中为取消图标，完成后按需出现还原图标，无文字标签或Tooltip，保留aria-label。
