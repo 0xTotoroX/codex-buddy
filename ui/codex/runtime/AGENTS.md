@@ -46,3 +46,5 @@ lifecycle 统一执行 launcherAction：内在宿主显示/收放，外使用现
 lifecycle 每次渲染使用原 resolveFabExpression/fabExpressionLabel 和 activePaneCue 更新独立入口；来源沿用原关联身份与几何判断，单聊天或来源无效时不显示小点，不为图标另行读取聊天。
 
 lifecycle在宿主安装/销毁prompt-enhancement，独立于工作台业务启停，不在桌面投影安装。其验证接口仅回答指定在途优化请求是否仍对应原草稿；不对外返回草稿。
+
+独立主界面的入口收放按当前承载分流：sidebar更新dockOpen，overlay更新open，desktop仍走整组返回；避免浮层误用停靠状态而无法收起。

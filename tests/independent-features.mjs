@@ -302,9 +302,9 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.csw-workbench[data-composition="focus"]').count(), 0);
         assert.equal(await outline.locator('.feature-pane-head strong').count(), 0);
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         const widthHandle = page.getByRole('separator', { name: '调整工作台宽度' });
         const beforeWidth = Number(await widthHandle.getAttribute('aria-valuenow'));
@@ -362,7 +362,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
           'hidden tabs preserve reading across periodic save',
         );
         await openFeature('board');
-        const capsule = page.locator('.csw-fab');
+        const capsule = page.locator('.csw-fab:not(.csw-launcher-face)');
         assert.equal(await capsule.locator('.csw-status-stage').count(), 1);
         assert.equal(await page.locator('select[aria-label="打开功能"]').count(), 0);
         const board = page.locator('[data-feature="board"]');
@@ -385,7 +385,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.mouse.up();
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
         assert.equal((await dock.boundingBox()).width, 0, 'collapsed sidebar releases its slot');
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await board.getByLabel('新任务标题', { exact: true }).waitFor();
         assert.equal(
           await board.getByLabel('新任务标题', { exact: true }).inputValue(),
@@ -407,13 +407,8 @@ export function independentFeatureCases({ mode, syncSettings }) {
           assert.equal(await outline.count(), 1);
           if (i === 0) {
             await page.emulateMedia({ reducedMotion: 'no-preference' });
-            const face = page.locator(
-              '[data-companion-stepwise-root]:not([data-codex-buddy-features-root]) .csw-workbench-face',
-            );
-            await face.click();
-            await page.waitForFunction(
-              () => window.__companionFloatingPanel.state.popover.dataset.morphing === 'true',
-            );
+            const face = page.getByRole('button', { name: 'CodexBuddy', exact: true });
+            await face.press('Enter');
             await page.waitForFunction(
               () =>
                 !window.__companionFloatingPanel.state.open &&
@@ -422,13 +417,10 @@ export function independentFeatureCases({ mode, syncSettings }) {
             const rect = await page
               .getByRole('button', { name: 'CodexBuddy', exact: true })
               .boundingBox();
-            assert.equal(await page.locator('.csw-fab').isVisible(), false);
+            assert.equal(await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(), false);
             assert.equal(Math.round(rect.width), 36);
             assert.equal(Math.round(rect.height), 36);
-            await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
-            await page.waitForFunction(
-              () => window.__companionFloatingPanel.state.popover.dataset.morphing === 'true',
-            );
+            await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
             await page.waitForFunction(
               () =>
                 window.__companionFloatingPanel.state.open &&
@@ -482,9 +474,9 @@ export function independentFeatureCases({ mode, syncSettings }) {
         });
         await board.waitFor({ state: 'detached' });
         assert.equal(await outline.count(), 1);
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.dockOpen);
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await outline.getByRole('navigation', { name: '大纲' }).waitFor();
         assert.equal(
           await board.count(),
@@ -705,7 +697,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.waitForFunction(
           () => document.querySelector('[data-codex-buddy-dock]')?.dataset.reason === 'space',
         );
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.waitForTimeout(150);
         assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
         assert.equal(
@@ -737,7 +729,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.waitForFunction(
           () => window.__companionFloatingPanel.state.dockStatus === 'unsupported',
         );
-        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).click();
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.waitForTimeout(150);
         assert.equal(await page.locator('.csw-dock-menu,.csw-dock-warning').count(), 0);
         assert.equal(

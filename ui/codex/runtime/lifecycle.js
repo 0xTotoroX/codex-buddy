@@ -519,7 +519,8 @@ async function launcherAction(action, toggle = false) {
   } else if (shellState.detached) {
     const result = await bridgeCall('/panel/return', {});
     if (result.error) throw Error(result.error);
-  } else if (independentFeatures()) toggleFeatureDock(toggle ? !shellState.dockOpen : true);
+  } else if (independentFeatures() && featurePlacement() === 'sidebar')
+    toggleFeatureDock(toggle ? !shellState.dockOpen : true);
   else setOpen(toggle ? !shellState.open : true);
 }
 
