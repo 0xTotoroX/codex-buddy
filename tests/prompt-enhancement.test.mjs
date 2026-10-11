@@ -33,6 +33,9 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
     const editor = page.getByLabel('草稿'),
       optimize = () => page.getByRole('button', { name: '优化提示词', exact: true });
     assert.equal(await optimize().isDisabled(), true);
+    const control = page.locator('[data-codex-buddy-prompt] button');
+    const firstButton = await control.elementHandle();
+    assert.equal(await control.count(), 1);
     const original = '只讨论，不执行。\n保留 $&、$1 和 "引号"。';
     await editor.fill(original);
     await optimize().click();
@@ -48,8 +51,25 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
       window.replies.shift()({ prompt: '请仅讨论方案，不执行操作。\n保留 $&、$1 和 "引号"。' }),
     );
     await page.getByRole('button', { name: '恢复原提示词' }).waitFor();
+    assert.equal(await control.count(), 1);
+    assert.equal(await control.evaluate((node, initial) => node === initial, firstButton), true);
+    assert.equal(await control.locator('svg').getAttribute('data-icon'), 'return');
+    assert.equal((await control.textContent()).trim(), '');
     await page.getByRole('button', { name: '恢复原提示词' }).click();
     assert.equal(await editor.inputValue(), original);
+    assert.equal(await control.locator('svg').getAttribute('data-icon'), 'prompt-improve');
+    assert.equal(
+      await page.evaluate(() => window.calls.length),
+      1,
+      'restore does not request a model',
+    );
+    await optimize().click();
+    await page.evaluate(() => window.replies.shift()({ prompt: '第二次优化' }));
+    await page.getByRole('button', { name: '恢复原提示词' }).waitFor();
+    await editor.fill('优化后手动编辑');
+    assert.equal(await optimize().count(), 1);
+    assert.equal(await page.getByRole('button', { name: '恢复原提示词' }).count(), 0);
+    assert.equal(await control.count(), 1);
     await optimize().click();
     await editor.fill('我正在继续编辑');
     assert.equal(

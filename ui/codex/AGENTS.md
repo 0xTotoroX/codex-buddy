@@ -32,4 +32,4 @@ plugin-tab.js 的 openSettingsBrowser 仅接收本机 HTTP 地址，经当前聊
 
 model.js增加只读inputTarget()，复用唯一聊天身份与最近操作归属，不依赖模型能力/菜单触发器；已有snapshot/apply仍要求模型触发器。
 
-提示词优化入口位于当前输入框右侧语音/发送操作同排，避开模型选择器的折行容器。按钮只显示PencilSparkle图标，与原生按钮同高；处理中为取消图标，完成后按需出现还原图标，无文字标签或Tooltip，保留aria-label。
+提示词优化入口位于当前输入框右侧语音/发送操作同排，避开模型选择器的折行容器。按钮只显示PencilSparkle图标，与原生按钮同高；处理中为取消图标，完成后同一个按钮变为还原图标，回退后恢复优化，编辑后旧备份失效并恢复优化图标，无文字标签或Tooltip，保留aria-label。

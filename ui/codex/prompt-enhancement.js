@@ -20,15 +20,13 @@ export function installPromptEnhancer({
   let composing = false;
   const host = document.createElement('span');
   host.dataset.codexBuddyPrompt = 'true';
-  host.style.cssText =
-    'display:inline-flex;align-items:center;flex:none;gap:2px;margin-inline-end:4px;';
+  host.style.cssText = 'display:inline-flex;align-items:center;flex:none;margin-inline-end:4px;';
   const shadow = host.attachShadow({ mode: 'open' });
   shadow.innerHTML = `<style>
     :host{color:inherit}button{font:inherit;display:inline-flex;align-items:center;justify-content:center;width:var(--buddy-composer-button-size,28px);height:var(--buddy-composer-button-size,28px);padding:0;border:0;border-radius:999px;background:transparent;color:inherit;cursor:pointer;opacity:.75}
-    button:hover,button:focus-visible{opacity:1}button:focus-visible{outline:1px solid currentColor;outline-offset:-1px}button:disabled{opacity:.35;cursor:default}svg{width:18px;height:18px;display:block}button[hidden]{display:none}
-  </style><button type="button" aria-label="优化提示词">${iconSvg('prompt-improve')}</button><button type="button" data-restore aria-label="恢复原提示词" hidden>${iconSvg('return')}</button>`;
+    button:hover,button:focus-visible{opacity:1}button:focus-visible{outline:1px solid currentColor;outline-offset:-1px}button:disabled{opacity:.35;cursor:default}svg{width:18px;height:18px;display:block}
+  </style><button type="button" aria-label="优化提示词">${iconSvg('prompt-improve')}</button>`;
   const button = shadow.querySelector('button');
-  const restore = /** @type {HTMLButtonElement} */ (shadow.querySelector('button[data-restore]'));
   const message = document.createElement('div');
   message.dataset.codexBuddyPrompt = 'true';
   message.setAttribute('role', 'status');
@@ -79,11 +77,11 @@ export function installPromptEnhancer({
         !rawComposerText(mounted.composer)
           .replace(/\u200b/g, '')
           .trim());
-    button.setAttribute('aria-label', pending ? '取消优化' : '优化提示词');
-    const icon = pending ? 'close' : 'prompt-improve';
+    if (undo && !matches(undo)) undo = null;
+    button.setAttribute('aria-label', pending ? '取消优化' : undo ? '恢复原提示词' : '优化提示词');
+    const icon = pending ? 'close' : undo ? 'return' : 'prompt-improve';
     if (button.querySelector('svg')?.dataset.icon !== icon) button.innerHTML = iconSvg(icon);
     button.setAttribute('aria-busy', String(!!pending));
-    restore.hidden = !undo || !matches(undo);
   }
   function write(snapshot, text) {
     if (!matches(snapshot)) throw Error('草稿或聊天已变化，未覆盖你的输入。');
@@ -105,6 +103,17 @@ export function installPromptEnhancer({
   button.addEventListener('click', async () => {
     if (pending) {
       cancel();
+      return;
+    }
+    if (undo) {
+      try {
+        write(undo, undo.original);
+        undo = null;
+        status('');
+      } catch (error) {
+        status(String(error.message || error));
+      }
+      refresh();
       return;
     }
     const target = getTarget();
@@ -158,17 +167,6 @@ export function installPromptEnhancer({
       if (pending === snapshot) pending = null;
       refresh();
     }
-  });
-  restore.addEventListener('click', () => {
-    if (!undo) return;
-    try {
-      write(undo, undo.original);
-      undo = null;
-      status('');
-    } catch (error) {
-      status(String(error.message || error));
-    }
-    refresh();
   });
   function changed(event) {
     if (applying || !mounted || !event.composedPath().includes(mounted.composer)) return;
