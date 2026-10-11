@@ -1,5 +1,5 @@
 // [INPUT]: CDP Client、Config、Model 与胶囊状态摘要。
-// [OUTPUT]: App、View、连接与无正文胶囊状态；退出信号取消模型请求，开发模式锁定启动窗口。
+// [OUTPUT]: App、View、连接与无正文胶囊状态；临时响应超时保留会话并恢复连接状态；退出信号取消模型请求，开发模式锁定启动窗口。
 // [POS]: 持有独立 tasks 服务； 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -180,9 +180,7 @@ impl App {
                 if session.is_some() {
                     let guard = self.transition.lock().await;
                     if let Err(error) = self.refresh().await {
-                        tracing::debug!(error = %error, "宿主状态刷新失败");
-                        self.clear_connection("disconnected", "Codex 连接中断，正在重连…")
-                            .await;
+                        self.handle_refresh_failure(&error).await;
                     }
                     drop(guard);
                 } else {
@@ -213,6 +211,24 @@ impl App {
             view.updated_at = now();
             true
         });
+    }
+
+    async fn handle_refresh_failure(&self, error: &anyhow::Error) {
+        tracing::debug!(%error, "宿主状态刷新失败");
+        if error.is::<tokio::time::error::Elapsed>()
+            && self
+                .desktop_client()
+                .await
+                .is_some_and(|client| !client.is_closed())
+        {
+            self.update_connection(
+                "unresponsive",
+                "Codex 页面暂未响应，保留当前界面并等待恢复…",
+            );
+            return;
+        }
+        self.clear_connection("disconnected", "Codex 连接中断，正在重连…")
+            .await;
     }
 
     async fn establish(self: &Arc<Self>, desired: &Desired) -> Result<()> {
@@ -364,6 +380,7 @@ impl App {
                 && view.panel_theme == theme
                 && view.panel_font_base == font_base
                 && view.panel_colors == colors
+                && view.connection.status == "connected"
             {
                 return false;
             }
@@ -371,6 +388,8 @@ impl App {
             view.panel_theme = theme;
             view.panel_font_base = font_base;
             view.panel_colors = colors;
+            view.connection.status = "connected".into();
+            view.connection.message = "已连接桌面 Codex".into();
             view.updated_at = now();
             true
         });
@@ -383,4 +402,131 @@ fn now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis() as u64
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::net::TcpListener;
+    use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+    #[tokio::test]
+    async fn response_timeout_preserves_session_then_fresh_reply_restores_status() {
+        let temp = tempfile::tempdir().unwrap();
+        let app = App::new(
+            Paths::new(Some(temp.path().into())).unwrap(),
+            Config::default(),
+            None,
+            true,
+        );
+        let ui = json!(app.appearance().await.ui);
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("ws://{}", listener.local_addr().unwrap());
+        let (close, closed) = tokio::sync::oneshot::channel();
+        let peer = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async(stream).await.unwrap();
+            let first: Value =
+                serde_json::from_str(socket.next().await.unwrap().unwrap().to_text().unwrap())
+                    .unwrap();
+            // The delayed response must be discarded, not mistaken for the next read.
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            socket
+                .send(Message::Text(
+                    json!({"id":first["id"],"result":{"result":{"value":"stale"}}})
+                        .to_string()
+                        .into(),
+                ))
+                .await
+                .unwrap();
+            let second: Value =
+                serde_json::from_str(socket.next().await.unwrap().unwrap().to_text().unwrap())
+                    .unwrap();
+            assert_eq!(second["method"], "Runtime.evaluate");
+            assert!(
+                !second["params"]["expression"]
+                    .as_str()
+                    .unwrap()
+                    .contains("destroy()")
+            );
+            socket.send(Message::Text(json!({"id":second["id"],"result":{"result":{"value":{
+                "desktop":{"hasAnswer":true,"headings":4},"ui":ui,"theme":"dark","fontBase":16.,"colors":{}
+            }}}}).to_string().into())).await.unwrap();
+            let _ = closed.await;
+            socket.close(None).await.unwrap();
+        });
+        let client = Client::connect(&endpoint).await.unwrap();
+        *app.session.write().await = Some(Session {
+            client: client.clone(),
+        });
+        app.views.send_modify(|view| {
+            view.connection.status = "connected".into();
+            view.connection.target_id = Some("synthetic-target".into());
+            view.desktop = DesktopStatus {
+                has_answer: true,
+                headings: 4,
+            };
+            view.panel_theme = Some("dark".into());
+            view.panel_font_base = 16.;
+            view.panel_colors = json!({});
+        });
+        let failure = client
+            .evaluate_with_timeout("synthetic slow read".into(), Duration::from_millis(20))
+            .await
+            .unwrap_err();
+        assert!(failure.is::<tokio::time::error::Elapsed>());
+        app.handle_refresh_failure(&failure).await;
+        assert!(Arc::ptr_eq(&app.desktop_client().await.unwrap(), &client));
+        assert!(!client.is_closed());
+        assert_eq!(app.view().connection.status, "unresponsive");
+        assert_eq!(
+            app.view().connection.target_id.as_deref(),
+            Some("synthetic-target")
+        );
+        assert_eq!(app.view().desktop.headings, 4);
+        app.refresh().await.unwrap();
+        assert_eq!(app.view().connection.status, "connected");
+        assert_eq!(app.view().desktop.headings, 4);
+        close.send(()).unwrap();
+        peer.await.unwrap();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while !client.is_closed() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        app.handle_refresh_failure(&failure).await;
+        assert!(app.desktop_client().await.is_none());
+        assert_eq!(app.view().connection.status, "disconnected");
+        assert!(app.view().connection.target_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn incompatible_response_still_releases_a_live_session() {
+        let temp = tempfile::tempdir().unwrap();
+        let app = App::new(
+            Paths::new(Some(temp.path().into())).unwrap(),
+            Config::default(),
+            None,
+            true,
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("ws://{}", listener.local_addr().unwrap());
+        let peer = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut socket = accept_async(stream).await.unwrap();
+            assert!(matches!(socket.next().await, Some(Ok(Message::Close(_)))));
+        });
+        let client = Client::connect(&endpoint).await.unwrap();
+        *app.session.write().await = Some(Session { client });
+        app.handle_refresh_failure(&anyhow::anyhow!("synthetic incompatible page"))
+            .await;
+        assert!(app.desktop_client().await.is_none());
+        tokio::time::timeout(Duration::from_secs(1), peer)
+            .await
+            .unwrap()
+            .unwrap();
+    }
 }

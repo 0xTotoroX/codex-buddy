@@ -198,6 +198,8 @@ npm run dev
 
 多个 Git worktree 可通过 `npm run dev:settings` 或旧眼睛入口右键打开开发设置，在同页「开发」分类切换来源（旧 worktree 保留顶部入口）；`npm run dev:settings` 打开同一页面并携带连接凭据。升级开发脚本后，正常停止并重开一次 Dev。未包含统一入口修复的历史 worktree 仍使用原齿轮地址，可从已有 Dev 设置标签页切回。切换会同时更换后台、设置界面与热更新来源，保持设置地址，不重启 Codex，并记住最后成功的选择。各 worktree 保留独立配置；编译失败保留当前来源，接入失败尝试恢复原来源。同一目标窗口使用一个 Dev 监督进程；迁入此流程前，先正常退出旧的独立 Dev 会话。也可用 `npm run dev -- --source /path/to/worktree` 显式指定启动来源。
 
+从 Dev App 新建的后台会话会在确认 ChatGPT 主进程退出后自动清理；页面短暂断连不会结束会话。脚本升级后先运行 `npm run dev:stop`，再打开 Dev App；ChatGPT 可保持打开。
+
 开发模式连接真实 Codex；修改界面后自动加载，修改 Rust 后自动编译。命令行启动时按 Ctrl+C 结束。开发配置独立，不覆盖日常安装；内嵌液态与正式版共用 SVG 渲染。
 
 ```sh

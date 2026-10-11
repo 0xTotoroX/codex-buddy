@@ -88,7 +88,13 @@ function App() {
             CodexBuddy{import.meta.env.DEV ? ' · 开发版' : ''}
           </a>
           <span className="settings-connection-status">
-            {connected ? '已连接' : live ? '等待连接' : '未连接'}
+            {view?.connection.status === 'unresponsive'
+              ? '页面暂未响应'
+              : connected
+                ? '已连接'
+                : live
+                  ? '等待连接'
+                  : '未连接'}
           </span>
         </div>
         <div

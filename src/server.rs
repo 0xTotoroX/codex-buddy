@@ -779,34 +779,7 @@ async fn tasks_command(
     State(service): State<Service>,
     Json(command): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
-    let window_guard = if command["op"] == "open" {
-        Some(service.app.feature_operation.lock().await)
-    } else {
-        None
-    };
-    if command["op"] == "open" && service.app.feature_managed("board").await {
-        drop(window_guard);
-        return Ok(Json(
-            service
-                .app
-                .feature_request(json!({"op":"reveal","id":"board"}))
-                .await?,
-        ));
-    }
-    let modules_changed = command["op"] == "modules";
-    let board_before = service.app.tasks.board_enabled().await;
-    let mut result = service.app.tasks.command(command).await?;
-    if modules_changed {
-        let settings = service.app.settings().await;
-        service.app.sync_desktop_settings(&settings).await;
-        let enabled = service.app.tasks.board_enabled().await;
-        if enabled != board_before
-            && let Err(error) = service.app.set_feature_enabled("board", enabled).await
-        {
-            result["presentationError"] = json!(format!("看板开关已保存，窗口更新失败：{error}"));
-        }
-    }
-    Ok(Json(result))
+    Ok(Json(service.app.task_command(command).await?))
 }
 
 async fn surfaces(

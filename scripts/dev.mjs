@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Git worktrees、Rust/Node、来源选择器与独立开发数据目录。
- * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，安全恢复失效租约，含占用检查在内的启动错误传回 App。
+ * [OUTPUT]: 一条命令启动设置页热更新、胶囊热加载及 Rust/模型控制资源编译后自动重启；显式 --restart-running 复用共享宿主准备，安全恢复失效租约，含占用检查在内的启动错误传回 App；App 新会话按宿主进程身份退出清理，终端默认持续调试。
  * [POS]: 持久开发编排与统一设置入口；先绑定稳定地址供后台齿轮打开，各来源隔离 Vite 缓存；持有目标租约并串行交接 worktree，管理开发进程，显式启用时委托共享宿主启动策略，暂停并恢复安装版连接，不改写官方应用包。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -38,6 +38,8 @@ import {
   initializeData,
   pauseInstallation,
   restoreInstallation,
+  findHostProcess,
+  watchHostProcess,
 } from './dev-host.mjs';
 
 const controllerRoot = resolve(import.meta.dirname, '..');
@@ -48,6 +50,7 @@ const { values: args } = parseArgs({
   options: {
     'no-open': { type: 'boolean' },
     'restart-running': { type: 'boolean' },
+    'exit-with-host': { type: 'boolean' },
     help: { type: 'boolean' },
     cdp: { type: 'string' },
     target: { type: 'string' },
@@ -112,12 +115,16 @@ let service,
 let pendingNative = false,
   pendingPanel = false,
   timer;
-const execute = (program, args) => command(program, args, options, children);
+const execute = (program, args) => {
+  if (closing) throw new Error('开发会话正在退出，不再启动构建进程');
+  return command(program, args, options, children);
+};
 const token = randomUUID();
 let nativeFingerprint, switcher, settingsUrl, switchTask;
 let buildError = '';
 let sourceEpoch = randomUUID();
 let injectedSettings;
+let hostProcess, stopHostWatch, cleanupTask;
 const nativeInputs = (root) => [
   ...filesUnder(root, 'src'),
   existsSync(join(root, 'ui/codex/model.js')) ? 'ui/codex/model.js' : 'ui/model-control/host.js',
@@ -197,6 +204,7 @@ async function startService() {
   }, '真实 Codex 胶囊未完成安装');
 }
 async function rebuildNative() {
+  if (closing) return;
   const before = fingerprint(root, nativeInputs(root));
   if (before === nativeFingerprint && existsSync(binary)) return;
   console.log('正在编译 Rust；现有开发窗口保持运行…');
@@ -241,6 +249,7 @@ async function flush() {
       try {
         if (panel) {
           await buildDevPanel(root, snapshot);
+          if (closing) return;
           console.log('胶囊资源已更新（CSS 保留实例，逻辑重新加载）。');
         }
         if (native) await rebuildNative();
@@ -375,6 +384,8 @@ function saveSession() {
     source: root,
     controller: controllerRoot,
     sourceEpoch,
+    exitWithHost: !!args['exit-with-host'],
+    hostProcess,
     supervisorPid: process.pid,
   });
   for (const destination of new Set([directory, controllerDirectory]))
@@ -499,9 +510,12 @@ function createSourceSwitcher() {
     },
   });
 }
-async function cleanup() {
-  if (closing) return;
+function cleanup() {
+  return (cleanupTask ??= cleanupDevelopment());
+}
+async function cleanupDevelopment() {
   closing = true;
+  stopHostWatch?.();
   clearTimeout(timer);
   for (const watcher of watchers) watcher.close();
   await Promise.allSettled([...children].map(stopChild));
@@ -532,6 +546,7 @@ async function cleanup() {
   releaseSource();
   releaseTarget();
   releaseController?.();
+  console.log(`[${new Date().toISOString()}] 开发会话已清理并退出。`);
 }
 for (const signal of ['SIGINT', 'SIGTERM'])
   process.once(signal, () => cleanup().then(() => process.exit(0)));
@@ -580,6 +595,12 @@ try {
     hostSettingsDirectory(source, data),
   );
   releaseTarget = claimTarget(host, controllerRoot);
+  if (args['exit-with-host']) {
+    hostProcess = await findHostProcess(host.endpoint);
+    console.log(
+      `[${new Date().toISOString()}] Dev 跟随 Codex 主进程 ${hostProcess.pid}；网页断连不触发退出。`,
+    );
+  }
   await restoreInstallation(journal, host);
   initializeData(source, data, host);
   switcher = createSourceSwitcher();
@@ -633,6 +654,12 @@ try {
     opener.on('error', () => console.error('无法自动打开开发设置页。'));
   }
   startWatchers();
+  if (hostProcess)
+    stopHostWatch = watchHostProcess(hostProcess, async () => {
+      console.log(`[${new Date().toISOString()}] Codex 主进程已退出，正在清理开发会话。`);
+      await cleanup();
+      process.exit(0);
+    });
 } catch (error) {
   console.error(error.message);
   try {

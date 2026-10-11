@@ -1,5 +1,5 @@
 // [INPUT]: Fixed feature identities, authenticated UI requests and existing business services.
-// [OUTPUT]: One main placement, main ownership independent of edge membership, checked layouts and view handoff.
+// [OUTPUT]: One main placement, enabled legacy membership recovery, checked layouts and view handoff.
 // [POS]: Presentation lifecycle only; business validation remains in tasks/codex/model_control.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -197,6 +197,36 @@ impl App {
         state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"themes":self.surfaces.lock().await.preferences.themes});
         state
     }
+    pub(crate) async fn task_command(&self, command: Value) -> Result<Value> {
+        let window_guard = if command["op"] == "open" {
+            Some(self.feature_operation.lock().await)
+        } else {
+            None
+        };
+        if command["op"] == "open"
+            && (self.feature_managed("board").await || self.main_features_managed().await)
+        {
+            drop(window_guard);
+            return self
+                .feature_request(json!({"op":"reveal","id":"board"}))
+                .await;
+        }
+        let modules_changed = command["op"] == "modules";
+        let board_before = self.tasks.board_enabled().await;
+        let mut result = self.tasks.command(command).await?;
+        if modules_changed {
+            let settings = self.settings().await;
+            self.sync_desktop_settings(&settings).await;
+            let enabled = self.tasks.board_enabled().await;
+            if enabled != board_before
+                && let Err(error) = self.set_feature_enabled("board", enabled).await
+            {
+                result["presentationError"] =
+                    json!(format!("看板开关已保存，窗口更新失败：{error}"));
+            }
+        }
+        Ok(result)
+    }
     pub async fn edge_features_active(&self) -> bool {
         self.features.lock().await.entries.values().any(|e| {
             e.pref.open && e.pref.placement == "edge"
@@ -204,7 +234,7 @@ impl App {
         })
     }
     pub async fn set_feature_enabled(&self, id: &str, enabled: bool) -> Result<()> {
-        if enabled && self.feature_managed(id).await {
+        if enabled && (self.feature_managed(id).await || self.main_features_managed().await) {
             self.feature_request(json!({"op":"reveal", "id":id}))
                 .await?;
         } else if !enabled {
@@ -613,6 +643,7 @@ impl App {
                         data["patch"].as_object().is_some_and(|p| p.keys().all(|k| [
                             "pinned",
                             "presets",
+                            "modelOrder",
                             "modelColumnWidth"
                         ]
                         .contains(&k.as_str()))),
@@ -679,10 +710,64 @@ impl App {
         }
         Ok(result)
     }
+    // Called under feature_operation. Only fill missing registrations: explicit closed
+    // views, edge assignments and live legacy windows retain their existing ownership.
+    async fn restore_unregistered_main_features(&self) -> Result<()> {
+        if !self.main_features_managed().await || self.appearance().await.detached {
+            return Ok(());
+        }
+        let (outline, next) = {
+            let model = self.model.read().await;
+            (model.options.answer_outline_enabled, model.options.enabled)
+        };
+        let board = self.tasks.board_enabled().await && !self.tasks.window_open().await;
+        let mut f = self.features.lock().await;
+        if f.main.target.is_some()
+            || (f.main.pref.placement == "desktop" && !crate::panel::popout_supported())
+        {
+            return Ok(());
+        }
+        let missing: Vec<_> = [("outline", outline), ("next", next), ("board", board)]
+            .into_iter()
+            .filter(|(id, enabled)| *enabled && !f.entries.contains_key(*id))
+            .map(|(id, _)| id)
+            .collect();
+        if missing.is_empty() {
+            return Ok(());
+        }
+        for id in &missing {
+            let placement = f.main.pref.placement.clone();
+            f.entries.insert(
+                (*id).into(),
+                Entry {
+                    pref: Preference {
+                        placement,
+                        open: true,
+                        ..Default::default()
+                    },
+                    owner: uuid::Uuid::new_v4().to_string(),
+                    view: json!({}),
+                    pending: None,
+                    reveal: 1,
+                    closing: None,
+                },
+            );
+        }
+        if let Err(error) = f.save(&self.paths) {
+            for id in missing {
+                f.entries.remove(id);
+            }
+            return Err(error);
+        }
+        Ok(())
+    }
     pub async fn supervise_features(&self) {
         let Ok(_operation) = self.feature_operation.try_lock() else {
             return;
         };
+        if let Err(error) = self.restore_unregistered_main_features().await {
+            tracing::warn!(%error, "无法接续已启用的主界面功能");
+        }
         let mut f = self.features.lock().await;
         if f.entries.values().any(|e| {
             e.pending
@@ -1045,6 +1130,48 @@ mod tests {
         );
     }
     #[tokio::test]
+    async fn managed_main_recovers_enabled_missing_members_and_preserves_closed_views() {
+        let (_dir, app) = app().await;
+        app.model.write().await.options.enabled = true;
+        app.tasks.inner.lock().await.store.board_enabled = true;
+        // Enabled services alone must not replace an unmigrated legacy workbench.
+        app.supervise_features().await;
+        assert!(!app.main_features_managed().await);
+        let owner = open(&app, "outline").await;
+        let layout =
+            json!({"axis":"auto","groups":[{"ids":["outline"],"active":"outline","weight":1.0}]});
+        app.feature_request(json!({"op":"layout","id":"outline","owner":owner,"placement":"sidebar","layout":layout})).await.unwrap();
+        app.supervise_features().await;
+        let restored = Features::load(&app.paths);
+        for id in ["outline", "next", "board"] {
+            assert!(restored.entries[id].pref.open);
+            assert_eq!(restored.entries[id].pref.placement, "sidebar");
+        }
+        assert_eq!(restored.snapshot()["layouts"]["sidebar"], layout);
+        assert_eq!(app.features.lock().await.entries["outline"].owner, owner);
+        app.close_feature("next").await.unwrap();
+        app.supervise_features().await;
+        assert!(!Features::load(&app.paths).entries["next"].pref.open);
+        assert!(app.features.lock().await.entries["next"].closing.is_some());
+    }
+    #[tokio::test]
+    async fn enabling_missing_main_member_and_opening_board_use_shared_surface() {
+        let (_dir, app) = app().await;
+        app.model.write().await.options.enabled = false;
+        app.tasks.inner.lock().await.store.board_enabled = false;
+        open(&app, "outline").await;
+        app.supervise_features().await;
+        assert!(!app.feature_managed("next").await);
+        assert!(!app.feature_managed("board").await);
+        app.model.write().await.options.enabled = true;
+        app.set_feature_enabled("next", true).await.unwrap();
+        assert!(app.features.lock().await.entries["next"].pending.is_some());
+        app.tasks.inner.lock().await.store.board_enabled = true;
+        app.task_command(json!({"op":"open"})).await.unwrap();
+        assert!(app.features.lock().await.entries["board"].pending.is_some());
+        assert!(!app.tasks.window_open().await);
+    }
+    #[tokio::test]
     async fn first_board_migration_keeps_existing_window_until_user_handles_draft() {
         let (_dir, app) = app().await;
         {
@@ -1063,6 +1190,10 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("保存草稿"));
         assert!(app.tasks.window_open().await);
         assert!(!app.feature_managed("board").await);
+        open(&app, "outline").await;
+        app.supervise_features().await;
+        assert!(!app.feature_managed("board").await);
+        assert!(app.tasks.window_open().await);
         app.tasks.close_window().await;
         open(&app, "board").await;
     }
@@ -1104,6 +1235,36 @@ mod tests {
                 .unwrap();
             assert_eq!(app.features.lock().await.entries[id].view["top"], 42);
         }
+    }
+    #[tokio::test]
+    async fn model_view_order_saves_through_owner_guard_and_rejects_invalid_updates() {
+        let (_dir, app) = app().await;
+        app.model_control.lock().await.preferences.enabled = true;
+        let owner = open(&app, "model").await;
+        let revision = app.model_control.lock().await.revision;
+        let result = app.feature_request(json!({"op":"action","id":"model","owner":owner,"action":"preferences","data":{"revision":revision,"patch":{"modelOrder":["b","a"]}}})).await.unwrap();
+        assert_eq!(result["preferences"]["modelOrder"], json!(["b", "a"]));
+        let saved: Value = serde_json::from_slice(
+            &std::fs::read(app.paths.root.join("model-control.json")).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(saved["modelOrder"], json!(["b", "a"]));
+        for (lease, patch, revision) in [
+            ("stale", json!({"modelOrder":["a","b"]}), revision + 1),
+            (
+                owner.as_str(),
+                json!({"modelOrder":["a","a"]}),
+                revision + 1,
+            ),
+            (owner.as_str(), json!({"enabled":false}), revision + 1),
+            (owner.as_str(), json!({"modelOrder":["a","b"]}), revision),
+        ] {
+            assert!(app.feature_request(json!({"op":"action","id":"model","owner":lease,"action":"preferences","data":{"revision":revision,"patch":patch}})).await.is_err());
+        }
+        assert_eq!(
+            app.model_control.lock().await.preferences.model_order,
+            Some(vec!["b".into(), "a".into()])
+        );
     }
     #[tokio::test]
     async fn feature_switch_closes_only_its_view_and_reopens_saved_placement() {

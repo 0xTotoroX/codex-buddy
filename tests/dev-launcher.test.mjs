@@ -23,7 +23,144 @@ import {
   revealDevelopment,
   launcherSource,
   developmentSettingsUrl,
+  openDevelopment,
 } from '../scripts/dev-launcher.mjs';
+import { readHostProcess, watchHostProcess } from '../scripts/dev-host.mjs';
+import { until, stopChild } from '../scripts/dev-runtime.mjs';
+
+test('App sessions clean up after host exit and concurrent reopen starts one replacement', async (t) => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-app-lifetime-')));
+  mkdirSync(join(root, 'scripts'));
+  mkdirSync(join(root, 'target/dev/real'), { recursive: true });
+  const hostModule = new URL('../scripts/dev-host.mjs', import.meta.url).href;
+  writeFileSync(
+    join(root, 'scripts/dev.mjs'),
+    `
+    import fs from 'node:fs';
+    import {createServer} from 'node:http';
+    import {watchHostProcess} from ${JSON.stringify(hostModule)};
+    const identity = JSON.parse(fs.readFileSync('host.json'));
+    const server=createServer((req,res)=>{
+      if(req.url==='/api/state' && fs.existsSync('drop-session')){
+        fs.rmSync('drop-session');res.end(JSON.stringify({connection:{status:'disconnected'}}));
+        queueMicrotask(cleanup);return;
+      }
+      if(req.url==='/api/connect') fs.rmSync('disconnected',{force:true});
+      res.end(JSON.stringify(req.url==='/api/state'
+        ? {connection:{status:fs.existsSync('disconnected')?'disconnected':'connected'}} : {ok:true}));
+    });
+    fs.appendFileSync('starts.log',process.pid+'\\n');
+    fs.writeFileSync('target/dev/owner.json',JSON.stringify({pid:process.pid}));
+    server.listen(0,'127.0.0.1',()=>{
+      fs.writeFileSync('target/dev/real/runtime.json',JSON.stringify({pid:process.pid,port:server.address().port,token:'fixture'}));
+      fs.writeFileSync('target/dev/session.json',JSON.stringify({supervisorPid:process.pid,runtime:process.cwd()+'/target/dev/real',exitWithHost:true,hostProcess:identity}));
+    });
+    let stopping=false,stopWatch;
+    function cleanup(){
+      if(stopping)return;stopping=true;stopWatch?.();
+      server.closeAllConnections();server.close(()=>{
+        for(const path of ['owner.json','session.json','real/runtime.json'])fs.rmSync('target/dev/'+path,{force:true});
+        process.exit(0);
+      });
+    }
+    if(!fs.existsSync('hold-cleanup'))stopWatch=watchHostProcess(identity,cleanup,{interval:20});
+    process.on('SIGTERM',cleanup);
+  `,
+  );
+  let host;
+  t.after(async () => {
+    await stopBackgroundDevelopment(root);
+    await stopChild(host);
+    rmSync(root, { recursive: true, force: true });
+  });
+  async function launchHost() {
+    host = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio: 'ignore' });
+    await once(host, 'spawn');
+    const identity = await readHostProcess(host.pid);
+    writeFileSync(join(root, 'host.json'), JSON.stringify(identity));
+  }
+  await launchHost();
+  // A stale session from a crashed supervisor must not reject the replacement's first click.
+  writeFileSync(
+    join(root, 'target/dev/session.json'),
+    JSON.stringify({
+      supervisorPid: 2147483647,
+      exitWithHost: true,
+      hostProcess: { pid: 2147483647, startedAt: 'old', executable: 'old' },
+    }),
+  );
+  await Promise.all([openDevelopment(root), openDevelopment(root)]);
+  const first = JSON.parse(readFileSync(join(root, 'target/dev/owner.json'))).pid;
+  assert.equal(readFileSync(join(root, 'starts.log'), 'utf8').trim().split('\n').length, 1);
+  writeFileSync(join(root, 'disconnected'), '');
+  writeFileSync(
+    join(root, 'target/dev/real/config.json'),
+    JSON.stringify({ cdpEndpoint: 'http://127.0.0.1:9231', targetId: 'original' }),
+  );
+  await openDevelopment(root);
+  assert.equal(JSON.parse(readFileSync(join(root, 'target/dev/owner.json'))).pid, first);
+  writeFileSync(join(root, 'drop-session'), '');
+  await openDevelopment(root);
+  assert.notEqual(JSON.parse(readFileSync(join(root, 'target/dev/owner.json'))).pid, first);
+  await stopChild(host);
+  await until(
+    () => !existsSync(join(root, 'target/dev/owner.json')),
+    'App session exits with host',
+  );
+  assert.equal(existsSync(join(root, 'target/dev/real/runtime.json')), false);
+
+  // Leave one previous supervisor alive to exercise clicking during delayed cleanup.
+  writeFileSync(join(root, 'hold-cleanup'), '');
+  await launchHost();
+  await openDevelopment(root);
+  const second = JSON.parse(readFileSync(join(root, 'target/dev/owner.json'))).pid;
+  assert.notEqual(second, first);
+  await stopChild(host);
+  await launchHost();
+  await Promise.all([openDevelopment(root), openDevelopment(root)]);
+  const third = JSON.parse(readFileSync(join(root, 'target/dev/owner.json'))).pid;
+  assert.notEqual(third, second);
+  assert.equal(readFileSync(join(root, 'starts.log'), 'utf8').trim().split('\n').length, 4);
+  assert.match(
+    readFileSync(join(root, 'target/dev/launcher.log'), 'utf8'),
+    /原 Codex 主进程已退出/,
+  );
+});
+
+test('host monitoring preserves uncertain processes and detects reused process identities', async () => {
+  const identity = await readHostProcess(process.pid);
+  let exited = false,
+    errors = 0;
+  const observations = [
+    null,
+    new Error('inspection unavailable'),
+    identity,
+    { ...identity, startedAt: 'replacement' },
+    { ...identity, startedAt: 'replacement' },
+  ];
+  const stop = watchHostProcess(
+    identity,
+    () => {
+      exited = true;
+    },
+    {
+      interval: 10,
+      read: async () => {
+        const value = observations.shift();
+        if (value instanceof Error) throw value;
+        return value ?? null;
+      },
+      onError: () => errors++,
+    },
+  );
+  try {
+    await until(() => exited, 'changed process identity');
+  } finally {
+    stop();
+  }
+  assert.equal(errors, 1);
+  assert.equal(observations.length, 0, 'uncertain or recovered checks must not close the session');
+});
 
 test('development launcher respects a live owner and leaves stale records for dev cleanup', () => {
   const root = mkdtempSync(join(tmpdir(), 'buddy-launcher-'));
@@ -212,7 +349,7 @@ test(
     for (const directory of ['scripts', 'target/dev', 'node_modules/vite'])
       mkdirSync(join(root, directory), { recursive: true });
     writeFileSync(join(root, 'node_modules/vite/package.json'), '{}');
-    for (const name of ['dev-launcher.mjs', 'dev-host.mjs', 'launcher.mjs'])
+    for (const name of ['dev-launcher.mjs', 'dev-host.mjs', 'dev-sources.mjs', 'launcher.mjs'])
       copyFileSync(new URL('../scripts/' + name, import.meta.url), join(root, 'scripts', name));
     writeFileSync(
       join(root, 'scripts/dev.mjs'),

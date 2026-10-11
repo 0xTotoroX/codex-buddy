@@ -50,3 +50,5 @@
 模式/分类按钮带data-settings-navigation；切换不触发模型表单或字号输入的失焦保存。原“打开功能”动作保留在详细功能分类的折叠操作区，不与每个开关常驻。字号、窗口、功能归属及贴边位置按需展开。
 
 - codex-host-settings.tsx：详细模式“启动与开发”内独立管理区域，分类可见时轮询codex-host API；启停保存独立revision，安装、更新、回退、启动及重启停用均为显式操作。旧settings-codex-host锚点仍可定位，不新增整页。
+
+View.connection.status支持unresponsive：主标题显示页面暂未响应，启动与连接仍保留断开/手动重连操作，不将短暂页面迟缓显示为凭据错误。

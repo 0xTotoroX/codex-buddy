@@ -1,12 +1,107 @@
 /*
  * [INPUT]: 已安装配置、真实 Codex CDP 元数据与本机 API。
- * [OUTPUT]: 窗口选择、显式启用时使用开发配置（首次回退日常配置）委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因。
+ * [OUTPUT]: 窗口选择、显式启用时使用开发配置（首次回退日常配置）委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因；按调试端口定位宿主主进程，以 PID/启动时间/路径观察退出，不以断连代替进程退出。
  * [POS]: 真实宿主开发边界；不启动浏览器、不记录聊天、不修改官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 import { readFileSync, writeFileSync, existsSync, rmSync, renameSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const exec = promisify(execFile);
+
+// The process identity, not CDP reachability, defines a desktop session's lifetime.
+export async function readHostProcess(pid) {
+  if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error('宿主进程记录无效');
+  try {
+    process.kill(pid, 0);
+  } catch (error) {
+    if (error.code === 'ESRCH') return null;
+    throw error;
+  }
+  let stdout;
+  try {
+    ({ stdout } = await exec('/bin/ps', ['-p', String(pid), '-o', 'lstart=,comm='], {
+      timeout: 3000,
+    }));
+  } catch (error) {
+    try {
+      process.kill(pid, 0);
+    } catch (probe) {
+      if (probe.code === 'ESRCH') return null;
+    }
+    throw error;
+  }
+  const match = stdout.trim().match(/^(\w{3}\s+\w{3}\s+\d+\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.+)$/);
+  if (!match) throw new Error('无法确认宿主进程身份');
+  return { pid, startedAt: match[1], executable: match[2] };
+}
+
+export function sameHostProcess(expected, actual) {
+  return (
+    !!actual &&
+    expected.pid === actual.pid &&
+    expected.startedAt === actual.startedAt &&
+    expected.executable === actual.executable
+  );
+}
+
+export async function findHostProcess(endpoint) {
+  const port = new URL(endpointUrl(endpoint)).port;
+  const { stdout } = await exec(
+    '/usr/sbin/lsof',
+    ['-nP', '-a', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'],
+    { timeout: 3000 },
+  );
+  const records = await Promise.all(
+    [...new Set(stdout.trim().split(/\s+/))].map((pid) => readHostProcess(Number(pid))),
+  );
+  const matches = records.filter(
+    (record) => record && /\.app\/Contents\/MacOS\/(ChatGPT|Codex)$/.test(record.executable),
+  );
+  if (matches.length !== 1) throw new Error('无法确认调试端口所属的唯一 Codex 主进程');
+  return matches[0];
+}
+
+export function watchHostProcess(
+  identity,
+  onExit,
+  { interval = 1000, read = readHostProcess, onError = console.error } = {},
+) {
+  let stopped = false,
+    timer,
+    missing = 0,
+    reported = false;
+  async function poll() {
+    try {
+      const current = await read(identity.pid);
+      if (stopped) return;
+      missing = sameHostProcess(identity, current) ? 0 : missing + 1;
+      if (missing >= 2) {
+        stopped = true;
+        try {
+          await onExit();
+        } catch (error) {
+          onError(`开发会话清理失败：${error.message}`);
+        }
+        return;
+      }
+      reported = false;
+    } catch (error) {
+      missing = 0;
+      if (!stopped && !reported) onError(`宿主进程检查失败，保留开发会话：${error.message}`);
+      reported = true;
+    }
+    if (!stopped) timer = setTimeout(poll, interval);
+  }
+  timer = setTimeout(poll, interval);
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
 
 export function readJson(path, fallback = null) {
   try {

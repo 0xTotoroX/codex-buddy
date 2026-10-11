@@ -27,7 +27,7 @@ export function ConnectionSettings({
     [targetId, setTargetId] = useState(''),
     [connectionEdited, setConnectionEdited] = useState(false),
     [busy, setBusy] = useState('');
-  const connected = live && view?.connection.status === 'connected';
+  const connected = live && ['connected', 'unresponsive'].includes(view?.connection.status || '');
   useEffect(() => {
     if (!connectionEdited && view?.connection.endpoint) {
       setEndpoint(view.connection.endpoint);

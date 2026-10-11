@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 当前源码目录、Node/Rust 工具路径与现有开发进程锁。
- * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App，前台切换失败仅发通知；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；日志写入 launcher.log，具体启动错误透传且不受并发失败会话干扰。
+ * [OUTPUT]: --settings 打开当前稳定开发设置地址，唤起跟随已选来源；install:dev 生成带 Dock 启动反馈的 App，前台切换失败仅发通知；--open 后台启动并唤起，--stop 正常退出后台会话，--run 保留前台兼容入口；启动请求串行，确认原宿主退出后清理旧 Dev 再启动；日志追加到 launcher.log，唤起错误也保留；新会话按监督进程身份就绪，不复用旧记录。
  * [POS]: 仅为现有开发流程提供 Finder 入口，不更新安装版；冷启动按共享策略准备宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -14,18 +14,28 @@ import {
   rmSync,
   openSync,
   closeSync,
+  appendFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { spawnSync, spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { installIcon } from './launcher.mjs';
-import { readJson, requestRuntime } from './dev-host.mjs';
+import { readJson, requestRuntime, readHostProcess, sameHostProcess } from './dev-host.mjs';
+import { claimLease } from './dev-sources.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const root = resolve(import.meta.dirname, '..');
 const identifier = 'local.codex-buddy.dev-launcher';
 const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`;
 const appleQuote = (value) => `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+function logLaunch(directory, message) {
+  mkdirSync(join(directory, 'target/dev'), { recursive: true, mode: 0o700 });
+  appendFileSync(
+    join(directory, 'target/dev/launcher.log'),
+    `[${new Date().toISOString()}] ${message}\n`,
+    { mode: 0o600 },
+  );
+}
 function command(program, args, input) {
   const result = spawnSync(program, args, { encoding: 'utf8', input });
   if (result.error || result.status !== 0)
@@ -57,12 +67,13 @@ export async function startBackgroundDevelopment(directory) {
   const data = join(directory, 'target/dev');
   mkdirSync(data, { recursive: true, mode: 0o700 });
   rmSync(join(data, 'launcher-error.json'), { force: true });
-  const log = openSync(join(data, 'launcher.log'), 'w', 0o600);
+  logLaunch(directory, '启动新的 Dev 后台会话。');
+  const log = openSync(join(data, 'launcher.log'), 'a', 0o600);
   let child;
   try {
     child = spawn(
       process.execPath,
-      [join(directory, 'scripts/dev.mjs'), '--no-open', '--restart-running'],
+      [join(directory, 'scripts/dev.mjs'), '--no-open', '--restart-running', '--exit-with-host'],
       {
         cwd: directory,
         detached: true,
@@ -94,15 +105,32 @@ export async function startBackgroundDevelopment(directory) {
 export async function stopBackgroundDevelopment(directory) {
   if (!hasDevelopmentOwner(directory)) return;
   const owner = readJson(join(directory, 'target/dev/owner.json'));
+  if (!owner) return;
+  const controller = owner.controller || directory;
   const expected = [
     process.execPath,
-    join(directory, 'scripts/dev.mjs'),
+    join(controller, 'scripts/dev.mjs'),
     '--no-open',
     '--restart-running',
   ].join(' ');
-  const actual = command('/bin/ps', ['-p', String(owner.pid), '-o', 'command=']);
-  if (actual !== expected) throw new Error('进程不是此入口启动的后台开发会话；未结束其他进程。');
-  process.kill(owner.pid, 'SIGTERM');
+  let actual;
+  try {
+    actual = command('/bin/ps', ['-p', String(owner.pid), '-o', 'command=']);
+  } catch (error) {
+    if (!hasDevelopmentOwner(directory)) return;
+    throw error;
+  }
+  if (![expected, `${expected} --exit-with-host`].includes(actual))
+    throw new Error('进程不是此入口启动的后台开发会话；未结束其他进程。');
+  const current = readJson(join(directory, 'target/dev/owner.json'));
+  if (current?.pid !== owner.pid || current?.nonce !== owner.nonce) return;
+  logLaunch(directory, `正常退出 Dev 后台 ${owner.pid}，Codex 保持运行。`);
+  try {
+    process.kill(owner.pid, 'SIGTERM');
+  } catch (error) {
+    if (error.code === 'ESRCH') return;
+    throw error;
+  }
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     const current = readJson(join(directory, 'target/dev/owner.json'));
@@ -110,6 +138,70 @@ export async function stopBackgroundDevelopment(directory) {
     await delay(100);
   }
   throw new Error('开发会话仍在退出，请查看 target/dev/launcher.log；未强制结束进程。');
+}
+
+async function hostHasExited(session) {
+  if (!session?.exitWithHost || !session.hostProcess) return false;
+  return !sameHostProcess(session.hostProcess, await readHostProcess(session.hostProcess.pid));
+}
+
+// Hold one request lease through cleanup/start/reveal, so repeated clicks share the session.
+export async function openDevelopment(directory, { timeout = 120000, interval = 100 } = {}) {
+  const lock = join(directory, 'target/dev/launcher-owner.json');
+  const deadline = Date.now() + timeout;
+  let release;
+  while (!release) {
+    try {
+      release = claimLease(lock);
+    } catch (error) {
+      const owner = readJson(lock);
+      if (!Number.isSafeInteger(owner?.pid) || owner.pid <= 0 || Date.now() >= deadline)
+        throw error;
+      try {
+        process.kill(owner.pid, 0);
+      } catch {
+        throw error;
+      }
+      await delay(interval);
+    }
+  }
+  try {
+    let running = hasDevelopmentOwner(directory);
+    const session = readJson(join(directory, 'target/dev/session.json'));
+    if (running && (await hostHasExited(session))) {
+      logLaunch(directory, '原 Codex 主进程已退出，完成旧 Dev 会话清理后重新启动。');
+      await stopBackgroundDevelopment(directory);
+      running = false;
+    }
+    const startedPid = !running ? await startBackgroundDevelopment(directory) : undefined;
+    if (running) logLaunch(directory, '复用已有 Dev 会话并唤起原工作台。');
+    try {
+      const result = await revealDevelopment(directory, {
+        timeout: running ? 20000 : timeout,
+        checkStartupError: !running,
+        expectedSession: running ? session : undefined,
+        supervisorPid: startedPid,
+        requireOwner: running,
+      });
+      logLaunch(directory, '开发工作台已就绪。');
+      return result;
+    } catch (error) {
+      // The old host may exit between the initial identity check and reveal.
+      if (!running || !['HOST_EXITED', 'SESSION_ENDED'].includes(error.code)) throw error;
+      await stopBackgroundDevelopment(directory);
+      const pid = await startBackgroundDevelopment(directory);
+      return await revealDevelopment(directory, {
+        timeout,
+        checkStartupError: true,
+        supervisorPid: pid,
+      });
+    }
+  } catch (error) {
+    logLaunch(directory, `启动或唤起失败：${error.message}`);
+    throw error;
+  } finally {
+    release();
+  }
 }
 
 export function terminalScript(directory, node, path) {
@@ -222,7 +314,14 @@ function install() {
 
 export async function revealDevelopment(
   directory,
-  { timeout = 120000, interval = 350, checkStartupError = false } = {},
+  {
+    timeout = 120000,
+    interval = 350,
+    checkStartupError = false,
+    expectedSession,
+    supervisorPid,
+    requireOwner = false,
+  } = {},
 ) {
   const deadline = Date.now() + timeout;
   let reconnected = false;
@@ -242,7 +341,16 @@ export async function revealDevelopment(
     }
     if (failure && !otherOwner)
       throw new Error(failure.message || '开发模式启动失败，请查看 target/dev/launcher.log。');
+    if (requireOwner && !hasDevelopmentOwner(directory))
+      throw Object.assign(new Error('原开发会话已退出'), { code: 'SESSION_ENDED' });
     const session = readJson(join(directory, 'target/dev/session.json'));
+    if (supervisorPid && session?.supervisorPid !== supervisorPid) {
+      await delay(interval);
+      continue;
+    }
+    if (session?.hostProcess) expectedSession = session;
+    if (await hostHasExited(expectedSession))
+      throw Object.assign(new Error('原 Codex 主进程已退出'), { code: 'HOST_EXITED' });
     const data = session?.runtime || join(directory, 'target/dev/real');
     const runtime = readJson(join(data, 'runtime.json'));
     if (runtime) {
@@ -309,12 +417,7 @@ async function main() {
   if (!existsSync(join(root, 'node_modules/vite/package.json')))
     throw new Error('缺少开发依赖，请在源码目录运行 npm ci。');
   if (mode === '--open') {
-    const running = hasDevelopmentOwner(root);
-    if (!running) await startBackgroundDevelopment(root);
-    const result = await revealDevelopment(root, {
-      timeout: running ? 20000 : 120000,
-      checkStartupError: !running,
-    });
+    const result = await openDevelopment(root);
     console.log(result.pid || 'host');
     return;
   }

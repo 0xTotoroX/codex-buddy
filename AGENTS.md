@@ -154,3 +154,5 @@ Buddy自有界面不使用Tooltip（包括原生title悬停提示）；保留ari
 输入框优化入口固定在语音/发送操作旁，不塞入模型名称容器；使用带星光的笔图标，无文字与Tooltip。原生按钮尺寸作为对齐基准，取消/还原同样仅图标。
 
 CodexHost管理迁回main：独立src/codex_host.rs及codex_host子模块、认证/codex-host API和详细设置“启动与开发”内的管理区域。保留codexHost旧配置及独立revision；开关只保存意愿，显式启动/重启停用经身份校验与ask/force策略。不引入plugins聚合、MCP运行时或恢复官方插件入口。src/host.rs为启动与重连共用只读发现，Dev/显式窗口保持绑定。
+
+补齐四项工作台/Dev接续：模型排序通过原owner与revision校验保存modelOrder；已接管主界面只补登记未登记的已启用功能，不覆盖关闭状态、贴边归属、旧窗口或布局；CDP仍存活的响应超时进入unresponsive并保留界面，恢复响应回到connected，真正断线/不兼容才清理。Dev App新会话启用exit-with-host，按宿主PID/启动时间/路径观察退出并清理；断连不作为退出，终端Dev仍由Ctrl+C结束。

@@ -80,3 +80,5 @@ panel_window受限IPC新增window-state/hide/toggle-maximize：隐藏仅切换�
 - host.rs：启动与重连共用只读宿主发现/动态端口，Dev及显式窗口保持绑定；lifecycle复用发现与现有退出策略。
 
 Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，server提供认证GET/POST /api/codex-host。cdp先安装只读Agent兼容适配，再安装模型菜单适配。
+
+features.task_command承接原server看板命令协调：主界面已接管时，未登记看板的打开/启用进入共享容器；旧窗口草稿仍按原规则保护。restore_unregistered_main_features在feature_operation内只补缺失条目。模型preferences白名单加入modelOrder，继续校验owner、唯一ID及revision。state.handle_refresh_failure保留仍存活客户端上的Elapsed；Connection.status新增unresponsive，下一次正常refresh即恢复connected。

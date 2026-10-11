@@ -43,3 +43,5 @@ Dev 控制器使用所选源码的 dev-panel 构建器，监听看板和通用�
 Dev 来源识别和原生资源输入兼容新旧源码布局；旧路径仅作为历史 worktree 回退。升级目录布局时使用新版监督脚本正常重开，分别核对嵌入与实际存在的原生窗口资源修订号；没有活动窗口的旧遥测不代表当前已加载。
 
 CodexHost接续：findDevelopmentHost仅在选择启用、显式restart-running且未指定其他连接时委托当前源码CLI。dev.mjs记录supervisorPid、监听CodexHost兼容脚本构建；重启停用兼容旧owner记录。开发编排脚本更新在下次正常打开Dev入口使用。
+
+Dev生命周期修复：App入口串行openDevelopment、校验监督进程就绪，确认旧宿主退出后才清理旧Dev并启动一个替代；日志追加保留故障。dev-host按PID/启动时间/路径观察退出，连续缺失才清理，读取异常保留；dev.mjs在exit-with-host下调用统一且幂等的cleanup，回收后台、监听器和归属，终端默认不启用。脚本升级须正常停止现有Dev后台后重新打开入口，新会话生效。

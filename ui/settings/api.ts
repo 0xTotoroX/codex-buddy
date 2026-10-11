@@ -11,7 +11,7 @@ export interface View {
   settingsUrl?: string | null;
   version: string;
   connection: {
-    status: 'disconnected' | 'connecting' | 'connected' | 'incompatible';
+    status: 'disconnected' | 'connecting' | 'connected' | 'unresponsive' | 'incompatible';
     message: string;
     endpoint: string | null;
     targetId: string | null;

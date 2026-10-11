@@ -177,6 +177,8 @@ Then delete `/Applications/CodexBuddy.app` and `~/.local/bin/codex-buddy`. To al
 
 ## Development
 
+New Dev App sessions clean up after the ChatGPT process exits, using its PID, start time, and executable identity. A temporary page disconnection keeps the session alive. After a script upgrade, run `npm run dev:stop` and reopen the Dev App; ChatGPT can stay open.
+
 Built with **Rust, JavaScript / TypeScript, and React**.
 
 ```text
