@@ -121,6 +121,7 @@ let injectedSettings;
 const nativeInputs = (root) => [
   ...filesUnder(root, 'src'),
   existsSync(join(root, 'ui/codex/model.js')) ? 'ui/codex/model.js' : 'ui/model-control/host.js',
+  ...(existsSync(join(root, 'ui/codex/codex-host.js')) ? ['ui/codex/codex-host.js'] : []),
   existsSync(join(root, 'ui/shared/tokens.css')) ? 'ui/shared/tokens.css' : 'ui/tokens.css',
   existsSync(join(root, 'ui/shared/icons/index.js'))
     ? 'ui/shared/icons/index.js'
@@ -374,6 +375,7 @@ function saveSession() {
     source: root,
     controller: controllerRoot,
     sourceEpoch,
+    supervisorPid: process.pid,
   });
   for (const destination of new Set([directory, controllerDirectory]))
     writeFileSync(join(destination, 'session.json'), record, { mode: 0o600 });
@@ -550,28 +552,33 @@ try {
     });
   useContext(context(selected.path));
   assertBackendStopped();
-  host = await findDevelopmentHost(source, args, async () => {
-    // Build before any host restart; use current source, not an older installed CLI.
-    console.log('正在准备宿主启动器；将按「启动行为」设置处理没有调试连接的应用…');
-    if (!existsSync(join(root, 'target/web/index.html')))
-      await execute('npm', ['run', 'build:web']);
-    await execute('cargo', ['build', '--locked']);
-    if (closing) throw new Error('开发模式退出中');
-    return command(
-      join(root, 'target/debug/codex-buddy'),
-      [
-        '--data-dir',
-        hostSettingsDirectory(source, data),
-        'launch',
-        '--host-only',
-        '--restart-running',
-        '--no-open',
-      ],
-      options,
-      children,
-      true,
-    );
-  });
+  host = await findDevelopmentHost(
+    source,
+    args,
+    async () => {
+      // Build before any host restart; use current source, not an older installed CLI.
+      console.log('正在准备宿主启动器；将按「启动行为」设置处理没有调试连接的应用…');
+      if (!existsSync(join(root, 'target/web/index.html')))
+        await execute('npm', ['run', 'build:web']);
+      await execute('cargo', ['build', '--locked']);
+      if (closing) throw new Error('开发模式退出中');
+      return command(
+        join(root, 'target/debug/codex-buddy'),
+        [
+          '--data-dir',
+          hostSettingsDirectory(source, data),
+          'launch',
+          '--host-only',
+          '--restart-running',
+          '--no-open',
+        ],
+        options,
+        children,
+        true,
+      );
+    },
+    hostSettingsDirectory(source, data),
+  );
   releaseTarget = claimTarget(host, controllerRoot);
   await restoreInstallation(journal, host);
   initializeData(source, data, host);

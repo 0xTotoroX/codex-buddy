@@ -21,6 +21,7 @@ import { useTasks } from '../features/board/api';
 import { Field } from './settings-controls';
 import { NativeSelect } from './components/ui/native-select';
 import { ConnectionSettings } from './connection-settings';
+import { CodexHostSettings } from './codex-host-settings';
 function editable(value: Settings): EditableSettings {
   const {
     enabled,
@@ -230,6 +231,9 @@ function App() {
           </SettingsForm>
           <div hidden={simple || page !== 'features'}>
             <TaskSettings tasks={tasks} />
+          </div>
+          <div hidden={simple || page !== 'connection'}>
+            <CodexHostSettings live={live} active={!simple && page === 'connection'} />
           </div>
           <section hidden={simple || page !== 'connection' || !dev} className="settings-section">
             <h2>开发来源</h2>

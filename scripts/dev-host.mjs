@@ -154,9 +154,15 @@ export async function findHost(source, options = {}) {
     { code: 'NO_DEBUG_HOST' },
   );
 }
-export async function findDevelopmentHost(source, options, prepareHost) {
+export async function findDevelopmentHost(
+  source,
+  options,
+  prepareHost,
+  settingsDirectory = source,
+) {
+  let host;
   try {
-    return await findHost(source, options);
+    host = await findHost(source, options);
   } catch (error) {
     // Never turn an ambiguous/explicit target selection failure into a host restart.
     if (
@@ -169,6 +175,16 @@ export async function findDevelopmentHost(source, options, prepareHost) {
     const endpoint = endpointUrl((await prepareHost()).trim());
     return findHost(source, { ...options, cdp: endpoint });
   }
+  if (
+    readJson(join(settingsDirectory, 'config.json'), {}).codexHost?.enabled &&
+    options['restart-running'] &&
+    !options.cdp &&
+    !options.target
+  ) {
+    const endpoint = endpointUrl((await prepareHost()).trim());
+    return findHost(source, { ...options, cdp: endpoint });
+  }
+  return host;
 }
 
 export function initializeData(source, data, host) {

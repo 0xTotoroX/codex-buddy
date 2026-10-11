@@ -51,6 +51,10 @@ Drag a panel heading or tab to another panel's edge to split the layout, or to i
 
 Both panels share the same chat source. The source label and follow/lock menu are temporarily hidden; existing associations are preserved. If the source becomes unavailable, previous results remain available for reading until it reconnects.
 
+## CodexHost management
+
+Open **详细设置 → 启动与开发 → CodexHost** for installed/running versions, enablement, updates, version restore, and explicit restart to disable. The switch saves the next-launch preference; restarts follow the existing host policy. Management does not require Buddy’s MCP plugin.
+
 ## Prompt enhancement
 
 Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **详细设置 → 模型与生成**, and sends only the draft, without chat history.

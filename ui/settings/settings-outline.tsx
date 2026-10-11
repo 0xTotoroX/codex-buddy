@@ -25,6 +25,7 @@ const aliases: Record<string, SettingsPage> = {
   'settings-limits': 'model',
   'settings-capsule': 'surfaces',
   'settings-startup': 'connection',
+  'settings-codex-host': 'connection',
   'settings-dev': 'connection',
 };
 const legacyTargets: Record<string, string> = {

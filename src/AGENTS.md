@@ -75,3 +75,8 @@ panel::Preferences.launcher_action 默认 inside，可选 outside/settings；旧
 panel_window受限IPC新增window-state/hide/toggle-maximize：隐藏仅切换可见性；放大保存普通frame后使用当前NSScreen.visibleFrame，还原恢复普通frame；回读至__buddyWindowControls。放大期间拒绝网页position/size及拖动/缩放，旧reveal复用隐藏窗口。
 
 - `prompt_enhancement.rs`：受限/prompt/enhance请求；验证当前CDP连接及前端请求身份、配置版本，以单次结构化模型调用改写草稿，轮询取消并在返回前再校验，不写宿主、不经Stepwise方向/Jev。模型调用共用model.complete_json及原CLI/三协议实现；完整输入超过200KB报错，不截断。
+
+- codex_host.rs / [codex_host/AGENTS.md](codex_host/AGENTS.md)：独立CodexHost管理、更新/回退及显式重启协调，无MCP依赖。
+- host.rs：启动与重连共用只读宿主发现/动态端口，Dev及显式窗口保持绑定；lifecycle复用发现与现有退出策略。
+
+Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，server提供认证GET/POST /api/codex-host。cdp先安装只读Agent兼容适配，再安装模型菜单适配。

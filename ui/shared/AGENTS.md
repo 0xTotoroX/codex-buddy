@@ -22,3 +22,5 @@ AppearanceSettings 增加可选 settingsTarget（plugin/web），旧后台缺省
 AppearanceSettings.launcherAction 保存独立眼睛的默认动作（inside/outside/settings）；与工作台布局及生成设置分离。
 
 contracts.ts声明宿主inputTarget只读目标和提示词优化verify/destroy生命周期接口；原文不进入持久化配置或窗口投影。
+
+codex-host.ts定义独立后台管理状态和重启进度，不扩展FeatureId或插件注册。contracts声明上游只读Agent探针。

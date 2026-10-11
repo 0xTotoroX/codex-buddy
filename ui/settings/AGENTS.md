@@ -48,3 +48,5 @@
 设置凭据以同源localStorage共享并兼容迁移旧sessionStorage；入口hash令牌优先，读取后移出URL。storage/hashchange/focus触发SSE重连，不卸载表单或重放写入；新地址首次仍须通过眼睛菜单授权入口进入。开发来源请求实时读取共享凭据，不再固定旧令牌。
 
 模式/分类按钮带data-settings-navigation；切换不触发模型表单或字号输入的失焦保存。原“打开功能”动作保留在详细功能分类的折叠操作区，不与每个开关常驻。字号、窗口、功能归属及贴边位置按需展开。
+
+- codex-host-settings.tsx：详细模式“启动与开发”内独立管理区域，分类可见时轮询codex-host API；启停保存独立revision，安装、更新、回退、启动及重启停用均为显式操作。旧settings-codex-host锚点仍可定位，不新增整页。

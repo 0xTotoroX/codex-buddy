@@ -433,6 +433,7 @@
   function passive() {
     const target = resolveTarget(),
       busy = generating(target);
+    const compatibility = window.__codexBuddyHostCompatibility?.capability(target?.composer);
     const current =
       cache &&
       sameTarget(cache.target, target) &&
@@ -451,6 +452,8 @@
       current,
       busy,
       Boolean(window.__codexPlusQuickModelPresets),
+      compatibility?.officialModel,
+      compatibility?.message,
       disposed,
     ]);
     if (stateKey !== fingerprint) {
@@ -468,6 +471,9 @@
     } else if (!target) {
       status = 'unavailable';
       message = '无法唯一确认聊天身份与输入框，请选择目标聊天';
+    } else if (compatibility?.officialModel === false) {
+      status = 'unavailable';
+      message = compatibility.message;
     } else if (operation) {
       status = 'busy';
       message = '模型菜单操作进行中';
@@ -489,6 +495,8 @@
   }
   function guard(op, node) {
     checkLive();
+    const compatibility = window.__codexBuddyHostCompatibility?.capability(op.target?.composer);
+    if (compatibility?.officialModel === false) op.aborted ||= compatibility.message;
     if (op.controller.signal.aborted || performance.now() >= op.deadline)
       op.aborted ||= String(op.controller.signal.reason || '操作超过 11 秒截止时间');
     if (op.aborted) {

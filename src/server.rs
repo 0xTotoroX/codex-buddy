@@ -123,6 +123,10 @@ async fn termination() {
 fn router(service: Service) -> Router {
     let api = Router::new()
         .route("/features", post(features))
+        .route(
+            "/codex-host",
+            get(codex_host_status).post(codex_host_command),
+        )
         .route("/surfaces", post(surfaces))
         .route("/tasks/state", get(tasks_state))
         .route("/tasks/command", post(tasks_command))
@@ -816,4 +820,14 @@ async fn features(
     Json(input): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
     Ok(Json(service.app.feature_request(input).await?))
+}
+
+async fn codex_host_status(State(service): State<Service>) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.codex_host_status().await?))
+}
+async fn codex_host_command(
+    State(service): State<Service>,
+    Json(input): Json<Value>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.codex_host_command(input).await?))
 }

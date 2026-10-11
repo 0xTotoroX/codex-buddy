@@ -152,3 +152,5 @@ settings-connection.test.mjs验证多标签初次连接、旧页恢复、凭据�
 v0.9发布回归将旧胶囊表情/独立大纲设置页选择器同步为现有眼睛入口、窗口工具条和总览开关；区分入口菜单aria-expanded与工作台开合状态，保留双击、草稿往返和键盘验收。
 
 settings-modes.test.mjs使用真实构建页面与合成服务，检查默认简易、四分类宽窄布局、单份输入节点、模式切换不写配置、模型/密钥/分组/字号失败草稿、折叠和阅读恢复、模式记忆及旧字段链接。startup-settings覆盖原保存队列；Dev来源用例映射到启动与开发，e2e --settings-only覆盖真实Rust配置与四功能启停。
+
+codex-host-settings.test验证独立API、版本修订与开关不隐式启动；codex-host-compatibility.test验证输入框Agent隔离。Rust codex_host验证旧配置/额外字段保留、过期写入拒绝、安装身份、取消不退出；host验证动态端口/固定绑定；dev-host验证仅显式Dev准备应用选择。本轮不自动执行真实宿主重启或安装。

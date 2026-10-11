@@ -4,6 +4,7 @@
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
 use crate::config::{self, Paths, VERSION, write_private};
+use crate::host::{desktop_process, find_desktop, process_debug_endpoint};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -140,7 +141,7 @@ async fn start_binary(
     bail!("后台启动超时，请运行 doctor 检查")
 }
 
-fn detach(command: &mut Command) {
+pub(crate) fn detach(command: &mut Command) {
     use std::os::unix::process::CommandExt;
     command.process_group(0);
 }
@@ -211,21 +212,6 @@ pub async fn doctor(paths: &Paths, endpoint: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn find_desktop() -> Option<PathBuf> {
-    if let Some(path) = std::env::var_os("CODEX_BUDDY_DESKTOP_BIN") {
-        return Some(PathBuf::from(path));
-    }
-    for app in [
-        "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT",
-        "/Applications/Codex.app/Contents/MacOS/Codex",
-    ] {
-        if Path::new(app).is_file() {
-            return Some(app.into());
-        }
-    }
-    None
-}
-
 pub async fn launch(
     paths: &Paths,
     executable: Option<PathBuf>,
@@ -234,6 +220,36 @@ pub async fn launch(
     restart_running: bool,
     host_only: bool,
 ) -> Result<()> {
+    let config = paths.load()?;
+    if config.codex_host.enabled {
+        anyhow::ensure!(!isolated, "CodexHost 不支持独立 profile 启动");
+        let (_, desktop, _) =
+            crate::codex_host::prepare(&config.codex_host, executable.as_deref()).await?;
+        if crate::codex_host::running().await?.is_none()
+            && let Some(pid) = desktop_process(&desktop)?
+        {
+            // Preserve the existing refusal to quit independent profiles.
+            process_debug_endpoint(pid)?;
+            anyhow::ensure!(
+                restart_running,
+                "启用 CodexHost 需要重开 Codex；请结束任务后从 Buddy 启动入口应用更改"
+            );
+            if !restart_approved(config.host_restart_policy, || {
+                confirm_codex_host_restart(true)
+            })? {
+                bail!("已取消重开，Codex 保持运行");
+            }
+            quit_desktop(
+                &desktop,
+                pid,
+                config.host_restart_policy == config::HostRestartPolicy::Force,
+                Duration::from_secs(30),
+            )
+            .await?;
+        }
+        let endpoint = crate::codex_host::launch(paths, &config.codex_host, Some(&desktop)).await?;
+        return finish_launch(paths, &endpoint, no_open, host_only, true).await;
+    }
     if let Some(endpoint) = paths.load()?.cdp_endpoint
         && desktop_ready(&endpoint).await
     {
@@ -325,67 +341,6 @@ async fn finish_launch(
     Ok(())
 }
 
-fn desktop_process(executable: &Path) -> Result<Option<i32>> {
-    let executable = std::fs::canonicalize(executable).context("桌面程序路径无效")?;
-    let output = Command::new("/bin/ps")
-        .args(["-axo", "pid=,comm="])
-        .output()?;
-    if !output.status.success() {
-        bail!("无法检查已打开的桌面程序；未启动新的实例")
-    }
-    let mut matches = Vec::new();
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let Some((pid, path)) = line.trim().split_once(char::is_whitespace) else {
-            continue;
-        };
-        if Path::new(path.trim())
-            .canonicalize()
-            .is_ok_and(|path| path == executable)
-        {
-            matches.push(pid.parse::<i32>()?);
-        }
-    }
-    if matches.len() > 1 {
-        bail!("发现多个同路径宿主实例，无法确定需要重开的应用；未退出任何实例。")
-    }
-    Ok(matches.first().copied())
-}
-
-fn process_debug_endpoint(pid: i32) -> Result<Option<String>> {
-    let output = Command::new("/bin/ps")
-        .args(["-p", &pid.to_string(), "-o", "args="])
-        .output()?;
-    if !output.status.success() {
-        bail!("读取宿主进程失败，请重试；未退出应用。")
-    }
-    let args = String::from_utf8_lossy(&output.stdout);
-    if args
-        .split_whitespace()
-        .any(|arg| arg.starts_with("--user-data-dir"))
-    {
-        bail!("检测到独立 profile 的宿主，请使用其调试连接；不会自动重开独立实例。")
-    }
-    Ok(debug_endpoint_from_args(&args))
-}
-
-fn debug_endpoint_from_args(args: &str) -> Option<String> {
-    let mut args = args.split_whitespace();
-    while let Some(arg) = args.next() {
-        let value = if arg == "--remote-debugging-port" {
-            args.next()
-        } else {
-            arg.strip_prefix("--remote-debugging-port=")
-        };
-        if let Some(port) = value
-            .and_then(|value| value.parse::<u16>().ok())
-            .filter(|port| *port > 0)
-        {
-            return Some(format!("http://127.0.0.1:{port}"));
-        }
-    }
-    None
-}
-
 fn restart_approved(
     policy: config::HostRestartPolicy,
     confirm: impl FnOnce() -> Result<bool>,
@@ -414,7 +369,43 @@ fn confirm_desktop_restart() -> Result<bool> {
     Ok(String::from_utf8_lossy(&output.stdout).trim() == "退出并重开")
 }
 
-async fn quit_desktop(executable: &Path, pid: i32, force: bool, timeout: Duration) -> Result<()> {
+pub(crate) fn approve_codex_host_disable(policy: config::HostRestartPolicy) -> Result<bool> {
+    restart_approved(policy, || confirm_codex_host_restart(false))
+}
+
+fn confirm_codex_host_restart(enabled: bool) -> Result<bool> {
+    let message = if enabled {
+        "启用 CodexHost 需要退出并重开 Codex。请先结束正在执行的任务。"
+    } else {
+        "停用 CodexHost 需要退出并重开 Codex。正在执行的任务可能中断。"
+    };
+    let script = format!(
+        r#"
+        tell current application
+            activate
+            set choice to display dialog "{message}" with title "CodexBuddy" buttons {{"取消", "退出并重开"}} default button "取消"
+            return button returned of choice
+        end tell
+    "#
+    );
+    let output = Command::new("/usr/bin/osascript")
+        .args(["-e", &script])
+        .output()?;
+    if !output.status.success() {
+        if String::from_utf8_lossy(&output.stderr).contains("(-128)") {
+            return Ok(false);
+        }
+        bail!("无法显示重开确认，Codex 保持运行");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim() == "退出并重开")
+}
+
+pub(crate) async fn quit_desktop(
+    executable: &Path,
+    pid: i32,
+    force: bool,
+    timeout: Duration,
+) -> Result<()> {
     use objc2_app_kit::NSRunningApplication;
     // Recheck identity after the potentially long confirmation dialog.
     if desktop_process(executable)? != Some(pid) {
@@ -719,13 +710,15 @@ int main(void) {
     #[test]
     fn discovers_changed_debug_ports_from_process_arguments() {
         assert_eq!(
-            debug_endpoint_from_args(
+            crate::host::debug_endpoint_from_args(
                 "/Applications/ChatGPT.app/Contents/MacOS/ChatGPT --remote-debugging-port=51952"
             ),
             Some("http://127.0.0.1:51952".into())
         );
         assert_eq!(
-            debug_endpoint_from_args("a path with spaces --remote-debugging-port 9229"),
+            crate::host::debug_endpoint_from_args(
+                "a path with spaces --remote-debugging-port 9229"
+            ),
             Some("http://127.0.0.1:9229".into())
         );
         for args in [
@@ -734,7 +727,7 @@ int main(void) {
             "--remote-debugging-port=bad",
             "--fake-remote-debugging-port=9229",
         ] {
-            assert!(debug_endpoint_from_args(args).is_none());
+            assert!(crate::host::debug_endpoint_from_args(args).is_none());
         }
     }
 }

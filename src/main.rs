@@ -5,11 +5,13 @@
 
 mod assets;
 mod cdp;
+mod codex_host;
 mod config;
 mod directions;
 mod edge_window;
 mod feature_window;
 mod features;
+mod host;
 mod jev;
 mod lifecycle;
 mod model;
@@ -42,6 +44,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(hide = true)]
+    CodexHostRestart {
+        #[arg(long)]
+        lease: String,
+    },
     #[command(hide = true)]
     FeatureWindow {
         #[arg(long)]
@@ -148,6 +155,7 @@ async fn main() -> Result<()> {
         no_open: false,
         allow_fixture: false,
     }) {
+        Commands::CodexHostRestart { lease } => codex_host::restart::run(&paths, &lease).await,
         Commands::RemindersWorker {
             lease,
             runtime_token,

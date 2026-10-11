@@ -41,3 +41,5 @@ Dev 控制器使用所选源码的 dev-panel 构建器，监听看板和通用�
 开发快照从 ui/surfaces/main.ts 构建 feature.html/feature-dev.js；独立桌面和贴边以独立功能修订号检测更新，保存全部视图草稿后重载，忙碌/交接/分栏拖动时延期。development 几何回读区分宿主与桌面/贴边，不读取卡片标题或聊天正文。
 
 Dev 来源识别和原生资源输入兼容新旧源码布局；旧路径仅作为历史 worktree 回退。升级目录布局时使用新版监督脚本正常重开，分别核对嵌入与实际存在的原生窗口资源修订号；没有活动窗口的旧遥测不代表当前已加载。
+
+CodexHost接续：findDevelopmentHost仅在选择启用、显式restart-running且未指定其他连接时委托当前源码CLI。dev.mjs记录supervisorPid、监听CodexHost兼容脚本构建；重启停用兼容旧owner记录。开发编排脚本更新在下次正常打开Dev入口使用。

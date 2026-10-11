@@ -284,6 +284,28 @@ test('Dev reuses an available host and never invokes restart policy', async (t) 
   assert.equal(found.target.id, 'same');
 });
 
+test('selected CodexHost applies only through explicitly authorized Dev preparation', async (t) => {
+  const source = temporary(t);
+  const host = await server(t, (_, res) =>
+    res.end(JSON.stringify([{ id: 'same', type: 'page', url: 'app://-/index.html' }])),
+  );
+  writeFileSync(
+    join(source, 'config.json'),
+    JSON.stringify({ cdpEndpoint: host.origin, codexHost: { enabled: true } }),
+  );
+  let prepared = 0;
+  const prepare = () => {
+    prepared++;
+    return host.origin;
+  };
+  await findDevelopmentHost(source, {}, prepare, source);
+  assert.equal(prepared, 0);
+  await findDevelopmentHost(source, { 'restart-running': true }, prepare, source);
+  assert.equal(prepared, 1);
+  await findDevelopmentHost(source, { 'restart-running': true, cdp: host.origin }, prepare, source);
+  assert.equal(prepared, 1);
+});
+
 test('first real session copies settings privately and later sessions preserve development edits', (t) => {
   const root = temporary(t),
     source = join(root, 'installed'),

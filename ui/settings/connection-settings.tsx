@@ -63,7 +63,7 @@ export function ConnectionSettings({
               label="ChatGPT 已打开，但没有调试连接时"
               hint={
                 form.hostRestartPolicy === 'force'
-                  ? '直接强制退出并重开，可能中断任务或丢失未保存内容。已有调试连接时不会重启。'
+                  ? '直接强制退出并重开，可能中断任务或丢失未保存内容。普通接入已有调试连接时不会重启；切换 CodexHost 按其启停状态处理。'
                   : '先询问；确认后请求正常退出，再重开并注入。取消或未能正常退出时保留应用。'
               }
             >

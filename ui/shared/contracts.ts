@@ -199,6 +199,12 @@ export interface PopoutBridge {
 declare global {
   const CODEX_BUDDY_DEVELOPMENT: boolean;
   interface Window {
+    __codexhostRendererBindingProbeV1?: {
+      status(): { version: number; selections?: { composerId: string; agent: string }[] };
+    };
+    __codexBuddyHostCompatibility?: {
+      capability(composer?: Element | null): { officialModel: boolean; message: string };
+    };
     __codexBuddyModelControl?: {
       inputTarget(): {
         id: string;

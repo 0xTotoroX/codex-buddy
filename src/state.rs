@@ -65,6 +65,7 @@ pub struct App {
     pub(crate) surfaces: Mutex<crate::surfaces::Surfaces>,
     pub(crate) features: Mutex<crate::features::Features>,
     pub(crate) feature_operation: Mutex<()>,
+    pub(crate) codex_host_operation: Mutex<()>,
     pub tasks: Arc<crate::tasks::Service>,
     pub views: watch::Sender<View>,
     pub shutdown: Notify,
@@ -123,6 +124,7 @@ impl App {
             surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
             features: Mutex::new(crate::features::Features::load(&paths)),
             feature_operation: Mutex::new(()),
+            codex_host_operation: Mutex::new(()),
             tasks: crate::tasks::Service::load(&paths),
             views,
             shutdown: Notify::new(),
@@ -214,13 +216,10 @@ impl App {
     }
 
     async fn establish(self: &Arc<Self>, desired: &Desired) -> Result<()> {
-        let endpoints = if let Some(endpoint) = &desired.endpoint {
-            vec![endpoint.clone()]
-        } else {
-            [9229, 9231, 9329]
-                .map(|port| format!("http://127.0.0.1:{port}"))
-                .to_vec()
-        };
+        let pinned = self.allow_fixture
+            || crate::assets::development().is_some()
+            || desired.target_id.is_some();
+        let endpoints = crate::host::endpoints(desired.endpoint.as_deref(), pinned)?;
         let mut found = None;
         for endpoint in endpoints {
             if let Ok(targets) = crate::cdp::discover(&endpoint, self.allow_fixture).await
