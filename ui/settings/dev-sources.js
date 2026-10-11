@@ -5,8 +5,19 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 const incoming = new URLSearchParams(location.hash.slice(1)).get('token');
-if (incoming) sessionStorage.setItem('companion-token', incoming);
-const token = incoming || sessionStorage.getItem('companion-token') || '';
+if (incoming) {
+  sessionStorage.setItem('companion-token', incoming);
+  try {
+    localStorage.setItem('companion-token', incoming);
+  } catch {}
+}
+function credential() {
+  let shared = '';
+  try {
+    shared = localStorage.getItem('companion-token') || '';
+  } catch {}
+  return shared || sessionStorage.getItem('companion-token') || '';
+}
 const host = document.createElement('section');
 host.id = 'buddy-dev-sources';
 const view = host.attachShadow({ mode: 'open' });
@@ -32,7 +43,8 @@ let active = '',
   pending = false,
   polling = false;
 async function api(body) {
-  if (!token) throw new Error('缺少连接凭据，请从工作台齿轮或 npm run dev:settings 重新打开。');
+  const token = credential();
+  if (!token) throw new Error('请从眼睛菜单打开一次设置，当前标签页会自动恢复连接。');
   const response = await fetch('/api/dev/sources', {
     method: body === undefined ? 'GET' : 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },

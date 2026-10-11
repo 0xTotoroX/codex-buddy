@@ -42,3 +42,5 @@
 所有动作图标通过shared/icons/react读取同一公开SVG目录，统一18px。页面保留桌面16px、窄屏12px额外顶部留白及底部边距。
 
 大纲和模型快切不再占独立分类；旧settings-outline/settings-model-control锚点映射总览并定位对应开关。窄屏布局align-content:start避免多余高度拉开导航和正文。Apple提醒事项暂不展示入口、授权或同步状态，总览看板只显示启停；后台能力和已存数据保留。
+
+设置凭据以同源localStorage共享并兼容迁移旧sessionStorage；入口hash令牌优先，读取后移出URL。storage/hashchange/focus触发SSE重连，不卸载表单或重放写入；新地址首次仍须通过眼睛菜单授权入口进入。开发来源请求实时读取共享凭据，不再固定旧令牌。

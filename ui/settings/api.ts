@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 启动令牌、React 与本机认证 API/SSE。
  * [OUTPUT]: 公开数据类型、request 与 useCompanion 状态订阅。
- * [POS]: 网页通信层，启动令牌移入当前标签页存储；认证状态中的 Dev 地址将普通设置入口导向监督进程。
+ * [POS]: 网页通信层，令牌在同源标签页共享并自动恢复认证连接；认证状态中的 Dev 地址将普通设置入口导向监督进程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
@@ -32,11 +32,34 @@ export interface Failure {
   message: string;
 }
 
+const credentialKey = 'companion-token';
+let memoryToken = '';
+function stored(storage: 'localStorage' | 'sessionStorage') {
+  try {
+    return window[storage].getItem(credentialKey) || '';
+  } catch {
+    return '';
+  }
+}
+function remember(storage: 'localStorage' | 'sessionStorage', token: string) {
+  try {
+    if (window[storage].getItem(credentialKey) !== token)
+      window[storage].setItem(credentialKey, token);
+  } catch {
+    /* Restricted browser storage still permits this page's in-memory connection. */
+  }
+}
 function readToken() {
   const params = new URLSearchParams(location.hash.slice(1));
   const incoming = params.get('token');
+  // An authenticated entry link is authoritative; otherwise reuse the latest same-origin token.
+  const token = incoming || stored('localStorage') || stored('sessionStorage') || memoryToken;
+  if (token) {
+    memoryToken = token;
+    remember('localStorage', token);
+    remember('sessionStorage', token);
+  }
   if (incoming) {
-    sessionStorage.setItem('companion-token', incoming);
     params.delete('token');
     history.replaceState(
       null,
@@ -44,9 +67,8 @@ function readToken() {
       location.pathname + location.search + (params.size ? `#${params}` : ''),
     );
   }
-  return incoming || sessionStorage.getItem('companion-token') || '';
+  return token;
 }
-const token = readToken();
 
 export class ApiError extends Error {
   constructor(public data: Failure) {
@@ -54,7 +76,10 @@ export class ApiError extends Error {
   }
 }
 
-const headers = () => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
+const headers = () => ({
+  Authorization: `Bearer ${readToken()}`,
+  'Content-Type': 'application/json',
+});
 
 export async function request<T = { ok: boolean }>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`/api/${path}`, {
@@ -75,9 +100,24 @@ export function useCompanion() {
   const [view, setView] = useState<View | null>(null);
   const [live, setLive] = useState(false);
   const [error, setError] = useState('');
+  const [credential, setCredential] = useState(readToken);
   useEffect(() => {
-    if (!token) {
-      setError('缺少连接凭据，请从工作台齿轮重新打开设置；Dev 也可运行 npm run dev:settings。');
+    const sync = () => setCredential(readToken());
+    const shared = (event: StorageEvent) => {
+      if (event.key === credentialKey) sync();
+    };
+    window.addEventListener('storage', shared);
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('focus', sync);
+    return () => {
+      window.removeEventListener('storage', shared);
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('focus', sync);
+    };
+  }, []);
+  useEffect(() => {
+    if (!credential) {
+      setError('此标签页尚未连接 Buddy。请从眼睛菜单打开一次设置，其他标签页会自动恢复。');
       return;
     }
     const controller = new AbortController();
@@ -87,14 +127,12 @@ export function useCompanion() {
       while (!disposed) {
         try {
           const response = await fetch('/api/events', {
-            headers: headers(),
+            headers: { Authorization: `Bearer ${credential}` },
             signal: controller.signal,
           });
           if (response.status === 401) {
             setLive(false);
-            setError(
-              '连接凭据已过期，请从工作台齿轮重新打开设置；Dev 也可运行 npm run dev:settings。',
-            );
+            setError('设置连接已过期。请从眼睛菜单重新打开设置，其他标签页会自动恢复。');
             return;
           }
           if (!response.ok || !response.body) throw new Error('服务连接暂时中断');
@@ -145,6 +183,6 @@ export function useCompanion() {
       disposed = true;
       controller.abort();
     };
-  }, []);
+  }, [credential]);
   return { view, live, error };
 }
