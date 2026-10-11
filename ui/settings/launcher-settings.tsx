@@ -43,9 +43,10 @@ export function LauncherSettings({
   }
   return (
     <div className="settings-section">
-      <Field id="launcher-click-action" label="眼睛单击默认动作">
+      <Field id="launcher-click-action" label="眼睛单击">
         <NativeSelect
           id="launcher-click-action"
+          aria-label="眼睛单击默认动作"
           disabled={!prefs || busy}
           value={prefs?.launcherAction ?? 'inside'}
           onChange={(e) => void change(e.target.value)}

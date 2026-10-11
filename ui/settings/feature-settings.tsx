@@ -13,7 +13,9 @@ export function FeatureSettings({
   live,
   desktopSupported,
   onPlacement,
+  simple = false,
 }: {
+  simple?: boolean;
   live: boolean;
   desktopSupported: boolean;
   onPlacement: (placement: string) => void;
@@ -121,60 +123,68 @@ export function FeatureSettings({
   }
   return (
     <section className="settings-section">
-      <h2>功能位置与布局</h2>
-      <div id="main-placement" className="settings-choice" role="group" aria-label="主界面形式">
-        {(['sidebar', 'overlay', 'desktop'] as const).map((p) => (
-          <button
-            type="button"
-            key={p}
-            aria-pressed={(state.pendingPlacement || primary) === p}
-            disabled={moving || (p === 'desktop' && !desktopSupported)}
-            onClick={() => void change({ op: 'main-placement', placement: p })}
-          >
-            {labels[p]}
-          </button>
-        ))}
+      <h2 hidden={simple}>功能位置与布局</h2>
+      <div className="settings-placement-row">
+        <span hidden={!simple}>主界面位置</span>
+        <div id="main-placement" className="settings-choice" role="group" aria-label="主界面形式">
+          {(['sidebar', 'overlay', 'desktop'] as const).map((p) => (
+            <button
+              type="button"
+              key={p}
+              aria-pressed={(state.pendingPlacement || primary) === p}
+              disabled={moving || (p === 'desktop' && !desktopSupported)}
+              onClick={() => void change({ op: 'main-placement', placement: p })}
+            >
+              {simple ? { sidebar: '侧栏', overlay: '浮层', desktop: '桌面' }[p] : labels[p]}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="settings-hint mb-5">主界面只保留一份，贴边窗口可以独立显示。</p>
-      {Object.entries(titles).map(([id, title]) => (
-        <Field key={id} id={`placement-${id}`} label={title}>
+      <div hidden={simple}>
+        <p className="settings-hint mb-5">主界面只保留一份，贴边窗口可以独立显示。</p>
+        <details id="feature-placements" className="settings-details">
+          <summary>各功能位置</summary>
+          {Object.entries(titles).map(([id, title]) => (
+            <Field key={id} id={`placement-${id}`} label={title}>
+              <NativeSelect
+                id={`placement-${id}`}
+                aria-label={`${title}默认位置`}
+                disabled={moving}
+                value={
+                  state.features.find((e) => e.id === id)?.placement === 'edge' ||
+                  (!state.features.some((e) => e.id === id) && id === 'model')
+                    ? 'edge'
+                    : primary
+                }
+                onChange={(e) => void change({ op: 'move', id, placement: e.target.value })}
+              >
+                <option value={primary}>{labels[primary]}</option>
+                <option value="edge" disabled={!desktopSupported}>
+                  贴边 / 刘海
+                </option>
+              </NativeSelect>
+            </Field>
+          ))}
+        </details>
+        <Field id="main-layout" label="主界面布局">
           <NativeSelect
-            id={`placement-${id}`}
-            aria-label={`${title}默认位置`}
-            disabled={moving}
-            value={
-              state.features.find((e) => e.id === id)?.placement === 'edge' ||
-              (!state.features.some((e) => e.id === id) && id === 'model')
-                ? 'edge'
-                : primary
-            }
-            onChange={(e) => void change({ op: 'move', id, placement: e.target.value })}
+            id="main-layout"
+            disabled={moving || !ids.length}
+            value={mode}
+            onChange={(e) => arrange(e.target.value)}
           >
-            <option value={primary}>{labels[primary]}</option>
-            <option value="edge" disabled={!desktopSupported}>
-              贴边 / 刘海
-            </option>
+            <option value="tabs">标签组</option>
+            <option value="vertical">上下分栏</option>
+            <option value="horizontal">左右分栏</option>
+            <option value="auto">自动分栏</option>
+            {mode === 'custom' && (
+              <option value="custom" disabled>
+                自定义分栏
+              </option>
+            )}
           </NativeSelect>
         </Field>
-      ))}
-      <Field id="main-layout" label="主界面布局">
-        <NativeSelect
-          id="main-layout"
-          disabled={moving || !ids.length}
-          value={mode}
-          onChange={(e) => arrange(e.target.value)}
-        >
-          <option value="tabs">标签组</option>
-          <option value="vertical">上下分栏</option>
-          <option value="horizontal">左右分栏</option>
-          <option value="auto">自动分栏</option>
-          {mode === 'custom' && (
-            <option value="custom" disabled>
-              自定义分栏
-            </option>
-          )}
-        </NativeSelect>
-      </Field>
+      </div>
       <Feedback text={error || readError} failed />
     </section>
   );

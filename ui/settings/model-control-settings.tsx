@@ -60,7 +60,6 @@ export function ModelControlSettings({ live }: { live: boolean }) {
         checked={enabled ?? false}
         disabled={!live || busy || enabled === null}
         onChange={(value) => void change(value)}
-        onOpen={() => void change(true)}
       />
       <Feedback text={message} />
     </section>

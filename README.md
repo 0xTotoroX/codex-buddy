@@ -33,7 +33,7 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **下一步 → 高级生成设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
+In Web settings, choose **详细设置 → 模型与生成 → 高级生成设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
 
 **Suggestion directions** are independent of when generation starts:
 
@@ -45,7 +45,7 @@ Web settings include six editable directions and custom directions. Counts are m
 
 CodexBuddy uses its own eyes entry in the left rail and does not require the plugin. Click to toggle the workbench; double-click or Alt+Enter keeps the existing window handoff. Right-click or Option-right-click opens settings in ChatGPT’s built-in browser side panel.
 
-Hover over the independent eyes entry to choose inside, outside, or settings; configure its default click action in the settings overview. Workbench headers no longer repeat the face. The desktop window has a horizontal-line return-to-chat button, maximize/restore, and pin controls at the top right. Maximize uses the available screen area; restore returns to the original position and size.
+Hover over the independent eyes entry to choose inside, outside, or settings; configure its default click action in the simple settings. Workbench headers no longer repeat the face. The desktop window has a horizontal-line return-to-chat button, maximize/restore, and pin controls at the top right. Maximize uses the available screen area; restore returns to the original position and size.
 
 Drag a panel heading or tab to another panel's edge to split the layout, or to its center to group them as tabs. Double-click a heading or tab to temporarily enlarge that panel; double-click its heading again or press Esc to restore the layout. Keyboard users can focus a heading and press Enter or Space. Choose tabs, vertical, horizontal or automatic splits under **显示与布局 → 主界面布局** in Web settings. Press Esc during a drag to cancel it.
 
@@ -53,11 +53,15 @@ Both panels share the same chat source. The source label and follow/lock menu ar
 
 ## Prompt enhancement
 
-Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **下一步 → 生成模型**, and sends only the draft, without chat history.
+Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **详细设置 → 模型与生成**, and sends only the draft, without chat history.
+
+## Simple and detailed settings
+
+Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Narrow panels use a category selector. Both modes use the same forms and save queue; switching retains unfinished edits, disclosure state and reading position without changing advanced values. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
 
 ## Task board
 
-Open **看板** in Web settings, enable it, then click **打开看板**, or run `codex-buddy board`. The default groups are To do, In progress and Done; rename or add groups in settings. Narrow views use group tabs, while wide windows show columns.
+Open **看板** in Web settings, enable it; the existing feature placement is retained, or run `codex-buddy board`. The default groups are To do, In progress and Done; rename or add groups in settings. Narrow views use group tabs, while wide windows show columns.
 
 Apple Reminders authorization, list selection and sync controls are temporarily hidden. This release primarily uses the local board; integration code, existing bindings and task data are retained. Hiding the entry neither deletes Apple reminders nor automatically resets an existing sync configuration. Legacy Waiting tasks appear under To do while retaining their original stored stage.
 
@@ -67,7 +71,7 @@ Settings credentials are shared by browser tabs using the same backend address. 
 
 In Web settings, use **显示与布局 → 主界面** to choose a sidebar, in-page overlay or resizable desktop window. Only one main interface exists. Each feature joins either this shared tabbed interface or the independent edge/notch panel, which can coexist with it. Each form saves its own black, matte, frosted or liquid (Regular/Clear) theme. Click the capsule to expand or collapse; double-click to move the entire main interface to or from the desktop. Revealing it from settings reuses its window. Moving preserves drafts, closed features and task data.
 
-The settings **总览** (overview) shows saved placement, themes, layout, generation options, task counts by group, and current/favorite models. Click a property to open its setting. **显示与布局 → 内容字号** adjusts each feature independently in 1px steps, accepts one decimal place, and resets all fonts in one click. Defaults are 16px for outline and next steps, 15px for the board, and 14px for model switching; existing font preferences are preserved.
+Under **详细设置 → 外观与布局 → 内容字号**, adjust each feature independently in 1px steps, enter one decimal place, or reset all fonts. Defaults are 16px for outline and next steps, 15px for the board, and 14px for model switching; existing preferences are preserved.
 The board starts with To do, In progress and Done. Rename groups or add your own. Cards show titles; create tasks at the bottom of each group. Drag to another column, or onto a group tab in narrow views. Hover over a card to reveal its trash button and remove it from Buddy immediately. The Apple reminder stays intact and is not imported again. Cards do not open details; expand search when needed. Custom groups stay local, while moving to Done syncs completion.
 
 
@@ -75,7 +79,7 @@ Return an existing desktop workbench before entering independent mode. Moving pr
 
 Before first moving a legacy standalone board into independent mode, save its draft and close that window. Otherwise the move is refused and the original window is kept open.
 
-Hover over the eyes entry to reveal a background-free menu that expands upward within the sidebar: **Inside**, **Desktop**, and **Settings**. The settings overview lets you choose the default single-click action; existing configurations default to toggling the in-chat workbench. Arrow keys open and navigate the menu, and Esc closes it. Alt+Enter retains window handoff. Motion follows the reduced-motion preference.
+Hover over the eyes entry to reveal a background-free menu that expands upward within the sidebar: **Inside**, **Desktop**, and **Settings**. The simple settings lets you choose the default single-click action; existing configurations default to toggling the in-chat workbench. Arrow keys open and navigate the menu, and Esc closes it. Alt+Enter retains window handoff. Motion follows the reduced-motion preference.
 
 The eyes entry reflects the original capsule states, including blinking at idle, generation, completion and errors. With multiple visible chats, a small edge dot indicates the linked chat’s direction; it is hidden for a single chat or an unavailable source. This does not add another capsule or change the entry’s click/menu actions.
 

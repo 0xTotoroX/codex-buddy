@@ -111,18 +111,22 @@ test(
         errors.push(error.message);
       });
       await page.goto(`http://127.0.0.1:${server.address().port}/#token=fixture`);
-      await page.getByRole('link', { name: '启动与连接', exact: true }).click();
+      await page.getByRole('button', { name: '详细设置', exact: true }).click();
+      await page.getByRole('link', { name: '启动与开发', exact: true }).click();
       const policy = page.getByLabel('ChatGPT 已打开，但没有调试连接时');
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'ask');
       await policy.selectOption('force');
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       await until(() => saves.length === 1);
       assert.equal(saves[0].hostRestartPolicy, 'force');
       await page.reload();
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'force');
-      await page.getByRole('link', { name: '下一步', exact: true }).click();
+      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
       await page.getByText('高级生成设置', { exact: true }).click();
       const context = page.getByLabel('输入上下文', { exact: true });
       await context.selectOption('latest');
@@ -138,46 +142,55 @@ test(
       await input.fill('8000');
       // Typed input stays local until blur or the explicit save button.
       assert.equal(settings.maxInputChars, 12000);
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await until(() => settings.maxInputChars === 8000);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       hold = true;
       await input.fill('9000');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
       await page
         .getByRole('navigation', { name: '设置分类' })
-        .getByRole('link', { name: '总览', exact: true })
+        .getByRole('link', { name: '功能与交互', exact: true })
         .click();
-      await page.getByRole('link', { name: '下一步', exact: true }).click();
+      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
       assert.equal(await input.inputValue(), '9000');
       await input.fill('10000');
       pending.shift()();
       await until(() => settings.maxInputChars === 9000);
       assert.equal(await input.inputValue(), '10000', 'slow save must not erase newer typing');
       assert.equal(pending.length, 0, 'typing alone must not be saved');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
       hold = false;
       pending.shift()();
       await until(() => settings.maxInputChars === 10000);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       assert.equal(maxInFlight, 1);
       rejectNext = true;
       await input.fill('11000');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await page.getByText('合成保存失败，请重试', { exact: true }).waitFor();
       assert.equal(await input.inputValue(), '11000');
       assert.equal(settings.maxInputChars, 10000);
       await page.getByRole('button', { name: '保存设置', exact: true }).click();
       await until(() => settings.maxInputChars === 11000);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       hold = true;
       await input.fill('12000');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await until(() => pending.length === 1);
       await input.fill('13000');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       // Allow the second blur debounce to join the active save queue.
       await page.waitForTimeout(300);
       assert.equal(pending.length, 1);
@@ -186,11 +199,14 @@ test(
       hold = false;
       pending.shift()();
       await until(() => settings.maxInputChars === 13000);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       assert.equal(maxInFlight, 1, 'queued saves must use the new revision serially');
       settings = { ...settings, configurationRevision: settings.configurationRevision + 1 };
       await input.fill('14000');
-      await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).click();
+      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
       await page.getByText('设置已在其他窗口更新，请重新载入后再保存', { exact: true }).waitFor();
       assert.equal(await input.inputValue(), '14000');
       assert.equal(settings.maxInputChars, 13000);
@@ -202,11 +218,15 @@ test(
       await page.getByText('高级生成设置', { exact: true }).click();
       await input.waitFor();
       assert.equal(await input.inputValue(), '13000');
+      await page.getByRole('link', { name: '功能与交互', exact: true }).click();
       const quick = page.getByLabel('常用提示词 1 内容', { exact: true });
       await quick.fill('请继续推进整体目标');
       await page.getByRole('heading', { name: '常用提示词', exact: true }).click();
       await until(() => settings.quickPrompts[0].prompt === '请继续推进整体目标');
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       await page.reload();
       await quick.waitFor();
       assert.equal(await quick.inputValue(), '请继续推进整体目标');
@@ -228,7 +248,10 @@ test(
       await page.getByLabel('倾向说明 4', { exact: true }).fill('关注维护成本与依赖负担');
       await page.getByRole('heading', { name: '建议方向', exact: true }).click();
       await until(() => settings.directionLibrary.length === 4);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       await page.reload();
       await source.waitFor();
       assert.equal(await source.inputValue(), 'manual');
@@ -254,7 +277,10 @@ test(
       await page.getByRole('button', { name: '删除方向', exact: true }).click();
       await page.getByLabel('我同意将最近一问一答', { exact: false }).check();
       await until(() => settings.jev.consent);
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       hold = true;
       await page.getByLabel('Jev 模型', { exact: true }).fill('jev-second');
       await page.getByRole('heading', { name: '建议方向', exact: true }).click();
@@ -266,7 +292,10 @@ test(
       await page.waitForTimeout(300); // latest full snapshot joins the existing queue
       hold = false;
       pending.shift()();
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       await until(
         () =>
           inFlight === 0 &&
@@ -287,7 +316,10 @@ test(
       await page.getByLabel('Jev API 密钥', { exact: true }).fill('fixture-judge-secret');
       await page.getByRole('heading', { name: '建议方向', exact: true }).click();
       await until(() => saves.at(-1).jevApiKey === 'fixture-judge-secret');
-      await page.getByText('设置已同步到本机', { exact: true }).waitFor();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
+      );
       assert.equal(await page.getByLabel('Jev API 密钥', { exact: true }).inputValue(), '');
       await page.getByRole('button', { name: '添加自定义方向', exact: true }).click();
       await source.selectOption('auto');
@@ -342,7 +374,9 @@ test('Dev source widget survives settings unmount and remount', { timeout: 15000
     await page.addScriptTag({ content: bundle.outputFiles[0].text });
     for (let i = 0; i < 2; i++) {
       await page.evaluate(() => window.mountSettings());
-      await page.getByRole('link', { name: '开发', exact: true }).waitFor();
+      await page.waitForFunction(() =>
+        document.querySelector('#settings-dev-content > #buddy-dev-sources'),
+      );
       assert.equal(
         await page.evaluate(
           () =>

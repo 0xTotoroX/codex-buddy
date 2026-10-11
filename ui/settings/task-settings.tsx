@@ -5,7 +5,6 @@
 import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
-import { FeatureSwitch } from './settings-controls';
 import { Switch } from './components/ui/switch';
 import { NativeSelect } from './components/ui/native-select';
 import {
@@ -16,8 +15,8 @@ import {
 } from '../features/board/api';
 // Retain the integration UI for later; no authorization/list controls are mounted today.
 const remindersSettingsVisible = false;
-export function TaskSettings() {
-  const { state, error, busy, command } = useTasks(true);
+export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) {
+  const { state, error, busy, command } = tasks;
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
   const [newGroup, setNewGroup] = useState('');
   const [calendars, setCalendars] = useState<Calendar[]>([]);
@@ -41,13 +40,6 @@ export function TaskSettings() {
     (!!hasLinks && !!currentId && !needsRepair);
   return (
     <section id="settings-tasks" className="settings-section space-y-5">
-      <FeatureSwitch
-        name="看板"
-        checked={state?.store.boardEnabled ?? false}
-        disabled={busy || !state || !!state.error}
-        onChange={(boardEnabled) => void command({ op: 'modules', boardEnabled })}
-        onOpen={() => void command({ op: 'open' })}
-      />
       <details id="board-groups" className="group">
         <summary className="cursor-pointer text-[15px] group-open:mb-4">看板分组</summary>
         <div className="space-y-3">

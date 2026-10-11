@@ -52,27 +52,25 @@ async function waitFor(check, message, timeout = 12000) {
   }
   throw new Error(message);
 }
-async function checkSettingsNavigation(page, context, base, runtime) {
-  const nav = page.getByRole('navigation', { name: '设置分类' });
-  const names = ['总览', '下一步', '看板', '显示与布局', '启动与连接'];
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await nav.getByRole('link', { name: '总览', exact: true }).click();
-  const overview = page.locator('.settings-overview');
-  await overview.getByRole('region', { name: '下一步配置', exact: true }).waitFor();
-  assert.equal(
-    await overview
-      .locator('button,input,select,textarea,[role="switch"],[contenteditable="true"]')
-      .count(),
-    0,
-    'overview links navigate without configuration controls',
-  );
-  const savedSettings = await page.evaluate(async () =>
-    (
-      await fetch('/api/settings', {
-        headers: { Authorization: 'Bearer ' + sessionStorage.getItem('companion-token') },
+async function selectSettingsCategory(page, id) {
+  await page.getByRole('button', { name: '详细设置', exact: true }).click();
+  const select = page.getByLabel('详细设置分类');
+  if (await select.isVisible()) await select.selectOption(id);
+  else
+    await page
+      .getByRole('navigation', { name: '设置分类' })
+      .getByRole('link', {
+        name: {
+          features: '功能与交互',
+          model: '模型与生成',
+          surfaces: '外观与布局',
+          connection: '启动与开发',
+        }[id],
+        exact: true,
       })
-    ).json(),
-  );
+      .click();
+}
+async function checkSettingsNavigation(page, context, base, runtime) {
   const writes = [];
   const recordWrite = (req) => {
     if (req.method() !== 'POST') return;
@@ -82,90 +80,61 @@ async function checkSettingsNavigation(page, context, base, runtime) {
     writes.push(path);
   };
   page.on('request', recordWrite);
-  await overview
-    .getByRole('region', { name: '下一步配置' })
-    .getByText(savedSettings.model, { exact: true })
-    .waitFor();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   for (const width of [1280, 780, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const name of names) {
-      await nav.getByRole('link', { name, exact: true }).click();
-      await page.getByRole('heading', { name, exact: true, level: 1 }).waitFor();
+    await page.getByRole('button', { name: '简易', exact: true }).click();
+    await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    for (const id of ['features', 'model', 'surfaces', 'connection']) {
+      await selectSettingsCategory(page, id);
+      await page
+        .getByRole('heading', {
+          name: {
+            features: '功能与交互',
+            model: '模型与生成',
+            surfaces: '外观与布局',
+            connection: '启动与开发',
+          }[id],
+          level: 1,
+          exact: true,
+        })
+        .waitFor();
       assert.equal(
-        await nav.getByRole('link', { name, exact: true }).getAttribute('aria-current'),
-        'page',
-      );
-      assert.equal(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-        true,
-        `${name} overflow at ${width}`,
+        await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+        false,
+        `${id} overflow at ${width}`,
       );
     }
-    await nav.getByRole('link', { name: '总览', exact: true }).click();
-    await overview.getByRole('region', { name: '下一步配置' }).waitFor();
-    await page.screenshot({ path: join(output, `settings-overview-${width}.png`), fullPage: true });
-    await nav.getByRole('link', { name: '显示与布局', exact: true }).click();
-    await page.screenshot({ path: join(output, `settings-layout-${width}.png`), fullPage: true });
   }
   page.off('request', recordWrite);
-  assert.deepEqual(writes, [], 'viewing overview does not write configuration or execute actions');
+  assert.deepEqual(writes, [], 'presentation-only navigation never writes configuration');
   await page.setViewportSize({ width: 1280, height: 900 });
-  await nav.getByRole('link', { name: '看板', exact: true }).focus();
-  await page.keyboard.press('Enter');
-  await page.getByRole('heading', { name: '看板', exact: true, level: 1 }).waitFor();
+  await selectSettingsCategory(page, 'features');
   await page.getByText('看板分组', { exact: true }).click();
-  const groupName = page.getByLabel('分组名称：待办', { exact: true });
-  await groupName.fill('尚未保存的分组名称');
-  await nav.getByRole('link', { name: '总览', exact: true }).click();
-  assert.equal(
-    await overview.getByText('尚未保存的分组名称', { exact: true }).count(),
-    0,
-    'overview shows saved values, not form drafts',
-  );
-  await nav.getByRole('link', { name: '看板', exact: true }).click();
-  assert.equal(await groupName.inputValue(), '尚未保存的分组名称');
-  await page.goto(`${base}/#settings-limits`);
+  const group = page.getByLabel('分组名称：待办', { exact: true });
+  await group.fill('尚未保存的分组名称');
+  await page.getByRole('button', { name: '简易', exact: true }).click();
+  await page.getByRole('button', { name: '详细设置', exact: true }).click();
+  assert.equal(await group.inputValue(), '尚未保存的分组名称');
+  await page.evaluate(() => (location.hash = 'settings-limits'));
   await page.getByLabel('输入上下文', { exact: true }).waitFor();
-  assert.equal(
-    await nav.getByRole('link', { name: '下一步', exact: true }).getAttribute('aria-current'),
-    'page',
-  );
-  await page.getByLabel('输入上下文', { exact: true }).scrollIntoViewIfNeeded();
-  const top = await page.evaluate(() => scrollY);
-  await nav.getByRole('link', { name: '总览', exact: true }).click();
-  await nav.getByRole('link', { name: '下一步', exact: true }).click();
-  assert.ok(
-    Math.abs((await page.evaluate(() => scrollY)) - top) < 2,
-    'category scroll position is retained',
-  );
-  await page.goBack();
-  await page.getByRole('heading', { name: '总览', exact: true, level: 1 }).waitFor();
-  await page.goForward();
-  await page.getByRole('heading', { name: '下一步', exact: true, level: 1 }).waitFor();
   const gated = await context.newPage();
   await gated.route('**/api/settings', async (route) => {
     const response = await route.fetch();
     await route.fulfill({ response, json: { ...(await response.json()), popoutSupported: false } });
   });
   await gated.goto(`${base}/#token=${runtime.token}`);
-  await gated.getByRole('link', { name: '显示与布局', exact: true }).click();
-  await waitFor(
-    () => gated.getByRole('button', { name: '侧栏', exact: true }).isEnabled(),
-    'feature state did not load',
-  );
-  assert.equal(
-    await gated.getByRole('button', { name: '桌面窗口', exact: true }).isDisabled(),
-    true,
-  );
-  assert.equal(
-    await gated
-      .locator('option[value="edge"]')
-      .evaluateAll((options) => options.length === 4 && options.every((option) => option.disabled)),
-    true,
-  );
+  await selectSettingsCategory(gated, 'surfaces');
+  await gated.locator('#main-placement button').last().waitFor();
+  assert.equal(await gated.locator('#main-placement button').last().isDisabled(), true);
   await gated.close();
-  record('设置分类宽窄布局、键盘/历史/旧链接、草稿和阅读位置保留、平台限制');
+  record('简易／详细设置共享配置、宽窄分类、草稿与旧链接、平台限制');
 }
+
 const suggestions = [
   {
     title: '拆解开发步骤',
@@ -440,9 +409,7 @@ try {
       ['board', '看板'],
       ['model', '模型快切'],
     ]) {
-      await nav
-        .getByRole('link', { name: ['outline', 'model'].includes(id) ? '总览' : name, exact: true })
-        .click();
+      await nav.getByRole('link', { name: '功能与交互', exact: true }).click();
       const control = page.getByRole('switch', { name: `启用${name}`, exact: true });
       await waitFor(() => control.isEnabled(), `${name} switch unavailable`);
       if (!(await featureFlags())[id]) {
@@ -490,17 +457,17 @@ try {
         `${name} did not return`,
       );
     }
-    await nav.getByRole('link', { name: '下一步', exact: true }).click();
+    await nav.getByRole('link', { name: '模型与生成', exact: true }).click();
     await page.goto(`${base}/#settings-next/max-output`);
     const limit = page.getByLabel('输出 token 上限', { exact: true });
     await limit.fill('1');
-    await nav.getByRole('link', { name: '总览', exact: true }).click();
+    await nav.getByRole('link', { name: '功能与交互', exact: true }).click();
     await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
     await waitFor(
       async () => !(await settings()).answerOutlineEnabled,
       'outline disable blocked by unrelated draft',
     );
-    await nav.getByRole('link', { name: '下一步', exact: true }).click();
+    await nav.getByRole('link', { name: '模型与生成', exact: true }).click();
     assert.equal(
       await limit.inputValue(),
       '1',
@@ -508,7 +475,7 @@ try {
     );
     await limit.fill(String((await settings()).maxOutputTokens));
     await limit.blur();
-    await nav.getByRole('link', { name: '总览', exact: true }).click();
+    await nav.getByRole('link', { name: '功能与交互', exact: true }).click();
     await page.getByRole('switch', { name: '启用大纲', exact: true }).click();
     await waitFor(async () => (await settings()).answerOutlineEnabled, 'outline did not restore');
     await waitFor(
@@ -516,7 +483,7 @@ try {
       'feature reopen did not settle',
     );
     record('四功能独立启停、原位置恢复、看板数据与同步保留、开关不提交无效草稿');
-    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
+    await page.getByRole('link', { name: '外观与布局', exact: true }).click();
     const before = (await api('features', { op: 'state' })).body;
     for (const axis of ['vertical', 'horizontal', 'tabs']) {
       await page.getByLabel('主界面布局', { exact: true }).selectOption(axis);
@@ -537,19 +504,6 @@ try {
       membership((await api('features', { op: 'state' })).body.features),
       membership(before.features),
     );
-    await page.getByRole('link', { name: '总览', exact: true }).click();
-    await page.locator('.settings-overview').getByText('标签组', { exact: true }).waitFor();
-    const boardSummary = page.getByRole('region', { name: '看板配置', exact: true });
-    await boardSummary.getByText('待办', { exact: true }).waitFor();
-    await page
-      .getByRole('region', { name: '模型快切配置', exact: true })
-      .getByRole('heading', { name: '常用模型', exact: true })
-      .waitFor();
-    const fontLinks = page.locator('.overview-fonts a');
-    assert.equal(await fontLinks.count(), 4);
-    for (const link of await fontLinks.all()) assert.match(await link.innerText(), /\d+\.\d px$/);
-    // Deep links reveal collapsed controls and preserve browser back navigation.
-    const summary = page.locator('.settings-overview');
     for (const [href, target] of [
       ['#settings-surfaces/font-board', 'font-board'],
       ['#settings-surfaces/main-layout', 'main-layout'],
@@ -558,94 +512,20 @@ try {
       ['#settings-next/suggestion-click', 'suggestion-click'],
       ['#settings-board/board-groups', 'board-groups'],
     ]) {
-      await summary.locator(`a[href="${href}"]`).first().click();
+      await page.evaluate((hash) => (location.hash = hash), href);
       await page.waitForFunction((id) => document.activeElement?.id === id, target);
       assert.equal(await page.locator(`#${target}`).isVisible(), true);
-      await page.goBack();
-      await page.locator('.settings-overview').waitFor({ state: 'visible' });
     }
-
     await page.emulateMedia({ colorScheme: 'dark' });
-    await page.screenshot({ path: join(output, 'settings-overview-dark.png'), fullPage: true });
-    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
-    await page.screenshot({ path: join(output, 'settings-dark.png'), fullPage: true });
-    const longModel = 'custom-provider/project-planning-and-implementation-model-long-name';
-    await page.route('**/api/settings', async (route) => {
-      const response = await route.fetch();
-      await route.fulfill({ response, json: { ...(await response.json()), model: longModel } });
-    });
-    await page.route('**/api/tasks/state', async (route) => {
-      const response = await route.fetch(),
-        state = await response.json();
-      state.store.columns = [
-        { id: 'todo', title: '待办：整理资料并确认本周项目交付范围' },
-        { id: 'doing', title: '正在进行的跨设备界面核验' },
-        { id: 'done', title: '完成' },
-      ];
-      state.store.tasks = state.store.columns.flatMap((column, index) =>
-        Array.from({ length: index + 1 }, (_, i) => ({
-          id: `${column.id}-${i}`,
-          archived: false,
-          deleteRequested: false,
-          remote: null,
-          remoteMissing: false,
-          conflict: null,
-          fields: {
-            title: `合成任务 ${i}`,
-            notes: '',
-            due: null,
-            priority: 0,
-            column: column.id,
-            completed: column.id === 'done',
-          },
-        })),
-      );
-      await route.fulfill({ response, json: state });
-    });
-    await page.route('**/api/model-control/state', async (route) => {
-      const response = await route.fetch();
-      const state = await response.json();
-      state.preferences.pinned = ['test-model'];
-      state.preferences.presets = [
-        {
-          id: 'preset-test',
-          name: '日常开发与长文本评审组合',
-          selection: { model: 'test-model', reasoning: 'high', speed: 'fast' },
-        },
-      ];
-      state.snapshot.models = [
-        {
-          id: 'test-model',
-          label: '用于确认长模型名称正确换行的开发模型',
-          reasoning: ['high'],
-          fast: true,
-        },
-      ];
-      state.snapshot.current = { model: 'test-model', reasoning: 'high', speed: 'fast' };
-      state.snapshot.status = 'ready';
-      state.snapshot.message = '';
-      await route.fulfill({ response, json: state });
-    });
     await page.setViewportSize({ width: 390, height: 900 });
-    await page.getByRole('link', { name: '总览', exact: true }).click();
-    await page.locator('.settings-overview').getByText(longModel, { exact: true }).waitFor();
-    await page
-      .getByRole('region', { name: '看板配置' })
-      .getByText('3项', { exact: true })
-      .waitFor();
-    await page
-      .getByRole('region', { name: '模型快切配置' })
-      .getByText('日常开发与长文本评审组合', { exact: true })
-      .waitFor();
-
+    await selectSettingsCategory(page, 'surfaces');
     assert.equal(
-      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
-      true,
-      'long saved values wrap in narrow overview',
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
     );
-    await page.screenshot({ path: join(output, 'settings-overview-long.png'), fullPage: true });
+    await page.screenshot({ path: join(output, 'settings-detail-dark.png'), fullPage: true });
     assert.deepEqual(errors, []);
-    record('只读总览宽窄与长文本、草稿隔离、保存后更新；真实 Rust 服务布局保存与深色设置页面');
+    record('双模式草稿保留、旧深链接；真实 Rust 服务布局保存与深色设置页面');
     writeFileSync(
       join(output, 'e2e-report.json'),
       JSON.stringify({ artifact, scope: 'settings', reports, pageErrors: errors }, null, 2),
@@ -1202,7 +1082,7 @@ try {
     page = await context.newPage();
     page.on('pageerror', (error) => errors.push(`settings: ${error.message}`));
     await page.goto(`${base}/#token=${runtime.token}`);
-    await page.getByRole('navigation', { name: '设置分类' }).waitFor();
+    await page.locator('nav[aria-label="设置分类"]').waitFor({ state: 'attached' });
     assert.equal(page.url(), `${base}/`);
     assert.equal(await page.getByLabel('Codex 明暗', { exact: true }).count(), 0);
     assert.equal(await desktop.locator('[data-action="theme"]').count(), 0);
@@ -1211,16 +1091,18 @@ try {
       'undefined',
     );
     await checkSettingsNavigation(page, context, base, runtime);
-    await page.getByRole('link', { name: '下一步', exact: true }).click();
+    await page.getByRole('link', { name: '模型与生成', exact: true }).click();
     await page.getByText('高级生成设置', { exact: true }).click();
 
     assert.equal(await page.getByLabel('API 密钥', { exact: true }).inputValue(), '');
+    await selectSettingsCategory(page, 'features');
     await page.getByLabel('最多建议数量').fill('3');
     await page.getByRole('button', { name: '保存设置', exact: true }).click();
     await waitFor(async () => (await settings()).maxItems === 3, 'Web settings were not saved');
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'secrets.json'))).apiKey, 'fixture-key');
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'config.json'))).unrelatedOption.keep, true);
     assert.equal(statSync(join(dataDir, 'secrets.json')).mode & 0o777, 0o600);
+    await selectSettingsCategory(page, 'model');
     await page.getByRole('button', { name: '读取模型', exact: true }).click();
     await waitFor(
       async () => (await page.locator('#available-models option').count()) === 2,
@@ -1231,7 +1113,7 @@ try {
     record('网页保存、模型列表、连接测试、密钥保留与私有权限');
     const appearanceBefore = (await api('appearance')).body;
     // Themes belong to surfaces; legacy panel appearance remains compatible but is not edited here.
-    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
+    await page.getByRole('link', { name: '外观与布局', exact: true }).click();
     const surfaceBefore = (await api('surfaces', { op: 'state' })).body;
     const theme = page.getByLabel('侧栏主题', { exact: true });
     await theme.selectOption('native-glass');
@@ -1257,7 +1139,7 @@ try {
       theme: surfaceBefore.preferences.themes.sidebar,
     });
     await page.screenshot({ path: join(output, 'settings-single-liquid.png') });
-    await page.getByRole('link', { name: '下一步', exact: true }).click();
+    await page.getByRole('link', { name: '模型与生成', exact: true }).click();
     await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
     await waitFor(
       async () => (await panelState()).clickMode === 'hybrid',
@@ -1275,7 +1157,8 @@ try {
       ui: { material: 'frosted' },
     });
     assert.notEqual(staleAppearance.status, 200);
-    await page.getByRole('link', { name: '显示与布局', exact: true }).click();
+    await page.getByRole('link', { name: '外观与布局', exact: true }).click();
+    await page.locator('#settings-fonts summary').click();
     await page.getByLabel('大纲字号（px）', { exact: true }).fill('16');
     await page.getByLabel('大纲字号（px）', { exact: true }).blur();
     await waitFor(
@@ -1555,7 +1438,7 @@ try {
     await generate();
     record('旧格式 JSON 作为普通正文保留，建议只来自独立模型');
     await page.reload();
-    await page.getByRole('navigation', { name: '设置分类' }).waitFor();
+    await page.locator('nav[aria-label="设置分类"]').waitFor({ state: 'attached' });
     await delay(300);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: join(output, 'settings-desktop.png'), fullPage: true });

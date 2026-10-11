@@ -94,6 +94,11 @@ export function PanelSettings({
               }
             }}
             onBlur={(e) => {
+              if (
+                e.relatedTarget instanceof Element &&
+                e.relatedTarget.closest('[data-settings-navigation]')
+              )
+                return;
               const entered = e.currentTarget.valueAsNumber;
               const n = decimal ? Math.round(entered * 10) / 10 : entered;
               if (Number.isFinite(n) && n >= min && n <= max) {
@@ -165,9 +170,9 @@ export function PanelSettings({
         </>
       ) : (
         <>
-          <section className="settings-section settings-surface-group" id="settings-fonts">
+          <details className="settings-section settings-surface-group" id="settings-fonts">
+            <summary className="settings-group-title">内容字号</summary>
             <div className="settings-row settings-font-heading">
-              <h2>内容字号</h2>
               <Button
                 type="button"
                 variant="ghost"
@@ -197,9 +202,9 @@ export function PanelSettings({
                 )}
               </div>
             ))}
-          </section>
-          <section className="settings-section settings-surface-group">
-            <h2>尺寸与窗口</h2>
+          </details>
+          <details className="settings-section settings-surface-group" id="settings-window">
+            <summary className="settings-group-title">尺寸与窗口</summary>
             {number('dock-width', '侧栏宽度（px）', ui.dockWidth, DOCK_MIN_WIDTH, Infinity, (n) =>
               change('dockWidth', n),
             )}
@@ -210,7 +215,7 @@ export function PanelSettings({
                 onChange={(v) => void update({ alwaysOnTop: v })}
               />
             </div>
-          </section>
+          </details>
         </>
       )}
       <Feedback text={error} failed />

@@ -278,13 +278,13 @@ test(
       });
       await page.goto(`${session.url}/#token=${session.token}`);
       const navigation = page.getByRole('navigation', { name: '设置分类' });
-      await page.getByRole('heading', { name: '总览', exact: true }).waitFor();
-      await page.getByLabel('当前配置总览', { exact: true }).waitFor();
-      await navigation.getByRole('link', { name: '总览', exact: true }).click();
+      await page.getByRole('heading', { name: '设置', exact: true }).waitFor({ state: 'attached' });
+      await page.getByRole('button', { name: '详细设置', exact: true }).click();
+      await navigation.getByRole('link', { name: '功能与交互', exact: true }).click();
       const outlineSwitch = page.getByRole('switch', { name: '启用大纲', exact: true });
       await outlineSwitch.waitFor();
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings controls must be usable');
-      await navigation.getByRole('link', { name: '开发', exact: true }).click();
+      await navigation.getByRole('link', { name: '启动与开发', exact: true }).click();
       await page.getByText(/开发来源 · Stepwise/).waitFor();
       await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'complete settings page must render without React errors');
@@ -310,7 +310,7 @@ test(
       await page.getByText(/界面资源已确认/).waitFor();
       switchingSource = false;
       assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
-      await navigation.getByRole('link', { name: '总览', exact: true }).click();
+      await navigation.getByRole('link', { name: '功能与交互', exact: true }).click();
       await outlineSwitch.waitFor();
       await until(() => outlineSwitch.isEnabled(), 'settings remain usable after switching');
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
@@ -333,7 +333,7 @@ test(
         200,
         'current page automatically includes its source identity',
       );
-      await navigation.getByRole('link', { name: '开发', exact: true }).click();
+      await navigation.getByRole('link', { name: '启动与开发', exact: true }).click();
       mkdirSync(join(project, 'target/reports'), { recursive: true });
       await page.screenshot({ path: join(project, 'target/reports/dev-source-selector.png') });
       const unauthenticated = await browser.newPage();
@@ -344,9 +344,10 @@ test(
       await unauthenticated.close();
       const expired = await browser.newPage();
       await expired.goto(`${session.url}/#token=expired`);
+      await expired.getByRole('button', { name: '详细设置', exact: true }).click();
       await expired
         .getByRole('navigation', { name: '设置分类' })
-        .getByRole('link', { name: '开发', exact: true })
+        .getByRole('link', { name: '启动与开发', exact: true })
         .click();
       await expired.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
       await expired.getByRole('alert').filter({ hasText: '设置连接已过期' }).waitFor();

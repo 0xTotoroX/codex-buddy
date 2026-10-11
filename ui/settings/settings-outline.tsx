@@ -1,58 +1,118 @@
-/* [INPUT]: URL 锚点、当前设置分类与 Dev 注入入口。
- * [OUTPUT]: 单页分类导航、属性定位与折叠展开、旧锚点兼容、各分类阅读位置及最后访问分类。
- * [POS]: 设置导航；隐藏而不卸载内容，保留编辑草稿。
- * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
+/* [INPUT]: URL anchors, local presentation preference and the Dev source widget.
+ * [OUTPUT]: Simple/detail navigation with per-mode/category reading restoration and legacy anchors.
+ * [POS]: Presentation state only; never changes backend configuration or remounts forms.
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { NativeSelect } from './components/ui/native-select';
 export const pageTitles = {
-  overview: '总览',
-  next: '下一步',
-  board: '看板',
-  surfaces: '显示与布局',
-  connection: '启动与连接',
-  dev: '开发',
+  features: '功能与交互',
+  model: '模型与生成',
+  surfaces: '外观与布局',
+  connection: '启动与开发',
 };
 export type SettingsPage = keyof typeof pageTitles;
+export type SettingsMode = 'simple' | 'detail';
 const aliases: Record<string, SettingsPage> = {
-  'settings-tasks': 'board',
-  'settings-outline': 'overview',
-  'settings-model-control': 'overview',
+  'settings-overview': 'features',
+  'settings-outline': 'features',
+  'settings-model-control': 'features',
+  'settings-next': 'features',
+  'settings-board': 'features',
+  'settings-tasks': 'features',
+  'settings-directions': 'features',
+  'settings-quick-prompts': 'features',
+  'settings-model': 'model',
+  'settings-limits': 'model',
   'settings-capsule': 'surfaces',
-  'settings-features': 'next',
-  'settings-model': 'next',
-  'settings-directions': 'next',
-  'settings-quick-prompts': 'next',
-  'settings-limits': 'next',
   'settings-startup': 'connection',
+  'settings-dev': 'connection',
 };
-function fromHash(): SettingsPage | null {
-  const hash = location.hash.slice(1).split('/')[0];
-  if (aliases[hash]) return aliases[hash];
-  const key = hash.replace(/^settings-/, '');
-  return key in pageTitles ? (key as SettingsPage) : null;
+const legacyTargets: Record<string, string> = {
+  'settings-board': 'settings-tasks',
+  'settings-dev': 'settings-dev-content',
+};
+const storage = (kind: 'localStorage' | 'sessionStorage', key: string) => {
+  try {
+    return window[kind].getItem(key) || '';
+  } catch {
+    return '';
+  }
+};
+function remember(kind: 'localStorage' | 'sessionStorage', key: string, value: string) {
+  try {
+    window[kind].setItem(key, value);
+  } catch {}
+}
+function savedPage(): SettingsPage {
+  const value =
+    storage('sessionStorage', 'buddy-settings-detail-page') ||
+    storage('sessionStorage', 'buddy-settings-page');
+  return value in pageTitles ? (value as SettingsPage) : aliases['settings-' + value] || 'features';
+}
+function fromHash() {
+  const [section, field = ''] = location.hash.slice(1).split('/');
+  if (
+    /^(provider|protocol|base-url|api-key(?:-env)?|model|max-input|max-output|context-scope|timeout)$/.test(
+      field,
+    )
+  )
+    return { mode: 'detail' as const, page: 'model' as const };
+  if (
+    /^(font-|theme-|edge-|placement-|main-|dock-width|window-pinning|launcher-click-action)/.test(
+      field,
+    )
+  )
+    return { mode: 'detail' as const, page: 'surfaces' as const };
+  if (section === 'settings-simple' || section === 'settings-overview')
+    return { mode: 'simple' as const, page: savedPage() };
+  const page =
+    aliases[section] ||
+    (section.replace(/^settings-/, '') in pageTitles
+      ? (section.replace(/^settings-/, '') as SettingsPage)
+      : null);
+  return page ? { mode: 'detail' as const, page } : null;
 }
 export function useSettingsPage(ready: boolean) {
-  const [selection, setSelection] = useState(() => {
-    const saved = sessionStorage.getItem('buddy-settings-page') || '';
-    return {
-      page: fromHash() || (saved in pageTitles ? (saved as SettingsPage) : ('overview' as const)),
-      hash: location.hash,
-    };
-  });
-  const { page, hash } = selection;
+  const [selection, setSelection] = useState(() => ({
+    ...(fromHash() || {
+      mode:
+        storage('localStorage', 'buddy-settings-mode') === 'detail'
+          ? ('detail' as const)
+          : ('simple' as const),
+      page: savedPage(),
+    }),
+    hash: location.hash,
+  }));
+  const { page, mode, hash } = selection;
   const [dev, setDev] = useState(false);
   const positions = useRef(new Map<string, number>());
-  const current = useRef(page);
-  function select(next: SettingsPage, hash: string) {
-    if (next !== current.current) positions.current.set(current.current, window.scrollY);
-    setSelection({ page: next, hash });
+  const current = useRef(selection);
+  const positionKey = (value: { mode: SettingsMode; page: SettingsPage }) =>
+    value.mode === 'simple' ? 'simple' : `detail:${value.page}`;
+  function select(next: { mode: SettingsMode; page: SettingsPage }, hash: string) {
+    if (
+      current.current.mode === next.mode &&
+      current.current.page === next.page &&
+      current.current.hash === hash
+    )
+      return;
+    positions.current.set(positionKey(current.current), window.scrollY);
+    setSelection({ ...next, hash });
   }
   function navigate(next: SettingsPage, hash: string) {
-    if (location.hash !== hash) history.pushState(null, '', hash);
-    select(next, hash);
+    if (location.hash !== hash)
+      history.pushState({ buddySettings: { mode: 'detail', page: next } }, '', hash);
+    select({ mode: 'detail', page: next }, hash);
+  }
+  function switchMode(next: SettingsMode) {
+    if (mode === next) return;
+    const nextHash = next === 'simple' ? '#settings-simple' : `#settings-${page}`;
+    history.pushState({ buddySettings: { mode: next, page } }, '', nextHash);
+    select({ mode: next, page }, nextHash);
   }
   useEffect(() => {
     const change = () => {
-      const next = fromHash();
+      const next = fromHash() || history.state?.buddySettings;
       if (next) select(next, location.hash);
     };
     window.addEventListener('hashchange', change);
@@ -63,19 +123,29 @@ export function useSettingsPage(ready: boolean) {
     };
   }, []);
   useLayoutEffect(() => {
-    current.current = page;
-    sessionStorage.setItem('buddy-settings-page', page);
-    window.scrollTo({ top: positions.current.get(page) || 0, behavior: 'instant' });
-    if (!ready) return;
+    current.current = selection;
+    if (history.state?.buddySettings?.mode !== mode || history.state?.buddySettings?.page !== page)
+      history.replaceState({ ...history.state, buddySettings: { mode, page } }, '', location.href);
+    remember('localStorage', 'buddy-settings-mode', mode);
+    remember('sessionStorage', 'buddy-settings-detail-page', page);
+    window.scrollTo({
+      top: positions.current.get(positionKey(selection)) || 0,
+      behavior: 'instant',
+    });
+    if (!ready || mode === 'simple') return;
     const [section, field] = hash.slice(1).split('/');
-    const target = field || (aliases[section] === page ? section : '');
+    const target =
+      field ||
+      legacyTargets[section] ||
+      (aliases[section] === page && !(section.replace(/^settings-/, '') in pageTitles)
+        ? section
+        : '');
     if (!target) return;
     const focusTarget = () => {
       const node = document.getElementById(target);
-      if (!node) return false;
-      for (let parent: HTMLElement | null = node; parent; parent = parent.parentElement) {
+      if (!node || node.closest('[hidden]')) return false;
+      for (let parent: HTMLElement | null = node; parent; parent = parent.parentElement)
         if (parent instanceof HTMLDetailsElement) parent.open = true;
-      }
       if (!node.hasAttribute('tabindex') && !node.matches('input,select,button,a'))
         node.tabIndex = -1;
       node.focus({ preventScroll: true });
@@ -92,7 +162,7 @@ export function useSettingsPage(ready: boolean) {
       observer.disconnect();
       clearTimeout(timer);
     };
-  }, [page, hash, ready]);
+  }, [page, mode, hash, ready]);
   useLayoutEffect(() => {
     let attachedHost: HTMLElement | null = null;
     const attach = () => {
@@ -117,36 +187,56 @@ export function useSettingsPage(ready: boolean) {
       if (attachedHost) document.body.prepend(attachedHost);
     };
   }, []);
-  return { page, dev, navigate };
+
+  return { page, mode, dev, navigate, switchMode };
 }
 export function SettingsOutline({
   page,
-  dev,
+  mode = 'detail',
   navigate,
 }: {
   page: SettingsPage;
-  dev: boolean;
+  mode?: SettingsMode;
+  dev?: boolean;
   navigate: (page: SettingsPage, hash: string) => void;
 }) {
   return (
-    <nav aria-label="设置分类" className="settings-nav">
-      {(Object.keys(pageTitles) as SettingsPage[])
-        .filter((id) => id !== 'dev' || dev)
-        .map((id) => (
+    <nav
+      aria-label="设置分类"
+      className="settings-nav"
+      hidden={mode === 'simple'}
+      data-settings-navigation
+    >
+      <NativeSelect
+        className="settings-category-select"
+        aria-label="详细设置分类"
+        value={page}
+        onChange={(event) =>
+          navigate(event.target.value as SettingsPage, `#settings-${event.target.value}`)
+        }
+      >
+        {Object.entries(pageTitles).map(([id, title]) => (
+          <option key={id} value={id}>
+            {title}
+          </option>
+        ))}
+      </NativeSelect>
+      <div className="settings-category-links">
+        {(Object.keys(pageTitles) as SettingsPage[]).map((id) => (
           <a
             key={id}
+            href={`#settings-${id}`}
+            aria-current={page === id ? 'page' : undefined}
             onClick={(event) => {
               if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
               event.preventDefault();
               navigate(id, event.currentTarget.hash);
             }}
-            className={id === 'surfaces' ? 'settings-nav-divider' : ''}
-            href={`#settings-${id}`}
-            aria-current={page === id ? 'page' : undefined}
           >
             {pageTitles[id]}
           </a>
         ))}
+      </div>
     </nav>
   );
 }

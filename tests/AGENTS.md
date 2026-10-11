@@ -150,3 +150,5 @@ workbench的closed independent views定向用例检查全部视图关闭后释�
 settings-connection.test.mjs验证多标签初次连接、旧页恢复、凭据轮换、关闭全部标签后重开、隔离浏览器存储、旧session迁移及写入不重试；不使用真实凭据。
 
 v0.9发布回归将旧胶囊表情/独立大纲设置页选择器同步为现有眼睛入口、窗口工具条和总览开关；区分入口菜单aria-expanded与工作台开合状态，保留双击、草稿往返和键盘验收。
+
+settings-modes.test.mjs使用真实构建页面与合成服务，检查默认简易、四分类宽窄布局、单份输入节点、模式切换不写配置、模型/密钥/分组/字号失败草稿、折叠和阅读恢复、模式记忆及旧字段链接。startup-settings覆盖原保存队列；Dev来源用例映射到启动与开发，e2e --settings-only覆盖真实Rust配置与四功能启停。

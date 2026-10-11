@@ -2,6 +2,7 @@
  * [POS]: Presentation settings, no feature enable/disable or business state.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
+import { SettingsDisclosure } from './settings-disclosure';
 import { FeatureSettings } from './feature-settings';
 import { request } from './api';
 import { NativeSelect } from './components/ui/native-select';
@@ -21,7 +22,9 @@ export function SurfaceSettings({
   desktopSupported,
   appearance,
   fontBase,
+  simple = false,
 }: {
+  simple?: boolean;
   live: boolean;
   desktopSupported: boolean;
   appearance?: AppearanceSettings;
@@ -99,9 +102,14 @@ export function SurfaceSettings({
       aria-label="呈现形式设置"
       className="settings-section"
     >
-      <FeatureSettings live={live} desktopSupported={desktopSupported} onPlacement={setPrimary} />
+      <FeatureSettings
+        live={live}
+        desktopSupported={desktopSupported}
+        onPlacement={setPrimary}
+        simple={simple}
+      />
       <section className="settings-section settings-surface-group">
-        <h2>主题</h2>
+        <h2 hidden={simple}>各形式外观</h2>
         <div className="space-y-3">
           {Object.entries(labels).map(([placement, label]) => {
             const theme = state?.preferences.themes[placement] || {
@@ -109,15 +117,17 @@ export function SurfaceSettings({
               liquidVariant: 'regular',
             };
             return (
-              <details
+              <SettingsDisclosure
                 key={placement}
                 id={`theme-${placement}`}
-                open={placement === primary || placement === 'edge'}
+                hidden={simple && placement !== primary}
+                initiallyOpen={placement === primary}
+                forceOpen={simple ? placement === primary : undefined}
                 className="settings-details"
               >
-                <summary>{label}</summary>
+                <summary hidden={simple}>{label}</summary>
                 <div className="settings-field">
-                  <span className="text-sm">材质</span>
+                  <span className="text-sm">{simple ? '主界面材质' : '材质'}</span>
                   <div className="flex min-w-0 flex-wrap gap-2 [&>div]:flex-1">
                     <NativeSelect
                       aria-label={`${label}主题`}
@@ -150,13 +160,19 @@ export function SurfaceSettings({
                     )}
                   </div>
                 </div>
-              </details>
+              </SettingsDisclosure>
             );
           })}
         </div>
       </section>
-      <PanelSettings value={appearance} fontBase={fontBase} />
-      <details id="edge-position" className="settings-section settings-surface-group">
+      <div hidden={simple}>
+        <PanelSettings value={appearance} fontBase={fontBase} />
+      </div>
+      <details
+        id="edge-position"
+        className="settings-section settings-surface-group"
+        hidden={simple}
+      >
         <summary className="settings-group-title">贴边 / 刘海位置</summary>
         <div className="mt-3 space-y-3">
           <label className="settings-field text-sm">

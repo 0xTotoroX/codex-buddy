@@ -79,6 +79,8 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
+    await page.locator('#settings-fonts summary').click();
+    await page.locator('#settings-window summary').click();
     const font = page.getByLabel('大纲字号（px）', { exact: true });
     assert.equal(await font.inputValue(), '23.1');
     assert.equal(await font.getAttribute('step'), '1');

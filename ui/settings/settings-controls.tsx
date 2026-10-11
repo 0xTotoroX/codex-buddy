@@ -51,22 +51,17 @@ export function FeatureSwitch({
   checked,
   disabled,
   onChange,
-  onOpen,
 }: {
   name: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (value: boolean) => void;
-  onOpen: () => void;
 }) {
   const id = useId();
   return (
     <div className="settings-row settings-feature-switch">
       <label htmlFor={id}>启用{name}</label>
       <div className="flex shrink-0 items-center gap-4">
-        <Button type="button" variant="ghost" disabled={disabled || !checked} onClick={onOpen}>
-          打开{name}
-        </Button>
         <Switch
           id={id}
           aria-label={`启用${name}`}
@@ -104,7 +99,8 @@ export function SettingsForm({
     <form
       onBlurCapture={(e) => {
         if (!(
-          e.relatedTarget instanceof Element && e.relatedTarget.closest('button[type="submit"]')
+          e.relatedTarget instanceof Element &&
+          e.relatedTarget.closest('button[type="submit"], [data-settings-navigation]')
         ))
           schedule(e.currentTarget);
       }}
@@ -134,9 +130,13 @@ export function SettingsForm({
             </Button>
           </div>
         )}
-        <div className="settings-save">
+        <div
+          className="settings-save"
+          data-save-state={saving ? 'saving' : dirty ? 'dirty' : 'saved'}
+          hidden={!dirty && !saving}
+        >
           <span role="status">
-            {saving ? '正在保存…' : dirty ? '编辑中，离开输入框后自动保存' : '设置已同步到本机'}
+            {saving ? '正在保存…' : dirty ? '编辑中，离开输入框后自动保存' : ''}
           </span>
           {dirty && (
             <Button type="submit" variant="outline" disabled={saving || remoteChanged}>
