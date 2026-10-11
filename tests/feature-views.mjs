@@ -581,7 +581,12 @@ try {
   assert.equal(await view.getByLabel('模型工具').count(), 0, 'no empty preset tools');
   await page.screenshot({ path: join(output, 'edge-model.png') });
   model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
-  model.snapshot.models.push({ id: 'c', label: 'Model C', reasoning: ['high'], fast: false });
+  model.snapshot.models.push({
+    id: 'c',
+    label: 'Gemini-3.1-pro-preview-customtools · 优先级 20 · routing group',
+    reasoning: ['high'],
+    fast: false,
+  });
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
   await view.getByRole('button', { name: /其他模型/, expanded: true }).waitFor();
@@ -627,6 +632,26 @@ try {
       ),
   );
   record('model tools, expanded rows and horizontal reading survive remount');
+  const longName = view.locator('[data-model-row="c"] .model-name strong');
+  const nameGeometry = await longName.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      width: node.clientWidth,
+      scrollWidth: node.scrollWidth,
+      height: node.getBoundingClientRect().height,
+      lineHeight: parseFloat(style.lineHeight),
+    };
+  });
+  assert.ok(nameGeometry.height > nameGeometry.lineHeight * 1.5, 'long names wrap');
+  assert.ok(nameGeometry.scrollWidth <= nameGeometry.width + 1, 'full name fits its column');
+  const longRow = view.locator('[data-model-row="c"]');
+  const namesBox = await longRow.locator('.model-name').boundingBox();
+  const choicesBox = await longRow.locator('.model-choices').boundingBox();
+  assert.ok(namesBox.x + namesBox.width <= choicesBox.x, 'name does not overlap reasoning');
+  await view.getByRole('separator', { name: '模型名称列宽' }).press('ArrowRight');
+  await view.locator('[role="separator"][aria-valuenow="296"][aria-disabled="false"]').waitFor();
+  assert.equal(model.preferences.modelColumnWidth, 296);
+  record('desktop long model names wrap without clipping; column saves beyond old 280px limit');
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 0);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
   if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))

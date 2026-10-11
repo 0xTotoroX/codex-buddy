@@ -62,7 +62,7 @@ export function ModelView({
     action({ target: s.target, expectedRevision: s.revision, selection, preserveSpeed }, 'apply');
   const save = (patch: object) => action({ revision: state.revision, patch }, 'preferences');
   const nameWidth = columnWidth ?? prefs.modelColumnWidth ?? 140;
-  const clampWidth = (width: number) => Math.max(100, Math.min(280, Math.round(width)));
+  const clampWidth = (width: number) => Math.max(100, Math.min(560, Math.round(width)));
   const saveWidth = async (width: number) => {
     try {
       await save({ modelColumnWidth: width });
@@ -339,7 +339,7 @@ export function ModelView({
             aria-label="模型名称列宽"
             aria-orientation="vertical"
             aria-valuemin={100}
-            aria-valuemax={280}
+            aria-valuemax={560}
             aria-valuenow={nameWidth}
             aria-disabled={busy}
             tabIndex={busy ? -1 : 0}

@@ -66,7 +66,7 @@ impl Selection {
 
 impl Preferences {
     fn validate(&self) -> Result<()> {
-        if !(100. ..=280.).contains(&self.model_column_width) {
+        if !(100. ..=560.).contains(&self.model_column_width) {
             bail!("模型列宽无效");
         }
         let mut ids = std::collections::HashSet::new();
@@ -355,6 +355,9 @@ mod tests {
         let next = prefs.patched(&json!({"pinned":["a"]})).unwrap();
         assert_eq!(next.presets, prefs.presets);
         assert_eq!(next.pinned, vec!["a"]);
+        let widened = next.patched(&json!({"modelColumnWidth":560})).unwrap();
+        assert_eq!(widened.model_column_width, 560.);
+        assert!(next.patched(&json!({"modelColumnWidth":561})).is_err());
         let reordered = next.patched(&json!({"modelOrder":["b","a"]})).unwrap();
         assert_eq!(reordered.pinned, next.pinned);
         assert_eq!(reordered.presets, next.presets);
