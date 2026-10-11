@@ -11,7 +11,7 @@ export const cardStyles = `
 @media(prefers-reduced-motion:no-preference){.term-card{animation:term-appear 120ms ease-out}@keyframes term-appear{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}}`;
 export function createCard(
   term,
-  { style = 'plain', semantic = false, onMaster = async () => {} } = {},
+  { style = 'plain', semantic = false, onMaster = async (_id) => {} } = {},
 ) {
   const card = document.createElement('article');
   card.className = 'term-card';

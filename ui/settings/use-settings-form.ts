@@ -12,6 +12,7 @@ type ControlPatch = {
   jevConsent?: boolean;
   enabled?: boolean;
   answerOutlineEnabled?: boolean;
+  promptEnhancementEnabled?: boolean;
 };
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 type Draft = {
@@ -161,7 +162,11 @@ export function useSettingsForm(
                 Object.assign(form, { [key]: editable(value)[key] });
             }
           } else {
-            for (const key of ['enabled', 'answerOutlineEnabled'] as const) {
+            for (const key of [
+              'enabled',
+              'answerOutlineEnabled',
+              'promptEnhancementEnabled',
+            ] as const) {
               if (control[key] !== undefined && form[key] === control[key]) form[key] = value[key];
             }
             if (
@@ -228,7 +233,7 @@ export function useSettingsForm(
     update({ ...current.current, form: { ...previous, [key]: value } });
     notifyRef.current('');
     const control: ControlPatch | null =
-      key === 'enabled' || key === 'answerOutlineEnabled'
+      key === 'enabled' || key === 'answerOutlineEnabled' || key === 'promptEnhancementEnabled'
         ? { [key]: value }
         : key === 'directionSource' && value !== 'smart'
           ? { directionSource: value as EditableSettings['directionSource'] }

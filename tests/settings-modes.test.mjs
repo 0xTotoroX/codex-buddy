@@ -194,7 +194,7 @@ test(
         'simple',
       );
       assert.equal(await page.getByRole('navigation', { name: '设置分类' }).isVisible(), false);
-      assert.equal(await page.getByRole('switch').count(), 4);
+      assert.equal(await page.getByRole('switch').count(), 5);
       assert.equal(await page.getByRole('button', { name: /^打开/ }).count(), 0);
       await page.waitForFunction(
         () =>
@@ -256,7 +256,17 @@ test(
       const before = writes.length;
       await simple();
       await detail();
-      assert.equal(writes.length, before);
+      assert.equal(
+        writes.length,
+        before,
+        JSON.stringify(
+          writes.map(({ path, body }) => ({
+            path,
+            keys: Object.keys(body),
+            maxInputChars: body.maxInputChars,
+          })),
+        ),
+      );
       await page.evaluate(() => scrollTo({ top: 400, behavior: 'instant' }));
       const scroll = await page.evaluate(() => scrollY);
       assert.ok(scroll > 100);

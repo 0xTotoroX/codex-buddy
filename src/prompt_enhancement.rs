@@ -40,7 +40,9 @@ pub(crate) async fn rewrite(model: &Model, text: &str) -> Result<String> {
 }
 
 async fn current(app: &Arc<App>, client: &Arc<Client>, id: &str, revision: u64) -> bool {
-    if app.generation_revision.load(Ordering::SeqCst) != revision {
+    if !app.model.read().await.options.prompt_enhancement_enabled
+        || app.generation_revision.load(Ordering::SeqCst) != revision
+    {
         return false;
     }
     let Some(active) = app.desktop_client().await else {
@@ -71,6 +73,10 @@ pub(crate) async fn enhance(
     let text = payload["text"].as_str().context("缺少输入草稿")?;
     let model_guard = app.model.read().await;
     let revision = app.generation_revision.load(Ordering::SeqCst);
+    ensure!(
+        model_guard.options.prompt_enhancement_enabled,
+        "提示词优化已关闭"
+    );
     let model = model_guard.clone();
     drop(model_guard);
     ensure!(

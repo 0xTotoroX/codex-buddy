@@ -76,7 +76,6 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     if (!valid(a)) return hide();
     hide();
     active = a;
-    const appearance = window.__companionFloat?.panelAppearance?.() || {};
     const dark =
       document.documentElement.classList.contains('dark') ||
       getComputedStyle(document.documentElement).colorScheme === 'dark';
@@ -84,7 +83,6 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     host.style.setProperty('--term-fg', dark ? '#efeff1' : '#25262b');
     host.style.setProperty('--term-muted', dark ? '#aaaab3' : '#74747f');
     host.style.setProperty('--term-border', dark ? '#424249' : '#dedee3');
-    void appearance;
     const rects = [...a.range.getClientRects()].filter((r) => r.width && r.height);
     if (!rects.length) return hide();
     for (const r of rects) {
@@ -177,7 +175,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   }
   function schedule() {
     clearTimeout(scanTimer);
-    scanTimer = setTimeout(scan, 500);
+    scanTimer = window.setTimeout(scan, 500);
   }
   async function refresh() {
     if (loading || !alive) return;
@@ -287,10 +285,10 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       clearTimeout(hoverTimer);
       if (hit) {
         clearTimeout(closeTimer);
-        hoverTimer = setTimeout(() => show(hit), 220);
+        hoverTimer = window.setTimeout(() => show(hit), 220);
       } else if (active) {
         clearTimeout(closeTimer);
-        closeTimer = setTimeout(hide, 300);
+        closeTimer = window.setTimeout(hide, 300);
       }
     });
   }
@@ -316,7 +314,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     clearTimeout(closeTimer);
   }
   function leave() {
-    closeTimer = setTimeout(hide, 300);
+    closeTimer = window.setTimeout(hide, 300);
   }
   popover.addEventListener('pointerenter', enter);
   popover.addEventListener('pointerleave', leave);

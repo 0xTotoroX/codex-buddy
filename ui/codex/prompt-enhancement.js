@@ -5,9 +5,10 @@
 import { rawComposerText, setEditableText, setNativeValue } from './composer.js';
 import { iconSvg } from '../shared/icons/index.js';
 
-/** @param {{request:(path:string,payload:object)=>Promise<any>, getTarget?:()=>any}} options */
+/** @param {{request:(path:string,payload:object)=>Promise<any>, getTarget?:()=>any, isEnabled?:()=>boolean}} options */
 export function installPromptEnhancer({
   request,
+  isEnabled = () => true,
   getTarget = () => window.__codexBuddyModelControl?.inputTarget(),
 }) {
   window.__codexBuddyPromptEnhancer?.destroy();
@@ -52,6 +53,7 @@ export function installPromptEnhancer({
     const target = getTarget();
     return (
       !disposed &&
+      isEnabled() &&
       target?.id === snapshot.id &&
       target?.composer === snapshot.editor &&
       target?.root === snapshot.root &&
@@ -116,6 +118,7 @@ export function installPromptEnhancer({
       refresh();
       return;
     }
+    if (!isEnabled()) return;
     const target = getTarget();
     if (!target || target.composer !== mounted?.composer || composing) return;
     if (complex(target.composer)) {
@@ -179,6 +182,16 @@ export function installPromptEnhancer({
   for (const type of ['input', 'compositionstart', 'compositionend'])
     document.addEventListener(type, changed, { signal: life.signal, capture: true });
   function tick() {
+    if (!isEnabled()) {
+      pending = null;
+      undo = null;
+      mounted = null;
+      composing = false;
+      host.remove();
+      message.remove();
+      status('');
+      return;
+    }
     const target = getTarget();
     if (pending && !matches(pending)) cancel('草稿或聊天已变化，优化已取消。');
     if (undo && !matches(undo)) undo = null;
@@ -205,25 +218,39 @@ export function installPromptEnhancer({
         ),
       );
     if (action) {
-      let anchor = action;
-      while (
-        anchor.parentElement !== composerRoot &&
-        anchor.parentElement &&
-        getComputedStyle(anchor.parentElement).display === 'contents'
-      )
-        anchor = anchor.parentElement;
-      // The send/stop control may have its own margin wrapper. Keep that wrapper intact.
-      if (
-        anchor === action &&
-        action.parentElement !== composerRoot &&
-        getComputedStyle(action.parentElement).display === 'flex'
-      )
-        anchor = action.parentElement;
-      const parent = anchor.parentElement;
+      const agent = composerRoot.querySelector('[data-codexhost-agent-control]');
+      let parent, before;
+      if (agent) {
+        // CodexHost owns model → Agent → native trailing action adjacency.
+        // Join the native action's inner wrapper instead of inserting between those siblings.
+        parent = action.parentElement;
+        before = parent === agent.parentElement ? action.nextSibling : action;
+        if (before === host) before = host.nextSibling;
+      } else {
+        let anchor = action;
+        while (
+          anchor.parentElement !== composerRoot &&
+          anchor.parentElement &&
+          getComputedStyle(anchor.parentElement).display === 'contents'
+        )
+          anchor = anchor.parentElement;
+        if (
+          anchor === action &&
+          action.parentElement !== composerRoot &&
+          getComputedStyle(action.parentElement).display === 'flex'
+        )
+          anchor = action.parentElement;
+        parent = anchor.parentElement;
+        before = anchor;
+      }
       const height = getComputedStyle(action).height;
-      if (parseFloat(height) >= 24) host.style.setProperty('--buddy-composer-button-size', height);
-      if (host.parentElement !== parent || host.nextSibling !== anchor)
-        parent.insertBefore(host, anchor);
+      if (
+        parseFloat(height) >= 24 &&
+        host.style.getPropertyValue('--buddy-composer-button-size') !== height
+      )
+        host.style.setProperty('--buddy-composer-button-size', height);
+      if (host.parentElement !== parent || host.nextSibling !== before)
+        parent.insertBefore(host, before);
     } else if (host.parentElement !== composerRoot) composerRoot.append(host);
     if (composerRoot && message.parentElement !== composerRoot) composerRoot.append(message);
     refresh();

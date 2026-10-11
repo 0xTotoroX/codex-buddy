@@ -23,10 +23,12 @@ import { Field } from './settings-controls';
 import { NativeSelect } from './components/ui/native-select';
 import { ConnectionSettings } from './connection-settings';
 import { CodexHostSettings } from './codex-host-settings';
+import { SettingsSearch } from './settings-search';
 function editable(value: Settings): EditableSettings {
   const {
     enabled,
     answerOutlineEnabled,
+    promptEnhancementEnabled,
     generationMode,
     hostRestartPolicy,
     provider,
@@ -47,6 +49,7 @@ function editable(value: Settings): EditableSettings {
   return {
     enabled,
     answerOutlineEnabled,
+    promptEnhancementEnabled,
     generationMode,
     hostRestartPolicy,
     provider,
@@ -112,6 +115,7 @@ function App() {
           </button>
         </div>
       </header>
+      <SettingsSearch navigate={navigate} />
       <div className="settings-layout">
         <SettingsOutline page={page} mode={mode} dev={dev} navigate={navigate} />
         <main className="settings-content min-w-0">
@@ -123,6 +127,7 @@ function App() {
           <Feedback text={notice.text} failed={notice.failed} />
           <section
             hidden={!featuresVisible}
+            data-settings-page="features"
             className="settings-section settings-feature-list"
             aria-label="常用功能"
           >
@@ -148,6 +153,14 @@ function App() {
               onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
             />
             <ModelControlSettings live={live} />
+            <div id="settings-prompt-enhancement">
+              <FeatureSwitch
+                name="提示词优化"
+                checked={editor.form?.promptEnhancementEnabled ?? true}
+                disabled={!live || !editor.form}
+                onChange={(value) => editor.change('promptEnhancementEnabled', value)}
+              />
+            </div>
             <div hidden={!editor.form?.enabled}>
               <Field id="generation-mode" label="建议生成方式">
                 <NativeSelect
@@ -204,7 +217,11 @@ function App() {
                 </p>
               )}
           </section>
-          <section hidden={!surfacesVisible} className="settings-section settings-common-surface">
+          <section
+            data-settings-page="surfaces"
+            hidden={!surfacesVisible}
+            className="settings-section settings-common-surface"
+          >
             <h2 hidden={!simple}>界面与操作</h2>
             <SurfaceSettings
               live={live}
@@ -218,7 +235,7 @@ function App() {
               outsideAvailable={editor.saved?.popoutSupported === true}
             />
           </section>
-          <div hidden={simple || page !== 'features'}>
+          <div data-settings-page="features" hidden={simple || page !== 'features'}>
             <TerminologySettings active={!simple && page === 'features'} />
           </div>
           <SettingsForm
@@ -226,26 +243,30 @@ function App() {
             notify={notify}
             active={simple || page === 'model' || page === 'features' || page === 'connection'}
           >
-            <div hidden={simple || page !== 'features'}>
+            <div data-settings-page="features" hidden={simple || page !== 'features'}>
               <NextSettings editor={editor} appearance={view?.panelPreferences} />
             </div>
-            <div hidden={!simple && page !== 'model'}>
+            <div data-settings-page="model" hidden={!simple && page !== 'model'}>
               <h2 className="settings-simple-model-title" hidden={!simple}>
                 生成模型
               </h2>
               <ModelSettings editor={editor} notify={notify} simple={simple} />
             </div>
-            <div hidden={simple || page !== 'connection'}>
+            <div data-settings-page="connection" hidden={simple || page !== 'connection'}>
               <ConnectionSettings editor={editor} view={view} live={live} notify={notify} />
             </div>
           </SettingsForm>
-          <div hidden={simple || page !== 'features'}>
+          <div data-settings-page="features" hidden={simple || page !== 'features'}>
             <TaskSettings tasks={tasks} />
           </div>
-          <div hidden={simple || page !== 'connection'}>
+          <div data-settings-page="connection" hidden={simple || page !== 'connection'}>
             <CodexHostSettings live={live} active={!simple && page === 'connection'} />
           </div>
-          <section hidden={simple || page !== 'connection' || !dev} className="settings-section">
+          <section
+            data-settings-page="connection"
+            hidden={simple || page !== 'connection' || !dev}
+            className="settings-section"
+          >
             <h2>开发来源</h2>
             <div id="settings-dev-content" />
           </section>

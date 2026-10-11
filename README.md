@@ -59,6 +59,8 @@ Open **详细设置 → 启动与开发 → CodexHost** for installed/running ve
 
 ## Prompt enhancement
 
+Toggle prompt enhancement in the common feature switches, or **功能与交互** in detailed settings. The settings search finds controls across categories and opens their original location.
+
 Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **详细设置 → 模型与生成**, and sends only the draft, without chat history.
 
 ## Simple and detailed settings

@@ -20,6 +20,7 @@ pub struct QuickPrompt {
 pub struct Options {
     pub enabled: bool,
     pub answer_outline_enabled: bool,
+    pub prompt_enhancement_enabled: bool,
     pub generation_mode: String,
     pub protocol: String,
     pub api_key_env: String,
@@ -38,6 +39,22 @@ pub struct Options {
 mod tests {
     use super::*;
     use crate::config::{Config, Paths};
+
+    #[tokio::test]
+    async fn prompt_enhancement_toggle_persists_without_invalidating_stepwise() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(temp.path().into())).unwrap();
+        let legacy: Config = serde_json::from_str(r#"{"stepwise":{"enabled":true}}"#).unwrap();
+        assert!(legacy.stepwise.prompt_enhancement_enabled);
+        let app = App::new(paths.clone(), legacy, None, false);
+        let before = app.settings().await;
+        let saved = app.save_settings(serde_json::from_value(json!({"promptEnhancementEnabled":false,"expectedRevision":before["configurationRevision"]})).unwrap()).await.unwrap();
+        assert_eq!(saved["promptEnhancementEnabled"], false);
+        assert_eq!(saved["generationRevision"], before["generationRevision"]);
+        assert_eq!(saved["enabled"], before["enabled"]);
+        assert!(!paths.load().unwrap().stepwise.prompt_enhancement_enabled);
+        assert!(app.save_settings(serde_json::from_value(json!({"promptEnhancementEnabled":true,"expectedRevision":before["configurationRevision"]})).unwrap()).await.is_err());
+    }
 
     #[tokio::test]
     async fn quick_prompts_persist_without_invalidating_suggestions() {
@@ -259,6 +276,7 @@ impl Default for Options {
         Self {
             enabled: true,
             answer_outline_enabled: true,
+            prompt_enhancement_enabled: true,
             generation_mode: "manual".into(),
             protocol: "responses".into(),
             api_key_env: "CODEX_BUDDY_API_KEY".into(),
@@ -288,6 +306,7 @@ pub struct Update {
     pub expected_revision: Option<u64>,
     pub enabled: Option<bool>,
     pub answer_outline_enabled: Option<bool>,
+    pub prompt_enhancement_enabled: Option<bool>,
     pub generation_mode: Option<String>,
     pub provider: Option<String>,
     pub model: Option<String>,
@@ -385,6 +404,9 @@ impl App {
         }
         if let Some(value) = patch.answer_outline_enabled {
             options.answer_outline_enabled = value;
+        }
+        if let Some(value) = patch.prompt_enhancement_enabled {
+            options.prompt_enhancement_enabled = value;
         }
         if let Some(value) = patch.generation_mode {
             if !["manual", "auto"].contains(&value.as_str()) {

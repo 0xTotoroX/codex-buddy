@@ -699,7 +699,11 @@ function install() {
   };
 
   if (!IS_POPOUT) {
-    installPromptEnhancer({ request: bridgeCall });
+    installPromptEnhancer({
+      request: bridgeCall,
+      isEnabled: () =>
+        runtimeState.settingsLoaded && runtimeState.settings?.promptEnhancementEnabled !== false,
+    });
     installTerminology({
       request: bridgeCall,
       getRoot: chatRoot,

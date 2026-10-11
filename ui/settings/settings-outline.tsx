@@ -134,7 +134,13 @@ export function useSettingsPage(ready: boolean) {
       behavior: 'instant',
     });
     if (!ready || mode === 'simple') return;
-    const [section, field] = hash.slice(1).split('/');
+    const [section, encodedField] = hash.slice(1).split('/');
+    let field = encodedField;
+    try {
+      field = decodeURIComponent(encodedField || '');
+    } catch {
+      /* Preserve malformed legacy fragments. */
+    }
     const target =
       field ||
       legacyTargets[section] ||

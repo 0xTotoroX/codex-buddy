@@ -10,6 +10,7 @@ export const fixtureSettings = {
   popoutSupported: true,
   enabled: true,
   answerOutlineEnabled: true,
+  promptEnhancementEnabled: true,
   generationMode: 'manual',
   provider: 'api',
   protocol: 'responses',

@@ -115,6 +115,7 @@ impl Model {
     pub(crate) fn same_generation_config(&self, other: &Self) -> bool {
         let mut options = self.options.clone();
         options.answer_outline_enabled = other.options.answer_outline_enabled;
+        options.prompt_enhancement_enabled = other.options.prompt_enhancement_enabled;
         options.quick_prompts = other.options.quick_prompts.clone();
         if options.direction_source == crate::directions::DirectionSource::Auto
             && other.options.direction_source == options.direction_source

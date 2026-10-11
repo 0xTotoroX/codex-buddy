@@ -37,3 +37,5 @@ model.js增加只读inputTarget()，复用唯一聊天身份与最近操作归�
 codex-host.js通过上游版本化只读探针按输入框确认Agent；非Codex或缺失/未知状态拒绝官方模型写入，不触发上游菜单。cdp在model.js前安装，提示词优化保留独立输入目标识别。
 
 运行入口复用 context 的 chatRoot/findLatestAssistantMessage/findPreviousUserText 将只读问答交给独立术语模块，不增加另一套聊天身份识别。
+
+prompt-enhancement接收isEnabled只读配置；关闭时移除按钮、取消请求并清空临时备份。CodexHost存在时加入原生语音/发送的内部包装，原生按钮直属时放其后，保持上游模型/Agent/原生动作的相邻约束；无布局变化不重复搬动或写入宿主样式。

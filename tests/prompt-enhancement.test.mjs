@@ -12,8 +12,8 @@ const bundle = (
       resolveDir: process.cwd(),
       contents: `
 import {installPromptEnhancer} from './ui/codex/prompt-enhancement.js';import {rawComposerText} from './ui/codex/composer.js';window.readDraft=()=>rawComposerText(document.querySelector('textarea,[contenteditable]'));
-window.calls=[];window.replies=[];window.session='one';
-window.setup=()=>installPromptEnhancer({getTarget:()=>({id:window.session,root:document.querySelector('main'),scope:document.querySelector('main'),composer:document.querySelector('textarea,[contenteditable]')}),request:(path,payload)=>{window.calls.push({path,payload});return new Promise(resolve=>window.replies.push(resolve));}});window.setup();
+window.calls=[];window.replies=[];window.session='one';window.enabled=true;
+window.setup=()=>installPromptEnhancer({isEnabled:()=>window.enabled,getTarget:()=>({id:window.session,root:document.querySelector('main'),scope:document.querySelector('main'),composer:document.querySelector('textarea,[contenteditable]')}),request:(path,payload)=>{window.calls.push({path,payload});return new Promise(resolve=>window.replies.push(resolve));}});window.setup();
 `,
     },
     bundle: true,
@@ -130,6 +130,77 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
     assert.equal(await page.locator('[data-codex-buddy-prompt] [title]').count(), 0);
     await page.evaluate(() => window.__codexBuddyPromptEnhancer.destroy());
     assert.equal(await page.locator('[data-codex-buddy-prompt]').count(), 0);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('disabling prompt enhancement removes its control and invalidates pending requests', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      '<main data-codex-composer-root><textarea aria-label="草稿"></textarea></main>',
+    );
+    await page.addScriptTag({ content: bundle });
+    await page.getByLabel('草稿').fill('保留的草稿');
+    await page.getByRole('button', { name: '优化提示词', exact: true }).click();
+    await page.evaluate(() => (window.enabled = false));
+    assert.equal(
+      await page.evaluate(() =>
+        window.__codexBuddyPromptEnhancer.verify(window.calls[0].payload.requestId),
+      ),
+      false,
+    );
+    await page.waitForFunction(() => !document.querySelector('[data-codex-buddy-prompt]'));
+    await page.evaluate(() => window.replies.shift()({ prompt: '已停用的迟到结果' }));
+    assert.equal(await page.getByLabel('草稿').inputValue(), '保留的草稿');
+    await page.evaluate(() => (window.enabled = true));
+    await page.getByRole('button', { name: '优化提示词', exact: true }).waitFor();
+  } finally {
+    await browser.close();
+  }
+});
+
+test('CodexHost Agent controls stay stationary with the optimizer mounted beside native voice', async () => {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      `<main data-codex-composer-root><textarea aria-label="草稿"></textarea><div id="actions"><div id="model" data-codexhost-model-control></div><div id="agent" data-codexhost-agent-control><button id="agent-button">Agent</button><div id="menu" popover="auto">Codex / WorkBuddy</div></div><span id="voice" style="display:contents"><button aria-label="听写" style="width:28px;height:28px">Mic</button></span><button type="submit" aria-label="发送">Send</button></div></main>`,
+    );
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate(() => {
+      const model = document.querySelector('#model'),
+        agent = document.querySelector('#agent'),
+        anchor = document.querySelector('#voice'),
+        parent = document.querySelector('#actions');
+      window.agentMoves = 0;
+      window.check = setInterval(() => {
+        // CodexHost 0.13.1 preserves model → Agent → native trailing action adjacency.
+        if (model.nextElementSibling !== agent || agent.nextElementSibling !== anchor) {
+          parent.insertBefore(model, anchor);
+          parent.insertBefore(agent, anchor);
+          window.agentMoves++;
+        }
+      }, 40);
+      document.querySelector('#agent-button').onclick = () =>
+        document.querySelector('#menu').showPopover();
+    });
+    await page.getByRole('button', { name: 'Agent', exact: true }).click();
+    await page.waitForTimeout(1000);
+    assert.equal(await page.evaluate(() => window.agentMoves), 0);
+    assert.equal(
+      await page.locator('#menu').evaluate((node) => node.matches(':popover-open')),
+      true,
+    );
+    assert.equal(
+      await page.evaluate(
+        () => document.querySelector('[data-codex-buddy-prompt]').parentElement.id,
+      ),
+      'voice',
+    );
+    await page.evaluate(() => clearInterval(window.check));
   } finally {
     await browser.close();
   }

@@ -67,6 +67,7 @@ async function syncSettings(patch = {}) {
   const hasRuntimePatch =
     typeof normalizedPatch.enabled === 'boolean' ||
     typeof normalizedPatch.answerOutlineEnabled === 'boolean' ||
+    typeof normalizedPatch.promptEnhancementEnabled === 'boolean' ||
     Object.prototype.hasOwnProperty.call(normalizedPatch, 'generationMode');
   if (patch?.enabled === true) {
     pushDiagnostic('settings:enabled-sync', {});

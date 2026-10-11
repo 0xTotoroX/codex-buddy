@@ -14,6 +14,7 @@ export interface EditableSettings {
   hostRestartPolicy: 'ask' | 'force';
   enabled: boolean;
   answerOutlineEnabled: boolean;
+  promptEnhancementEnabled: boolean;
   generationMode: 'auto' | 'manual';
   provider: 'codex' | 'api';
   protocol: 'responses' | 'chat_completions' | 'anthropic_messages' | 'auto';
