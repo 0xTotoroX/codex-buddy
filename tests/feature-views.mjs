@@ -95,6 +95,7 @@ try {
   let surfaceTheme = 'matte';
   let rejectHandoff = true;
   let rejectPresetSave = false;
+  let rejectPinnedSave = false;
   let handoffs = 0;
   let pendingPlacement = null;
   await page.addInitScript(() => {
@@ -185,6 +186,8 @@ try {
           model.snapshot.revision = 'v2';
         }
         if (p.action === 'preferences') {
+          if (rejectPinnedSave && p.data.patch.pinned)
+            return route.fulfill({ status: 409, json: { ok: false, message: '常用保存冲突' } });
           if (rejectPresetSave && p.data.patch.presets)
             return route.fulfill({ status: 409, json: { ok: false, message: '预设保存冲突' } });
           Object.assign(model.preferences, p.data.patch);
@@ -348,16 +351,41 @@ try {
     '0s',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await view.getByRole('button', { name: /未分类/ }).waitFor();
+  const picker = () => view.getByRole('button', { name: /其他模型/ });
+  const showOthers = async () => {
+    if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
+    await picker().and(view.locator('[aria-expanded="true"]')).waitFor();
+  };
+  await picker().waitFor();
+  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
+  assert.equal(await view.locator('[data-model-group]').count(), 0, 'groups hidden by default');
+  await view.locator('.model-section-divider').waitFor();
   assert.equal(
     await view.locator('.model-row').count(),
     0,
     'no favorites means all models stay hidden',
   );
   assert.equal(await view.locator('.model-footer [role="status"]').count(), 0);
+  await showOthers();
   await view.getByRole('button', { name: /未分类/ }).click();
+  rejectPinnedSave = true;
+  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await view.getByText('Error: 常用保存冲突', { exact: true }).waitFor();
+  assert.equal(
+    await picker().getAttribute('aria-expanded'),
+    'true',
+    'failed pin keeps picker open',
+  );
+  assert.deepEqual(model.preferences.pinned, []);
+  rejectPinnedSave = false;
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  await picker().and(view.locator('[aria-expanded="false"]')).waitFor();
+  assert.equal(
+    await view.locator('[data-model-group]').count(),
+    0,
+    'pinning closes the temporary picker',
+  );
   assert.equal(
     await view
       .locator('.model-name strong')
@@ -393,6 +421,10 @@ try {
   await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '0')]);
   await view.locator('.model-name strong').first().hover();
   await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '1')]);
+  await view.locator('.model-choices button').first().hover();
+  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '0')]);
+  await view.locator('.model-matrix-head > span').hover();
+  await waitOpacity(visibility, '1');
   await page.locator('.edge-feature-actions:not([hidden])').hover();
   await Promise.all([waitModelRefresh('1'), waitOpacity(visibility, '0')]);
   await page.mouse.move(499, 699);
@@ -404,17 +436,16 @@ try {
   await headerRefresh.evaluate((node) => node.blur());
   await waitOpacity(headerRefresh, '0');
   record(
-    'model arrows only follow model content hover; refresh only follows upper-right actions; keyboard focus remains visible',
+    'model arrows only follow the name column, never reasoning hover; refresh only follows upper-right actions; keyboard focus remains visible',
   );
-  await view.getByRole('button', { name: /未分类/ }).click();
-  await view.getByRole('button', { name: /未分类/, expanded: false }).waitFor();
+  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
   assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
   await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
   assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
   assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
-  await view.getByRole('button', { name: /未分类/ }).click();
+  await showOthers();
   await view.getByLabel('设为常用 Model B', { exact: true }).click();
   await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
   assert.deepEqual(model.preferences.pinned, ['a', 'b']);
@@ -428,17 +459,19 @@ try {
   );
   assert.deepEqual(model.preferences.modelOrder, ['b', 'a']);
   await view.getByLabel('隐藏 Model A', { exact: true }).click();
-  await view.getByLabel('设为常用 Model A', { exact: true }).waitFor();
-  await view.getByRole('button', { name: /未分类/ }).click();
-  await view.getByRole('button', { name: /未分类/, expanded: false }).waitFor();
+  await picker().waitFor();
+  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
   assert.equal(
     await view.locator('[data-model-row="a"]').count(),
     0,
     'current model also hides when removed from favorites',
   );
-  await view.getByRole('button', { name: /未分类/ }).click();
+  await showOthers();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
   const compactModelHeight = await page
     .locator('#edge-panel')
     .evaluate((node) => node.getBoundingClientRect().height);
@@ -545,6 +578,11 @@ try {
   const beforeSizes = await sizeMessages();
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 10);
   await page.mouse.down();
+  assert.equal(
+    await columnHandle.evaluate((node) => getComputedStyle(node).outlineStyle),
+    'none',
+    'pointer resize has no focus rectangle',
+  );
   await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
   assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
@@ -639,6 +677,7 @@ try {
   });
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
+  await showOthers();
   await view.getByRole('button', { name: /Google/ }).click();
   await view.getByRole('button', { name: /Google/, expanded: true }).waitFor();
   await view.locator('.model-scroll').evaluate((node) => {
@@ -672,8 +711,9 @@ try {
   await waitModelRefresh('0');
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
-    await view.getByRole('button', { name: /Google/ }).getAttribute('aria-expanded'),
-    'true',
+    await view.locator('[data-model-group]').count(),
+    0,
+    'remounted picker defaults to favorites only',
   );
   assert.equal(
     await view.locator('.model-scroll').evaluate((node) => node.scrollLeft),
@@ -683,6 +723,11 @@ try {
         (node, saved) => Math.min(saved, node.scrollWidth - node.clientWidth),
         modelReading.modelLeft,
       ),
+  );
+  await showOthers();
+  assert.equal(
+    await view.getByRole('button', { name: /Google/ }).getAttribute('aria-expanded'),
+    'true',
   );
   record('model tools, expanded rows and horizontal reading survive remount');
   const longName = view.locator('[data-model-row="c"] .model-name strong');
@@ -943,6 +988,7 @@ try {
   await outlineView.locator('[data-outline-id="outline-child"]').click();
   assert.equal(actions.at(-1).data.kind, 'outline-jump');
   assert.equal(actions.at(-1).data.id, 'outline-child');
+  await outlineView.locator('[data-outline-id="outline-child"]:enabled').waitFor();
   await page.keyboard.press('Tab');
   await outlineView.locator('[data-outline-id="outline-child"]').focus();
   assert.equal(

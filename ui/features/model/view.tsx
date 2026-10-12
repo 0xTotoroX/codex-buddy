@@ -30,6 +30,7 @@ export function ModelView({
   busy: boolean;
 }) {
   const [tools, setTools] = useState(reading.modelTools || false),
+    [others, setOthers] = useState(false),
     [drop, setDrop] = useState(''),
     [columnWidth, setColumnWidth] = useState<number | null>(null),
     [metrics, setMetrics] = useState({ available: 0, widths: [] as number[] }),
@@ -79,7 +80,7 @@ export function ModelView({
   const visible = models.filter((m) => prefs.pinned.includes(m.id));
   const remaining = models.filter((m) => !prefs.pinned.includes(m.id));
   const groups = groupedModels(remaining, prefs);
-  const expanded = prefs.expandedGroups ?? (reading.modelOthers ? groups.map((g) => g.id) : []);
+  const expanded = prefs.expandedGroups ?? [];
   const dragType = 'application/x-codex-buddy-model';
   const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   const columns = [
@@ -180,13 +181,15 @@ export function ModelView({
             data-pinned={prefs.pinned.includes(m.id)}
             disabled={busy || !prefs.enabled}
             aria-label={`${prefs.pinned.includes(m.id) ? '隐藏' : '设为常用'} ${label(m.label)}`}
-            onClick={() =>
-              void save({
-                pinned: prefs.pinned.includes(m.id)
+            onClick={async () => {
+              const wasPinned = prefs.pinned.includes(m.id);
+              const result = await save({
+                pinned: wasPinned
                   ? prefs.pinned.filter((id) => id !== m.id)
                   : [...prefs.pinned, m.id],
-              })
-            }
+              });
+              if (!wasPinned && result !== null) setOthers(false);
+            }}
           >
             {icon('chevron-down')}
           </button>
@@ -441,31 +444,48 @@ export function ModelView({
               ))}
             </div>
           </div>
-          {!!visible.length && <div className="model-group-label">常用</div>}
+          {!!models.length && <div className="model-group-label">常用</div>}
+          {!!models.length && !visible.length && (
+            <p className="model-empty-favorites">暂无常用模型</p>
+          )}
           {rows(visible)}
-          {groups.map((group) => (
-            <div key={group.id} className="model-group" data-model-group={group.id}>
+          {!!remaining.length && (
+            <>
+              <hr className="model-section-divider" />
               <button
-                className="model-disclosure"
-                aria-expanded={expanded.includes(group.id)}
-                disabled={busy}
-                onClick={() =>
-                  void save({
-                    expandedGroups: expanded.includes(group.id)
-                      ? expanded.filter((id) => id !== group.id)
-                      : [...expanded, group.id],
-                  })
-                }
+                className="model-disclosure model-picker-toggle"
+                aria-expanded={others}
+                onClick={() => setOthers(!others)}
               >
-                <span>
-                  {group.name} ({group.models.length})
-                </span>
-                {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
-                {group.models.some((m) => m.id === s.current?.model) && <small>当前</small>}
+                <span>其他模型 ({remaining.length})</span>
+                {icon('chevron-down')}
               </button>
-              {expanded.includes(group.id) && rows(group.models)}
-            </div>
-          ))}
+            </>
+          )}
+          {others &&
+            groups.map((group) => (
+              <div key={group.id} className="model-group" data-model-group={group.id}>
+                <button
+                  className="model-disclosure"
+                  aria-expanded={expanded.includes(group.id)}
+                  disabled={busy}
+                  onClick={() =>
+                    void save({
+                      expandedGroups: expanded.includes(group.id)
+                        ? expanded.filter((id) => id !== group.id)
+                        : [...expanded, group.id],
+                    })
+                  }
+                >
+                  <span>
+                    {group.name} ({group.models.length})
+                  </span>
+                  {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
+                  {group.models.some((m) => m.id === s.current?.model) && <small>当前</small>}
+                </button>
+                {expanded.includes(group.id) && rows(group.models)}
+              </div>
+            ))}
           {!models.length && <p>暂无可用模型</p>}
         </div>
       </div>

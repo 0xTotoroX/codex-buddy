@@ -192,7 +192,7 @@ input:focus-visible {
   .feature-view[data-feature='model'] {
     --model-visibility-opacity: 0;
   }
-  .feature-view[data-feature='model']:hover {
+  .feature-view[data-feature='model']:has(.model-name:hover, .model-matrix-head > span:hover) {
     --model-visibility-opacity: 1;
   }
   .feature-view .model-visibility {

@@ -221,6 +221,18 @@ function probePage() {
             .querySelector('#edge-panel nav button')
             ?.getBoundingClientRect()
             .toJSON(),
+          modelView: (() => {
+            const root = document.querySelector('.edge-view')?.shadowRoot;
+            const handle = root?.querySelector('.model-column-resize');
+            const divider = root?.querySelector('.model-section-divider');
+            return {
+              outline: handle ? getComputedStyle(handle).outlineStyle : null,
+              picker: root?.querySelector('.model-picker-toggle')?.getAttribute('aria-expanded'),
+              groups: root?.querySelectorAll('[data-model-group]').length,
+              rows: root?.querySelectorAll('.model-row').length,
+              divider: divider ? getComputedStyle(divider).borderTopWidth : null,
+            };
+          })(),
           columnWidth: document
             .querySelector('.edge-view')
             ?.shadowRoot?.querySelector('.model-column-resize')
@@ -300,7 +312,11 @@ const server = createServer(async (request, response) => {
       if (input.op === 'action' && input.action === 'preferences') {
         assert.equal(input.owner, 'feature-lease');
         assert.equal(input.data.revision, revision);
-        assert.deepEqual(Object.keys(input.data.patch), ['modelColumnWidth']);
+        assert.ok(
+          Object.keys(input.data.patch).every((key) =>
+            ['modelColumnWidth', 'pinned', 'expandedGroups'].includes(key),
+          ),
+        );
         Object.assign(prefs, input.data.patch);
         revision++;
         return json(envelope());
@@ -461,8 +477,10 @@ try {
     assert.equal(telemetry.native.keyboard, false);
     assert.equal(telemetry.native.expanded, false);
   }
+  const focusActivations = telemetry.keyboardActivations;
   await ipc({ action: 'focus' });
-  await until(() => telemetry.native.keyboard && telemetry.native.expanded, 'focus without host');
+  // 检查已送达的焦点转换；其他应用可随即取回前台，不能要求最后一帧一直占有焦点。
+  await until(() => telemetry.keyboardActivations > focusActivations, 'focus without host');
   check(
     'host hide, blur and disconnect preserve display placement; explicit focus remains available',
   );
@@ -510,7 +528,40 @@ try {
       : 'synthetic native pointer message expands without stealing focus',
   );
   assert.equal(telemetry.featureVisible, true);
-  check('shared model feature is mounted inside the native edge shell');
+  assert.equal(telemetry.modelView.picker, 'false');
+  assert.equal(telemetry.modelView.groups, 0);
+  assert.equal(telemetry.modelView.divider, '1px');
+  check('native model view defaults to favorites with a horizontal divider and collapsed picker');
+  const favoriteHeight = telemetry.native.layoutHeight;
+  await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-picker-toggle').click()",
+  );
+  await until(
+    () => telemetry.modelView.picker === 'true' && telemetry.modelView.groups === 1,
+    'native chooser opens',
+  );
+  await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-model-group] .model-disclosure').click()",
+  );
+  await until(() => telemetry.modelView.rows === 2, 'native group opens');
+  await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-pinned=false]').click()",
+  );
+  await until(
+    () => prefs.pinned.includes('fixture-b') && telemetry.modelView.groups === 0,
+    'native pin returns to favorites',
+  );
+  prefs.pinned = ['fixture-a'];
+  revision++;
+  await until(
+    () =>
+      telemetry.modelView.picker === 'false' &&
+      telemetry.modelView.rows === 1 &&
+      telemetry.native.layoutHeight === favoriteHeight,
+    'restore native favorite fixture',
+  );
+  check('native chooser is temporary and closes after adding a favorite');
+
   await capture('expanded');
   const shortHeight = telemetry.native.layoutHeight;
   snapshot.models.push({
@@ -601,6 +652,11 @@ try {
         'native pointer drag saves column',
       );
       assert.deepEqual(windowInfo().kCGWindowBounds, columnBounds);
+      assert.equal(
+        telemetry.modelView.outline,
+        'none',
+        'native divider drag has no blue focus rectangle',
+      );
       const frames = samples
         .trim()
         .split('\n')

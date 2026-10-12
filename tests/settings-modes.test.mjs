@@ -221,10 +221,15 @@ test(
       const model = page.getByLabel('模型名称', { exact: true }),
         key = page.getByLabel('API 密钥', { exact: true });
       const modelNode = await model.elementHandle();
+      const firstSave = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/settings') && response.request().method() === 'POST',
+      );
       await model.fill('未保存模型草稿');
       await key.fill('fixture-secret-draft');
       // Blur of model to key schedules a normal save; wait for it before exercising navigation-only edits.
-      await page.waitForTimeout(250);
+      await (await firstSave).finished();
+      await page.locator('.settings-save[data-save-state="dirty"]').waitFor({ state: 'attached' });
       writes.length = 0;
       await key.fill('fixture-unsaved-key');
       await detail();
@@ -246,6 +251,11 @@ test(
       assert.equal(await group.inputValue(), '未保存分组');
       assert.equal(await group.isVisible(), true);
       await category('model');
+      // 前面的普通失焦允许保存；先完成它，再单独验证模式切换不保存新的限额草稿。
+      await page.locator('.settings-save[data-save-state="saving"]').waitFor({ state: 'detached' });
+      if (await page.locator('.settings-save[data-save-state="dirty"]').count())
+        await page.getByRole('button', { name: '保存设置', exact: true }).click();
+      await page.locator('.settings-save[data-save-state="saved"]').waitFor({ state: 'attached' });
       const limits = page.locator('#settings-limits');
       await limits.locator('summary').click();
       await page.getByLabel('输入字符上限', { exact: true }).fill('18000');

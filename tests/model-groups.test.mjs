@@ -188,6 +188,8 @@ test(
       const settings = page.locator('#settings'),
         view = page.locator('#view');
       assert.equal(await view.locator('.model-row').count(), 1);
+      assert.equal(await view.locator('[data-model-group]').count(), 0);
+      await view.getByRole('button', { name: /其他模型/ }).click();
       await view.getByRole('button', { name: /Anthropic/ }).click();
       await view.locator('[data-model-row="route-a/claude-test"]').waitFor();
       assert.equal(await view.locator('.model-route').count(), 2);

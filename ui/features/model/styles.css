@@ -89,8 +89,7 @@
   background: var(--muted);
 }
 .model-column-resize:focus-visible {
-  outline: 2px solid var(--accent);
-  border-radius: 4px;
+  outline: none;
 }
 .model-matrix-head,
 .model-row {
@@ -203,4 +202,21 @@
 [data-reasoning-label] {
   display: inline-block;
   white-space: nowrap;
+}
+
+.model-column-resize:focus-visible:not([data-resizing='true'])::after {
+  background: var(--ink);
+}
+.model-section-divider {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 10px 0;
+}
+.model-empty-favorites {
+  color: var(--muted);
+  margin: 8px 0;
+}
+
+.model-picker-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
