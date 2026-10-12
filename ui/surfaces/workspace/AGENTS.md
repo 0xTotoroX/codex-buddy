@@ -32,3 +32,5 @@
 [PROTOCOL]: 结构、职责或接口变化时更新本文；父级描述受影响时同步父级地图。
 
 `window-controls.js` 处理横线收回与放大/还原操作和原生状态确认；hide保留页面/租约，toggle-maximize保存普通几何，window-state回读状态。geometryTransient阻止临时几何写入持久偏好。窗口操作与置顶共用18px图形、28px按钮和工作台悬停显现规则。
+
+共享容器支持第五项 terms，通过 features/content 委托术语积木视图，继续使用同一布局/交接机制。

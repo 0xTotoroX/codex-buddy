@@ -1,12 +1,15 @@
 // [INPUT]: 私有术语文件、认证命令与独立检索结果。
-// [OUTPUT]: 术语库/手动词条、已掌握状态、样式设置与中文 Markdown 导出。
+// [OUTPUT]: 术语库/手动词条、收藏/掌握、当前聊天涉及编号、样式设置与中文 Markdown 导出。
 // [POS]: 本机知识服务，不写主聊天；完整词库不随源码或安装包分发。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 use crate::{config::write_private, state::App};
 use anyhow::{Context, Result, bail, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,6 +35,7 @@ pub(crate) struct Preferences {
     pub auto_expand: bool,
     pub card_style: String,
     pub mastered: BTreeSet<String>,
+    pub favorites: BTreeSet<String>,
     pub revision: u64,
 }
 impl Default for Preferences {
@@ -42,10 +46,20 @@ impl Default for Preferences {
             auto_expand: true,
             card_style: "plain".into(),
             mastered: BTreeSet::new(),
+            favorites: BTreeSet::new(),
             revision: 0,
         }
     }
 }
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct Seen {
+    context: String,
+    sessions: BTreeMap<String, BTreeSet<String>>,
+    phase: String,
+    message: String,
+}
+
 pub(crate) fn read<T: serde::de::DeserializeOwned + Default>(root: &Path, name: &str) -> Result<T> {
     let p = root.join(name);
     if !p.exists() {
@@ -172,7 +186,7 @@ pub(crate) fn known<'a>(terms: &'a [Term], query: &str) -> Option<&'a Term> {
             || t.aliases.iter().any(|a| a.to_lowercase() == q)
     })
 }
-pub(crate) async fn command(app: &Arc<App>, mut input: Value) -> Result<Value> {
+pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
     if input["action"] == "manual" {
         let entries = input["entries"].as_array_mut().context("缺少手动词条")?;
         ensure!(entries.len() == 1, "一次手动添加一个词条");
@@ -205,10 +219,13 @@ pub(crate) async fn command(app: &Arc<App>, mut input: Value) -> Result<Value> {
     let _guard = app.terminology_operation.lock().await;
     let root = &app.paths.root;
     let mut prefs: Preferences = read(root, "terminology-settings.json")?;
+    if prefs.card_style == "note" {
+        prefs.card_style = "plain".into();
+    }
     let mut terms = library(root)?;
     let action = input["action"].as_str().unwrap_or("state");
     match action {
-        "state" => {}
+        "state" | "view" => {}
         "settings" => {
             ensure!(
                 input["revision"].as_u64() == Some(prefs.revision),
@@ -224,8 +241,51 @@ pub(crate) async fn command(app: &Arc<App>, mut input: Value) -> Result<Value> {
                 }
             }
             if let Some(style) = input["cardStyle"].as_str() {
-                ensure!(["plain", "frost", "note"].contains(&style), "未知卡片样式");
+                ensure!(["plain", "frost"].contains(&style), "未知卡片样式");
                 prefs.card_style = style.into();
+            }
+            prefs.revision += 1;
+            save(root, "terminology-settings.json", &prefs)?;
+        }
+        "observe" => {
+            let context = input["context"].as_str().context("缺少聊天身份")?;
+            ensure!(context.len() <= 180, "聊天身份过长");
+            let mut seen: Seen = read(root, "terminology-seen.json")?;
+            seen.context = context.into();
+            seen.phase = input["phase"]
+                .as_str()
+                .filter(|s| ["ready", "analyzing", "error", "disabled", "waiting"].contains(s))
+                .unwrap_or("ready")
+                .into();
+            seen.message = input["message"]
+                .as_str()
+                .unwrap_or("")
+                .chars()
+                .take(180)
+                .collect();
+            if !context.is_empty() {
+                let ids = seen.sessions.entry(context.into()).or_default();
+                for id in input["ids"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|v| v.as_str())
+                    .take(2000)
+                {
+                    if terms.iter().any(|t| t.id == id) {
+                        ids.insert(id.into());
+                    }
+                }
+            }
+            save(root, "terminology-seen.json", &seen)?;
+        }
+        "favorite" | "unfavorite" => {
+            let id = input["id"].as_str().context("缺少术语编号")?;
+            ensure!(terms.iter().any(|t| t.id == id), "术语已不存在");
+            if action == "favorite" {
+                prefs.favorites.insert(id.into());
+            } else {
+                prefs.favorites.remove(id);
             }
             prefs.revision += 1;
             save(root, "terminology-settings.json", &prefs)?;
@@ -305,7 +365,22 @@ pub(crate) async fn command(app: &Arc<App>, mut input: Value) -> Result<Value> {
         }
         _ => bail!("未知术语操作"),
     }
-    Ok(json!({"preferences":prefs,"entries":terms}))
+    let seen: Seen = read(root, "terminology-seen.json")?;
+    let involved = seen
+        .sessions
+        .get(&seen.context)
+        .cloned()
+        .unwrap_or_default();
+    if action == "view" {
+        terms.retain(|t| {
+            involved.contains(&t.id)
+                || prefs.favorites.contains(&t.id)
+                || prefs.mastered.contains(&t.id)
+        });
+    }
+    Ok(
+        json!({"preferences":prefs,"entries":terms,"context":seen.context,"involved":involved,"phase":seen.phase,"message":seen.message}),
+    )
 }
 
 #[cfg(test)]
@@ -357,6 +432,41 @@ mod tests {
         );
         assert_eq!(
             read::<Vec<Term>>(dir.path(), "terminology-manual.json")
+                .unwrap()
+                .len(),
+            1
+        );
+        command(&app, json!({"action":"favorite","id":"TERM-1"}))
+            .await
+            .unwrap();
+        command(&app,json!({"action":"observe","context":"chat-a","ids":["TERM-1","unknown"],"phase":"ready"})).await.unwrap();
+        let a = command(&app, json!({"action":"state"})).await.unwrap();
+        assert_eq!(a["involved"], json!(["TERM-1"]));
+        assert_eq!(a["preferences"]["favorites"], json!(["TERM-1"]));
+        assert_eq!(a["preferences"]["mastered"], json!(["TERM-1"]));
+        command(
+            &app,
+            json!({"action":"observe","context":"chat-b","ids":[],"phase":"ready"}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            command(&app, json!({"action":"state"})).await.unwrap()["involved"],
+            json!([])
+        );
+        command(
+            &app,
+            json!({"action":"observe","context":"chat-a","ids":[],"phase":"ready"}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            command(&app, json!({"action":"state"})).await.unwrap()["involved"],
+            json!(["TERM-1"])
+        );
+        assert_eq!(
+            command(&app, json!({"action":"view"})).await.unwrap()["entries"]
+                .as_array()
                 .unwrap()
                 .len(),
             1

@@ -91,3 +91,5 @@ settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修�
 模型分类扩展 model_control::Preferences：保存自定义组、按模型 ID 的厂家/分组覆盖、组序与展开状态；新字段缺省兼容旧配置。保存统一校验非空名称、重复组名、归属引用与修订号，不裁剪暂不可用模型，不改变常用、预设或宿主模型身份。
 
 模型功能视图的受限 preferences 白名单允许 expandedGroups，与常用/顺序/预设一样校验 owner 和 revision；厂家及自定义分组仍只经设置服务保存，视图不能写 enabled、groups 或 modelOverrides。
+
+terminology 的 seen 文件只保存聊天身份、术语编号和分析状态；收藏与已掌握独立保存。features 增加 terms 业务分发与已有主界面缺失成员补登记，不覆盖关闭状态和布局。

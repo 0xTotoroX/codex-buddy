@@ -61,7 +61,7 @@ test('hover, style, mastery, navigation and cleanup preserve host content', asyn
     await page.mouse.move(point.x, point.y);
     await page.getByRole('dialog', { name: '竞态条件释义' }).waitFor();
     assert.equal(await page.locator('main').innerHTML(), before);
-    for (const style of ['plain', 'frost', 'note']) {
+    for (const style of ['plain', 'frost']) {
       await page.evaluate(async (style) => {
         window.state.preferences.cardStyle = style;
         await window.__codexBuddyTerminology.refresh();
@@ -103,12 +103,12 @@ test('hover, style, mastery, navigation and cleanup preserve host content', asyn
   }
 });
 
-test('render three actual card styles for selection', async () => {
+test('render current card styles without removed note variant', async () => {
   const result = (
     await build({
       stdin: {
         resolveDir: process.cwd(),
-        contents: `import {cardStyles,createCard} from './ui/terminology/card.js';document.querySelector('style').textContent+=cardStyles;for(const [id,label] of [['plain','A · 简洁白卡'],['frost','B · 磨砂卡'],['note','C · 阅读批注']]){const section=document.createElement('section');const title=document.createElement('h2');title.textContent=label;section.append(title,createCard(${JSON.stringify(term)},{style:id,semantic:true}));document.querySelector('main').append(section);}`,
+        contents: `import {cardStyles,createCard} from './ui/terminology/card.js';document.querySelector('style').textContent+=cardStyles;for(const [id,label] of [['plain','A · 简洁白卡'],['frost','B · 磨砂卡']]){const section=document.createElement('section');const title=document.createElement('h2');title.textContent=label;section.append(title,createCard(${JSON.stringify(term)},{style:id,semantic:true}));document.querySelector('main').append(section);}`,
       },
       bundle: true,
       format: 'iife',
@@ -127,7 +127,71 @@ test('render three actual card styles for selection', async () => {
     await page.setContent(html);
     await page.waitForTimeout(180);
     await page.screenshot({ path: 'target/reports/terminology/cards.png' });
-    assert.equal(await page.locator('.term-card').count(), 3);
+    assert.equal(await page.locator('.term-card').count(), 2);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('semantic spans cross paragraphs, whitespace and formatting without reading editor or code', async () => {
+  const { outputFiles } = await build({
+    stdin: {
+      resolveDir: process.cwd(),
+      contents: `import {textIndex,semanticSpans} from './ui/terminology/text-ranges.js';window.inspect=()=>{const index=textIndex(document.querySelector('main'));const spans=semanticSpans(index.text,'连续输入期间 暂不执行，等停止输入片刻再发出请求。');return {text:index.text,spans:spans.map(s=>index.range(s.start,s.end).toString())};};`,
+    },
+    bundle: true,
+    write: false,
+  });
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(
+      '<main><p>连续<strong>输入</strong>期间</p><p>暂不执行，等停止输入片刻再发出请求。</p><code>秘密代码</code><p>虚拟<code>隔离</code> DOM</p><textarea>秘密草稿</textarea></main>',
+    );
+    await page.addScriptTag({ content: outputFiles[0].text });
+    const value = await page.evaluate(() => window.inspect());
+    assert.equal(value.spans.length, 1);
+    assert.ok(value.spans[0].includes('停止输入'));
+    assert.ok(!value.text.includes('秘密'));
+    assert.ok(!value.text.includes('虚拟 DOM'));
+  } finally {
+    await browser.close();
+  }
+});
+
+test('semantic response paints a multi-paragraph phrase without a literal term and is cached', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(
+      '<main style="margin:80px"><p>旧请求回来</p><p>覆盖新页面，该怎么处理？</p></main>',
+    );
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate(async () => {
+      window.state.preferences.semantic = true;
+      await window.__codexBuddyTerminology.refresh();
+    });
+    await page.waitForFunction(() => window.semanticReply !== null);
+    await page.evaluate(() =>
+      window.semanticReply({
+        matches: [{ id: 'TERM-1', quote: '旧请求回来 覆盖新页面，该怎么处理？' }],
+      }),
+    );
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 1);
+    const text = await page.evaluate(() =>
+      [...CSS.highlights.get('codex-buddy-terms')][0].toString(),
+    );
+    assert.ok(text.includes('旧请求回来') && text.includes('覆盖新页面'));
+    assert.ok(!text.includes('竞态条件'));
+    await page.evaluate(() => window.__codexBuddyTerminology.refresh());
+    await page.waitForTimeout(1300);
+    assert.equal(
+      await page.evaluate(
+        () => window.calls.filter((c) => c.path === '/terminology/analyze').length,
+      ),
+      1,
+    );
+    await page.evaluate(() => window.__codexBuddyTerminology.destroy());
   } finally {
     await browser.close();
   }

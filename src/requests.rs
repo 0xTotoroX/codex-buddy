@@ -119,6 +119,18 @@ pub(crate) async fn dispatch(
             if !Arc::ptr_eq(client, &current) {
                 bail!("宿主连接已变化");
             }
+            if request.payload["action"] == "observe" {
+                let same = client
+                    .evaluate(format!(
+                        "window.__codexBuddyTerminology?.contextKey() === {}",
+                        json!(request.payload["context"].as_str().unwrap_or(""))
+                    ))
+                    .await
+                    .unwrap_or(Value::Bool(false));
+                if same != true {
+                    bail!("聊天已变化，未记录旧术语");
+                }
+            }
             crate::terminology::command(app, request.payload.clone()).await
         }
         "/terminology/analyze" => {

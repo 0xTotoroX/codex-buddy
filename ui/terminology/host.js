@@ -2,11 +2,10 @@
  * [OUTPUT]: 细下划线、悬停圈注与释义卡；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { textIndex, semanticSpans } from './text-ranges.js';
 import { createMatcher } from './matcher.js';
 import { cardStyles, createCard } from './card.js';
 const HIGHLIGHT = 'codex-buddy-terms';
-const blocked =
-  'a,button,input,textarea,select,pre,code,script,style,[hidden],[aria-hidden=true],[contenteditable]:not([contenteditable=false]),[data-codex-buddy-root],[data-codex-buddy-features-root],[data-codex-buddy-dock],[data-buddy-terms]';
 export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   window.__codexBuddyTerminology?.destroy();
   let alive = true,
@@ -27,6 +26,12 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     lastAnalysis = '',
     lastText = '',
     loading = false;
+  let phase = 'waiting',
+    lastReport = '',
+    reportQueue = Promise.resolve(),
+    retryAt = 0,
+    failures = 0;
+  const cache = new Map();
   const host = document.createElement('div');
   host.dataset.buddyTerms = 'true';
   host.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483645';
@@ -94,6 +99,10 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     const card = createCard(a.term, {
       style: state.preferences.cardStyle,
       semantic: a.semantic,
+      favorite: state.preferences.favorites?.includes(a.term.id),
+      onFavorite: async (id, value) => {
+        state = await api({ action: value ? 'favorite' : 'unfavorite', id });
+      },
       onMaster: async (id) => {
         state = await api({ action: 'master', id });
         hide();
@@ -110,68 +119,61 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       popover.style.top = `${rects[0].top - box.height - 10}px`;
     if (keyboard) card.querySelector('button')?.focus();
   }
-  function chunks() {
-    if (!root) return [];
-    const groups = new Map();
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-      acceptNode(node) {
-        const parent = node.parentElement;
-        return parent && !parent.closest(blocked) && node.textContent.trim()
-          ? NodeFilter.FILTER_ACCEPT
-          : NodeFilter.FILTER_REJECT;
-      },
-    });
-    let node;
-    while ((node = walker.nextNode())) {
-      const parent = node.parentElement;
-      const block =
-        parent.closest('p,li,h1,h2,h3,h4,h5,h6,blockquote,[data-message-author-role],.markdown') ||
-        parent;
-      if (!groups.has(block)) groups.set(block, { text: '', nodes: [] });
-      const item = groups.get(block);
-      item.nodes.push({
-        node,
-        start: item.text.length,
-        end: item.text.length + node.textContent.length,
-      });
-      item.text += node.textContent;
-    }
-    return [...groups.values()];
+  function contextKey() {
+    return root && root === getRoot() ? String(getExchange()?.sessionId || '') : '';
   }
-  function rangeFor(chunk, start, end) {
-    const first = chunk.nodes.find((n) => n.end > start),
-      last = chunk.nodes.find((n) => n.end >= end);
-    if (!first || !last) return null;
-    const range = document.createRange();
-    range.setStart(first.node, start - first.start);
-    range.setEnd(last.node, end - last.start);
-    return range;
+  function report(ids = []) {
+    const payload = {
+      action: 'observe',
+      context: contextKey(),
+      ids: [...new Set(ids)].sort(),
+      phase: state.preferences.enabled ? phase : 'disabled',
+      message: apiObject.lastError || '',
+    };
+    const signature = JSON.stringify(payload);
+    if (signature === lastReport) return;
+    lastReport = signature;
+    reportQueue = reportQueue
+      .catch(() => {})
+      .then(async () => {
+        if (!alive || payload.context !== contextKey()) return;
+        await api(payload);
+      })
+      .catch(() => {
+        lastReport = '';
+      });
   }
   function scan() {
     clearTimeout(scanTimer);
     if (!alive) return;
     clear();
-    if (!state.preferences.enabled || !root || root !== getRoot()) return;
-    const match = createMatcher(state.entries, state.preferences.mastered);
-    const terms = new Map(state.entries.map((t) => [t.id, t]));
-    for (const chunk of chunks().reverse()) {
-      if (annotations.length >= 400) break;
-      const hits = match(chunk.text);
-      for (const hint of semanticMatches) {
-        const term = terms.get(hint.id);
-        if (!term || state.preferences.mastered.includes(hint.id)) continue;
-        const start = chunk.text.indexOf(hint.quote);
-        if (start >= 0 && !hits.some((h) => h.start < start + hint.quote.length && h.end > start))
-          hits.push({ start, end: start + hint.quote.length, term, semantic: true });
+    if (!root || root !== getRoot() || !state.preferences.enabled) {
+      report();
+      return;
+    }
+    const index = textIndex(root),
+      terms = new Map(state.entries.map((t) => [t.id, t]));
+    const hits = createMatcher(state.entries)(index.text);
+    for (const hint of semanticMatches) {
+      const term = terms.get(hint.id);
+      if (!term) continue;
+      for (const span of semanticSpans(index.text, hint.quote)) {
+        if (!hits.some((h) => h.start < span.end && h.end > span.start))
+          hits.push({ ...span, term, semantic: true });
       }
-      for (const h of hits) {
-        if (annotations.length >= 400) break;
-        const range = rangeFor(chunk, h.start, h.end);
-        if (range) annotations.push({ ...h, range, text: range.toString() });
-      }
+    }
+    const involved = hits.map((h) => h.term.id);
+    // 仅限制屏幕绘制量，当前聊天词条集合仍完整收集，已掌握不再绘制。
+    for (const h of hits
+      .filter((h) => !state.preferences.mastered.includes(h.term.id))
+      .sort((a, b) => b.start - a.start)
+      .slice(0, 400)) {
+      const range = index.range(h.start, h.end);
+      if (range) annotations.push({ ...h, range, text: range.toString() });
     }
     if (CSS.highlights && typeof Highlight !== 'undefined')
       CSS.highlights.set(HIGHLIGHT, new Highlight(...annotations.map((a) => a.range)));
+    report(involved);
   }
   function schedule() {
     clearTimeout(scanTimer);
@@ -183,17 +185,31 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     try {
       const value = await api({ action: 'state' });
       if (!alive) return;
-      const changed = JSON.stringify(value) !== JSON.stringify(state);
+      const changed =
+        JSON.stringify([value.preferences, value.entries]) !==
+        JSON.stringify([state.preferences, state.entries]);
+      const toggled =
+        value.preferences.semantic !== state.preferences.semantic ||
+        value.preferences.enabled !== state.preferences.enabled;
       state = value;
       if (changed) {
-        pending = '';
-        lastAnalysis = '';
+        if (toggled) {
+          pending = '';
+          lastAnalysis = '';
+          failures = 0;
+        }
         scan();
       }
     } catch (e) {
       apiObject.lastError = e.message;
     } finally {
       loading = false;
+      let phase = 'waiting',
+        lastReport = '',
+        reportQueue = Promise.resolve(),
+        retryAt = 0,
+        failures = 0;
+      const cache = new Map();
     }
   }
   function identity() {
@@ -208,11 +224,21 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   async function analyze() {
     if (!state.preferences.enabled || !state.preferences.semantic || pending) return;
     const exchange = identity();
-    if (!exchange || exchange.key === lastAnalysis) return;
+    if (!exchange || exchange.key === lastAnalysis || Date.now() < retryAt) return;
+    if (cache.has(exchange.key)) {
+      semanticMatches = cache.get(exchange.key);
+      lastAnalysis = exchange.key;
+      phase = 'ready';
+      scan();
+      return;
+    }
     const id = `terms-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     pending = id;
     lastAnalysis = exchange.key;
     const originalRoot = root;
+    phase = 'analyzing';
+    apiObject.lastError = '';
+    scan();
     try {
       const result = await api(
         {
@@ -226,13 +252,27 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       if (!alive || pending !== id || root !== originalRoot || identity()?.key !== exchange.key)
         return;
       semanticMatches = result.matches || [];
+      cache.set(exchange.key, semanticMatches);
+      if (cache.size > 32) cache.delete(cache.keys().next().value);
+      failures = 0;
+      retryAt = 0;
+      phase = result.warning ? 'error' : 'ready';
       apiObject.lastError = result.warning || '';
       const updated = await api({ action: 'state' });
       if (!alive || pending !== id) return;
       state = updated;
       scan();
     } catch (e) {
-      if (alive && pending === id) apiObject.lastError = e.message;
+      if (alive && pending === id) {
+        apiObject.lastError = e.message;
+        phase = 'error';
+        failures++;
+        if (failures < 3) {
+          lastAnalysis = '';
+          retryAt = Date.now() + 30000;
+        }
+        scan();
+      }
     } finally {
       if (pending === id) pending = '';
     }
@@ -247,7 +287,12 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       pending = '';
       lastAnalysis = '';
       lastText = '';
+      failures = 0;
+      retryAt = 0;
+      phase = 'waiting';
+      lastReport = '';
       clear();
+      report();
       if (root) {
         observer = new MutationObserver(schedule);
         observer.observe(root, { childList: true, subtree: true, characterData: true });
@@ -260,6 +305,9 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       lastText = key;
       pending = '';
       semanticMatches = [];
+      phase = isBusy() ? 'waiting' : 'ready';
+      failures = 0;
+      retryAt = 0;
       schedule();
     } else if (key) void analyze();
   }
@@ -326,6 +374,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     poll = setInterval(refresh, 15000);
   const apiObject = {
     lastError: '',
+    contextKey,
     verify: (id) => alive && pending === id && identity()?.key === lastAnalysis,
     refresh,
     destroy() {

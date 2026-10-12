@@ -19,6 +19,8 @@ Click the face to expand or collapse the in-chat workbench using your saved plac
 
 Terminology annotations are available under detailed settings → Features and interactions. Import a local glossary to underline terms in chat, hover for Chinese definitions, and mark concepts as mastered. Three card styles, manual entries, and document export are included. Optional semantic detection sends the current question and answer to the configured model; online enrichment queries only short term names and does not write to the main chat. Glossaries stay in local data and are not bundled with releases.
 
+The workbench also provides a Terminology tab with concepts encountered in the current chat, favorites, and mastered terms. Semantic spans can cross paragraphs and inline formatting; results are cached and failed analysis is retried a bounded number of times.
+
 ## Features
 
 | Feature | What it does |

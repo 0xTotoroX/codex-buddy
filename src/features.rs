@@ -19,7 +19,7 @@ use std::{
 mod main_surface;
 use main_surface::{FeatureLayout, MainSurface, SavedFeatures};
 
-pub const IDS: [&str; 4] = ["outline", "board", "next", "model"];
+pub const IDS: [&str; 5] = ["outline", "board", "next", "model", "terms"];
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Preference {
@@ -389,6 +389,7 @@ impl App {
                 .unwrap_or_else(|| e.pref.placement.clone());
             drop(f);
             let mut result = match id {
+                "terms" => crate::terminology::command(self, json!({"action":"view"})).await,
                 "board" => Ok(self.tasks.state().await),
                 "model" => self.model_control_state(false).await,
                 _ => {
@@ -628,6 +629,15 @@ impl App {
         ensure!(op == "action", "未知功能操作");
         let data = input["data"].clone();
         match id {
+            "terms" => {
+                ensure!(
+                    ["favorite", "unfavorite", "master", "restore"]
+                        .contains(&data["action"].as_str().unwrap_or("")),
+                    "术语视图不允许此操作"
+                );
+                crate::terminology::command(self, data).await?;
+                crate::terminology::command(self, json!({"action":"view"})).await
+            }
             "board" => self.tasks.view_command(data).await,
             "model" => match input["action"].as_str().unwrap_or("") {
                 "refresh" => {
@@ -728,11 +738,18 @@ impl App {
         {
             return Ok(());
         }
-        let missing: Vec<_> = [("outline", outline), ("next", next), ("board", board)]
-            .into_iter()
-            .filter(|(id, enabled)| *enabled && !f.entries.contains_key(*id))
-            .map(|(id, _)| id)
-            .collect();
+        let terminology =
+            crate::terminology::library(&self.paths.root).is_ok_and(|v| !v.is_empty());
+        let missing: Vec<_> = [
+            ("outline", outline),
+            ("next", next),
+            ("board", board),
+            ("terms", terminology),
+        ]
+        .into_iter()
+        .filter(|(id, enabled)| *enabled && !f.entries.contains_key(*id))
+        .map(|(id, _)| id)
+        .collect();
         if missing.is_empty() {
             return Ok(());
         }

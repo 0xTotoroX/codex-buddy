@@ -24,6 +24,7 @@ type Library = {
     autoExpand: boolean;
     cardStyle: string;
     mastered: string[];
+    favorites: string[];
     revision: number;
   };
 };
@@ -63,6 +64,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
     [busy, setBusy] = useState(false);
   const [query, setQuery] = useState(''),
     [masteredOnly, setMasteredOnly] = useState(false);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [name, setName] = useState(''),
     [english, setEnglish] = useState(''),
     [definition, setDefinition] = useState('');
@@ -108,6 +110,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
   const results = (data?.entries || []).filter(
     (t) =>
       (!masteredOnly || prefs?.mastered.includes(t.id)) &&
+      (!favoritesOnly || prefs?.favorites?.includes(t.id)) &&
       [t.name, t.english, ...t.aliases, ...t.category].some((v) =>
         v.toLowerCase().includes(query.trim().toLowerCase()),
       ),
@@ -119,6 +122,14 @@ export function TerminologySettings({ active }: { active: boolean }) {
           `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{width:100%;max-width:440px}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
       </style>
       <h2>术语释义</h2>
+      <button
+        type="button"
+        onClick={() =>
+          void request('features', { op: 'reveal', id: 'terms' }).catch((e) => setError(e.message))
+        }
+      >
+        打开术语模块
+      </button>
       {error && (
         <p role="alert" className="text-destructive">
           {error}
@@ -152,7 +163,6 @@ export function TerminologySettings({ active }: { active: boolean }) {
             {[
               ['plain', '简洁白卡'],
               ['frost', '磨砂卡'],
-              ['note', '阅读批注'],
             ].map(([id, label]) => (
               <button
                 key={id}
@@ -227,6 +237,14 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 onChange={(e) => setMasteredOnly(e.target.checked)}
               />{' '}
               只看已掌握
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={favoritesOnly}
+                onChange={(e) => setFavoritesOnly(e.target.checked)}
+              />{' '}
+              只看收藏
             </label>
             <div className="term-results">
               {results.slice(0, 80).map((t) => (

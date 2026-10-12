@@ -115,6 +115,7 @@ export function SettingsOverview({
     next: settings.enabled,
     board: tasks.store.boardEnabled,
     model: models.preferences.enabled,
+    terms: features.features.some((entry) => entry.id === 'terms' && entry.open),
   };
   const location = (id: FeatureId) =>
     features.features.find((e) => e.id === id)?.placement || (id === 'model' ? 'edge' : primary);

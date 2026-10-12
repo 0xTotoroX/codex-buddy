@@ -28,3 +28,5 @@ codex-host.ts定义独立后台管理状态和重启进度，不扩展FeatureId�
 contracts 声明术语实例 verify/refresh/destroy 接口与无正文错误状态；正式词库不放入 shared。
 
 EditableSettings.promptEnhancementEnabled是提示词优化独立开关，历史配置由后台默认true；不归入四功能FeatureId或布局。
+
+features.ts 增加 terms、默认14px字号与术语筛选/选择阅读状态，其他功能身份和保存协议不变。

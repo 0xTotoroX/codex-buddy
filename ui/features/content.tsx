@@ -1,9 +1,10 @@
 /* [INPUT]: Feature identity, business envelope, guarded transport, reading state and optional header slot.
- * [OUTPUT]: The four feature views and their business command adapters, without window policy.
+ * [OUTPUT]: The five feature views and their business command adapters, without window policy.
  * [POS]: Fixed feature composition; persistence and validation remain in existing services.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useCallback, useRef } from 'react';
 import { Board } from './board/app';
+import { TerminologyView, type TermData } from './terminology';
 import type { TaskRequest } from './board/api';
 import { ModelView, type ModelState } from './model/view';
 import { ProjectedContent } from './projected';
@@ -49,6 +50,23 @@ export function FeatureContent({
     },
     [call],
   );
+  if (id === 'terms')
+    return value ? (
+      <TerminologyView
+        state={value as unknown as TermData}
+        reading={reading}
+        locked={locked}
+        action={(data) =>
+          operation(async () => {
+            const result = await call<FeatureData>('action', { data });
+            update(result);
+            return result;
+          })
+        }
+      />
+    ) : (
+      <p className="feature-placeholder">正在读取术语…</p>
+    );
   if (id === 'board')
     return (
       <Board
