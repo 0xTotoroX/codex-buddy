@@ -88,9 +88,12 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     );
   }
   function cardOptions(a) {
+    const source = a.range.startContainer;
+    const element = source.nodeType === Node.ELEMENT_NODE ? source : source.parentElement;
+    const fontSize = element ? Number.parseFloat(getComputedStyle(element).fontSize) : undefined;
     return {
       preferences: state.preferences,
-      appearance: appearance(),
+      appearance: { ...appearance(), fontSize },
       favorite: state.preferences.favorites?.includes(a.term.id),
       mastered: state.preferences.mastered.includes(a.term.id),
       onFavorite: async (id, value) => {

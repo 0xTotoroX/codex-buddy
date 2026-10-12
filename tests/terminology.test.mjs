@@ -225,6 +225,24 @@ test('long phrase popover follows hover point, clamps to viewport and stays stil
     await card.waitFor();
     await page.waitForTimeout(270);
     assert.ok(Math.abs((await card.boundingBox()).x - x) < 2);
+    const typography = await card.evaluate((c) => {
+      const title = getComputedStyle(c.querySelector('strong'));
+      const text = getComputedStyle(c.querySelector('p'));
+      return {
+        title: title.fontSize,
+        text: text.fontSize,
+        indent: text.textIndent,
+        gap: text.marginTop,
+        line: text.lineHeight,
+      };
+    });
+    assert.deepEqual(typography, {
+      title: '24px',
+      text: '24px',
+      indent: '48px',
+      gap: '38.4px',
+      line: '38.4px',
+    });
     const next = x - 130;
     await page.mouse.move(next, line.y);
     await page.waitForTimeout(50);

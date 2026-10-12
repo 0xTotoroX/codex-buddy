@@ -13,6 +13,7 @@ export function inheritedAppearance(element = document.documentElement) {
       style.colorScheme === 'dark' || document.documentElement.classList.contains('dark')
         ? 'dark'
         : undefined,
+    fontSize: Number.parseFloat(style.fontSize) || 16,
     colors: {
       text: read('--ink', '--foreground') || style.color,
       muted: read('--muted-foreground', '--muted'),
@@ -80,6 +81,11 @@ export function attachCardAppearance(card) {
         danger: appearance.colors?.danger || '#bf4d4d',
       }))
         if (value) card.style.setProperty('--term-' + name, value);
+      const fontSize = Number(appearance.fontSize);
+      card.style.setProperty(
+        '--term-font-size',
+        `${Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 16}px`,
+      );
       card.style.colorScheme = surface.colorScheme;
       card.style.width = `${Math.max(280, Math.min(420, preferences.cardWidth || 348))}px`;
       card.dataset.material = material;
