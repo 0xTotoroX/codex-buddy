@@ -35,8 +35,9 @@ export function textIndex(root) {
       parent.closest('p,li,h1,h2,h3,h4,h5,h6,blockquote,[data-message-author-role]') || root;
     if (block && block !== next) pushSpace();
     block = next;
-    for (let offset = 0; offset < node.length; offset++) {
-      const char = node.data[offset];
+    const textNode = /** @type {Text} */ (node);
+    for (let offset = 0; offset < textNode.length; offset++) {
+      const char = textNode.data[offset];
       if (/[\s\u200b]/u.test(char)) {
         pushSpace();
         continue;

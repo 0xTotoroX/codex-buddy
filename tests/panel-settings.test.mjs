@@ -131,7 +131,13 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     assert.deepEqual(prefs.ui.fontSizes, { outline: 16.3, next: 18.5, board: 17.2, model: 16.1 });
     await page.getByRole('button', { name: '重置全部字号' }).click();
     await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
-    assert.deepEqual(prefs.ui.fontSizes, { outline: 16, next: 16, board: 15, model: 14 });
+    assert.deepEqual(prefs.ui.fontSizes, {
+      outline: 16,
+      next: 16,
+      board: 15,
+      model: 14,
+      terms: 14,
+    });
     assert.equal(prefs.ui.fontOffset, 0);
     await font.fill('18.9');
     await page.getByRole('button', { name: '重置全部字号' }).click();

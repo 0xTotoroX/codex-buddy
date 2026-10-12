@@ -90,6 +90,14 @@ async function setup(page) {
       if (path === '/features' && payload.op === 'state') reply = { features: [] };
       else if (path === '/terminology' && payload.action === 'state')
         reply = { preferences: { enabled: false, semantic: false, mastered: [] }, entries: [] };
+      else if (
+        path === '/terminology' &&
+        payload.action === 'observe' &&
+        ['waiting', 'disabled'].includes(payload.phase) &&
+        Array.isArray(payload.ids) &&
+        payload.ids.length === 0
+      )
+        reply = { status: 'ok' };
       else if (path === '/settings/open') reply = { status: 'ok' };
       else if (path === '/stepwise/settings') reply = { settings: fixture.settings };
       else if (path === '/stepwise/generate' && fixture.deferred) {
@@ -100,7 +108,11 @@ async function setup(page) {
         fixture.settings.configurationRevision += 1;
         reply = { settings: fixture.settings };
       } else {
-        fixture.unexpected.push(path);
+        fixture.unexpected.push(
+          path === '/terminology'
+            ? { path, action: payload.action, phase: payload.phase, ids: payload.ids }
+            : path,
+        );
         reply = { error: `Unexpected fixture request: ${path}` };
       }
       queueMicrotask(() => window.__companionDesktop.complete(id, structuredClone(reply)));

@@ -713,7 +713,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         });
         await model.getByText('模型快切已停用，请在设置页开启。').waitFor();
         assert.equal(
-          await model.getByRole('button', { name: '刷新可用模型', exact: true }).isDisabled(),
+          await model.getByRole('button', { name: 'Fast', exact: true }).isDisabled(),
           true,
         );
         assert.equal(

@@ -1,18 +1,12 @@
 /* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Grouped model matrix, favorites, persisted expansion/order, presets and capability-driven selection.
+ * [OUTPUT]: Favorites matrix, complete grouped picker, wrapping presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
-import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { Reading } from '../../shared/features';
-import {
-  groupedModels,
-  modelGroup,
-  orderedModelIds,
-  type ModelState,
-  type Selection,
-} from './catalog';
+import { groupedModels, orderedModelIds, type ModelState, type Selection } from './catalog';
 export type { ModelState } from './catalog';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const icon = (name: string) => <span dangerouslySetInnerHTML={{ __html: iconSvg(name) }} />;
@@ -41,6 +35,31 @@ export function ModelView({
       creating: boolean;
     } | null>(null);
   const matrix = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLElement>(null);
+  const picker = useRef<HTMLDivElement>(null);
+  const pickerToggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!others) return;
+    const document = root.current!.ownerDocument;
+    const outside = (event: PointerEvent) => {
+      const path = event.composedPath();
+      if (!path.includes(picker.current!) && !path.includes(pickerToggle.current!))
+        setOthers(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.isComposing) return;
+      event.stopPropagation();
+      setOthers(false);
+      pickerToggle.current?.focus({ preventScroll: true });
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape, true);
+    picker.current?.querySelector<HTMLButtonElement>('.model-tile')?.focus({ preventScroll: true });
+    return () => {
+      document.removeEventListener('pointerdown', outside, true);
+      document.removeEventListener('keydown', escape, true);
+    };
+  }, [others]);
   const resize = useRef<{
     pointer: number;
     x: number;
@@ -78,9 +97,7 @@ export function ModelView({
     return model ? [model] : [];
   });
   const visible = models.filter((m) => prefs.pinned.includes(m.id));
-  const remaining = models.filter((m) => !prefs.pinned.includes(m.id));
-  const groups = groupedModels(remaining, prefs);
-  const expanded = prefs.expandedGroups ?? [];
+  const groups = groupedModels(models, prefs);
   const dragType = 'application/x-codex-buddy-model';
   const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   const columns = [
@@ -140,16 +157,7 @@ export function ModelView({
           event.preventDefault();
           event.stopPropagation();
           const id = event.dataTransfer.getData(dragType);
-          if (
-            id === m.id ||
-            !models.some((model) => model.id === id) ||
-            prefs.pinned.includes(id) !== prefs.pinned.includes(m.id) ||
-            (!prefs.pinned.includes(id) &&
-              modelGroup(
-                models.find((item) => item.id === id)!,
-                prefs,
-              ).id !== modelGroup(m, prefs).id)
-          )
+          if (id === m.id || !models.some((model) => model.id === id) || !prefs.pinned.includes(id))
             return;
           const next = modelOrder.filter((item) => item !== id);
           const rect = event.currentTarget.getBoundingClientRect();
@@ -179,23 +187,6 @@ export function ModelView({
               <small className="model-route">{m.id}</small>
             )}
           </strong>
-          <button
-            className="model-visibility"
-            data-pinned={prefs.pinned.includes(m.id)}
-            disabled={busy || !prefs.enabled}
-            aria-label={`${prefs.pinned.includes(m.id) ? '隐藏' : '设为常用'} ${label(m.label)}`}
-            onClick={async () => {
-              const wasPinned = prefs.pinned.includes(m.id);
-              const result = await save({
-                pinned: wasPinned
-                  ? prefs.pinned.filter((id) => id !== m.id)
-                  : [...prefs.pinned, m.id],
-              });
-              if (!wasPinned && result !== null) setOthers(false);
-            }}
-          >
-            {icon('chevron-down')}
-          </button>
         </div>
         <div className="model-choices">
           {columns.map((reasoning) => {
@@ -220,19 +211,34 @@ export function ModelView({
         </div>
       </div>
     ));
-  const refreshButton = (
+  const allButton = (
     <button
-      data-refresh="model"
-      aria-label="刷新可用模型"
-      disabled={busy || !prefs.enabled}
-      onClick={() => void action({}, 'refresh')}
+      ref={pickerToggle}
+      className="model-picker-toggle"
+      data-model-picker
+      aria-label="所有"
+      aria-expanded={others}
+      aria-haspopup="dialog"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        border: 0,
+        background: 'transparent',
+      }}
+      onClick={() => {
+        setPresetDraft(null);
+        setOthers(!others);
+      }}
     >
-      {icon('refresh')}
+      所有{icon('chevron-down')}
     </button>
   );
   return (
     <section
+      ref={root}
       className="feature-model"
+      data-header-actions={!!headerActions}
       style={
         {
           '--name-width': `${nameWidth}px`,
@@ -242,127 +248,10 @@ export function ModelView({
         } as CSSProperties
       }
     >
-      <header className="model-toolbar">
-        <button
-          className="model-fast"
-          aria-label="Fast"
-          aria-pressed={s.current?.speed === 'fast'}
-          disabled={
-            busy || !allowed || !s.current || !s.models.find((m) => m.id === s.current?.model)?.fast
-          }
-          onClick={() =>
-            s.current &&
-            void apply({ ...s.current, speed: s.current.speed === 'fast' ? 'standard' : 'fast' })
-          }
-        >
-          {icon('bolt')}
-        </button>
-        <div className="model-presets">
-          {prefs.presets.map((p) => (
-            <button
-              key={p.id}
-              disabled={busy || !allowed || !valid(p.selection)}
-              onClick={() => void apply(p.selection)}
-            >
-              {p.name}
-            </button>
-          ))}
-        </div>
-        {!!prefs.presets.length && (
-          <button
-            aria-label="模型工具"
-            aria-expanded={tools}
-            onClick={() => setTools((reading.modelTools = !tools))}
-          >
-            {icon('more')}
-          </button>
-        )}
-        {headerActions ? createPortal(refreshButton, headerActions) : refreshButton}
-        <button
-          aria-label="保存预设"
-          disabled={busy || !allowed || !s.current}
-          onClick={() => {
-            if (s.current)
-              setPresetDraft({
-                id: crypto.randomUUID(),
-                name: '',
-                selection: { ...s.current },
-                creating: true,
-              });
-          }}
-        >
-          {icon('plus')}
-        </button>
-      </header>
-      {presetDraft && (
-        <form
-          key={presetDraft.id}
-          className="model-preset-editor"
-          aria-label={presetDraft.creating ? '保存模型预设' : '重命名模型预设'}
-          onSubmit={async (event) => {
-            event.preventDefault();
-            const name = presetDraft.name.trim();
-            if (busy || !prefs.enabled || !name) return;
-            const preset = { id: presetDraft.id, name, selection: presetDraft.selection };
-            const result = await save({
-              presets: presetDraft.creating
-                ? [...prefs.presets, preset]
-                : prefs.presets.map((item) => (item.id === preset.id ? { ...item, name } : item)),
-            });
-            if (result !== null) setPresetDraft(null);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.stopPropagation();
-              if (event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              if (!busy) setPresetDraft(null);
-            }
-          }}
-        >
-          <input
-            aria-label="预设名称"
-            placeholder="预设名称"
-            autoFocus
-            maxLength={256}
-            value={presetDraft.name}
-            disabled={busy || !prefs.enabled}
-            onChange={(event) => setPresetDraft({ ...presetDraft, name: event.target.value })}
-          />
-          <button type="submit" disabled={busy || !prefs.enabled || !presetDraft.name.trim()}>
-            保存
-          </button>
-          <button type="button" disabled={busy} onClick={() => setPresetDraft(null)}>
-            取消
-          </button>
-        </form>
-      )}
-      {tools && !!prefs.presets.length && (
-        <div className="model-tools">
-          {prefs.presets.map((p) => (
-            <div className="model-preset" key={p.id}>
-              <span>{p.name}</span>
-              <button
-                aria-label={`重命名预设 ${p.name}`}
-                disabled={busy}
-                onClick={() =>
-                  setPresetDraft({ ...p, selection: { ...p.selection }, creating: false })
-                }
-              >
-                改名
-              </button>
-              <button
-                aria-label={`删除预设 ${p.name}`}
-                disabled={busy}
-                onClick={() =>
-                  void save({ presets: prefs.presets.filter((item) => item.id !== p.id) })
-                }
-              >
-                删除
-              </button>
-            </div>
-          ))}
-        </div>
+      {headerActions ? (
+        createPortal(allButton, headerActions)
+      ) : (
+        <header className="model-toolbar">{allButton}</header>
       )}
       <div
         className="model-scroll"
@@ -374,7 +263,8 @@ export function ModelView({
         <div className="model-matrix">
           <div className="model-intrinsic-width" data-intrinsic-width hidden />
           <div className="model-primary">
-            <div
+            <button
+              type="button"
               className="model-column-resize"
               role="separator"
               aria-label="模型名称列宽"
@@ -438,9 +328,32 @@ export function ModelView({
                 setColumnWidth(width);
                 void saveWidth(width);
               }}
-            />
+            >
+              {icon('grip')}
+            </button>
             <div className="model-matrix-head">
-              <span>常用模型</span>
+              <span className="model-fixed-tools">
+                <button
+                  className="model-fast"
+                  aria-label="Fast"
+                  aria-pressed={s.current?.speed === 'fast'}
+                  disabled={
+                    busy ||
+                    !allowed ||
+                    !s.current ||
+                    !s.models.find((m) => m.id === s.current?.model)?.fast
+                  }
+                  onClick={() =>
+                    s.current &&
+                    void apply({
+                      ...s.current,
+                      speed: s.current.speed === 'fast' ? 'standard' : 'fast',
+                    })
+                  }
+                >
+                  {icon('bolt')}
+                </button>
+              </span>
               <div>
                 {columns.map((c) => (
                   <span key={c}>
@@ -450,58 +363,193 @@ export function ModelView({
               </div>
             </div>
             {!!models.length && !visible.length && (
-              <p className="model-empty-favorites">暂无常用模型</p>
+              <p className="model-empty-favorites">暂无模型</p>
             )}
             {rows(visible)}
+            {!models.length && <p>暂无可用模型</p>}
           </div>
         </div>
       </div>
-      {!!remaining.length && (
-        <div className="model-picker">
-          <button
-            className="model-disclosure model-picker-toggle"
-            aria-label={`其他模型，${remaining.length} 个模型`}
-            aria-expanded={others}
-            onClick={() => setOthers(!others)}
-          >
-            <span className="model-disclosure-label">其他模型</span>
-            <span className="model-count">{remaining.length}</span>
-            {icon('chevron-down')}
-          </button>
-          {others && (
-            <div className="model-other-list">
-              {groups.map((group) => (
-                <div key={group.id} className="model-group" data-model-group={group.id}>
-                  <button
-                    className="model-disclosure"
-                    aria-label={`${group.name}，${group.models.length} 个模型${group.models.some((m) => m.id === s.current?.model) ? '，当前模型所在分组' : ''}`}
-                    aria-expanded={expanded.includes(group.id)}
-                    disabled={busy}
-                    onClick={() =>
-                      void save({
-                        expandedGroups: expanded.includes(group.id)
-                          ? expanded.filter((id) => id !== group.id)
-                          : [...expanded, group.id],
-                      })
-                    }
-                  >
-                    <span className="model-disclosure-label">
-                      {group.name}
-                      {group.models.some((m) => m.id === s.current?.model) && (
-                        <small className="model-group-current">当前</small>
-                      )}
-                    </span>
-                    <span className="model-count">{group.models.length}</span>
-                    {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
-                  </button>
-                  {expanded.includes(group.id) && rows(group.models)}
-                </div>
-              ))}
-            </div>
+      <section className="model-collections" aria-label="收藏">
+        <div className="model-collections-heading">
+          <span>收藏</span>
+          {!!prefs.presets.length && (
+            <button
+              aria-label="模型工具"
+              aria-expanded={tools}
+              onClick={() => setTools((reading.modelTools = !tools))}
+            >
+              {icon('more')}
+            </button>
           )}
         </div>
+        <div className="model-presets">
+          {prefs.presets.map((p) => (
+            <button
+              key={p.id}
+              disabled={busy || !allowed || !valid(p.selection)}
+              aria-pressed={
+                s.current?.model === p.selection.model &&
+                s.current.reasoning === p.selection.reasoning &&
+                s.current.speed === p.selection.speed
+              }
+              onClick={() => void apply(p.selection)}
+            >
+              {p.name}
+            </button>
+          ))}
+          <button
+            className="model-add-preset"
+            aria-label="保存预设"
+            disabled={busy || !allowed || !s.current}
+            onClick={() => {
+              if (s.current) {
+                setOthers(false);
+                setPresetDraft({
+                  id: crypto.randomUUID(),
+                  name: '',
+                  selection: { ...s.current },
+                  creating: true,
+                });
+              }
+            }}
+          >
+            {icon('plus')}
+          </button>
+        </div>
+        {presetDraft && (
+          <form
+            key={presetDraft.id}
+            className="model-preset-editor"
+            aria-label={presetDraft.creating ? '保存模型预设' : '重命名模型预设'}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const name = presetDraft.name.trim();
+              if (busy || !prefs.enabled || !name) return;
+              const preset = { id: presetDraft.id, name, selection: presetDraft.selection };
+              const result = await save({
+                presets: presetDraft.creating
+                  ? [...prefs.presets, preset]
+                  : prefs.presets.map((item) => (item.id === preset.id ? { ...item, name } : item)),
+              });
+              if (result !== null) setPresetDraft(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation();
+                if (event.nativeEvent.isComposing) return;
+                event.preventDefault();
+                if (!busy) setPresetDraft(null);
+              }
+            }}
+          >
+            <input
+              aria-label="预设名称"
+              placeholder="预设名称"
+              autoFocus
+              maxLength={256}
+              value={presetDraft.name}
+              disabled={busy || !prefs.enabled}
+              onChange={(event) => setPresetDraft({ ...presetDraft, name: event.target.value })}
+            />
+            <button type="submit" disabled={busy || !prefs.enabled || !presetDraft.name.trim()}>
+              保存
+            </button>
+            <button type="button" disabled={busy} onClick={() => setPresetDraft(null)}>
+              取消
+            </button>
+          </form>
+        )}
+        {tools && !!prefs.presets.length && (
+          <div className="model-tools">
+            {prefs.presets.map((p) => (
+              <div className="model-preset" key={p.id}>
+                <span>{p.name}</span>
+                <button
+                  aria-label={`重命名预设 ${p.name}`}
+                  disabled={busy}
+                  onClick={() =>
+                    setPresetDraft({ ...p, selection: { ...p.selection }, creating: false })
+                  }
+                >
+                  改名
+                </button>
+                <button
+                  aria-label={`删除预设 ${p.name}`}
+                  disabled={busy}
+                  onClick={() =>
+                    void save({ presets: prefs.presets.filter((item) => item.id !== p.id) })
+                  }
+                >
+                  删除
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+      {others && (
+        <div className="model-picker" ref={picker} role="dialog" aria-label="所有模型">
+          <div className="model-picker-actions">
+            <button
+              data-refresh="model"
+              aria-label="刷新可用模型"
+              disabled={busy || !prefs.enabled}
+              onClick={() => void action({}, 'refresh')}
+            >
+              {icon('refresh')}
+            </button>
+            <button
+              aria-label="关闭所有模型"
+              onClick={() => {
+                setOthers(false);
+                pickerToggle.current?.focus({ preventScroll: true });
+              }}
+            >
+              {icon('close')}
+            </button>
+          </div>
+          <div className="model-other-list">
+            {groups.map((group) => (
+              <section
+                className="model-group"
+                data-model-group={group.id}
+                key={group.id}
+                aria-label={group.name}
+              >
+                <h3>{group.name}</h3>
+                <div className="model-tiles">
+                  {group.models.map((m) => (
+                    <button
+                      className="model-tile"
+                      key={m.id}
+                      data-model-tile={m.id}
+                      aria-label={m.label}
+                      aria-pressed={prefs.pinned.includes(m.id)}
+                      disabled={busy || !prefs.enabled}
+                      onClick={async (event) => {
+                        const button = event.currentTarget;
+                        await save({
+                          pinned: prefs.pinned.includes(m.id)
+                            ? prefs.pinned.filter((id) => id !== m.id)
+                            : [...prefs.pinned, m.id],
+                        });
+                        if (button.isConnected) button.focus({ preventScroll: true });
+                      }}
+                    >
+                      <span>{m.label}</span>
+                      {models.some((other) => other.id !== m.id && other.label === m.label) && (
+                        <small className="model-route">{m.id}</small>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ))}
+            {!models.length && <p>暂无可用模型</p>}
+          </div>
+        </div>
       )}
-      {!models.length && <p>暂无可用模型</p>}
       {(!prefs.enabled || s.message) && (
         <footer className="model-footer">
           <span role="status">

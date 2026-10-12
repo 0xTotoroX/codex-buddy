@@ -189,15 +189,22 @@ test(
         view = page.locator('#view');
       assert.equal(await view.locator('.model-row').count(), 1);
       assert.equal(await view.locator('[data-model-group]').count(), 0);
-      await view.getByRole('button', { name: /其他模型/ }).click();
-      await view.getByRole('button', { name: /Anthropic/ }).click();
-      await view.locator('[data-model-row="route-a/claude-test"]').waitFor();
+      await view.getByRole('button', { name: '所有', exact: true }).click();
+      assert.equal(await view.locator('.model-tile').count(), 4);
+      assert.equal(
+        await view.locator('[data-model-tile="gpt-test"]').getAttribute('aria-pressed'),
+        'true',
+      );
       assert.equal(await view.locator('.model-route').count(), 2);
+      await view.locator('[data-model-tile="route-b/claude-test"]').click();
+      await view.getByRole('button', { name: '关闭所有模型' }).click();
       await view.locator('[data-model="route-b/claude-test"][data-reasoning="high"]').click();
       assert.equal(
         (await page.evaluate(() => window.applied)).selection.model,
         'route-b/claude-test',
       );
+      await view.getByRole('button', { name: '所有', exact: true }).click();
+      await view.locator('[data-model-tile="route-b/claude-test"]').click();
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await settings.getByLabel('新模型分组名称').fill('编程');
       rejectNext = true;
@@ -273,9 +280,11 @@ test(
         'custom',
       ]);
       await page.evaluate((state) => window.render(state), state);
+      await view.getByRole('button', { name: '所有', exact: true }).click();
+      await view.locator('[data-model-group="vendor:Anthropic"]').waitFor();
       assert.equal(
-        await view.getByRole('button', { name: /Anthropic/ }).getAttribute('aria-expanded'),
-        'true',
+        await view.locator('[data-model-group="vendor:Anthropic"] .model-tile').count(),
+        2,
       );
       state.snapshot.models = state.snapshot.models.filter((m) => m.id !== 'custom');
       state.preferences.modelOverrides.custom = { manufacturer: '保留厂家' };
@@ -363,14 +372,11 @@ test(
       if ((await chooser.getAttribute('aria-expanded')) === 'true') await chooser.click();
       await view.locator('[data-model-row="favorite-4"] .model-route').waitFor();
       await page.mouse.move(850, 950);
-      await page.waitForFunction(
-        () => getComputedStyle(document.querySelector('#view .model-visibility')).opacity === '0',
-      );
-      assert.equal(await view.locator('.model-matrix-head > span').textContent(), '常用模型');
-      assert.equal(await view.locator('hr, .model-group-label').count(), 0);
+      assert.equal(await view.locator('.model-visibility, hr, .model-group-label').count(), 0);
+      assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
       const line = await view.locator('.model-column-resize').boundingBox();
-      const toggle = await chooser.boundingBox();
-      assert.ok(line.y + line.height < toggle.y, 'resize line stays within the favorites table');
+      const head = await view.locator('.model-matrix-head').boundingBox();
+      assert.ok(line.y + line.height <= head.y + head.height + 1, 'resize grip ends in the header');
       await view.screenshot({ path: 'target/reports/model-groups/model-compact.png' });
       await chooser.click();
       const list = view.locator('.model-other-list');
@@ -378,13 +384,31 @@ test(
         await list.evaluate((node) => node.scrollHeight > node.clientHeight),
         'dense catalogs scroll within the chooser',
       );
-      const chevrons = await view
-        .locator('.model-group > .model-disclosure > span:last-child')
-        .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().right));
-      assert.ok(
-        Math.max(...chevrons) - Math.min(...chevrons) < 1,
-        'counts and arrows have stable trailing alignment',
+      assert.equal(await view.locator('.model-tile').count(), state.snapshot.models.length);
+      assert.equal(await view.locator('.model-tile[aria-pressed="true"]').count(), 5);
+      assert.equal(await view.locator('.model-tile svg').count(), 0);
+      const colors = await view.locator('.model-tile').evaluateAll((nodes) =>
+        nodes.map((n) => ({
+          pressed: n.getAttribute('aria-pressed'),
+          bg: getComputedStyle(n).backgroundColor,
+          fg: getComputedStyle(n).color,
+        })),
       );
+      assert.notEqual(
+        colors.find((n) => n.pressed === 'true').bg,
+        colors.find((n) => n.pressed === 'false').bg,
+      );
+      assert.equal(
+        colors.find((n) => n.pressed === 'true').fg,
+        colors.find((n) => n.pressed === 'false').fg,
+      );
+      const refresh = await view
+        .getByRole('button', { name: '刷新可用模型', exact: true })
+        .boundingBox();
+      const close = await view
+        .getByRole('button', { name: '关闭所有模型', exact: true })
+        .boundingBox();
+      assert.ok(refresh.x + refresh.width <= close.x + 1 && Math.abs(refresh.y - close.y) < 1);
       await page.mouse.move(850, 950);
       await view.screenshot({ path: 'target/reports/model-groups/model-expanded.png' });
 
@@ -392,12 +416,18 @@ test(
       const fixedFrame = await view.boundingBox();
       await view.evaluate((node, height) => (node.style.height = `${height}px`), fixedFrame.height);
       const fixedButton = await chooser.boundingBox();
+      const fixedFast = await view.locator('.model-fast').boundingBox();
       const separator = view.getByRole('separator', { name: '模型名称列宽' });
       const start = await separator.boundingBox();
       await page.mouse.move(start.x + start.width / 2, start.y + 12);
       await page.mouse.down();
       await page.mouse.move(start.x - 180, start.y + 12, { steps: 12 });
       assert.equal(await separator.getAttribute('aria-valuenow'), '100');
+      assert.deepEqual(
+        await view.locator('.model-fast').boundingBox(),
+        fixedFast,
+        'Fast never follows column width',
+      );
       const scroller = view.locator('.model-scroll');
       assert.ok(
         await scroller.evaluate((n) => n.scrollHeight > n.clientHeight),
@@ -435,6 +465,30 @@ test(
         await chooser.getAttribute('aria-expanded'),
         'true',
         'compact chooser still opens after resizing',
+      );
+      await view.getByRole('button', { name: '关闭所有模型' }).click();
+      state.preferences.presets = Array.from({ length: 24 }, (_, index) => ({
+        id: `wrapping-${index}`,
+        name: `收藏快捷组合 ${index + 1}`,
+        selection: { ...state.snapshot.current },
+      }));
+      await page.evaluate((state) => window.render(state), state);
+      await view
+        .getByRole('button', { name: '收藏快捷组合 24', exact: true })
+        .waitFor({ state: 'attached' });
+      const wrapped = await view.locator('.model-presets').evaluate((node) => {
+        const buttons = [...node.querySelectorAll('button')];
+        return {
+          rows: new Set(buttons.map((button) => button.offsetTop)).size,
+          height: node.clientHeight,
+          scroll: node.scrollHeight,
+          rowHeight: buttons[0].getBoundingClientRect().height,
+        };
+      });
+      assert.ok(wrapped.rows > 3 && wrapped.scroll > wrapped.height);
+      assert.ok(
+        wrapped.height <= wrapped.rowHeight * 3 + 9,
+        'preset wrapping is capped at three rows',
       );
       assert.deepEqual(errors, []);
     } finally {

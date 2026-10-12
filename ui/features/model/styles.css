@@ -1,12 +1,18 @@
-/* [INPUT]: Model view DOM and surface semantic colors.
- * [OUTPUT]: Shared model matrix and preset controls.
- * [POS]: Feature content styling; no outer window or material.
+/* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
+ * [OUTPUT]: Stable columns, fixed Fast control and contained neutral popovers.
+ * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
-.model-preset {
-  display: inline-flex;
-  gap: 2px;
+.feature-model {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  --model-popup: color-mix(in srgb, var(--paper) 92%, var(--ink));
+  --model-tile: color-mix(in srgb, var(--paper) 86%, var(--ink));
+  --model-tile-on: color-mix(in srgb, var(--paper) 78%, var(--ink));
+  --model-preset-height: max(28px, calc(1.4em + 10px));
 }
-
 .feature-model button {
   border: 0;
   min-width: 28px;
@@ -22,50 +28,19 @@
   width: 18px;
   height: 18px;
 }
-.model-toolbar,
-.model-footer,
-.model-presets {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.model-presets {
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-}
-.model-presets button {
-  white-space: nowrap;
-}
-.model-tools {
-  padding: 8px 0;
-  display: grid;
-  gap: 8px;
-}
-.model-preset-editor {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 0;
-}
-.model-preset-editor input {
-  flex: 1 1 120px;
-  min-width: 0;
-  width: 100%;
-  padding: 5px 8px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  background: transparent;
-}
-.feature-model {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-.feature-model > :not(.model-scroll, .model-picker) {
+.feature-model > :not(.model-scroll) {
   flex: none;
+}
+.model-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+.model-picker-toggle {
+  color: var(--muted);
+}
+.model-picker-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
 }
 .model-scroll {
   min-height: 0;
@@ -76,31 +51,26 @@
   position: relative;
   min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
 }
-.model-column-resize {
+.model-primary {
+  position: relative;
+}
+.feature-model .model-column-resize {
   position: absolute;
   z-index: 1;
-  left: var(--name-width);
-  top: 4px;
-  bottom: 4px;
-  width: 8px;
+  left: calc(var(--name-width) - 10px);
+  top: 0;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  color: var(--muted);
   cursor: col-resize;
   touch-action: none;
   user-select: none;
 }
-.model-column-resize::after {
-  content: '';
-  position: absolute;
-  inset: 0 3px;
-  border-radius: 2px;
-  background: var(--line);
-}
-.model-column-resize:hover::after,
-.model-column-resize:focus-visible::after,
-.model-column-resize[data-resizing='true']::after {
-  background: var(--muted);
-}
-.model-column-resize:focus-visible {
+.feature-model .model-column-resize:focus-visible {
   outline: none;
+  color: var(--ink);
+  background: var(--hover);
 }
 .model-matrix-head,
 .model-row {
@@ -114,6 +84,19 @@
   min-height: 28px;
   color: var(--muted);
   font-size: inherit;
+}
+.model-fixed-tools {
+  display: flex;
+  justify-content: flex-start;
+}
+.feature-model .model-fast {
+  padding: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+.feature-model .model-fast[aria-pressed='true'] {
+  color: var(--ink);
+  background: transparent;
 }
 .model-matrix-head > div,
 .model-choices {
@@ -146,19 +129,12 @@
   font-size: inherit;
   color: var(--muted);
 }
-.model-choices button[aria-pressed='true'],
-.model-fast[aria-pressed='true'] {
+.model-choices button[aria-pressed='true'] {
   color: var(--accent);
   background: transparent;
 }
 .model-name strong[draggable='true'] {
   cursor: grab;
-}
-.model-visibility {
-  flex-shrink: 0;
-}
-.model-visibility[data-pinned='false'] svg {
-  transform: rotate(180deg);
 }
 .model-row[data-drop='before'] {
   box-shadow: inset 0 2px var(--accent);
@@ -166,40 +142,13 @@
 .model-row[data-drop='after'] {
   box-shadow: inset 0 -2px var(--accent);
 }
-.model-disclosure {
-  color: var(--muted);
-  margin: 4px 0;
-  padding-inline: 0;
-  text-align: left;
-}
-.model-footer {
-  justify-content: flex-end;
-  margin-top: 8px;
-  color: var(--muted);
-}
-.model-footer > span {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.model-disclosure {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.model-disclosure small {
-  color: var(--fg);
-}
 .model-route {
   display: block;
   color: var(--muted);
   font-weight: normal;
   overflow-wrap: anywhere;
 }
-
-/* 窗口按稳定的名称预算测量；拖动仅在当前视口内分配两列，不改变原生外框。 */
+/* 自然尺寸与拖动列宽分离，避免贴边窗口追随名称换行跳动。 */
 .model-intrinsic-width {
   min-width: max(432px, calc(280px + 8px + var(--reasoning-min-width)));
 }
@@ -211,81 +160,172 @@
   display: inline-block;
   white-space: nowrap;
 }
-
-.model-column-resize:focus-visible:not([data-resizing='true'])::after {
-  background: var(--ink);
-}
 .model-empty-favorites {
   color: var(--muted);
   margin: 8px 0;
 }
-
-.model-picker-toggle[aria-expanded='true'] svg {
-  transform: rotate(180deg);
+.model-collections {
+  margin-top: 16px;
 }
-
-.model-primary {
-  position: relative;
-}
-.model-picker {
+.model-collections-heading {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  color: var(--muted);
+}
+.model-presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: calc(3 * var(--model-preset-height) + 8px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.feature-model .model-presets > button {
   flex: none;
-  min-height: 0;
-  max-height: 50%;
-  margin-top: 12px;
-}
-.model-disclosure {
-  width: var(--name-width);
   max-width: 100%;
-  gap: 8px;
-  margin-block: 2px;
+  height: var(--model-preset-height);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--hover);
 }
-.model-disclosure-label {
+.feature-model .model-presets > button[aria-pressed='true'] {
+  background: var(--model-tile-on);
+}
+.feature-model .model-presets > .model-add-preset {
+  width: var(--model-preset-height);
+  padding: 5px;
+  background: transparent;
+}
+.model-preset {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.model-preset > span {
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.model-count {
-  min-width: 2ch;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.model-tools {
+  display: grid;
+  gap: 8px;
+  max-height: 10em;
+  overflow: auto;
+  padding: 8px 0;
 }
-.model-disclosure > span:last-child {
+.model-preset-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 0;
+}
+.model-preset-editor input {
+  flex: 1 1 120px;
+  min-width: 0;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: transparent;
+}
+.model-picker {
+  --picker-top: clamp(0px, calc(100% - 180px), 32px);
+  position: absolute;
+  z-index: 5;
+  top: var(--picker-top);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(430px, 100%);
+  max-height: min(24em, calc(100% - var(--picker-top)));
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--model-popup);
+  box-shadow: 0 10px 28px #0003;
+}
+.feature-model[data-header-actions='true'] .model-picker {
+  top: 0;
+  max-height: min(24em, 100%);
+}
+.model-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
   flex: none;
+  margin-bottom: 8px;
+}
+.feature-model .model-picker-actions button {
+  color: var(--muted);
+  background: transparent;
+}
+.feature-model .model-picker-actions button:hover {
+  color: var(--ink);
+  background: transparent;
 }
 .model-other-list {
   min-height: 0;
-  max-height: 20em;
   overflow: auto;
   overscroll-behavior: contain;
-  margin-top: 4px;
 }
-.model-group > .model-disclosure {
-  padding-left: 12px;
+.model-group + .model-group {
+  margin-top: 16px;
 }
-.model-group .model-name {
-  padding-left: 24px;
-}
-
-.model-group-current {
-  display: inline-block;
-  margin-left: 6px;
-}
-
-.feature-model .model-picker-toggle {
-  align-self: flex-start;
-  flex: none;
-  width: auto;
-  padding: 5px 10px;
-  gap: 8px;
-  color: var(--ink);
-  background: var(--hover);
-  white-space: nowrap;
-}
-.model-picker-toggle .model-count {
+.model-group h3 {
+  margin: 0 0 6px;
+  font: inherit;
   color: var(--muted);
 }
-.model-picker-toggle .model-disclosure-label {
-  flex: none;
+.model-tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.feature-model .model-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  max-width: 100%;
+  padding: 6px 10px;
+  text-align: left;
+  overflow-wrap: anywhere;
+  background: var(--model-tile);
+  color: var(--ink);
+}
+.feature-model .model-tile[aria-pressed='true'] {
+  background: var(--model-tile-on);
+  color: var(--ink);
+}
+.feature-model .model-tile:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--model-tile) 80%, var(--ink));
+}
+.feature-model .model-tile[aria-pressed='true']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--model-tile-on) 80%, var(--ink));
+}
+.model-footer {
+  display: flex;
+  margin-top: 8px;
+  color: var(--muted);
+}
+.model-footer > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (hover: hover) and (pointer: fine) {
+  .model-collections-heading button {
+    opacity: 0;
+  }
+  .model-collections-heading:hover button,
+  .model-collections-heading button:focus-visible {
+    opacity: 1;
+  }
 }

@@ -187,32 +187,6 @@ input:focus-visible {
   min-height: 0;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .feature-view [data-refresh='model'] {
-    --feature-refresh-opacity: 0;
-  }
-  .feature-view [data-refresh='model']:hover {
-    --feature-refresh-opacity: 1;
-  }
-  .feature-view[data-feature='model'] {
-    --model-visibility-opacity: 0;
-  }
-  .feature-view[data-feature='model']:has(.model-name:hover, .model-matrix-head > span:hover) {
-    --model-visibility-opacity: 1;
-  }
-  .feature-view .model-visibility {
-    opacity: var(--model-visibility-opacity, 0);
-    transition: opacity 140ms ease-out;
-  }
-  .feature-view .model-visibility:disabled {
-    opacity: calc(var(--model-visibility-opacity, 0) * 0.45);
-  }
-  .feature-view .model-visibility:focus-visible {
-    opacity: 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .feature-view .model-visibility {
-    transition: none;
-  }
+.feature-view [data-refresh='model'] {
+  --feature-refresh-opacity: 1;
 }

@@ -227,7 +227,7 @@ function probePage() {
             const divider = root?.querySelector('.model-section-divider');
             return {
               outline: handle ? getComputedStyle(handle).outlineStyle : null,
-              picker: root?.querySelector('.model-picker-toggle')?.getAttribute('aria-expanded'),
+              picker: document.querySelector('[data-model-picker]')?.getAttribute('aria-expanded'),
               groups: root?.querySelectorAll('[data-model-group]').length,
               rows: root?.querySelectorAll('.model-row').length,
               divider: divider ? getComputedStyle(divider).borderTopWidth : null,
@@ -533,23 +533,26 @@ try {
   assert.equal(telemetry.modelView.divider, null);
   check('native model view defaults to favorites with a borderless collapsed picker');
   const favoriteHeight = telemetry.native.layoutHeight;
-  await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-picker-toggle').click()",
-  );
+  await command("document.querySelector('[data-model-picker]').click()");
   await until(
     () => telemetry.modelView.picker === 'true' && telemetry.modelView.groups === 1,
     'native chooser opens',
   );
-  await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-model-group] .model-disclosure').click()",
+  assert.equal(
+    telemetry.native.layoutHeight,
+    favoriteHeight,
+    'opening all models does not resize the native frame',
   );
-  await until(() => telemetry.modelView.rows === 2, 'native group opens');
   await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-pinned=false]').click()",
+    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-model-tile=fixture-b]').click()",
   );
   await until(
-    () => prefs.pinned.includes('fixture-b') && telemetry.modelView.groups === 0,
-    'native pin returns to favorites',
+    () => prefs.pinned.includes('fixture-b') && telemetry.modelView.rows === 2,
+    'native tile adds favorite',
+  );
+  assert.equal(telemetry.modelView.groups, 1, 'picker stays open with all models');
+  await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('[aria-label=\"关闭所有模型\"]').click()",
   );
   prefs.pinned = ['fixture-a'];
   revision++;
@@ -560,7 +563,7 @@ try {
       telemetry.native.layoutHeight === favoriteHeight,
     'restore native favorite fixture',
   );
-  check('native chooser is temporary and closes after adding a favorite');
+  check('native all-model tiles preserve the catalog and close explicitly');
 
   await capture('expanded');
   const shortHeight = telemetry.native.layoutHeight;
@@ -592,6 +595,9 @@ try {
     'hold column-resize fixture open',
   );
   const columnBounds = windowInfo().kCGWindowBounds;
+  const fastBounds = await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
+  );
   const originalColumn = prefs.modelColumnWidth;
   for (const width of [100, 200, 560, originalColumn]) {
     prefs.modelColumnWidth = width;
@@ -604,6 +610,13 @@ try {
       windowInfo().kCGWindowBounds,
       columnBounds,
       'column width must not move or resize the native frame',
+    );
+    assert.deepEqual(
+      await command(
+        "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
+      ),
+      fastBounds,
+      'native Fast control does not follow the column divider',
     );
     assert.equal(telemetry.native.layoutWidth, preparedWidth);
     assert.ok(
@@ -705,14 +718,14 @@ try {
   );
   const longBounds = windowInfo().kCGWindowBounds;
   const pickerY = await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-picker-toggle').getBoundingClientRect().y",
+    "document.querySelector('[data-model-picker]').getBoundingClientRect().y",
   );
   prefs.modelColumnWidth = 100;
   revision++;
   await until(() => Number(telemetry.columnWidth) === 100, 'narrow long favorite names');
   const overflow = await command(`(() => {
     const root = document.querySelector('.edge-view').shadowRoot;
-    const list = root.querySelector('.model-scroll'), button = root.querySelector('.model-picker-toggle');
+    const list = root.querySelector('.model-scroll'), button = document.querySelector('[data-model-picker]');
     list.scrollTop = list.scrollHeight;
     const last = root.querySelector('[data-model-row="long-4"] .model-choices').getBoundingClientRect();
     const viewport = list.getBoundingClientRect();

@@ -322,71 +322,35 @@ try {
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
-  const waitModelRefresh = (opacity) =>
-    page.waitForFunction((opacity) => {
-      const hosts = [...document.querySelectorAll('.edge-view, .csw-feature-content > div')];
-      const button =
-        document.querySelector('#edge-panel [data-refresh="model"]') ||
-        hosts.map((host) => host.shadowRoot?.querySelector('[data-refresh="model"]')).find(Boolean);
-      return button && getComputedStyle(button).opacity === opacity;
-    }, opacity);
-  await page.mouse.move(499, 699);
-  await waitModelRefresh('0');
-  await page.locator('#edge-panel > header').hover();
-  await waitModelRefresh('0');
-  await page.locator('.edge-feature-actions:not([hidden])').hover();
-  await waitModelRefresh('1');
-  await page.mouse.move(499, 699);
-  await waitModelRefresh('0');
-  await page.keyboard.press('Tab');
-  await page.getByRole('button', { name: '刷新可用模型' }).focus();
-  await waitModelRefresh('1');
-  await page.getByRole('button', { name: '刷新可用模型' }).evaluate((node) => node.blur());
-  await waitModelRefresh('0');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  assert.equal(
-    await page
-      .getByRole('button', { name: '刷新可用模型' })
-      .evaluate((node) => getComputedStyle(node).transitionDuration),
-    '0s',
-  );
-  await page.emulateMedia({ reducedMotion: 'no-preference' });
-  const picker = () => view.getByRole('button', { name: /其他模型/ });
+  const picker = () => page.locator('[data-model-picker]:visible');
+  const tile = (id) => view.locator(`[data-model-tile="${id}"]`);
   const showOthers = async () => {
     if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
-    await picker().and(view.locator('[aria-expanded="true"]')).waitFor();
+    await view.getByRole('dialog', { name: '所有模型' }).waitFor();
   };
+  const closeOthers = () => view.getByRole('button', { name: '关闭所有模型' }).click();
+  const expandedBefore = structuredClone(model.preferences.expandedGroups);
   await picker().waitFor();
-  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
-  assert.equal(await view.locator('[data-model-group]').count(), 0, 'groups hidden by default');
+  assert.equal(await picker().innerText(), '所有');
+  assert.equal(await view.locator('[data-model-group], .model-visibility').count(), 0);
+  assert.equal(await view.locator('.model-row, [data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
-  assert.equal(await view.locator('.model-matrix-head > span').textContent(), '常用模型');
-  assert.equal(
-    await view.locator('.model-row').count(),
-    0,
-    'no favorites means all models stay hidden',
-  );
-  assert.equal(await view.locator('.model-footer [role="status"]').count(), 0);
+  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
   await showOthers();
-  await view.getByRole('button', { name: /未分类/ }).click();
+  assert.equal(await view.locator('.model-tile').count(), 2);
+  assert.equal(await view.locator('.model-tile svg').count(), 0);
   rejectPinnedSave = true;
-  await view.getByLabel('设为常用 Model A', { exact: true }).click();
+  await tile('a').click();
   await view.getByText('Error: 常用保存冲突', { exact: true }).waitFor();
-  assert.equal(
-    await picker().getAttribute('aria-expanded'),
-    'true',
-    'failed pin keeps picker open',
-  );
   assert.deepEqual(model.preferences.pinned, []);
+  assert.equal(await tile('a').getAttribute('aria-pressed'), 'false');
+  assert.equal(await picker().getAttribute('aria-expanded'), 'true');
   rejectPinnedSave = false;
-  await view.getByLabel('设为常用 Model A', { exact: true }).click();
-  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
-  await picker().and(view.locator('[aria-expanded="false"]')).waitFor();
-  assert.equal(
-    await view.locator('[data-model-group]').count(),
-    0,
-    'pinning closes the temporary picker',
-  );
+  await tile('a').click();
+  await view.locator('[data-model-tile="a"][aria-pressed="true"]').waitFor();
+  assert.equal(await view.locator('.model-tile').count(), 2, 'all includes pinned models');
+  await closeOthers();
+  assert.equal(await view.locator('.model-row').count(), 1);
   assert.equal(
     await view
       .locator('.model-name strong')
@@ -394,118 +358,56 @@ try {
       .evaluate((n) => getComputedStyle(n).fontSize),
     '16.3px',
   );
-  const modelNameBox = await view.locator('.model-name strong').first().boundingBox();
-  const disclosureBox = await view.locator('.model-disclosure').boundingBox();
-  assert.ok(Math.abs(disclosureBox.x - modelNameBox.x) < 1);
   const resizeBox = await view.getByRole('separator', { name: '模型名称列宽' }).boundingBox();
+  const headerBox = await view.locator('.model-matrix-head').boundingBox();
   assert.ok(
-    resizeBox.y + resizeBox.height < disclosureBox.y,
-    'vertical divider ends before the picker',
+    resizeBox.y + resizeBox.height <= headerBox.y + headerBox.height + 1,
+    'grip stays in header',
   );
-  assert.equal(
-    await view.locator('.model-disclosure').evaluate((node) => getComputedStyle(node).paddingLeft),
-    '10px',
-  );
-  const visibility = view.getByLabel('隐藏 Model A', { exact: true });
-  const headerRefresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
-  const waitOpacity = async (locator, opacity) => {
-    await locator.evaluate(async (node, opacity) => {
-      const deadline = performance.now() + 5000;
-      while (getComputedStyle(node).opacity !== opacity) {
-        if (performance.now() > deadline) throw Error(`Expected opacity ${opacity}`);
-        await new Promise(requestAnimationFrame);
-      }
-    }, opacity);
-  };
-  await page.mouse.move(499, 699);
-  await Promise.all([
-    waitModelRefresh('0'),
-    waitOpacity(visibility, '0'),
-    waitOpacity(headerRefresh, '0'),
-  ]);
-  await page.locator('#edge-panel > header').hover();
-  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '0')]);
-  await view.locator('.model-name strong').first().hover();
-  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '1')]);
-  await view.locator('.model-choices button').first().hover();
-  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '0')]);
-  await view.locator('.model-matrix-head > span').hover();
-  await waitOpacity(visibility, '1');
-  await page.locator('.edge-feature-actions:not([hidden])').hover();
-  await Promise.all([waitModelRefresh('1'), waitOpacity(visibility, '0')]);
-  await page.mouse.move(499, 699);
-  await page.keyboard.press('Tab');
-  await visibility.focus();
-  await waitOpacity(visibility, '1');
-  await headerRefresh.focus();
-  await waitOpacity(headerRefresh, '1');
-  await headerRefresh.evaluate((node) => node.blur());
-  await waitOpacity(headerRefresh, '0');
   record(
-    'model arrows only follow the name column, never reasoning hover; refresh only follows upper-right actions; keyboard focus remains visible',
+    'all-model picker contains pinned and unpinned tiles; failed saves retain state and the point matrix has no pin controls',
   );
-  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
-  assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
   await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
-  assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
   assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
+  assert.equal(await view.evaluate((n) => getComputedStyle(n).color), 'rgb(30, 35, 40)');
   await showOthers();
-  const groupHeader = view.locator('[data-model-group] > .model-disclosure').first();
-  assert.ok((await picker().boundingBox()).width < disclosureBox.width + 1);
-  const groupLabel = await groupHeader.locator('.model-disclosure-label').boundingBox();
-  assert.ok(
-    groupLabel.x >= disclosureBox.x + 12,
-    'manufacturer headings are nested beneath other models',
-  );
-  await view.getByLabel('设为常用 Model B', { exact: true }).click();
-  await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
-  assert.deepEqual(model.preferences.pinned, ['a', 'b']);
+  await tile('b').click();
+  await view.locator('[data-model-tile="b"][aria-pressed="true"]').waitFor();
+  await closeOthers();
   await view
     .locator('[data-model-row="b"] strong')
     .dragTo(view.locator('[data-model-row="a"]'), { targetPosition: { x: 40, y: 2 } });
   await page.waitForFunction(() =>
     [...document.querySelectorAll('.edge-view')].some(
-      (node) => node.shadowRoot?.querySelector('.model-row')?.dataset.modelRow === 'b',
+      (n) => n.shadowRoot?.querySelector('.model-row')?.dataset.modelRow === 'b',
     ),
   );
   assert.deepEqual(model.preferences.modelOrder, ['b', 'a']);
-  await view.getByLabel('隐藏 Model A', { exact: true }).click();
-  await picker().waitFor();
-  assert.equal(await picker().getAttribute('aria-expanded'), 'false');
-  assert.equal(
-    await view.locator('[data-model-row="a"]').count(),
-    0,
-    'current model also hides when removed from favorites',
-  );
+  const beforeToggle = structuredClone(model.snapshot.current);
   await showOthers();
-  await view.getByLabel('设为常用 Model A', { exact: true }).click();
-  await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
-  await page.evaluate(
-    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  await tile('a').click();
+  await view.locator('[data-model-tile="a"][aria-pressed="false"]').waitFor();
+  assert.equal(await view.locator('[data-model-row="a"]').count(), 0);
+  assert.deepEqual(
+    model.snapshot.current,
+    beforeToggle,
+    'removing from favorites does not switch the actual model',
   );
-  const compactModelHeight = await page
-    .locator('#edge-panel')
-    .evaluate((node) => node.getBoundingClientRect().height);
-  assert.ok(compactModelHeight < 350, 'few model rows shrink the edge panel');
-  const refreshBox = await page.getByRole('button', { name: '刷新可用模型' }).boundingBox();
-  assert.equal(await page.getByRole('button', { name: '设置', exact: true }).count(), 0);
-  const settingsBox = await page.locator('#edge-panel > header nav').boundingBox();
-  const plusBox = await view.getByRole('button', { name: '保存预设', exact: true }).boundingBox();
-  const toolbarBox = await view.locator('.model-toolbar').boundingBox();
-  assert.ok(
-    Math.abs(refreshBox.y + refreshBox.height / 2 - settingsBox.y - settingsBox.height / 2) < 2,
-  );
-  assert.ok(refreshBox.x >= settingsBox.x + settingsBox.width);
-  assert.ok(Math.abs(plusBox.x + plusBox.width - toolbarBox.x - toolbarBox.width) < 1);
-  await page.getByRole('button', { name: '刷新可用模型' }).click();
-  await page.getByRole('button', { name: '刷新可用模型' }).evaluate(async (node) => {
-    const deadline = performance.now() + 5000;
-    while (node.disabled) {
-      if (performance.now() > deadline) throw Error('Refresh remained disabled');
-      await new Promise(requestAnimationFrame);
-    }
+  await tile('a').click();
+  await view.locator('[data-model-tile="a"][aria-pressed="true"]').waitFor();
+  const refresh = view.getByRole('button', { name: '刷新可用模型', exact: true });
+  const close = view.getByRole('button', { name: '关闭所有模型', exact: true });
+  const refreshBox = await refresh.boundingBox(),
+    closeBox = await close.boundingBox();
+  assert.ok(refreshBox.x + refreshBox.width <= closeBox.x + 1);
+  assert.ok(Math.abs(refreshBox.y - closeBox.y) < 1);
+  await page.mouse.move(499, 699);
+  assert.equal(await refresh.evaluate((n) => getComputedStyle(n).opacity), '1');
+  await refresh.click();
+  await refresh.evaluate(async (n) => {
+    while (n.disabled) await new Promise(requestAnimationFrame);
   });
   assert.equal(actions.at(-1).action, 'refresh');
   assert.equal(actions.at(-1).id, 'model');
@@ -513,14 +415,22 @@ try {
     .getByRole('navigation', { name: '功能' })
     .getByRole('button', { name: '看板', exact: true })
     .click();
-  await page.getByRole('button', { name: '刷新可用模型' }).waitFor({ state: 'hidden' });
+  await refresh.waitFor({ state: 'hidden' });
   await page
     .getByRole('navigation', { name: '功能' })
-    .getByRole('button', { name: '模型快切' })
+    .getByRole('button', { name: '模型快切', exact: true })
     .click();
-  await page.getByRole('button', { name: '刷新可用模型' }).waitFor();
+  await showOthers();
+  await refresh.waitFor();
+  await closeOthers();
+  assert.equal(await page.locator('#edge-panel > header [data-refresh="model"]').count(), 0);
+  assert.equal(await view.getByRole('button', { name: '保存预设', exact: true }).innerText(), '');
+  const compactModelHeight = await page
+    .locator('#edge-panel')
+    .evaluate((n) => n.getBoundingClientRect().height);
+  assert.ok(compactModelHeight < 350, 'few model rows keep the edge panel compact');
   record(
-    'edge model refresh sits beside tabs, follows the active tab and dispatches model refresh; plus and disclosure align',
+    'refresh lives beside the picker close button and presets use a wrapping footer with an icon-only add button',
   );
   const savedSelection = structuredClone(model.snapshot.current);
   const presetButton = view.getByRole('button', { name: '保存预设', exact: true });
@@ -586,6 +496,7 @@ try {
   const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
   const beforeResize = preferenceCount();
   const columnFrame = await page.locator('#edge-panel').boundingBox();
+  const fixedFast = await view.locator('.model-fast').boundingBox();
   const sizeMessages = () =>
     page.evaluate(() => window.nativeMessages.filter((m) => m.action === 'content-size').length);
   const beforeSizes = await sizeMessages();
@@ -599,6 +510,11 @@ try {
   await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
   assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
+  assert.deepEqual(
+    await view.locator('.model-fast').boundingBox(),
+    fixedFast,
+    'Fast stays fixed while dragging',
+  );
   assert.deepEqual(
     await page.locator('#edge-panel').boundingBox(),
     columnFrame,
@@ -691,8 +607,9 @@ try {
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
   await showOthers();
-  await view.getByRole('button', { name: /Google/ }).click();
-  await view.getByRole('button', { name: /Google/, expanded: true }).waitFor();
+  await tile('c').click();
+  await view.locator('[data-model-row="c"]').waitFor();
+  await closeOthers();
   await view.locator('.model-scroll').evaluate((node) => {
     node.scrollLeft = 160;
   });
@@ -707,21 +624,18 @@ try {
   const modelReading = entries.find((e) => e.id === 'model').view;
   assert.ok(modelReading.modelLeft > 0);
   assert.equal(modelReading.modelTools, true);
-  assert.ok(model.preferences.expandedGroups.includes('vendor:Google'));
+  assert.deepEqual(
+    model.preferences.expandedGroups,
+    expandedBefore,
+    'existing group preferences are not rewritten',
+  );
   for (const entry of entries) entry.placement = 'desktop';
   await page.goto(
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
   await view.getByRole('separator', { name: '模型名称列宽' }).waitFor();
-  await page.mouse.move(1, 1);
-  await waitModelRefresh('0');
-  await page.locator('.csw-workbench-head').hover();
-  await waitModelRefresh('0');
-  await view.locator('[data-refresh="model"]').hover();
-  await waitModelRefresh('1');
-  await page.mouse.move(1, 1);
-  await waitModelRefresh('0');
+  assert.equal(await view.locator('[data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
     await view.locator('[data-model-group]').count(),
@@ -738,11 +652,10 @@ try {
       ),
   );
   await showOthers();
-  assert.equal(
-    await view.getByRole('button', { name: /Google/ }).getAttribute('aria-expanded'),
-    'true',
-  );
-  record('model tools, expanded rows and horizontal reading survive remount');
+  assert.equal(await view.locator('[data-model-group="vendor:Google"] .model-tile').count(), 1);
+  assert.equal(await tile('c').getAttribute('aria-pressed'), 'true');
+  await closeOthers();
+  record('model tools, classification preferences and horizontal reading survive remount');
   const longName = view.locator('[data-model-row="c"] .model-name strong');
   const nameGeometry = await longName.evaluate((node) => {
     const style = getComputedStyle(node);
