@@ -326,7 +326,7 @@ try {
   const tile = (id) => view.locator(`[data-model-tile="${id}"]`);
   const showOthers = async () => {
     if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
-    await view.getByRole('dialog', { name: '所有模型' }).waitFor();
+    await view.getByRole('region', { name: '所有模型' }).waitFor();
   };
   const closeOthers = () => view.getByRole('button', { name: '关闭所有模型' }).click();
   const expandedBefore = structuredClone(model.preferences.expandedGroups);

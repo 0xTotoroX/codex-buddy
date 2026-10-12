@@ -1,5 +1,5 @@
 /* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
- * [OUTPUT]: Stable columns, fixed Fast control and contained neutral popovers.
+ * [OUTPUT]: Stable columns, fixed Fast control and a single-surface model catalog.
  * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 .feature-model {
@@ -8,7 +8,6 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  --model-popup: color-mix(in srgb, var(--paper) 92%, var(--ink));
   --model-tile: color-mix(in srgb, var(--paper) 86%, var(--ink));
   --model-tile-on: color-mix(in srgb, var(--paper) 78%, var(--ink));
   --model-preset-height: max(28px, calc(1.4em + 10px));
@@ -28,7 +27,22 @@
   width: 18px;
   height: 18px;
 }
-.feature-model > :not(.model-scroll) {
+.feature-model > :not(.model-main),
+.model-main > :not(.model-scroll) {
+  flex: none;
+}
+.model-main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.model-main[data-view='all'] > :not(.model-picker) {
+  visibility: hidden;
+}
+:host([data-measuring='true']) .model-main[data-view='all'] {
+  height: var(--model-browser-height);
   flex: none;
 }
 .model-toolbar {
@@ -234,24 +248,13 @@
   background: transparent;
 }
 .model-picker {
-  --picker-top: clamp(0px, calc(100% - 180px), 32px);
   position: absolute;
-  z-index: 5;
-  top: var(--picker-top);
-  right: 0;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  width: min(430px, 100%);
-  max-height: min(24em, calc(100% - var(--picker-top)));
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--model-popup);
-  box-shadow: 0 10px 28px #0003;
-}
-.feature-model[data-header-actions='true'] .model-picker {
-  top: 0;
-  max-height: min(24em, 100%);
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .model-picker-actions {
   display: flex;
