@@ -28,8 +28,12 @@ export function createLauncherFace(button) {
     pointerFrame = 0,
     pointer;
   const setPoint = (value) => {
+    const halfHeight = button.clientHeight / 2;
     button.style.setProperty('--source-x', `${18 + 16 * Math.cos(value)}px`);
-    button.style.setProperty('--source-y', `${18 + 16 * Math.sin(value)}px`);
+    button.style.setProperty(
+      '--source-y',
+      `${halfHeight + Math.max(0, halfHeight - 2) * Math.sin(value)}px`,
+    );
   };
   function resetEyes() {
     cancelAnimationFrame(pointerFrame);

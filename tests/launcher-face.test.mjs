@@ -47,7 +47,14 @@ test('launcher reuses original expressions and source geometry while retaining i
     assert.ok(eyeBox.y + eyeBox.height <= profileBox.y + 0.5, 'click targets do not overlap');
     const eyeShape = await eye.locator('.csw-fab-eye').first().boundingBox();
     const faceGap = avatarBefore.y - eyeShape.y - eyeShape.height;
-    assert.ok(faceGap >= 8 && faceGap <= 15, `compact face gap: ${faceGap}`);
+    assert.ok(faceGap >= 12 && faceGap <= 17, `compact face gap: ${faceGap}`);
+    await eye.hover();
+    const stageBox = await eye.locator('.csw-status-stage').boundingBox();
+    assert.ok(
+      Math.abs(stageBox.y + stageBox.height / 2 - eyeBox.y - eyeBox.height / 2) < 0.5,
+      'eyes remain vertically centered in the actual hover and click target',
+    );
+    assert.ok(eyeBox.height >= 28, 'compact button keeps the minimum click height');
     for (const [kind, animation] of [
       ['idle', 'csw-face-blink'],
       ['generating', 'csw-face-generate-bob'],

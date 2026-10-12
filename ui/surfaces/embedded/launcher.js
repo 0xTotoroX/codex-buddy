@@ -199,13 +199,12 @@ export function syncLauncher(options) {
     shadow.innerHTML = `<style>
       :host { color:inherit; }
       .entry { display:flex;flex-direction:column;align-items:center;gap:8px;padding:0; }
-      button { appearance:none;display:grid;place-items:center;width:36px;height:36px;
+      button { appearance:none;display:grid;place-items:center;width:36px;height:28px;
         border:0;border-radius:10px;padding:0;background:transparent;color:inherit;cursor:pointer; }
       button:hover { background:color-mix(in srgb,currentColor 10%,transparent); }
       button:focus-visible { outline:2px solid currentColor;outline-offset:2px; }
       svg { width:20px;height:20px;fill:currentColor; }
       ${launcherFaceStyles}
-      .entry .csw-status-stage { top:calc(50% + 8px); }
     </style><div class="entry">
       <button type="button" class="csw-launcher-face csw-fab" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter">
         ${launcherFaceHtml()}
