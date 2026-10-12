@@ -330,6 +330,8 @@ try {
   await page.mouse.move(499, 699);
   await waitModelRefresh('0');
   await page.locator('#edge-panel > header').hover();
+  await waitModelRefresh('0');
+  await page.locator('.edge-feature-actions:not([hidden])').hover();
   await waitModelRefresh('1');
   await page.mouse.move(499, 699);
   await waitModelRefresh('0');
@@ -388,11 +390,11 @@ try {
     waitOpacity(headerRefresh, '0'),
   ]);
   await page.locator('#edge-panel > header').hover();
-  await Promise.all([
-    waitModelRefresh('1'),
-    waitOpacity(visibility, '1'),
-    waitOpacity(headerRefresh, '1'),
-  ]);
+  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '0')]);
+  await view.locator('.model-name strong').first().hover();
+  await Promise.all([waitModelRefresh('0'), waitOpacity(visibility, '1')]);
+  await page.locator('.edge-feature-actions:not([hidden])').hover();
+  await Promise.all([waitModelRefresh('1'), waitOpacity(visibility, '0')]);
   await page.mouse.move(499, 699);
   await page.keyboard.press('Tab');
   await visibility.focus();
@@ -401,7 +403,9 @@ try {
   await waitOpacity(headerRefresh, '1');
   await headerRefresh.evaluate((node) => node.blur());
   await waitOpacity(headerRefresh, '0');
-  record('model arrows and header actions follow hover visibility and remain keyboard accessible');
+  record(
+    'model arrows only follow model content hover; refresh only follows upper-right actions; keyboard focus remains visible',
+  );
   await view.getByRole('button', { name: /未分类/ }).click();
   await view.getByRole('button', { name: /未分类/, expanded: false }).waitFor();
   assert.equal(await view.locator('.model-row').count(), 1);
@@ -535,11 +539,25 @@ try {
   const handleBox = await columnHandle.boundingBox();
   const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
   const beforeResize = preferenceCount();
+  const columnFrame = await page.locator('#edge-panel').boundingBox();
+  const sizeMessages = () =>
+    page.evaluate(() => window.nativeMessages.filter((m) => m.action === 'content-size').length);
+  const beforeSizes = await sizeMessages();
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + 10);
   await page.mouse.down();
   await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
   assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
+  assert.deepEqual(
+    await page.locator('#edge-panel').boundingBox(),
+    columnFrame,
+    'column gesture keeps outer frame fixed',
+  );
+  assert.equal(
+    await sizeMessages(),
+    beforeSizes,
+    'column gesture does not resize the native window',
+  );
   await page.mouse.up();
   await page.waitForFunction(() => {
     const host = document.querySelector('.edge-view:not([hidden])');
@@ -550,6 +568,11 @@ try {
   });
   assert.equal(model.preferences.modelColumnWidth, 190);
   assert.equal(preferenceCount(), beforeResize + 1);
+  assert.deepEqual(
+    await page.locator('#edge-panel').boundingBox(),
+    columnFrame,
+    'saving the column keeps outer frame fixed',
+  );
   const cancelBox = await columnHandle.boundingBox();
   await page.mouse.move(cancelBox.x + 4, cancelBox.y + 10);
   await page.mouse.down();
@@ -570,6 +593,31 @@ try {
   record(
     'model search and width slider removed; divider previews, saves on release and supports Escape/keyboard',
   );
+  const limitBox = await columnHandle.boundingBox();
+  const limitFrame = await page.locator('#edge-panel').boundingBox();
+  const limitValue = Number(await columnHandle.getAttribute('aria-valuemax'));
+  await page.mouse.move(limitBox.x + 4, limitBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(limitBox.x + 650, limitBox.y + 10, { steps: 10 });
+  assert.equal(Number(await columnHandle.getAttribute('aria-valuenow')), limitValue);
+  assert.deepEqual(await page.locator('#edge-panel').boundingBox(), limitFrame);
+  const clearColumns = await view.locator('.model-matrix-head').evaluate((node) => {
+    const name = node.children[0].getBoundingClientRect();
+    const choices = node.children[1].getBoundingClientRect();
+    const labels = [...node.querySelectorAll('[data-reasoning-label]')];
+    return (
+      name.right <= choices.left &&
+      labels.every((label) => label.offsetWidth <= label.parentElement.clientWidth)
+    );
+  });
+  assert.equal(clearColumns, true, 'upper bound keeps reasoning headers readable without overlap');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  assert.equal(model.preferences.modelColumnWidth, 174);
+  record(
+    'column dragging stops before reasoning labels and does not move either edge of the panel',
+  );
+
   await page.waitForFunction(
     (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
     compactModelHeight,
@@ -617,6 +665,8 @@ try {
   await page.mouse.move(1, 1);
   await waitModelRefresh('0');
   await page.locator('.csw-workbench-head').hover();
+  await waitModelRefresh('0');
+  await view.locator('[data-refresh="model"]').hover();
   await waitModelRefresh('1');
   await page.mouse.move(1, 1);
   await waitModelRefresh('0');
@@ -651,10 +701,20 @@ try {
   const namesBox = await longRow.locator('.model-name').boundingBox();
   const choicesBox = await longRow.locator('.model-choices').boundingBox();
   assert.ok(namesBox.x + namesBox.width <= choicesBox.x, 'name does not overlap reasoning');
+  assert.equal(
+    model.preferences.modelColumnWidth,
+    280,
+    'narrow rendering preserves the wider saved preference',
+  );
+  await page.setViewportSize({ width: 1100, height: 700 });
+  await view.locator('[role="separator"][aria-valuenow="280"]').waitFor();
   await view.getByRole('separator', { name: '模型名称列宽' }).press('ArrowRight');
   await view.locator('[role="separator"][aria-valuenow="296"][aria-disabled="false"]').waitFor();
   assert.equal(model.preferences.modelColumnWidth, 296);
-  record('desktop long model names wrap without clipping; column saves beyond old 280px limit');
+  record(
+    'desktop long model names wrap without clipping; viewport limits preserve saved widths and wide windows can save beyond 280px',
+  );
+  await page.setViewportSize({ width: 500, height: 700 });
   assert.equal(await page.locator('.csw-workbench-face .csw-fab-eye').count(), 0);
   await page.getByRole('tab', { name: '看板', exact: true }).click();
   if (!(await board.getByLabel('新任务标题', { exact: true }).isVisible()))

@@ -63,7 +63,7 @@
 }
 .model-matrix {
   position: relative;
-  min-width: calc(var(--name-width) + 8px + var(--columns) * max(48px, 4.5em));
+  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
 }
 .model-column-resize {
   position: absolute;
@@ -98,7 +98,7 @@
   grid-template-columns: var(--name-width) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  min-width: calc(var(--name-width) + 8px + var(--columns) * max(48px, 4.5em));
+  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
 }
 .model-matrix-head {
   min-height: 28px;
@@ -108,7 +108,7 @@
 .model-matrix-head > div,
 .model-choices {
   display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
+  grid-template-columns: var(--reasoning-columns);
   gap: 4px;
   align-items: center;
   text-align: center;
@@ -191,4 +191,16 @@
   color: var(--muted);
   font-weight: normal;
   overflow-wrap: anywhere;
+}
+
+/* 窗口按稳定的名称预算测量；拖动仅在当前视口内分配两列，不改变原生外框。 */
+.model-intrinsic-width {
+  min-width: max(432px, calc(280px + 8px + var(--reasoning-min-width)));
+}
+:host([data-measuring='true']) .feature-model {
+  --name-width: 280px !important;
+}
+[data-reasoning-label] {
+  display: inline-block;
+  white-space: nowrap;
 }

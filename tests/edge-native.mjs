@@ -221,6 +221,14 @@ function probePage() {
             .querySelector('#edge-panel nav button')
             ?.getBoundingClientRect()
             .toJSON(),
+          columnWidth: document
+            .querySelector('.edge-view')
+            ?.shadowRoot?.querySelector('.model-column-resize')
+            ?.getAttribute('aria-valuenow'),
+          columnMax: document
+            .querySelector('.edge-view')
+            ?.shadowRoot?.querySelector('.model-column-resize')
+            ?.getAttribute('aria-valuemax'),
           featureVisible: !!document
             .querySelector('.edge-view')
             ?.shadowRoot?.querySelector('[data-feature="model"]'),
@@ -289,6 +297,14 @@ const server = createServer(async (request, response) => {
         surface: { theme: prefs.theme, liquidVariant: prefs.liquidVariant },
       };
       if (input.op === 'read') return json({ ...envelope(), appearance: visual });
+      if (input.op === 'action' && input.action === 'preferences') {
+        assert.equal(input.owner, 'feature-lease');
+        assert.equal(input.data.revision, revision);
+        assert.deepEqual(Object.keys(input.data.patch), ['modelColumnWidth']);
+        Object.assign(prefs, input.data.patch);
+        revision++;
+        return json(envelope());
+      }
       return json({ features: [feature] });
     }
     return json({});
@@ -309,7 +325,7 @@ const server = createServer(async (request, response) => {
     let source = readFileSync(join(root, 'target/web', path), 'utf8');
     if (path.endsWith('.js'))
       source = source.replace(
-        /\b\w+\.postMessage\(JSON.stringify\((\w+)\)\)/g,
+        /(?:window\.)?[\w$]+\.postMessage\(JSON.stringify\(([\w$]+)\)\)/g,
         'window.fixturePostMessage(JSON.stringify($1))',
       );
     return response.end(source);
@@ -516,17 +532,108 @@ try {
     () => telemetry.native.layoutHeight === shortHeight,
     'content shrinks when models are hidden',
   );
-  prefs.modelColumnWidth += 30;
+  // 此阶段只验列宽，避免测试期间鼠标离开触发独立的自动收起逻辑。
+  prefs.keepOpen = true;
   revision++;
+  await ipc({ action: 'focus' });
   await until(
-    () => telemetry.native.layoutWidth === preparedWidth + 30,
-    'content width follows readable columns',
+    () => telemetry.native.keepOpen && telemetry.native.expanded && !telemetry.native.animating,
+    'hold column-resize fixture open',
   );
-  prefs.modelColumnWidth -= 30;
-  revision++;
-  await until(() => telemetry.native.layoutWidth === preparedWidth, 'content width restores');
-  check('native panel fits active content height and width, including shrinking');
+  const columnBounds = windowInfo().kCGWindowBounds;
+  const originalColumn = prefs.modelColumnWidth;
+  for (const width of [100, 200, 560, originalColumn]) {
+    prefs.modelColumnWidth = width;
+    revision++;
+    await until(
+      () => Number(telemetry.columnWidth) === Math.min(width, Number(telemetry.columnMax)),
+      'model column readback',
+    );
+    assert.deepEqual(
+      windowInfo().kCGWindowBounds,
+      columnBounds,
+      'column width must not move or resize the native frame',
+    );
+    assert.equal(telemetry.native.layoutWidth, preparedWidth);
+    assert.ok(
+      Math.abs(telemetry.native.layoutX + telemetry.native.layoutWidth - telemetry.viewport[0]) < 1,
+      'content remains flush with the right window edge',
+    );
+  }
+  check(
+    'model columns stay inside a fixed native frame and preserve the screen-edge anchor',
+    columnBounds,
+  );
+  if (environment.canPostEvents) {
+    const handle = await command(`(() => {
+      const node = document.querySelector('.edge-view').shadowRoot.querySelector('.model-column-resize');
+      const rect = node.getBoundingClientRect();
+      return { x: rect.x + rect.width / 2, y: rect.y + 12, value: Number(node.getAttribute('aria-valuenow')), max: Number(node.getAttribute('aria-valuemax')) };
+    })()`);
+    const amount = Math.min(24, handle.max - handle.value);
+    assert.ok(amount > 0, 'fixture has room for an internal resize');
+    const sampler = spawn(geometryProbe, ['motion', String(child.pid)], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let samples = '';
+    sampler.stdout.on('data', (chunk) => {
+      samples += chunk;
+    });
+    try {
+      await until(() => samples.includes('\n'), 'native geometry sampler');
+      await new Promise((resolve, reject) =>
+        execFile(
+          geometryProbe,
+          [
+            'drag',
+            String(columnBounds.X + handle.x),
+            String(columnBounds.Y + handle.y),
+            String(columnBounds.X + handle.x + amount),
+            String(columnBounds.Y + handle.y),
+            String(child.pid),
+          ],
+          { timeout: 8000 },
+          (error) => (error ? reject(error) : resolve()),
+        ),
+      );
+      await until(
+        () => prefs.modelColumnWidth === handle.value + amount,
+        'native pointer drag saves column',
+      );
+      assert.deepEqual(windowInfo().kCGWindowBounds, columnBounds);
+      const frames = samples
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line));
+      for (const frame of frames)
+        assert.deepEqual(
+          frame.bounds,
+          columnBounds,
+          'native frame remains fixed throughout pointer drag',
+        );
+      check('real native pointer drag moves only the divider and leaves no screen-edge gap', {
+        frames: frames.length,
+        amount,
+      });
+    } finally {
+      sampler.kill('SIGTERM');
+    }
+    prefs.modelColumnWidth = originalColumn;
+    revision++;
+    await until(
+      () => Number(telemetry.columnWidth) === originalColumn,
+      'restore native test column',
+    );
+  } else {
+    report.skipped.push({
+      name: 'native column pointer drag',
+      reason: 'Event posting unavailable; geometry and bounds verified through preference updates',
+    });
+  }
 
+  prefs.keepOpen = false;
+  revision++;
+  await until(() => !telemetry.native.keepOpen, 'restore fixture hover policy');
   const stableBounds = windowInfo().kCGWindowBounds;
   await command('window.deferNative = true');
   await ipc({ action: 'collapse' });
@@ -722,7 +829,8 @@ try {
     if (theme === 'black') assert.equal(telemetry.background, 'rgb(0, 0, 0)');
     else if (effective === 'frosted') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
     else if (effective === 'native-glass') assert.equal(telemetry.background, 'rgba(0, 0, 0, 0)');
-    assert.ok(telemetry.viewport[1] >= 280);
+    assert.ok(telemetry.viewport[1] >= Math.min(144, telemetry.native.availableHeight));
+    assert.ok(telemetry.viewport[1] >= telemetry.native.layoutY + telemetry.native.layoutHeight);
     check(`independent theme ${theme}/${variant}`, telemetry.native);
     await capture(`theme-${theme}-${variant}`);
     const expandedBackground = telemetry.background;

@@ -32,6 +32,7 @@ export function ModelView({
   const [tools, setTools] = useState(reading.modelTools || false),
     [drop, setDrop] = useState(''),
     [columnWidth, setColumnWidth] = useState<number | null>(null),
+    [metrics, setMetrics] = useState({ available: 0, widths: [] as number[] }),
     [presetDraft, setPresetDraft] = useState<{
       id: string;
       name: string;
@@ -39,7 +40,13 @@ export function ModelView({
       creating: boolean;
     } | null>(null);
   const matrix = useRef<HTMLDivElement>(null);
-  const resize = useRef<{ pointer: number; x: number; width: number; value: number } | null>(null);
+  const resize = useRef<{
+    pointer: number;
+    x: number;
+    width: number;
+    value: number;
+    scale: number;
+  } | null>(null);
   useLayoutEffect(() => {
     if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
   }, []);
@@ -49,8 +56,6 @@ export function ModelView({
   const apply = (selection: Selection, preserveSpeed = false) =>
     action({ target: s.target, expectedRevision: s.revision, selection, preserveSpeed }, 'apply');
   const save = (patch: object) => action({ revision: state.revision, patch }, 'preferences');
-  const nameWidth = columnWidth ?? prefs.modelColumnWidth ?? 140;
-  const clampWidth = (width: number) => Math.max(100, Math.min(560, Math.round(width)));
   const saveWidth = async (width: number) => {
     try {
       await save({ modelColumnWidth: width });
@@ -80,6 +85,36 @@ export function ModelView({
   const columns = [
     ...new Set(models.flatMap((m) => (m.reasoning.length ? m.reasoning : ['']))),
   ].sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  // 按实际表头文字保留思考列的可读宽度，不用最长标题把每一列都撑宽。
+  useLayoutEffect(() => {
+    const node = matrix.current;
+    if (!node) return;
+    const labels = [...node.querySelectorAll<HTMLElement>('[data-reasoning-label]')];
+    const measure = () => {
+      if (!node.clientWidth) return;
+      const widths = labels.map((label) => Math.max(28, label.offsetWidth + 12));
+      const available = node.clientWidth;
+      setMetrics((previous) =>
+        previous.available === available &&
+        previous.widths.length === widths.length &&
+        widths.every((w, i) => w === previous.widths[i])
+          ? previous
+          : { available, widths },
+      );
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    labels.forEach((label) => observer.observe(label));
+    measure();
+    return () => observer.disconnect();
+  }, [columns.join('|')]);
+  const widths = columns.length ? columns.map((_, i) => metrics.widths[i] || 63) : [28];
+  const reasoningWidth = widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 4;
+  const maxNameWidth = metrics.available
+    ? Math.max(100, Math.min(560, Math.floor(metrics.available - 8 - reasoningWidth)))
+    : 560;
+  const clampWidth = (width: number) => Math.max(100, Math.min(maxNameWidth, Math.round(width)));
+  const nameWidth = clampWidth(columnWidth ?? prefs.modelColumnWidth ?? 140);
   const rows = (items: typeof models) =>
     items.map((m) => (
       <div
@@ -196,6 +231,8 @@ export function ModelView({
         {
           '--name-width': `${nameWidth}px`,
           '--columns': Math.max(1, columns.length),
+          '--reasoning-min-width': `${reasoningWidth}px`,
+          '--reasoning-columns': widths.map((width) => `minmax(${width}px, 1fr)`).join(' '),
         } as CSSProperties
       }
     >
@@ -329,13 +366,14 @@ export function ModelView({
         }}
       >
         <div className="model-matrix">
+          <div className="model-intrinsic-width" data-intrinsic-width hidden />
           <div
             className="model-column-resize"
             role="separator"
             aria-label="模型名称列宽"
             aria-orientation="vertical"
             aria-valuemin={100}
-            aria-valuemax={560}
+            aria-valuemax={maxNameWidth}
             aria-valuenow={nameWidth}
             aria-disabled={busy}
             tabIndex={busy ? -1 : 0}
@@ -347,7 +385,9 @@ export function ModelView({
               event.currentTarget.focus({ preventScroll: true });
               resize.current = {
                 pointer: event.pointerId,
-                x: event.screenX,
+                x: event.clientX,
+                scale:
+                  matrix.current!.getBoundingClientRect().width / matrix.current!.offsetWidth || 1,
                 width: nameWidth,
                 value: nameWidth,
               };
@@ -357,7 +397,7 @@ export function ModelView({
             onPointerMove={(event) => {
               const drag = resize.current;
               if (!drag || drag.pointer !== event.pointerId) return;
-              drag.value = clampWidth(drag.width + event.screenX - drag.x);
+              drag.value = clampWidth(drag.width + (event.clientX - drag.x) / drag.scale);
               setColumnWidth(drag.value);
             }}
             onPointerUp={(event) => {
@@ -391,11 +431,13 @@ export function ModelView({
               void saveWidth(width);
             }}
           />
-          <div className="model-matrix-head" data-intrinsic-width>
+          <div className="model-matrix-head">
             <span>模型</span>
             <div>
               {columns.map((c) => (
-                <span key={c}>{label(c) || '选择'}</span>
+                <span key={c}>
+                  <span data-reasoning-label>{label(c) || '选择'}</span>
+                </span>
               ))}
             </div>
           </div>

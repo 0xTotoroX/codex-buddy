@@ -114,3 +114,12 @@ body {
     transition: none;
   }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .edge-feature-actions [data-refresh='model'] {
+    --feature-refresh-opacity: 0;
+  }
+  .edge-feature-actions:hover [data-refresh='model'] {
+    --feature-refresh-opacity: 1;
+  }
+}
