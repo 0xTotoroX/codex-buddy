@@ -228,6 +228,7 @@ declare global {
         zoom: number;
       } | null;
       verify(requestId: string): boolean;
+      progress(requestId: string, matches: Array<{ id: string; quote: string }>): Promise<boolean>;
       refresh(): Promise<void>;
       destroy(): void;
       lastError: string;

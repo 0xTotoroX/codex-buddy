@@ -1126,6 +1126,31 @@ function findLatestAssistantMessage() {
   return latestMessageByDocumentOrder(candidates);
 }
 
+// 新回答生成时保留已完成问答供只读旁路分析，不采集未完成的输出。
+function terminologyExchange() {
+  const turns = conversationTurns();
+  const busy = chatBusy();
+  const newest = latestConversationTurnByKey(turns);
+  const completed = turns
+    .filter((turn) => turn.assistantMessage?.text && (!busy || turn !== newest))
+    .sort((a, b) => compareConversationTurnKeys(a.turnKey, b.turnKey))
+    .slice(-3);
+  if (completed.length)
+    return {
+      question: completed
+        .map((turn) => turn.userText)
+        .filter(Boolean)
+        .join('\n\n'),
+      answer: completed.map((turn) => turn.assistantMessage.text).join('\n\n'),
+      complete: true,
+    };
+  if (busy) return null;
+  const message = findLatestAssistantMessage();
+  return message?.text
+    ? { question: findPreviousUserText(message), answer: message.text, complete: true }
+    : null;
+}
+
 function findPreviousUserText(message) {
   const snapshotUserText = normalizeText(message?.userText || '');
   if (snapshotUserText) return snapshotUserText;
@@ -1169,6 +1194,7 @@ export {
   contextSnapshot,
   disabledButton,
   findLatestAssistantMessage,
+  terminologyExchange,
   findPreviousUserText,
   iconPathData,
   installContextTracking,

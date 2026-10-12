@@ -31,6 +31,18 @@ async fn current(app: &Arc<App>, client: &Arc<Client>, id: &str) -> bool {
         .unwrap_or(Value::Bool(false))
         == true
 }
+async fn publish_confirmed(client: &Arc<Client>, id: &str, matches: &[Value]) {
+    if matches.is_empty() {
+        return;
+    }
+    let _ = client
+        .evaluate(format!(
+            "window.__codexBuddyTerminology?.progress?.({}, {}) ?? false",
+            json!(id),
+            json!(matches)
+        ))
+        .await;
+}
 fn normalize(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
@@ -205,6 +217,17 @@ async fn analyze_inner(app: &Arc<App>, client: &Arc<Client>, input: &Value) -> R
         current(app, client, id).await,
         "聊天已变化，词义核对结果已丢弃"
     );
+    for (index, term_id) in &selected {
+        let quote = candidates[*index]["quote"].as_str().unwrap_or("");
+        if (2..=4000).contains(&quote.chars().count())
+            && (normalize(question).contains(&normalize(quote))
+                || normalize(answer).contains(&normalize(quote)))
+            && !prefs.mastered.contains(term_id)
+        {
+            matches.push(json!({"quote":quote,"id":term_id}));
+        }
+    }
+    publish_confirmed(client, id, &matches).await;
     for (index, candidate) in candidates.iter().enumerate() {
         let quote = candidate["quote"].as_str().unwrap_or("");
         let name = candidate["name"].as_str().unwrap_or("");
@@ -219,13 +242,7 @@ async fn analyze_inner(app: &Arc<App>, client: &Arc<Client>, input: &Value) -> R
             continue;
         }
         let terms = store::library(root)?;
-        if let Some(term) = selected
-            .get(&index)
-            .and_then(|id| terms.iter().find(|t| &t.id == id))
-        {
-            if !prefs.mastered.contains(&term.id) {
-                matches.push(json!({"quote":quote,"id":term.id}));
-            }
+        if selected.contains_key(&index) {
             continue;
         }
         if !prefs.auto_expand {
@@ -298,6 +315,8 @@ async fn analyze_inner(app: &Arc<App>, client: &Arc<Client>, input: &Value) -> R
             store::export_files(root)?;
             matches.push(json!({"quote":quote,"id":term.id}));
         }
+        drop(_guard);
+        publish_confirmed(client, id, &matches).await;
     }
     Ok(json!({"matches":matches,"warning":errors.first()}))
 }

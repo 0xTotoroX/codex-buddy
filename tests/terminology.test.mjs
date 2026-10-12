@@ -36,7 +36,7 @@ const bundle = (
       resolveDir: process.cwd(),
       contents: `import {installTerminology} from './ui/terminology/host.js';
 window.state={preferences:{enabled:true,semantic:false,autoExpand:false,cardStyle:'plain',mastered:[],revision:0},entries:[${JSON.stringify(term)}]};window.calls=[];window.session='one';window.answer='这是竞态条件。';window.semanticReply=null;
-window.setup=()=>installTerminology({getRoot:()=>document.querySelector('main'),isBusy:()=>false,getExchange:()=>({sessionId:window.session,title:'合成聊天',question:'旧请求回来覆盖新页面，该怎么处理？',answer:window.answer}),request:async(path,payload)=>{window.calls.push({path,payload});if(path.endsWith('/analyze'))return new Promise(r=>window.semanticReply=r);if(payload.action==='master')window.state.preferences.mastered.push(payload.id);return structuredClone(window.state);}});window.setup();`,
+window.setup=()=>installTerminology({getRoot:()=>document.querySelector('main'),isBusy:()=>!!window.busy,getExchange:()=>({complete:window.complete,sessionId:window.session,title:'合成聊天',question:'旧请求回来覆盖新页面，该怎么处理？',answer:window.answer}),request:async(path,payload)=>{window.calls.push({path,payload});if(path.endsWith('/analyze'))return new Promise(r=>window.semanticReply=r);if(payload.action==='master')window.state.preferences.mastered.push(payload.id);return structuredClone(window.state);}});window.setup();`,
     },
     bundle: true,
     format: 'iife',
@@ -370,6 +370,91 @@ test('context-approved sense replaces a conflicting literal match and failure do
     );
     assert.equal(await page.evaluate(() => CSS.highlights.get('codex-buddy-terms')?.size), 0);
     await page.evaluate(() => window.__codexBuddyTerminology.destroy());
+  } finally {
+    await browser.close();
+  }
+});
+
+test('completed exchange keeps terminology analysis alive while a new answer streams', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent('<main style="margin:80px"><p>这是竞态条件。</p></main>');
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate(async () => {
+      window.state.preferences.semantic = true;
+      window.busy = true;
+      window.complete = true;
+      await window.__codexBuddyTerminology.refresh();
+    });
+    await page.waitForFunction(() => window.semanticReply !== null);
+    const id = await page.evaluate(
+      () => window.calls.find((c) => c.path.endsWith('/analyze')).payload.requestId,
+    );
+    await page.waitForTimeout(1100);
+    assert.equal(await page.evaluate((id) => window.__codexBuddyTerminology.verify(id), id), true);
+    assert.equal(
+      await page.evaluate(
+        (id) =>
+          window.__codexBuddyTerminology.progress(id, [{ id: 'TERM-1', quote: '这是竞态条件。' }]),
+        id,
+      ),
+      true,
+    );
+    assert.equal(await page.evaluate(() => CSS.highlights.get('codex-buddy-terms')?.size), 1);
+    assert.equal(
+      await page.evaluate(() => window.__codexBuddyTerminology.progress('expired', [])),
+      false,
+    );
+    await page.evaluate(() =>
+      window.semanticReply({ matches: [{ id: 'TERM-1', quote: '这是竞态条件。' }] }),
+    );
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 1);
+    await page.evaluate(() => window.__codexBuddyTerminology.destroy());
+  } finally {
+    await browser.close();
+  }
+});
+
+test('context adapter uses the preceding completed turn and never another chat while busy', async () => {
+  const script = (
+    await build({
+      stdin: {
+        resolveDir: process.cwd(),
+        contents: `import{terminologyExchange}from'./ui/codex/context.js';import{initializeState}from'./ui/codex/runtime/state.js';initializeState({diagnostics:[]});window.readExchange=terminologyExchange;`,
+      },
+      bundle: true,
+      write: false,
+    })
+  ).outputFiles[0].text;
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.route('https://context.test/', (r) =>
+      r.fulfill({ contentType: 'text/html', body: '<body></body>' }),
+    );
+    await page.goto('https://context.test/');
+    const turn = (key, q, a) =>
+      `<div class="contents" data-content-search-turn-key="${key}"><div class="items-end"><h4 class="sr-only">你说：</h4><p>${q}</p></div><div class="group"><h4 class="sr-only">ChatGPT 说：</h4><p>${a}</p></div></div>`;
+    await page.setContent(
+      `<div class="thread-scroll-container" data-session-id="one">${turn('001', '解释竞态条件', '竞态条件是结果依赖多个操作的完成顺序。')}${turn('002', '正在输入新问题', '正在生成的新回答，不应该被读取。')}<button aria-label="停止">停止</button></div>`,
+    );
+    await page.addScriptTag({ content: script });
+    const previous = await page.evaluate(() => window.readExchange());
+    assert.equal(previous.question, '解释竞态条件');
+    assert.ok(previous.answer.includes('完成顺序'));
+    assert.equal(previous.complete, true);
+    await page.locator('[aria-label=停止]').evaluate((e) => e.remove());
+    assert.ok((await page.evaluate(() => window.readExchange())).answer.includes('正在生成'));
+    await page.locator('.thread-scroll-container').evaluate(
+      (e, html) => {
+        e.dataset.sessionId = 'two';
+        e.innerHTML = html;
+      },
+      turn('003', '新聊天', '新聊天正在生成，不能冒充已完成。') +
+        '<button aria-label="停止">停止</button>',
+    );
+    assert.equal(await page.evaluate(() => window.readExchange()), null);
   } finally {
     await browser.close();
   }

@@ -25,7 +25,7 @@ contracts.ts声明宿主inputTarget只读目标和提示词优化verify/destroy�
 
 codex-host.ts定义独立后台管理状态和重启进度，不扩展FeatureId或插件注册。contracts声明上游只读Agent探针。
 
-contracts 声明术语实例 verify/refresh/destroy、可选 typography 只读字体快照接口与无正文错误状态；正式词库不放入 shared。
+contracts 声明术语实例 verify/refresh/destroy、受请求身份校验的 progress 与可选 typography 只读字体快照接口与无正文错误状态；正式词库不放入 shared。
 
 EditableSettings.promptEnhancementEnabled是提示词优化独立开关，历史配置由后台默认true；不归入四功能FeatureId或布局。
 

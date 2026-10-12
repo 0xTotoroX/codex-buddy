@@ -52,3 +52,5 @@ lifecycle在宿主安装/销毁prompt-enhancement，独立于工作台业务启�
 lifecycle 同时安装并销毁 terminology/host，复用活动聊天根、标题、一问一答及忙碌状态；不参与 Stepwise 建议缓存。
 
 提示词优化安装透传settingsLoaded与promptEnhancementEnabled；settings-sync将工具开关按即时补丁更新，独立于工作台功能启停。
+
+术语旁路通过 context.terminologyExchange 读取最近三轮已完成问答；宿主生成新回答时仍允许核对已完成内容，换聊天继续取消旧请求。

@@ -248,9 +248,9 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     }
   }
   function identity() {
-    if (isBusy() || !root || getRoot() !== root) return null;
+    if (!root || getRoot() !== root) return null;
     const exchange = getExchange();
-    if (!exchange?.answer) return null;
+    if (!exchange?.answer || (isBusy() && !exchange.complete)) return null;
     return {
       ...exchange,
       key: JSON.stringify([exchange.sessionId, exchange.question, exchange.answer]),
@@ -260,7 +260,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     if (!state.preferences.enabled || !state.preferences.semantic || pending) return;
     const exchange = identity();
     if (!exchange || exchange.key === lastAnalysis || Date.now() < retryAt) return;
-    if (cache.has(exchange.key)) {
+    if (cache.has(exchange.key) && cache.get(exchange.key).complete !== false) {
       semanticMatches = cache.get(exchange.key).matches;
       lastAnalysis = exchange.key;
       phase = 'ready';
@@ -341,7 +341,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       lastText = key;
       pending = '';
       semanticMatches = [];
-      phase = isBusy() ? 'waiting' : 'ready';
+      phase = exchange ? 'ready' : 'waiting';
       failures = 0;
       retryAt = 0;
       schedule();
@@ -408,6 +408,23 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     typography: () => (root?.isConnected ? typography() : null),
     verify: (id) => alive && pending === id && identity()?.key === lastAnalysis,
     refresh,
+    async progress(id, matches) {
+      if (!alive || pending !== id || identity()?.key !== lastAnalysis) return false;
+      const updated = await api({ action: 'state' });
+      if (
+        !alive ||
+        pending !== id ||
+        identity()?.key !== lastAnalysis ||
+        !updated.preferences.enabled ||
+        !updated.preferences.semantic
+      )
+        return false;
+      state = updated;
+      semanticMatches = matches;
+      cache.set(lastAnalysis, { context: contextKey(), matches, complete: false });
+      scan();
+      return true;
+    },
     destroy() {
       alive = false;
       pending = '';

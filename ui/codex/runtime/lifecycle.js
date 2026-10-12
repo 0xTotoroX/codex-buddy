@@ -42,6 +42,7 @@ import {
   contextMatches,
   contextSnapshot,
   findLatestAssistantMessage,
+  terminologyExchange,
   findPreviousUserText,
   installContextTracking,
   removeContextTracking,
@@ -708,15 +709,11 @@ function install() {
       request: bridgeCall,
       getRoot: chatRoot,
       isBusy: chatBusy,
-      getExchange: () => {
-        const message = findLatestAssistantMessage();
-        return {
-          sessionId: contextSnapshot().sessionId,
-          title: document.title,
-          question: findPreviousUserText(message),
-          answer: message?.text || '',
-        };
-      },
+      getExchange: () => ({
+        ...terminologyExchange(),
+        sessionId: contextSnapshot().sessionId,
+        title: document.title,
+      }),
     });
   }
   void start();
