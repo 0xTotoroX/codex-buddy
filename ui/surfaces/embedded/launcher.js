@@ -198,15 +198,15 @@ export function syncLauncher(options) {
     const shadow = entry.attachShadow({ mode: 'open' });
     shadow.innerHTML = `<style>
       :host { color:inherit; }
-      .entry { display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 0; }
-      .divider { width:24px;border-top:1px solid color-mix(in srgb,currentColor 16%,transparent); }
+      .entry { display:flex;flex-direction:column;align-items:center;gap:8px;padding:0; }
       button { appearance:none;display:grid;place-items:center;width:36px;height:36px;
         border:0;border-radius:10px;padding:0;background:transparent;color:inherit;cursor:pointer; }
       button:hover { background:color-mix(in srgb,currentColor 10%,transparent); }
       button:focus-visible { outline:2px solid currentColor;outline-offset:2px; }
       svg { width:20px;height:20px;fill:currentColor; }
       ${launcherFaceStyles}
-    </style><div class="entry"><div class="divider" aria-hidden="true"></div>
+      .entry .csw-status-stage { top:calc(50% + 8px); }
+    </style><div class="entry">
       <button type="button" class="csw-launcher-face csw-fab" aria-label="CodexBuddy" aria-keyshortcuts="Alt+Enter">
         ${launcherFaceHtml()}
       </button></div>`;
@@ -237,6 +237,9 @@ export function syncLauncher(options) {
     });
   }
   if (entry.parentElement !== rail) rail.insertBefore(entry, rail.lastElementChild);
+  const railGap = parseFloat(getComputedStyle(rail).rowGap) || 0;
+  const footerMargin = `${-railGap}px`;
+  if (entry.style.marginBottom !== footerMargin) entry.style.marginBottom = footerMargin;
   if (!previewEnabled() && options.action && !radial)
     radial = createLauncherMenu(entry.shadowRoot.querySelector('button'), () => current);
   if (!face) face = createLauncherFace(entry.shadowRoot.querySelector('button'));

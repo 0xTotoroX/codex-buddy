@@ -31,14 +31,23 @@ test('launcher reuses original expressions and source geometry while retaining i
   const page = await browser.newPage({ viewport: { width: 900, height: 700 } });
   try {
     await page.setContent(
-      '<style>body{background:#fafafa;color:#252525}nav{display:flex;flex-direction:column;width:64px;height:500px;align-items:center}.thread-scroll-container{position:absolute;top:30px;left:110px;width:300px;height:280px}#right{left:450px}</style><nav class="group/sidebar-rail"><div style="flex:1"></div><span>Profile</span></nav><div id="left" class="thread-scroll-container"></div><div id="right" class="thread-scroll-container"></div>',
+      '<style>body{background:#fafafa;color:#252525}nav{display:flex;flex-direction:column;width:64px;height:500px;align-items:center;gap:8px;padding-bottom:4px}#profile{display:grid;place-items:center;width:36px;height:36px;flex:none;border:0;padding:0;background:none}#avatar{width:24px;height:24px;border-radius:50%;background:#87947a}.thread-scroll-container{position:absolute;top:30px;left:110px;width:300px;height:280px}#right{left:450px}</style><nav class="group/sidebar-rail"><div style="flex:1"></div><button id="profile" aria-label="Profile"><span id="avatar"></span></button></nav><div id="left" class="thread-scroll-container"></div><div id="right" class="thread-scroll-container"></div>',
     );
+    const avatarBefore = await page.locator('#avatar').boundingBox();
     await page.addScriptTag({ content: compiled.outputFiles[0].text });
     const eye = page
       .locator('[data-codex-buddy-launcher]')
       .getByRole('button', { name: 'CodexBuddy', exact: true });
     assert.equal(await eye.locator('.csw-fab-eye').count(), 2);
     assert.equal(await eye.getAttribute('data-source-direction'), 'left');
+    assert.equal(await page.locator('[data-codex-buddy-launcher] .divider').count(), 0);
+    assert.deepEqual(await page.locator('#avatar').boundingBox(), avatarBefore);
+    const eyeBox = await eye.boundingBox();
+    const profileBox = await page.locator('#profile').boundingBox();
+    assert.ok(eyeBox.y + eyeBox.height <= profileBox.y + 0.5, 'click targets do not overlap');
+    const eyeShape = await eye.locator('.csw-fab-eye').first().boundingBox();
+    const faceGap = avatarBefore.y - eyeShape.y - eyeShape.height;
+    assert.ok(faceGap >= 8 && faceGap <= 15, `compact face gap: ${faceGap}`);
     for (const [kind, animation] of [
       ['idle', 'csw-face-blink'],
       ['generating', 'csw-face-generate-bob'],
@@ -79,6 +88,8 @@ test('launcher reuses original expressions and source geometry while retaining i
     await eye.focus();
     await page.keyboard.press('ArrowRight');
     const menu = page.locator('[data-codex-buddy-launcher-menu]');
+    assert.deepEqual(await eye.boundingBox(), eyeBox, 'menu opens upward without moving eyes');
+    assert.deepEqual(await page.locator('#avatar').boundingBox(), avatarBefore);
     await menu.getByRole('menuitem', { name: '打开设置' }).click();
     assert.deepEqual(await page.evaluate(() => window.actions), ['settings']);
     await page.evaluate(() => {
