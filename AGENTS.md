@@ -159,7 +159,7 @@ CodexHost管理迁回main：独立src/codex_host.rs及codex_host子模块、认�
 
 ## 术语释义
 
-[ui/terminology/AGENTS.md](ui/terminology/AGENTS.md) 管理独立文本标注与三种候选卡片；后台 terminology 管理私有词库、手动词条、已掌握与导出，terminology_lookup 管理独立模型识别和公共资料核对。复用 context 的活动聊天与一问一答，不写主聊天、不改宿主文字节点、不重新引入插件依赖。词库 JSON/Markdown 不随源码分发；设置页可导入、按模型分类手动添加、恢复提示及导出。当前联网补充只查询公共百科，来源无效时不入库。
+[ui/terminology/AGENTS.md](ui/terminology/AGENTS.md) 管理独立文本标注与正文/侧栏共用的贴字浮层（沿用材质与主题色）；后台 terminology 管理私有词库、手动词条、已掌握与导出，terminology_lookup 管理独立模型识别和公共资料核对。复用 context 的活动聊天与一问一答，不写主聊天、不改宿主文字节点、不重新引入插件依赖。词库 JSON/Markdown 不随源码分发；设置页可导入、按模型分类手动添加、恢复提示及导出。当前联网补充只查询公共百科，来源无效时不入库。
 
 提示词优化新增独立promptEnhancementEnabled开关（旧配置默认开启），设置简易常用功能/详细功能与交互均可调；关闭隐藏入口并取消在途优化，不使Stepwise生成版本失效。设置搜索仅索引标签/标题和分类，不读取表单值或凭据，通过原导航定位控件，保留草稿与折叠状态。CodexHost存在时优化按钮加入原生操作内部容器，保留其模型→Agent→原生操作相邻顺序，不改上游安装资源。
 

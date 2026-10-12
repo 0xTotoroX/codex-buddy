@@ -83,7 +83,7 @@ Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，
 
 features.task_command承接原server看板命令协调：主界面已接管时，未登记看板的打开/启用进入共享容器；旧窗口草稿仍按原规则保护。restore_unregistered_main_features在feature_operation内只补缺失条目。模型preferences白名单加入modelOrder，继续校验owner、唯一ID及revision。state.handle_refresh_failure保留仍存活客户端上的Elapsed；Connection.status新增unresponsive，下一次正常refresh即恢复connected。
 
-- `terminology.rs`：本机私有术语/手动词库、偏好及已掌握状态，认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
+- `terminology.rs`：本机私有术语/手动词库、背景材质/液态变体/自定义色/宽度偏好及已掌握状态（兼容旧样式字段），认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
 - `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句与规范术语；未命中时仅向固定公共百科发送短术语，校验资料相关性与分类后新增，切换上下文或关闭功能拒绝迟到结果。
 
 settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修订保存；model.same_generation_config忽略这一工具开关。prompt_enhancement在开始和取消校验中检查开关，关闭后拒绝请求并终止在途操作。

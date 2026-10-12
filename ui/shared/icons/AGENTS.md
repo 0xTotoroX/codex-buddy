@@ -19,3 +19,5 @@ window-expand→ExpandMd、window-restore→CollapseSmall，来自同一固定�
 sparkles→Sparkles，来自同一固定公开提交，供输入框“优化”按钮使用。
 
 prompt-improve→PencilSparkle，同一固定公开提交；提示词优化采用此笔形图标的无填充描边样式，React stroke属性转换为标准SVG属性；保留sparkles资源供兼容。
+
+bookmark / bookmark-filled / check 分别摘取同一固定提交的 SavedXs / SavedFilledXs / Check，保留原路径；SavedXs 的18px源画布等比规范化到24px，控件统一18px，用于术语浮卡收藏与掌握。

@@ -69,7 +69,11 @@ test('hover, style, mastery, navigation and cleanup preserve host content', asyn
       await page.mouse.move(5, 5);
       await page.mouse.move(point.x, point.y);
       await page.getByRole('dialog').waitFor();
-      assert.equal(await page.locator('.term-card').getAttribute('data-style'), style);
+      assert.equal(await page.locator('.term-card').getAttribute('data-style'), 'attached');
+      assert.equal(
+        await page.locator('.term-card').getAttribute('data-material'),
+        style === 'frost' ? 'frosted' : 'matte',
+      );
     }
     await page.getByRole('button', { name: '已掌握，不再提示' }).click();
     await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 0);
@@ -108,7 +112,7 @@ test('render current card styles without removed note variant', async () => {
     await build({
       stdin: {
         resolveDir: process.cwd(),
-        contents: `import {cardStyles,createCard} from './ui/terminology/card.js';document.querySelector('style').textContent+=cardStyles;for(const [id,label] of [['plain','A · 简洁白卡'],['frost','B · 磨砂卡']]){const section=document.createElement('section');const title=document.createElement('h2');title.textContent=label;section.append(title,createCard(${JSON.stringify(term)},{style:id,semantic:true}));document.querySelector('main').append(section);}`,
+        contents: `import {cardStyles,createCard} from './ui/terminology/card.js';document.querySelector('style').textContent+=cardStyles;for(const [id,label] of [['plain','A · 简洁白卡'],['frost','B · 磨砂卡']]){const section=document.createElement('section');const title=document.createElement('h2');title.textContent=label;section.append(title,createCard(${JSON.stringify(term)},{preferences:{cardStyle:id},semantic:true}));document.querySelector('main').append(section);}`,
       },
       bundle: true,
       format: 'iife',

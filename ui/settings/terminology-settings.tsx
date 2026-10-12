@@ -1,9 +1,11 @@
 /* [INPUT]: 认证术语 API、共用卡片呈现与用户导入/输入。
- * [OUTPUT]: 三种真实卡片预览、检索、掌握列表、分类入库和文档导出。
+ * [OUTPUT]: 共用卡片与材质预览、检索、掌握列表、分类入库和文档导出。
  * [POS]: 详细设置的功能区，不访问主聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useRef, useState } from 'react';
 import { request } from './api';
+import { inheritedAppearance } from '../terminology/appearance.js';
+import { NativeSelect } from './components/ui/native-select';
 import { cardStyles, createCard } from '../terminology/card.js';
 
 type Term = {
@@ -23,6 +25,10 @@ type Library = {
     semantic: boolean;
     autoExpand: boolean;
     cardStyle: string;
+    cardMaterial?: string | null;
+    cardLiquidVariant?: string;
+    cardCustomColor?: string;
+    cardWidth?: number;
     mastered: string[];
     favorites: string[];
     revision: number;
@@ -32,24 +38,30 @@ const sample: Term = {
   id: 'sample',
   name: '竞态条件',
   english: 'Race Condition',
-  definition:
-    '多个操作的执行先后不可预测，最终结果随完成顺序变化。例如切换聊天后，旧请求较晚返回并覆盖新页面。',
+  definition: '多个操作的执行先后不可预测，最终结果随完成顺序变化。',
   aliases: [],
   category: ['程序基础与执行机制', '管理运行与并发'],
   example: '',
   source: '',
 };
-function Preview({ term, style }: { term: Term; style: string }) {
+function Preview({ term, preferences }: { term: Term; preferences: Library['preferences'] }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const node = ref.current!;
-    const card = createCard(term, { style, onMaster: async () => {} });
-    card.querySelector('button')?.setAttribute('disabled', '');
+    const card = createCard(term, {
+      preferences,
+      appearance: inheritedAppearance(node),
+      locked: true,
+    });
     node.replaceChildren(card);
-    return () => node.replaceChildren();
-  }, [term, style]);
+    return () => {
+      card.dispose();
+      node.replaceChildren();
+    };
+  }, [term, preferences]);
   return <div ref={ref} className="term-preview" />;
 }
+
 function download(text: string, name: string, type = 'text/markdown;charset=utf-8') {
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
@@ -119,7 +131,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
     <section className="settings-section" id="settings-terminology">
       <style>
         {cardStyles +
-          `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{width:100%;max-width:440px}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
+          `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{max-width:100%}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
       </style>
       <h2>术语释义</h2>
       <button
@@ -159,25 +171,68 @@ export function TerminologySettings({ active }: { active: boolean }) {
           <p className="settings-hint">
             细下划线 · 悬停查看释义 · Alt + Shift + T 打开当前可见术语
           </p>
-          <div className="term-style-options" aria-label="卡片样式">
-            {[
-              ['plain', '简洁白卡'],
-              ['frost', '磨砂卡'],
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
+          <div className="term-style-options">
+            <label>
+              背景材质
+              <NativeSelect
+                aria-label="术语卡片背景"
                 disabled={busy}
-                aria-pressed={prefs.cardStyle === id}
-                onClick={() =>
-                  void command({ action: 'settings', revision: prefs.revision, cardStyle: id })
+                value={prefs.cardMaterial || (prefs.cardStyle === 'frost' ? 'frosted' : 'matte')}
+                onChange={(e) =>
+                  void command({
+                    action: 'settings',
+                    revision: prefs.revision,
+                    cardMaterial: e.target.value,
+                  })
                 }
               >
-                {label}
-              </button>
-            ))}
+                <option value="matte">哑光</option>
+                <option value="frosted">磨砂</option>
+                <option value="native-glass">液态</option>
+                <option value="black">纯黑</option>
+                <option value="custom">自定义</option>
+              </NativeSelect>
+            </label>
+            {prefs.cardMaterial === 'native-glass' && (
+              <label>
+                液态变体
+                <NativeSelect
+                  aria-label="术语卡片液态变体"
+                  disabled={busy}
+                  value={prefs.cardLiquidVariant || 'regular'}
+                  onChange={(e) =>
+                    void command({
+                      action: 'settings',
+                      revision: prefs.revision,
+                      cardLiquidVariant: e.target.value,
+                    })
+                  }
+                >
+                  <option value="regular">Regular</option>
+                  <option value="clear">Clear</option>
+                </NativeSelect>
+              </label>
+            )}
+            {prefs.cardMaterial === 'custom' && (
+              <label>
+                背景颜色
+                <input
+                  type="color"
+                  aria-label="术语卡片自定义颜色"
+                  disabled={busy}
+                  value={prefs.cardCustomColor || '#33333a'}
+                  onChange={(e) =>
+                    void command({
+                      action: 'settings',
+                      revision: prefs.revision,
+                      cardCustomColor: e.target.value,
+                    })
+                  }
+                />
+              </label>
+            )}
           </div>
-          <Preview term={preview} style={prefs.cardStyle} />
+          <Preview term={preview} preferences={prefs} />
           <details>
             <summary>识别与自动积累</summary>
             <div className="settings-row">

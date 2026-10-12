@@ -33,6 +33,7 @@ test('terminology bricks preserve independent favorite and mastery states', asyn
     await page.getByRole('button', { name: '已掌握', exact: true }).click();
     await page.getByRole('button', { name: '防抖', exact: true }).click();
     await page.getByRole('button', { name: '恢复提示', exact: true }).click();
+    await page.getByRole('button', { name: '防抖', exact: true }).waitFor({ state: 'detached' });
     assert.equal(await page.getByRole('button', { name: '防抖', exact: true }).count(), 0);
     await page.getByRole('button', { name: '收藏', exact: true }).click();
     assert.equal(await page.getByRole('button', { name: '防抖', exact: true }).count(), 1);

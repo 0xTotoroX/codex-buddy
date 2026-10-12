@@ -2,9 +2,11 @@
  * [OUTPUT]: 术语积木、详情、收藏及已掌握；复用既有容器，不增加侧栏占位。
  * [POS]: 仅消费后台投影，不采集或改写宿主聊天。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
-import { useState } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
+import { createTermPopover } from '../terminology/popover.js';
+import { inheritedAppearance } from '../terminology/appearance.js';
+import type { Appearance } from '../surfaces/theme/appearance';
 import type { Reading } from '../shared/features';
-import { Icon } from '../shared/icons/react';
 export type Term = {
   id: string;
   name: string;
@@ -14,7 +16,16 @@ export type Term = {
 };
 export type TermData = {
   entries: Term[];
-  preferences: { favorites: string[]; mastered: string[] };
+  preferences: {
+    favorites: string[];
+    mastered: string[];
+    cardMaterial?: string | null;
+    cardStyle?: string;
+    cardLiquidVariant?: string;
+    cardCustomColor?: string;
+    cardWidth?: number;
+  };
+  appearance?: Appearance;
   involved: string[];
   context: string;
   phase: string;
@@ -33,15 +44,58 @@ export function TerminologyView({
 }) {
   const [filter, setFilter] = useState(reading.termsFilter || 'current');
   const [selected, setSelected] = useState(reading.termsSelected || '');
+  const [reveal, setReveal] = useState(0);
   const favorites = state.preferences.favorites || [],
     mastered = state.preferences.mastered || [];
   const ids =
     filter === 'current' ? state.involved || [] : filter === 'favorites' ? favorites : mastered;
   const terms = state.entries.filter((t) => ids.includes(t.id));
   const term = terms.find((t) => t.id === selected);
+  const module = useRef<HTMLDivElement>(null),
+    anchor = useRef<HTMLButtonElement | null>(null);
+  const popup = useRef<ReturnType<typeof createTermPopover> | null>(null);
+  const lastOpened = useRef(-1);
+  const latest = useRef({ action });
+  latest.current = { action };
+  useLayoutEffect(() => {
+    popup.current = createTermPopover();
+    return () => popup.current?.destroy();
+  }, []);
+  useLayoutEffect(() => {
+    const view = popup.current;
+    if (!view) return;
+    if (!term || !anchor.current?.isConnected) {
+      void view.hide();
+      return;
+    }
+    const perform = async (action: string, id: string) => {
+      const result = await latest.current.action({ action, id });
+      if (result === null) throw Error('操作未完成，请重试');
+    };
+    const options = {
+      preferences: state.preferences,
+      appearance: state.appearance || inheritedAppearance(module.current!),
+      locked,
+      favorite: favorites.includes(term.id),
+      mastered: mastered.includes(term.id),
+      returnFocus: anchor.current,
+      onFavorite: (id: string, value: boolean) => perform(value ? 'favorite' : 'unfavorite', id),
+      onMaster: (id: string, value: boolean) => perform(value ? 'master' : 'restore', id),
+    };
+    if (view.termId === term.id && view.open) view.update(term, options);
+    else if (lastOpened.current !== reveal) {
+      lastOpened.current = reveal;
+      view.show(
+        term,
+        () => (anchor.current?.isConnected ? anchor.current.getBoundingClientRect() : null),
+        options,
+      );
+    }
+  }, [term, state.preferences, state.appearance, state.context, locked, reveal]);
+
   return (
-    <div className="term-module">
-      <style>{`.term-module{padding:12px 14px;min-width:0;color:var(--ink);font-size:14px;line-height:1.7}.term-module nav{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap}.term-module nav button{border:0;background:none;color:var(--muted);padding:4px 0;font:inherit;cursor:pointer}.term-module nav button[aria-pressed=true]{color:var(--ink);font-weight:600}.term-bricks{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}.term-brick{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);background:var(--surface);font:inherit;line-height:1.4;cursor:pointer;max-width:100%;overflow-wrap:anywhere;transition:background 120ms,transform 120ms}.term-brick:active{transform:scale(.97)}.term-brick[aria-pressed=true]{background:var(--hover);border-color:var(--muted)}.term-brick[data-mastered=true]{color:var(--muted)}.term-description{padding:20px 0 8px}.term-description header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.term-description strong{font-size:17px}.term-description small{font-size:12px;color:var(--muted)}.term-description p{margin:12px 0}.term-module-actions{display:flex;justify-content:flex-end;gap:6px}.term-module-actions button{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer}.term-module-actions button{transition:transform 120ms,background 120ms}.term-module-actions button:active{transform:scale(.92)}.term-module-actions button[aria-pressed=true]{color:var(--ink);background:var(--hover)}.term-module .term-status{font-size:12px;color:var(--muted);margin:12px 0}.term-module button:focus-visible{outline:2px solid currentColor;outline-offset:3px}@media(prefers-reduced-motion:reduce){.term-brick,.term-module-actions button{transition:none}}`}</style>
+    <div className="term-module" ref={module}>
+      <style>{`.term-module{padding:12px 14px;min-width:0;color:var(--ink);font-size:14px;line-height:1.7}.term-module nav{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap}.term-module nav button{border:0;background:none;color:var(--muted);padding:4px 0;font:inherit;cursor:pointer}.term-module nav button[aria-pressed=true]{color:var(--ink);font-weight:600}.term-bricks{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}.term-brick{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);background:var(--surface);font:inherit;line-height:1.4;cursor:pointer;max-width:100%;overflow-wrap:anywhere;transition:background 120ms,transform 120ms}.term-brick:active{transform:scale(.97)}.term-brick[aria-pressed=true]{background:var(--hover);border-color:var(--muted)}.term-brick[data-mastered=true]{color:var(--muted)}.term-module .term-status{font-size:12px;color:var(--muted);margin:12px 0}.term-module button:focus-visible{outline:2px solid currentColor;outline-offset:3px}@media(prefers-reduced-motion:reduce){.term-brick{transition:none}}`}</style>
       <nav aria-label="术语范围">
         {[
           ['current', '当前聊天'],
@@ -72,7 +126,9 @@ export function TerminologyView({
             key={t.id}
             aria-pressed={selected === t.id}
             data-mastered={mastered.includes(t.id)}
-            onClick={() => {
+            onClick={(event) => {
+              anchor.current = event.currentTarget;
+              setReveal((n) => n + 1);
               setSelected(t.id);
               reading.termsSelected = t.id;
             }}
@@ -101,47 +157,6 @@ export function TerminologyView({
         <p className="term-status" role="status">
           {state.message || '本次语义分析未完成，已保留本地匹配结果。'}
         </p>
-      )}
-      {term && (
-        <article className="term-description">
-          <header>
-            <strong>{term.name}</strong>
-            <small>{term.english}</small>
-          </header>
-          <p>{term.definition}</p>
-          <div className="term-module-actions">
-            <button
-              type="button"
-              disabled={locked}
-              aria-pressed={favorites.includes(term.id)}
-              aria-label={favorites.includes(term.id) ? '取消收藏' : '收藏术语'}
-              title={favorites.includes(term.id) ? '取消收藏' : '收藏术语'}
-              onClick={() =>
-                void action({
-                  action: favorites.includes(term.id) ? 'unfavorite' : 'favorite',
-                  id: term.id,
-                })
-              }
-            >
-              <Icon name={favorites.includes(term.id) ? 'star-filled' : 'star'} />
-            </button>
-            <button
-              type="button"
-              disabled={locked}
-              aria-pressed={mastered.includes(term.id)}
-              aria-label={mastered.includes(term.id) ? '恢复提示' : '已掌握，不再提示'}
-              title={mastered.includes(term.id) ? '恢复提示' : '已掌握，不再提示'}
-              onClick={() =>
-                void action({
-                  action: mastered.includes(term.id) ? 'restore' : 'master',
-                  id: term.id,
-                })
-              }
-            >
-              <Icon name={mastered.includes(term.id) ? 'eye' : 'eye-off'} />
-            </button>
-          </div>
-        </article>
       )}
     </div>
   );

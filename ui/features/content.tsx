@@ -61,7 +61,7 @@ export function FeatureContent({
             const result = await call<FeatureData>('action', { data });
             update(result);
             return result;
-          })
+          }, true)
         }
       />
     ) : (

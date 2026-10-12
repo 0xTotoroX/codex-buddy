@@ -1,117 +1,135 @@
-import { iconSvg } from '../shared/icons/index.js';
-/* [INPUT]: 术语文本、三个候选样式、已掌握回调。
- * [OUTPUT]: 可安全挂载在 Shadow DOM 或设置预览内的释义卡。
- * [POS]: 共用卡片呈现，不使用术语内容拼接 HTML。
+/* [INPUT]: 术语、主题/材质偏好、收藏与掌握动作。
+ * [OUTPUT]: 已定稿贴字浮层的唯一卡片，两个入口和设置预览共用。
+ * [POS]: 只呈现名称与释义；静态共享图标，不插入不受信任 HTML。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { iconSvg } from '../shared/icons/index.js';
+import { attachCardAppearance } from './appearance.js';
 export const cardStyles = `
-.term-card{box-sizing:border-box;width:340px;max-width:calc(100vw - 24px);padding:18px 20px;border:1px solid var(--term-border,#dedee3);border-radius:14px;background:var(--term-bg,#fff);color:var(--term-fg,#25262b);box-shadow:0 8px 28px #00000014;font:14px/1.65 system-ui,sans-serif;text-align:left;overflow-wrap:anywhere}
-.term-card[data-style=frost]{background:color-mix(in srgb,var(--term-bg,#fff) 90%,transparent);backdrop-filter:blur(24px) saturate(1.15);border-color:color-mix(in srgb,var(--term-border,#dedee3) 65%,transparent);box-shadow:0 10px 32px #00000018,inset 0 1px #ffffff30;border-radius:20px}
-.term-card header{display:block;margin-bottom:12px}.term-card strong{font-size:17px;font-weight:600}.term-card small{display:block;color:var(--term-muted,#72727b);font-size:12px;margin-top:2px}.term-card p{margin:0 0 12px}.term-card .term-relation{font-size:12px;color:var(--term-muted,#72727b);margin-bottom:5px}.term-card footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:10px;border-top:1px solid var(--term-border,#dedee3)}
-.term-card button,.term-card a{font:inherit;font-size:12px;background:none;border:0;color:inherit;padding:4px 0;text-decoration:none;cursor:pointer}.term-card button:focus-visible,.term-card a:focus-visible{outline:2px solid currentColor;outline-offset:4px;border-radius:2px}.term-card button:disabled{opacity:.6;cursor:wait}.term-card .term-error{color:#b34848;font-size:12px;margin-top:8px}
-.term-card footer{justify-content:flex-end}.term-action{position:relative;display:inline-flex}.term-action button{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;padding:0}.term-action svg{width:18px;height:18px}.term-action button:hover{background:color-mix(in srgb,currentColor 7%,transparent)}.term-tooltip{position:absolute;bottom:calc(100% + 8px);right:0;white-space:nowrap;padding:5px 8px;border-radius:6px;background:var(--term-fg,#25262b);color:var(--term-bg,#fff);font-size:12px;line-height:1.5;visibility:hidden;opacity:0;pointer-events:none}.term-action:hover .term-tooltip,.term-action:focus-within .term-tooltip{visibility:visible;opacity:1}.term-action button:active{transform:scale(.94)}
-@media(prefers-reduced-motion:no-preference){.term-card{animation:term-appear 120ms ease-out}@keyframes term-appear{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}}`;
-let tooltipSequence = 0;
-export function createCard(
-  term,
-  {
-    style = 'plain',
-    semantic = false,
-    favorite = false,
-    onMaster = async (_id) => {},
-    onFavorite = async (_id, _value) => {},
-  } = {},
-) {
+.term-card{box-sizing:border-box;width:348px;max-width:100%;padding:13px 14px 10px;border:0;border-radius:14px;color:var(--term-fg,#202020);background:var(--term-bg,#fafafa);box-shadow:0 0 0 .5px var(--term-border,#dedee3),0 1px 2px #0000000d,0 16px 36px -14px #0000004d;font:14px/1.6 system-ui,-apple-system,sans-serif;overflow-wrap:anywhere;text-align:left;position:relative}
+.term-card header{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;min-width:0}.term-card strong{font-size:17px;line-height:1.28;font-weight:600;letter-spacing:.012em}.term-card small{font-size:12.5px;line-height:1.3;font-weight:500;letter-spacing:.035em;color:var(--term-muted,#72727b)}.term-card p{margin:6px 0 0;font-size:14px;line-height:1.6}.term-card footer{display:flex;justify-content:flex-end;gap:2px;margin-top:8px}
+.term-action{position:relative;display:inline-flex}.term-action button{display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--term-muted,#72727b);cursor:pointer;transition:color 150ms,background-color 150ms,transform 120ms}.term-action button svg{width:18px;height:18px}.term-action button:hover{color:var(--term-fg,#202020);background:var(--term-hover,#0000000d)}.term-action button[aria-pressed=true]{color:var(--term-accent,currentColor);background:color-mix(in srgb,var(--term-accent,currentColor) 12%,transparent)}.term-action button:active{transform:scale(.94)}.term-action button:focus-visible{outline:2px solid var(--term-accent,currentColor);outline-offset:2px}.term-action button:disabled{opacity:.5;cursor:wait}.term-tooltip{position:absolute;bottom:calc(100% + 8px);right:0;padding:5px 8px;border-radius:6px;white-space:nowrap;max-width:260px;font:12px/1.5 system-ui;background:var(--term-fg,#202020);color:var(--term-bg,#fafafa);visibility:hidden;opacity:0;pointer-events:none;z-index:3}.term-action:hover .term-tooltip,.term-action:focus-within .term-tooltip{visibility:visible;opacity:1}.term-error{color:var(--term-danger,#bf4d4d);font-size:12px;margin-top:8px}.term-error:empty{display:none}
+.term-card[data-material=native-glass]{box-shadow:inset 0 1px 0 #ffffff25,inset 0 0 0 .5px #ffffff18,0 16px 36px -14px #0000004d}
+@media(pointer:coarse){.term-action button{width:44px;height:44px}}
+@media(prefers-reduced-motion:reduce){.term-action button{transition:none}}
+`;
+let sequence = 0;
+export function createCard(term, options = {}) {
+  let opts = {
+    favorite: false,
+    mastered: false,
+    locked: false,
+    preferences: {},
+    appearance: {},
+    onFavorite: async (_id, _value) => {},
+    onMaster: async (_id, _value) => {},
+    ...options,
+  };
+  let alive = true,
+    busy = false;
+  const animations = new Set();
   const card = document.createElement('article');
   card.className = 'term-card';
-  card.dataset.style = style === 'note' ? 'plain' : style;
+  card.dataset.style = 'attached';
   card.setAttribute('role', 'dialog');
-  card.setAttribute('aria-label', `${term.name}释义`);
-  const header = document.createElement('header');
-  if (semantic) {
-    const label = document.createElement('div');
-    label.className = 'term-relation';
-    label.textContent = '可能对应';
-    header.append(label);
-  }
-  const title = document.createElement('strong');
-  title.textContent = term.name;
-  const english = document.createElement('small');
-  english.textContent = term.english === term.name ? '' : term.english;
-  header.append(title, english);
-  const definition = document.createElement('p');
-  definition.textContent = term.definition;
-  const category = document.createElement('small');
-  category.textContent = (term.category || []).join(' › ');
-  header.append(category);
-  const footer = document.createElement('footer');
-  const master = document.createElement('button');
-  master.type = 'button';
-  master.innerHTML = iconSvg('eye-off');
-  master.setAttribute('aria-label', '已掌握，不再提示');
-  const error = document.createElement('div');
+  const header = document.createElement('header'),
+    name = document.createElement('strong'),
+    english = document.createElement('small');
+  header.append(name, english);
+  const definition = document.createElement('p'),
+    footer = document.createElement('footer'),
+    error = document.createElement('div');
   error.className = 'term-error';
   error.setAttribute('role', 'status');
-  master.addEventListener('click', async () => {
-    master.disabled = true;
-    try {
-      await onMaster(term.id);
-    } catch (e) {
-      error.textContent = e.message || '保存失败，请重试';
-    } finally {
-      master.disabled = false;
-    }
-  });
-  const wrap = (button, label) => {
+  const controls = {};
+  for (const action of ['favorite', 'mastered']) {
     const wrapper = document.createElement('span');
     wrapper.className = 'term-action';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.action = action;
     const tip = document.createElement('span');
     tip.className = 'term-tooltip';
-    tip.id = `term-tip-${++tooltipSequence}`;
+    tip.id = `buddy-term-tip-${++sequence}`;
     tip.setAttribute('role', 'tooltip');
-    tip.textContent = label;
     button.setAttribute('aria-describedby', tip.id);
     wrapper.append(button, tip);
-    return { wrapper, tip };
-  };
-  const saved = document.createElement('button');
-  saved.type = 'button';
-  const savedTip = wrap(saved, '收藏术语');
-  const update = () => {
-    saved.innerHTML = iconSvg(favorite ? 'star-filled' : 'star');
-    saved.setAttribute('aria-pressed', String(favorite));
-    saved.setAttribute('aria-label', favorite ? '取消收藏' : '收藏术语');
-    savedTip.tip.textContent = favorite ? '取消收藏' : '收藏术语';
-  };
-  update();
-  saved.addEventListener('click', async () => {
-    saved.disabled = true;
-    try {
-      await onFavorite(term.id, !favorite);
-      favorite = !favorite;
-      update();
-      if (!matchMedia('(prefers-reduced-motion: reduce)').matches)
-        saved.animate(
-          [{ transform: 'scale(.85)' }, { transform: 'scale(1.12)' }, { transform: 'scale(1)' }],
-          { duration: 220 },
-        );
-    } catch (e) {
-      error.textContent = e.message || '保存失败，请重试';
-    } finally {
-      saved.disabled = false;
-    }
-  });
-  footer.append(savedTip.wrapper, wrap(master, '已掌握，不再提示').wrapper);
-  try {
-    const url = new URL(term.source);
-    if (url.protocol === 'https:') {
-      const link = document.createElement('a');
-      link.href = url.href;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = '来源';
-      footer.append(link);
-    }
-  } catch {}
+    footer.append(wrapper);
+    controls[action] = { button, tip };
+    button.addEventListener('click', async () => {
+      if (busy || opts.locked) return;
+      busy = true;
+      error.textContent = '';
+      render();
+      const value = !opts[action];
+      try {
+        await (action === 'favorite' ? opts.onFavorite : opts.onMaster)(term.id, value);
+        if (!alive) return;
+        opts[action] = value;
+        render();
+        document.dispatchEvent(new Event('buddy-terminology-change'));
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          const anim = button.animate(
+            [
+              { transform: 'scale(.86)' },
+              { transform: 'scale(1.07)', offset: 0.55 },
+              { transform: 'scale(1)' },
+            ],
+            { duration: 260, easing: 'cubic-bezier(.3,.9,.3,1)' },
+          );
+          animations.add(anim);
+          anim.finished.finally(() => animations.delete(anim)).catch(() => {});
+        }
+      } catch (e) {
+        if (alive) error.textContent = e.message || '保存失败，请重试';
+      } finally {
+        busy = false;
+        if (alive) render();
+      }
+    });
+  }
   card.append(header, definition, footer, error);
-  return card;
+  const appearance = attachCardAppearance(card);
+  function render() {
+    card.setAttribute('aria-label', `${term.name}释义`);
+    name.textContent = term.name;
+    english.textContent = term.english === term.name ? '' : term.english || '';
+    definition.textContent = term.definition;
+    for (const action of ['favorite', 'mastered']) {
+      const { button, tip } = controls[action];
+      const chosen = !!opts[action],
+        label =
+          action === 'favorite'
+            ? chosen
+              ? '取消收藏'
+              : '收藏术语'
+            : chosen
+              ? '恢复提示'
+              : '已掌握，不再提示';
+      button.setAttribute('aria-label', label);
+      button.setAttribute('aria-pressed', String(chosen));
+      tip.textContent = label;
+      button.disabled = busy || opts.locked;
+      const icon = action === 'favorite' ? (chosen ? 'bookmark-filled' : 'bookmark') : 'check';
+      if (button.dataset.icon !== icon) {
+        button.innerHTML = iconSvg(icon);
+        button.dataset.icon = icon;
+      }
+    }
+  }
+  render();
+  appearance.update(opts.preferences, opts.appearance);
+  return Object.assign(card, {
+    update(nextTerm, nextOptions = {}) {
+      term = nextTerm;
+      opts = { ...opts, ...nextOptions };
+      render();
+      appearance.update(opts.preferences, opts.appearance);
+    },
+    dispose() {
+      alive = false;
+      appearance.destroy();
+      animations.forEach((a) => a.cancel());
+      animations.clear();
+    },
+  });
 }

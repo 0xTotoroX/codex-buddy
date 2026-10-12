@@ -157,7 +157,7 @@ codex-host-settings.test验证独立API、版本修订与开关不隐式启动�
 
 补齐项验证：Rust features用例覆盖模型排序持久化/过期版本/非法ID拒绝、首次接入补登记及既有关闭/旧窗口/布局保留；state.connection_tests用合成WebSocket检查超时不destroy、丢弃迟到响应、正常响应恢复、真实关闭与不兼容清理。dev-launcher新增合成进程退出/并发重开仅启动一次、身份复用和读取异常保留检查；不退出真实ChatGPT。
 
-`terminology.test.mjs` 检查合成聊天跨节点高亮、英文词边界、别名歧义、已掌握、三样式、原文/草稿不变、聊天切换取消与清理；卡片截图仅使用合成文本。Rust terminology 检查私有分文件持久化、中文导出与损坏数据保护；真实联网来源可用性另行记录，不以模拟代替。
+`terminology.test.mjs` 检查合成聊天跨节点高亮、英文词边界、别名歧义、已掌握、旧样式兼容、原文/草稿不变、聊天切换取消与清理；卡片截图仅使用合成文本。Rust terminology 检查私有分文件持久化、中文导出与损坏数据保护；真实联网来源可用性另行记录，不以模拟代替。
 
 settings-search.test检查跨隐藏分类定位/展开、草稿保持及不索引凭据；prompt-enhancement.test增加关闭即取消，以及CodexHost相邻顺序/菜单保持展开检查。settings-modes核对5项常用开关；标准fixture补齐新布尔字段。Rust设置测试确认保存/并发校验且不推进Stepwise生成版本。target/reports/optimizer-codex-host-layout.json记录旧/新复现场景的重排4→0与菜单状态。
 
@@ -178,3 +178,5 @@ settings-modes 使用实际保存响应与 data-save-state 确认队列完成，
 模型布局回归覆盖紧凑“其他模型”按钮、窄名称列的内部滚动与最后一行可操作性；edge-native 使用合成模型验收固定原生外框和按钮位置，不更改真实模型偏好。
 
 术语回归扩展：跨段与多文字节点/空白归一化，代码和草稿排除；terminology-module 检查积木选择与收藏/掌握独立性，Rust 检查聊天隔离、涉及编号累积和未知编号过滤。
+
+- `terminology-card.test.mjs`：共用贴字浮层的主题色、材质/液态回收、自定义色对比度、失败不假成功、关闭中断与减少动态效果。正文与模块用例继续覆盖真实锚点、聊天切换和收藏/掌握独立性。

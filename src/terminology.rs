@@ -34,6 +34,10 @@ pub(crate) struct Preferences {
     pub semantic: bool,
     pub auto_expand: bool,
     pub card_style: String,
+    pub card_material: Option<String>,
+    pub card_liquid_variant: String,
+    pub card_custom_color: String,
+    pub card_width: u16,
     pub mastered: BTreeSet<String>,
     pub favorites: BTreeSet<String>,
     pub revision: u64,
@@ -45,6 +49,10 @@ impl Default for Preferences {
             semantic: true,
             auto_expand: true,
             card_style: "plain".into(),
+            card_material: None,
+            card_liquid_variant: "regular".into(),
+            card_custom_color: "#33333a".into(),
+            card_width: 348,
             mastered: BTreeSet::new(),
             favorites: BTreeSet::new(),
             revision: 0,
@@ -244,6 +252,31 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
                 ensure!(["plain", "frost"].contains(&style), "未知卡片样式");
                 prefs.card_style = style.into();
             }
+            if let Some(value) = input["cardMaterial"].as_str() {
+                ensure!(
+                    ["matte", "frosted", "native-glass", "black", "custom"].contains(&value),
+                    "未知卡片材质"
+                );
+                prefs.card_material = Some(value.into());
+            }
+            if let Some(value) = input["cardLiquidVariant"].as_str() {
+                ensure!(["regular", "clear"].contains(&value), "未知液态变体");
+                prefs.card_liquid_variant = value.into();
+            }
+            if let Some(value) = input["cardCustomColor"].as_str() {
+                ensure!(
+                    value.len() == 7
+                        && value.starts_with('#')
+                        && value[1..].bytes().all(|c| c.is_ascii_hexdigit()),
+                    "自定义颜色必须为六位十六进制颜色"
+                );
+                prefs.card_custom_color = value.into();
+            }
+            if let Some(value) = input.get("cardWidth") {
+                let width = value.as_u64().context("卡片宽度必须为整数")?;
+                ensure!((280..=420).contains(&width), "卡片宽度范围为280至420");
+                prefs.card_width = width as u16;
+            }
             prefs.revision += 1;
             save(root, "terminology-settings.json", &prefs)?;
         }
@@ -386,6 +419,50 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn card_materials_preserve_old_preferences_and_reject_bad_colors() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("terminology-settings.json"),
+            r##"{"cardStyle":"frost","mastered":["TERM-1"],"favorites":["TERM-1"],"revision":3}"##,
+        )
+        .unwrap();
+        let app = App::new(
+            crate::config::Paths::new(Some(dir.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let initial = command(&app, json!({"action":"state"})).await.unwrap();
+        assert_eq!(initial["preferences"]["cardStyle"], "frost");
+        assert!(initial["preferences"]["cardMaterial"].is_null());
+        for material in ["matte", "frosted", "native-glass", "black", "custom"] {
+            let p: Preferences = read(dir.path(), "terminology-settings.json").unwrap();
+            let next=command(&app,json!({"action":"settings","revision":p.revision,"cardMaterial":material,"cardLiquidVariant":"clear","cardCustomColor":"#f0e9ff","cardWidth":360})).await.unwrap();
+            assert_eq!(next["preferences"]["cardMaterial"], material);
+            assert_eq!(next["preferences"]["favorites"], json!(["TERM-1"]));
+        }
+        let p: Preferences = read(dir.path(), "terminology-settings.json").unwrap();
+        assert!(
+            command(
+                &app,
+                json!({"action":"settings","revision":p.revision,"cardCustomColor":"url(test)"})
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            command(
+                &app,
+                json!({"action":"settings","revision":p.revision,"cardWidth":999})
+            )
+            .await
+            .is_err()
+        );
+        let saved: Preferences = read(dir.path(), "terminology-settings.json").unwrap();
+        assert_eq!(saved.revision, p.revision);
+        assert_eq!(saved.card_custom_color, "#f0e9ff");
+    }
     #[tokio::test]
     async fn commands_preserve_mastery_revision_and_failed_imports() {
         let dir = tempfile::tempdir().unwrap();
