@@ -24,6 +24,7 @@ export interface View {
   panelPreferences: AppearanceSettings;
   panelTheme: string | null;
   panelFontBase: number;
+  panelTypography?: import('../shared/typography').Typography | null;
 }
 export type { EditableSettings, Settings } from '../shared/contracts';
 export interface Failure {

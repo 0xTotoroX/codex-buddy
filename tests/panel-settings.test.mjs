@@ -81,17 +81,17 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     }, prefs);
     await page.locator('#settings-fonts summary').click();
     await page.locator('#settings-window summary').click();
-    const font = page.getByLabel('大纲字号（px）', { exact: true });
-    assert.equal(await font.inputValue(), '23.1');
-    assert.equal(await font.getAttribute('step'), '1');
+    assert.equal(await page.getByLabel('字体大小', { exact: true }).inputValue(), 'follow');
+    assert.equal(await page.getByLabel('跟随对象', { exact: true }).inputValue(), 'body');
     const width = page.getByLabel('侧栏宽度（px）', { exact: true });
     await width.fill('640');
     await width.press('Tab');
     await page.waitForFunction(() => document.querySelector('#dock-width')?.value === '640');
-    await page.getByLabel('大纲字号（px）', { exact: true }).fill('16.34');
-    await page.getByLabel('大纲字号（px）', { exact: true }).press('Tab');
+    await page.getByLabel('跟随对象', { exact: true }).selectOption('session');
+    await page.getByLabel('相对大小（%）', { exact: true }).fill('115');
+    await page.getByLabel('相对大小（%）', { exact: true }).blur();
     await page.waitForFunction(() =>
-      [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
+      [...document.querySelectorAll('fieldset')].every((f) => !f.disabled),
     );
     await page.getByLabel('内容显示', { exact: true }).selectOption('true');
     await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
@@ -104,46 +104,26 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       () => document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true',
     );
     assert.equal(prefs.ui.dockWidth, 640);
-    assert.equal(prefs.ui.fontSizes.outline, 16.3);
-    assert.equal(prefs.ui.fontOffset, 10.130000000000003);
-    assert.equal(await font.inputValue(), '16.3');
-    await font.press('ArrowUp');
-    assert.equal(await font.inputValue(), '17.3');
-    await font.press('ArrowDown');
-    assert.equal(await font.inputValue(), '16.3');
-    await font.blur();
-    await page.getByRole('button', { name: '增大大纲字号（px）', exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '17.3');
-    await page.getByRole('button', { name: '减小大纲字号（px）', exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16.3');
-    for (const [label, size] of [
-      ['下一步', 18.5],
-      ['看板', 17.2],
-      ['模型快切', 16.1],
-    ]) {
-      const input = page.getByLabel(`${label}字号（px）`, { exact: true });
-      await input.fill(String(size));
-      await input.blur();
-      await page.waitForFunction(() =>
-        [...document.querySelectorAll('fieldset')].every((f) => !f.disabled),
-      );
-    }
-    assert.deepEqual(prefs.ui.fontSizes, { outline: 16.3, next: 18.5, board: 17.2, model: 16.1 });
-    await page.getByRole('button', { name: '重置全部字号' }).click();
-    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
-    assert.deepEqual(prefs.ui.fontSizes, {
-      outline: 16,
-      next: 16,
-      board: 15,
-      model: 14,
-      terms: 14,
+    assert.deepEqual(prefs.typography, {
+      mode: 'follow',
+      source: 'session',
+      scale: 115,
+      customSize: 16,
     });
-    assert.equal(prefs.ui.fontOffset, 0);
-    await font.fill('18.9');
-    await page.getByRole('button', { name: '重置全部字号' }).click();
-    await page.waitForFunction(() => document.querySelector('#font-outline')?.value === '16');
-    assert.equal(prefs.ui.fontSizes.outline, 16);
-
+    assert.equal(prefs.ui.fontOffset, 10.130000000000003);
+    await page.getByLabel('字体大小', { exact: true }).selectOption('custom');
+    const font = page.getByLabel('自定义字号（px）', { exact: true });
+    await font.fill('18.5');
+    await font.blur();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll('fieldset')].every((f) => !f.disabled),
+    );
+    assert.equal(prefs.typography.customSize, 18.5);
+    await page.getByLabel('字体大小', { exact: true }).selectOption('follow');
+    assert.equal(await page.getByLabel('相对大小（%）', { exact: true }).inputValue(), '115');
+    await page.getByLabel('字体大小', { exact: true }).selectOption('custom');
+    assert.equal(await font.inputValue(), '18.5');
+    assert.equal(prefs.ui.fontSizes, undefined);
     assert.equal(prefs.ui.labelOnly, true);
     assert.equal(prefs.ui.promptClickMode, 'hybrid');
     assert.equal(prefs.alwaysOnTop, true);

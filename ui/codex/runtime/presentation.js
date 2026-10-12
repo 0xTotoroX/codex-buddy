@@ -457,6 +457,7 @@ function exportPanelState() {
     colors: panelAppearance().colors,
     accentColor: getComputedStyle(shellState.root).getPropertyValue('--csw-accent').trim(),
     hostTypography: shellState.hostTypography,
+    typography: window.__codexBuddyTypography?.resolved(),
     settings: runtimeState.settings,
     association,
     sourceLabel:
@@ -536,6 +537,7 @@ function panelCommand(command) {
 }
 
 async function receivePanelState(result, initial) {
+  if (result.snapshot?.typography) shellState.sharedTypography = result.snapshot.typography;
   if (result.snapshot?.hostTypography) shellState.hostTypography = result.snapshot.hostTypography;
   if (initial || result.preferences.webRevision !== preferencesRevision) {
     preferencesRevision = result.preferences.webRevision;

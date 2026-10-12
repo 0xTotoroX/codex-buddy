@@ -54,3 +54,5 @@ lifecycle 同时安装并销毁 terminology/host，复用活动聊天根、标�
 提示词优化安装透传settingsLoaded与promptEnhancementEnabled；settings-sync将工具开关按即时补丁更新，独立于工作台功能启停。
 
 术语旁路通过 context.terminologyExchange 读取最近三轮已完成问答；宿主生成新回答时仍允许核对已完成内容，换聊天继续取消旧请求。
+
+lifecycle 暴露 syncTypography 与 typography 供原 CDP 状态轮询传入统一偏好并读回不含正文的字体快照。presentation 将解析后的快照传给旧浮窗；shell.sharedTypography 仅内存保存。

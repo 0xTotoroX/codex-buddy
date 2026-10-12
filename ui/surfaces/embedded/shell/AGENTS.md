@@ -29,3 +29,5 @@ views 复用唯一原壳和 geometry 动效，只由 embedded/features 替换内
 - `face-styles.js`：从原 layout/motion 提取的唯一表情形状、关键帧与减少动态效果样式，install-styles 与独立入口 Shadow DOM 共用，旧胶囊/工作台不另维护一份。effects.eyeOffset 导出原视线计算供入口复用。
 
 顶部胶囊眼睛在侧栏和桌面工作台均隐藏，旧绑定节点保留兼容；旧桌面页面 Alt+Enter 可从现有非业务输入控件触发收回，不再要求焦点位于已隐藏的表情。独立眼睛入口的动态表情和菜单保持。
+
+panel-appearance 将全局有效字体应用到旧工作台正文和标题变量；弹出兼容模式读 presentation 的 sharedTypography。旧 fontSizes/fontOffset 仅在没有新字体协议时回退。

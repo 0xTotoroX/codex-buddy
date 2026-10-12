@@ -3,6 +3,7 @@
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { mountFeature } from '../workspace/mount';
 import { titles, type FeatureState, type Request } from '../../shared/features';
+import { typographyStyle, layoutZoom } from '../../shared/typography';
 import { surfaceStyle } from '../theme/appearance';
 import styles from './styles.css?inline';
 export function startEdge(request: Request) {
@@ -105,6 +106,15 @@ export function startEdge(request: Request) {
       const state = await request<FeatureState>({ op: 'state' }),
         wanted = new Set<string>(),
         ids: string[] = [];
+      if (state.appearance?.typographyPreferences)
+        Object.assign(
+          panel.style,
+          typographyStyle(
+            state.appearance.typography,
+            state.appearance.typographyPreferences,
+            layoutZoom(panel),
+          ),
+        );
       for (const entry of state.features) {
         for (const candidate of [
           ...(entry.open ? [{ owner: entry.owner, placement: entry.placement }] : []),
@@ -211,7 +221,12 @@ export function startEdge(request: Request) {
       colors: native.appearance?.hostTheme?.colors,
       surface: { theme: native.theme, liquidVariant: native.liquidVariant },
     };
-    Object.assign(panel.style, surfaceStyle(appearance, true));
+    Object.assign(
+      panel.style,
+      Object.fromEntries(
+        Object.entries(surfaceStyle(appearance, true)).filter(([, value]) => value !== undefined),
+      ),
+    );
     Object.assign(handle.style, surfaceStyle(appearance, true));
     visibility();
     measure();

@@ -194,7 +194,7 @@ impl App {
         let mut state = self.features.lock().await.snapshot();
         let view = self.view();
         state["legacyLayouts"] = json!({"sidebar":view.panel_preferences.ui.dock_layout,"overlay":view.panel_preferences.ui.dock_layout,"desktop":view.panel_preferences.ui.popout_layout});
-        state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"colors":view.panel_colors,"themes":self.surfaces.lock().await.preferences.themes});
+        state["appearance"] = json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"typography":view.panel_typography,"typographyPreferences":view.panel_preferences.typography,"colors":view.panel_colors,"themes":self.surfaces.lock().await.preferences.themes});
         state
     }
     pub(crate) async fn task_command(&self, command: Value) -> Result<Value> {

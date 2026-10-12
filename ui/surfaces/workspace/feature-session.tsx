@@ -1,5 +1,5 @@
 /* [INPUT]: Owner lease, business projection, request function and optional surface header slot.
- * [OUTPUT]: Business content with per-feature fonts, guarded actions and draft/reading handoff with close acknowledgement; the surface owns chrome.
+ * [OUTPUT]: Business content with shared host typography and legacy font fallback, guarded actions and draft/reading handoff with close acknowledgement; the surface owns chrome.
  * [POS]: Shared by native windows and host Shadow DOM surfaces; no host parsing.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import {
@@ -10,6 +10,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { typographyStyle, layoutZoom } from '../../shared/typography';
 import { readWorkbenchScroll, writeWorkbenchScroll } from './reading.js';
 import { FeatureContent, contentToken, type FeatureData } from '../../features/content';
 import type { PanelSnapshot } from '../../shared/contracts';
@@ -237,6 +238,13 @@ export function FeatureView({
       appearance.fontSizes ? appearance.legacyFontSize : projection?.display?.fontSize,
     ),
   });
+  const typeStyle: Partial<ReturnType<typeof typographyStyle>> = appearance.typographyPreferences
+    ? typographyStyle(
+        appearance.typography,
+        appearance.typographyPreferences,
+        layoutZoom(body.current),
+      )
+    : {};
   return (
     <section
       className="feature-view"
@@ -245,8 +253,9 @@ export function FeatureView({
       style={
         {
           ...style,
-          '--board-font-size': style.fontSize,
-          '--csw-item-font': style.fontSize,
+          ...typeStyle,
+          '--board-font-size': typeStyle.fontSize || style.fontSize,
+          '--csw-item-font': typeStyle.fontSize || style.fontSize,
           background: 'transparent',
           backdropFilter: undefined,
         } as CSSProperties

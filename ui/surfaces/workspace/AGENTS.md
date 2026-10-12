@@ -34,3 +34,5 @@
 `window-controls.js` 处理横线收回与放大/还原操作和原生状态确认；hide保留页面/租约，toggle-maximize保存普通几何，window-state回读状态。geometryTransient阻止临时几何写入持久偏好。窗口操作与置顶共用18px图形、28px按钮和工作台悬停显现规则。
 
 共享容器支持第五项 terms，通过 features/content 委托术语积木视图，继续使用同一布局/交接机制。
+
+feature-session 使用共享 typography 快照与偏好，并补偿包含 Shadow DOM 在内的祖先 CSS zoom；无新协议时保留旧 per-feature 回退。各功能正文统一字号，标题/辅助文字保留比例，固定18px图标与窗口尺寸不随字号机械放大。

@@ -10,3 +10,5 @@
 各承载形式保留独立主题选择。桌面原生材质由 AppKit 合成，网页材质留在本模块；功能内容只消费语义色，不重复绘制容器底色。
 
 [PROTOCOL]: 结构、职责或接口变化时更新本文；父级描述受影响时同步父级地图。
+
+Appearance 增加只读 typography 快照与 typographyPreferences；surfaceStyle 在支持新协议时应用共享排版，材质与语义色计算不变。

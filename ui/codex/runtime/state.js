@@ -269,6 +269,7 @@ function createShellState(preferences) {
     hostTypography: /** @type {import("../../shared/contracts").HostTypography} */ (
       preferences.hostTypography
     ),
+    sharedTypography: /** @type {import("../../shared/typography").Typography|null} */ (null),
     fontOffset: preferences.fontOffset,
     fontSizes: /** @type {import("../../shared/features").FontSizes} */ ({}),
     material: preferences.material,

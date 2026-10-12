@@ -220,6 +220,7 @@ impl Client {
         ui: Value,
         revision: u64,
         launcher_action: Value,
+        typography: Value,
     ) -> Result<Value> {
         if let Some(dev) = crate::assets::development() {
             if self.evaluate("Boolean(window.__companionFloatingPanel && !window.__companionFloatingPanel.development)".into()).await? == true {
@@ -247,7 +248,7 @@ impl Client {
             }
         }
         let expression = format!(
-            "(() => {{const p=window.__companionFloatingPanel; if (!window.__companionDesktop || !p || p.state.destroyed) return null; p.syncPanelPreferences({ui}, {revision}, {detached}, {launcher_action}); return {{desktop:p.desktopStatus(),ui:p.panelPreferences(),theme:p.state.theme,colors:p.panelAppearance().colors,fontBase:p.state.hostTypography.baseItemFontSize}};}})()"
+            "(() => {{const p=window.__companionFloatingPanel; if (!window.__companionDesktop || !p || p.state.destroyed) return null; p.syncTypography?.({typography}); p.syncPanelPreferences({ui}, {revision}, {detached}, {launcher_action}); return {{desktop:p.desktopStatus(),ui:p.panelPreferences(),theme:p.state.theme,colors:p.panelAppearance().colors,fontBase:p.state.hostTypography.baseItemFontSize,typography:p.typography?.()}};}})()"
         );
         let mut value = self.evaluate(expression.clone()).await?;
         if value.is_null() {

@@ -98,7 +98,7 @@
   max-width: 980px;
   margin: auto;
   padding: 20px 24px 28px;
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
 }
 .settings-header {
   display: flex;
@@ -121,7 +121,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 16px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.066667);
   font-weight: 550;
 }
 .settings-brand img {
@@ -130,7 +130,7 @@
   border-radius: 8px;
 }
 .settings-connection-status {
-  font-size: 12px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.8);
   color: var(--buddy-muted);
   white-space: nowrap;
 }
@@ -150,7 +150,7 @@
   background: transparent;
   color: var(--buddy-muted);
   font: inherit;
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   cursor: pointer;
 }
 .settings-mode button[aria-pressed='true'] {
@@ -201,7 +201,7 @@
 }
 .settings-title {
   margin: 0 0 24px;
-  font-size: 20px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.333333);
   line-height: 1.4;
   font-weight: 600;
 }
@@ -211,7 +211,7 @@
   min-width: 0;
 }
 .settings-section h2 {
-  font-size: 17px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.133333);
   font-weight: 600;
   margin-bottom: 20px;
 }
@@ -221,7 +221,7 @@
   padding-top: 28px;
 }
 .settings-surface-group > .settings-group-title {
-  font-size: 17px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.133333);
   font-weight: 600;
 }
 .settings-feature-switch > label {
@@ -229,7 +229,7 @@
   font-weight: 550;
 }
 .settings-section h3 {
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
   font-weight: 550;
 }
 .settings-field {
@@ -241,7 +241,7 @@
 }
 .settings-field > label {
   padding-top: 9px;
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
 }
 .settings-row {
   display: flex;
@@ -250,17 +250,17 @@
   gap: 20px;
   padding: 12px 0;
   margin-bottom: 12px;
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
 }
 .settings-hint {
   margin-top: 8px;
   color: var(--buddy-muted);
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   line-height: 1.65;
 }
 .settings-feedback {
   margin: 0 0 20px;
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -274,13 +274,13 @@
   gap: 12px;
   min-height: 40px;
   margin: 24px 0;
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   color: var(--buddy-muted);
 }
 .settings-section > summary,
 .settings-details > summary {
   cursor: pointer;
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
   font-weight: 550;
 }
 .settings-section[open] > summary,
@@ -292,7 +292,7 @@
   margin-top: 24px;
   text-align: right;
   color: var(--buddy-muted);
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
 }
 .settings-choice {
   display: flex;
@@ -378,13 +378,13 @@
 }
 .overview-identity h2,
 .overview-edge h3 {
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
   font-weight: 500;
   margin: 0 0 12px;
 }
 .overview-identity > strong {
   display: block;
-  font-size: 27px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.8);
   line-height: 1.3;
   letter-spacing: -0.025em;
   font-weight: 580;
@@ -447,7 +447,7 @@
   margin-bottom: 24px;
 }
 .overview-section-head h2 {
-  font-size: 18px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.2);
   font-weight: 600;
   margin: 0;
 }
@@ -464,12 +464,12 @@
   margin-bottom: 12px;
 }
 .overview-board-columns dd {
-  font-size: 28px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.866667);
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
 .overview-board-columns dd span {
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
   margin-left: 8px;
   color: var(--buddy-muted);
 }
@@ -479,14 +479,14 @@
   gap: 24px 40px;
 }
 .overview-model h3 {
-  font-size: 15px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1);
   font-weight: 500;
   color: var(--buddy-muted);
   margin: 0 0 12px;
 }
 .overview-model-current strong {
   display: block;
-  font-size: 22px;
+  font-size: calc(var(--buddy-type-size, 16px) * 1.466667);
   font-weight: 550;
   line-height: 1.4;
   overflow-wrap: anywhere;
@@ -520,7 +520,7 @@
     padding: 20px;
   }
   .overview-identity > strong {
-    font-size: 24px;
+    font-size: calc(var(--buddy-type-size, 16px) * 1.6);
   }
   .overview-model-content {
     grid-template-columns: minmax(0, 1fr);
@@ -614,14 +614,14 @@
   cursor: pointer;
   padding: 4px 0;
   color: var(--buddy-muted);
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
 }
 .settings-model-editor[open] > summary {
   margin-bottom: 18px;
 }
 .settings-app[data-settings-mode='simple'] .settings-section h2,
 .settings-simple-model-title {
-  font-size: 13px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.866667);
   font-weight: 550;
   color: var(--buddy-muted);
   margin: 0 0 12px;
@@ -688,7 +688,7 @@
   background: var(--buddy-subtle);
 }
 .settings-app[data-settings-mode='simple'] .settings-choice button {
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   min-width: 0;
   padding: 6px 4px;
   border: 0;
@@ -711,12 +711,12 @@
 .settings-feature-actions > summary {
   cursor: pointer;
   color: var(--buddy-muted);
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   margin-bottom: 10px;
 }
 .settings-open-action {
   font: inherit;
-  font-size: 14px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.933333);
   padding: 6px 10px;
   border: 1px solid var(--buddy-border);
   border-radius: 7px;
@@ -807,7 +807,7 @@
 }
 .settings-search small {
   color: var(--buddy-muted);
-  font-size: 12px;
+  font-size: calc(var(--buddy-type-size, 16px) * 0.8);
 }
 .settings-search-empty {
   padding: 12px;

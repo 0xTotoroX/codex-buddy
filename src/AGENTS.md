@@ -93,3 +93,5 @@ settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修�
 模型功能视图的受限 preferences 白名单允许 expandedGroups，与常用/顺序/预设一样校验 owner 和 revision；厂家及自定义分组仍只经设置服务保存，视图不能写 enabled、groups 或 modelOverrides。
 
 terminology 的 seen 文件只保存聊天身份、术语编号和分析状态；verifiedSessions 单独保留经语境确认的编号，旧字面 sessions 保留但不作为语义模式当前聊天结果；收藏与已掌握独立保存。features 增加 terms 业务分发与已有主界面缺失成员补登记，不覆盖关闭状态和布局。
+
+panel.Preferences 顶层 typography 单独持久化并验证 follow/custom、body/session/composer、75–150%及10–32px，沿用外观修订。state.panel_typography 仅保存末次有效只读样式，CDP缺失/断连不清除；server 的认证状态/SSE 和 surfaces/features 外观投影传给所有承载，不含聊天文本，不写入模型配置。

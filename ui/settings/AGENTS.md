@@ -16,7 +16,7 @@
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
 - [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
-- [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示及常用提示词/推荐指令共用的点击行为、四功能独立内容字号（步进 1px，手填保留一位小数）及全部字号重置、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
+- [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示及常用提示词/推荐指令共用的点击行为、统一字体跟随来源、相对比例及自定义字号、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
 - [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
 - [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关、分类状态与串行修订保存，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；冲突重新读取但不自动重放，失败保留编辑草稿；不持有位置或主题。
@@ -61,3 +61,5 @@ settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/
 设置搜索的 Enter 操作根据当前输入与已挂载控件即时重新匹配，避免快速输入早于异步索引时失效；输入法组合期间不提交，仍只索引标签而不读取配置值。
 
 术语设置增加打开模块与收藏筛选；移除阅读批注候选，旧 note 偏好读取为 plain。
+
+`typography-settings.tsx` 是字体唯一设置入口，复用 PanelSettings 外观 revision 保存，数字草稿跨模式/分类保留；`use-typography.ts` 通过认证 SSE 接收字体快照，更新自有文档字体和 rem 基准。设置文字层级按同一基准缩放，颜色继续跟随系统。旧分功能字号表单由统一跟随/自定义控件替换，旧值不删除。

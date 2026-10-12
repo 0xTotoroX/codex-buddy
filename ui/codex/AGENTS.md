@@ -40,3 +40,5 @@ codex-host.js通过上游版本化只读探针按输入框确认Agent；非Codex
 运行入口复用 context 的 chatRoot/findLatestAssistantMessage/findPreviousUserText 将只读问答交给独立术语模块，不增加另一套聊天身份识别。
 
 prompt-enhancement接收isEnabled只读配置；关闭时移除按钮、取消请求并清空临时备份。CodexHost存在时加入原生语音/发送的内部包装，原生按钮直属时放其后，保持上游模型/Agent/原生动作的相邻约束；无布局变化不重复搬动或写入宿主样式。
+
+typography.createTypographyTracker 通过 lifecycle 提供的当前聊天/唯一输入框取样；左侧标题选择器集中在本文件。按 body/session/composer 缓存有效快照；连续相同且间隔至少200ms才发布，切换/隐藏不回落到 body 默认样式。无可用历史时16px系统字体。

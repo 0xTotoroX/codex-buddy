@@ -87,6 +87,7 @@ export interface ChatAssociation {
   selectedSessionId: string;
 }
 export interface PanelSnapshot {
+  typography?: import('./typography').Typography | null;
   display?: { labelOnly: boolean; promptClickMode: string; fontSize?: number };
   instanceId: string;
   context: ContextSnapshot;
@@ -215,6 +216,9 @@ declare global {
         trigger?: HTMLElement;
       } | null;
     };
+    __codexBuddyTypography?: ReturnType<
+      typeof import('../codex/typography.js').createTypographyTracker
+    >;
     __codexBuddyTerminology?: {
       typography?(): {
         fontFamily: string;
@@ -251,6 +255,7 @@ declare global {
 }
 
 export interface AppearanceSettings {
+  typography?: import('./typography').TypographyPreferences;
   launcherAction?: 'inside' | 'outside' | 'settings';
   settingsTarget?: 'plugin' | 'web';
   revision: number;

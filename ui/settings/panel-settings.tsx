@@ -1,12 +1,11 @@
 /* [INPUT]: 版本化外观偏好与认证 API。
- * [OUTPUT]: 下一步的显示/点击设置，及四功能独立字号、一键重置、宽度和置顶设置。
+ * [OUTPUT]: 下一步的显示/点击设置，及全局跟随/自定义字体、宽度和置顶设置。
  * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { DOCK_MIN_WIDTH } from '../surfaces/embedded/width.js';
 import { useEffect, useState } from 'react';
 import { Icon } from '../shared/icons/react';
-import { Button } from './components/ui/button';
-import { titles, defaultFontSizes, featureFontSize, type FeatureId } from '../shared/features';
+import { TypographySettings } from './typography-settings';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { Field, Toggle, Feedback } from './settings-controls';
@@ -23,8 +22,7 @@ export function PanelSettings({
 }) {
   const [prefs, setPrefs] = useState(value),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState(''),
-    [fontReset, setFontReset] = useState(0);
+    [error, setError] = useState('');
   useEffect(() => {
     if (value)
       setPrefs((current) => (!current || value.revision >= current.revision ? value : current));
@@ -76,7 +74,7 @@ export function PanelSettings({
       <Field id={id} label={label}>
         <div className={decimal ? 'font-stepper' : undefined}>
           <Input
-            key={decimal ? `${value}-${fontReset}` : value}
+            key={decimal ? `${value}` : value}
             id={id}
             type="number"
             defaultValue={value}
@@ -171,37 +169,11 @@ export function PanelSettings({
       ) : (
         <>
           <details className="settings-section settings-surface-group" id="settings-fonts">
-            <summary className="settings-group-title">内容字号</summary>
-            <div className="settings-row settings-font-heading">
-              <Button
-                type="button"
-                variant="ghost"
-                onPointerDown={(e) => e.preventDefault()}
-                onClick={async () => {
-                  if (await update({ ui: { fontSizes: defaultFontSizes, fontOffset: 0 } }))
-                    setFontReset((n) => n + 1);
-                }}
-              >
-                重置全部字号
-              </Button>
-            </div>
-            {(Object.keys(defaultFontSizes) as FeatureId[]).map((id) => (
-              <div key={id}>
-                {number(
-                  `font-${id}`,
-                  `${titles[id]}字号（px）`,
-                  featureFontSize(
-                    id,
-                    ui.fontSizes,
-                    ui.fontOffset ? ui.fontOffset + fontBase : undefined,
-                  ),
-                  10,
-                  24,
-                  (n) => change('fontSizes', { ...ui.fontSizes, [id]: n }),
-                  true,
-                )}
-              </div>
-            ))}
+            <summary className="settings-group-title">字体</summary>
+            <TypographySettings
+              value={prefs.typography}
+              save={(typography) => update({ typography })}
+            />
           </details>
           <details className="settings-section settings-surface-group" id="settings-window">
             <summary className="settings-group-title">尺寸与窗口</summary>

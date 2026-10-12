@@ -237,8 +237,9 @@ impl App {
     pub async fn surface_appearance(&self, placement: &str) -> Value {
         let theme = self.surfaces.lock().await.theme(placement);
         let view = self.view();
-        let ui = self.appearance().await.ui;
-        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"fontSizes":ui.font_sizes,"legacyFontSize":(ui.font_offset != 0.).then_some(view.panel_font_base + ui.font_offset),"colors":view.panel_colors,"surface":theme})
+        let prefs = self.appearance().await;
+        let ui = prefs.ui;
+        json!({"theme":view.panel_theme,"fontSize":view.panel_font_base,"typography":view.panel_typography,"typographyPreferences":prefs.typography,"fontSizes":ui.font_sizes,"legacyFontSize":(ui.font_offset != 0.).then_some(view.panel_font_base + ui.font_offset),"colors":view.panel_colors,"surface":theme})
     }
     pub async fn surface_request(&self, input: Value) -> Result<Value> {
         let op = input["op"].as_str().unwrap_or("state");

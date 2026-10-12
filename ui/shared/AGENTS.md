@@ -30,3 +30,5 @@ contracts 声明术语实例 verify/refresh/destroy、受请求身份校验的 p
 EditableSettings.promptEnhancementEnabled是提示词优化独立开关，历史配置由后台默认true；不归入四功能FeatureId或布局。
 
 features.ts 增加 terms、默认14px字号与术语筛选/选择阅读状态，其他功能身份和保存协议不变。
+
+`typography.ts` 定义 TypographyPreferences/字体快照、默认值、有效祖先缩放及跨表面的字号计算；不采集 DOM 文本。跟随按宿主字号×相对比例×宿主缩放/当前容器缩放，自定义用固定逻辑像素并保留字体家族。

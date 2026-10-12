@@ -236,7 +236,7 @@ async fn state(State(service): State<Service>) -> impl IntoResponse {
 fn public_view(view: crate::state::View) -> Value {
     json!({"settingsUrl":crate::assets::settings_url(),"version":view.version,"connection":view.connection,"model":view.model,"updatedAt":view.updated_at,
         "desktop":view.desktop,"configurationRevision":view.configuration_revision,
-        "panelPreferences":view.panel_preferences,"panelTheme":view.panel_theme,"panelFontBase":view.panel_font_base})
+        "panelPreferences":view.panel_preferences,"panelTheme":view.panel_theme,"panelFontBase":view.panel_font_base,"panelTypography":view.panel_typography})
 }
 
 async fn settings(State(service): State<Service>) -> Json<Value> {

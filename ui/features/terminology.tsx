@@ -4,6 +4,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useState, useRef, useLayoutEffect } from 'react';
 import { createTermPopover } from '../terminology/popover.js';
+import { resolveTypography } from '../shared/typography';
 import { sessionTypography } from '../codex/typography.js';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import type { Appearance } from '../surfaces/theme/appearance';
@@ -77,7 +78,9 @@ export function TerminologyView({
       preferences: state.preferences,
       appearance: {
         ...(state.appearance || inheritedAppearance(module.current!)),
-        typography: sessionTypography(module.current!),
+        typography: state.appearance?.typographyPreferences
+          ? resolveTypography(state.appearance.typography, state.appearance.typographyPreferences)
+          : sessionTypography(module.current!),
       },
       locked,
       favorite: favorites.includes(term.id),
@@ -99,7 +102,7 @@ export function TerminologyView({
 
   return (
     <div className="term-module" ref={module}>
-      <style>{`.term-module{padding:12px 14px;min-width:0;color:var(--ink);font-size:14px;line-height:1.7}.term-module nav{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap}.term-module nav button{border:0;background:none;color:var(--muted);padding:4px 0;font:inherit;cursor:pointer}.term-module nav button[aria-pressed=true]{color:var(--ink);font-weight:600}.term-bricks{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}.term-brick{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);background:var(--surface);font:inherit;line-height:1.4;cursor:pointer;max-width:100%;overflow-wrap:anywhere;transition:background 120ms,transform 120ms}.term-brick:active{transform:scale(.97)}.term-brick[aria-pressed=true]{background:var(--hover);border-color:var(--muted)}.term-brick[data-mastered=true]{color:var(--muted)}.term-module .term-status{font-size:12px;color:var(--muted);margin:12px 0}.term-module button:focus-visible{outline:2px solid currentColor;outline-offset:3px}@media(prefers-reduced-motion:reduce){.term-brick{transition:none}}`}</style>
+      <style>{`.term-module{padding:12px 14px;min-width:0;color:var(--ink);font-size:inherit;line-height:inherit}.term-module nav{display:flex;gap:18px;margin-bottom:16px;flex-wrap:wrap}.term-module nav button{border:0;background:none;color:var(--muted);padding:4px 0;font:inherit;cursor:pointer}.term-module nav button[aria-pressed=true]{color:var(--ink);font-weight:600}.term-bricks{display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start}.term-brick{border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:var(--ink);background:var(--surface);font:inherit;line-height:1.4;cursor:pointer;max-width:100%;overflow-wrap:anywhere;transition:background 120ms,transform 120ms}.term-brick:active{transform:scale(.97)}.term-brick[aria-pressed=true]{background:var(--hover);border-color:var(--muted)}.term-brick[data-mastered=true]{color:var(--muted)}.term-module .term-status{font-size:.85em;color:var(--muted);margin:12px 0}.term-module button:focus-visible{outline:2px solid currentColor;outline-offset:3px}@media(prefers-reduced-motion:reduce){.term-brick{transition:none}}`}</style>
       <nav aria-label="术语范围">
         {[
           ['current', '当前聊天'],

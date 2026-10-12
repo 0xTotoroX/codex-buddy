@@ -1,5 +1,5 @@
 // [INPUT]: CDP Client、Config、Model 与胶囊状态摘要。
-// [OUTPUT]: App、View、连接与无正文胶囊状态；临时响应超时保留会话并恢复连接状态；退出信号取消模型请求，开发模式锁定启动窗口。
+// [OUTPUT]: App、View、连接与无正文胶囊状态与共享字体快照；临时响应超时保留会话并恢复连接状态；退出信号取消模型请求，开发模式锁定启动窗口。
 // [POS]: 持有独立 tasks 服务； 后台业务状态层，为 server、requests 与 panel 提供一致状态；独立维护模型控制条服务及窗口监督。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -47,6 +47,7 @@ pub struct View {
     pub panel_theme: Option<String>,
     pub panel_font_base: f64,
     pub panel_colors: Value,
+    pub panel_typography: Value,
 }
 
 #[derive(Clone)]
@@ -120,6 +121,7 @@ impl App {
             panel_theme: None,
             panel_font_base: 13.,
             panel_colors: json!({}),
+            panel_typography: Value::Null,
         });
         Arc::new(Self {
             surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
@@ -368,8 +370,9 @@ impl App {
         let client = self.desktop_client().await.context("尚未连接 Codex")?;
         let (detached, ui, revision, web_revision) = self.panel_host_state().await;
         let launcher_action = json!(self.panel.lock().await.prefs.launcher_action);
+        let typography = json!(self.panel.lock().await.prefs.typography);
         let result = client
-            .desktop_status(detached, ui, web_revision, launcher_action)
+            .desktop_status(detached, ui, web_revision, launcher_action, typography)
             .await?;
         self.observe_panel_ui(revision, result["ui"].clone())
             .await?;
@@ -377,11 +380,13 @@ impl App {
         let theme = result["theme"].as_str().map(String::from);
         let colors = result["colors"].clone();
         let font_base = result["fontBase"].as_f64().unwrap_or(13.);
+        let typography = result["typography"].clone();
         self.views.send_if_modified(|view| {
             if view.desktop == desktop
                 && view.panel_theme == theme
                 && view.panel_font_base == font_base
                 && view.panel_colors == colors
+                && (!typography.is_object() || view.panel_typography == typography)
                 && view.connection.status == "connected"
             {
                 return false;
@@ -390,6 +395,9 @@ impl App {
             view.panel_theme = theme;
             view.panel_font_base = font_base;
             view.panel_colors = colors;
+            if typography.is_object() {
+                view.panel_typography = typography;
+            }
             view.connection.status = "connected".into();
             view.connection.message = "已连接桌面 Codex".into();
             view.updated_at = now();

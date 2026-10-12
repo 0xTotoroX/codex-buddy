@@ -93,6 +93,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     );
   }
   function typography(a) {
+    if (window.__codexBuddyTypography) return window.__codexBuddyTypography.resolved();
     const source = a?.range.startContainer;
     return readTypography(
       source ? (source.nodeType === Node.ELEMENT_NODE ? source : source.parentElement) : root,

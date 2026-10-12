@@ -1,5 +1,5 @@
 // [INPUT]: App、宿主投影、窗口租约与私有 panel 偏好。
-// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸、分功能字号及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
+// [OUTPUT]: macOS 15+ arm64 弹出能力与入口校验、Panel、独立胶囊/工作台尺寸、统一字体跟随偏好、兼容分功能字号及分呈现方式的排列/比例偏好、带分栏阅读位置与新建任务草稿接续的弹出/收回/受限命令（含常用提示词填入），以及保留原实例的开发唤起目标。
 // [POS]: 后台系统浮窗管理层，窗口在来源位置原生呈现后隐藏内嵌胶囊；受租约保护的临时坐标不持久化，收回偏好按版本校验并保存。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -164,6 +164,7 @@ pub struct Position {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Preferences {
+    pub typography: TypographyPreferences,
     pub revision: u64,
     pub web_revision: u64,
     pub detached: bool,
@@ -174,11 +175,42 @@ pub struct Preferences {
     pub position: Option<Position>,
     pub ui: Ui,
 }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct TypographyPreferences {
+    pub mode: String,
+    pub source: String,
+    pub scale: f64,
+    pub custom_size: f64,
+}
+impl Default for TypographyPreferences {
+    fn default() -> Self {
+        Self {
+            mode: "follow".into(),
+            source: "body".into(),
+            scale: 100.,
+            custom_size: 16.,
+        }
+    }
+}
+impl TypographyPreferences {
+    fn validate(&self) -> Result<()> {
+        if !["follow", "custom"].contains(&self.mode.as_str())
+            || !["body", "session", "composer"].contains(&self.source.as_str())
+            || !(75. ..=150.).contains(&self.scale)
+            || !(10. ..=32.).contains(&self.custom_size)
+        {
+            bail!("字体选项无效");
+        }
+        Ok(())
+    }
+}
 impl Default for Preferences {
     fn default() -> Self {
         Self {
             revision: 0,
             web_revision: 0,
+            typography: TypographyPreferences::default(),
             detached: false,
             return_open: None,
             always_on_top: true,
@@ -721,6 +753,10 @@ impl App {
                 next.ui.split_ratio = next.ui.dock_layout.as_ref().unwrap().vertical_ratio;
             }
             next.ui.validate()?;
+        }
+        if let Some(value) = input.get("typography") {
+            next.typography = serde_json::from_value(value.clone())?;
+            next.typography.validate()?;
         }
         if let Some(value) = input.get("launcherAction") {
             let action = value.as_str().context("默认入口动作无效")?;
@@ -1323,6 +1359,53 @@ mod tests {
             prefs.ui.material = invalid.into();
             assert!(prefs.ui.validate().is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn typography_defaults_persist_and_reject_invalid_or_stale_edits() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().into())).unwrap();
+        std::fs::write(
+            paths.root.join("panel.json"),
+            r#"{"ui":{"width":510,"fontSizes":{"board":17.4}}}"#,
+        )
+        .unwrap();
+        let app = App::new(paths.clone(), crate::config::Config::default(), None, true);
+        let initial = app.appearance().await;
+        assert_eq!(initial.typography, TypographyPreferences::default());
+        let saved = app
+            .save_appearance(json!({"expectedRevision":initial.revision,
+            "typography":{"mode":"follow","source":"composer","scale":115,"customSize":18.5}}))
+            .await
+            .unwrap();
+        assert_eq!(saved.ui, initial.ui);
+        assert_eq!(Preferences::read(&paths).typography, saved.typography);
+        for invalid in [
+            json!({"mode":"other"}),
+            json!({"source":"unknown"}),
+            json!({"scale":0}),
+            json!({"customSize":100}),
+            json!({"unknown":true}),
+        ] {
+            assert!(
+                app.save_appearance(
+                    json!({"expectedRevision":saved.revision,"typography":invalid})
+                )
+                .await
+                .is_err()
+            );
+        }
+        assert!(
+            app.save_appearance(json!({"expectedRevision":initial.revision,"typography":{}}))
+                .await
+                .is_err()
+        );
+        let resized = app
+            .save_appearance(json!({"expectedRevision":saved.revision,"ui":{"width":620}}))
+            .await
+            .unwrap();
+        assert_eq!(resized.typography, saved.typography);
+        assert_eq!(resized.ui.font_sizes, initial.ui.font_sizes);
     }
 
     #[tokio::test]

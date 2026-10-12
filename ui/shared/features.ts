@@ -67,6 +67,8 @@ export type FeatureState = {
   mainWindow?: { lease: string; pid?: number | null; size: [number, number] };
   features: Entry[];
   appearance?: {
+    typography?: import('./typography').Typography | null;
+    typographyPreferences?: import('./typography').TypographyPreferences;
     theme?: string | null;
     fontSize?: number;
     colors?: Record<string, string>;

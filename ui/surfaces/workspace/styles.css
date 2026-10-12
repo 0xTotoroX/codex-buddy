@@ -77,7 +77,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.8);
   color: var(--csw-muted);
 }
 .csw-workbench-controls {
@@ -116,7 +116,7 @@
   padding: 0 10px;
 }
 .csw-workbench-pane > header strong {
-  font-size: 13px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.866667);
   font-weight: 600;
 }
 .csw-workbench .csw-body {
@@ -209,7 +209,7 @@
   color: inherit;
   text-align: left;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.8);
   cursor: pointer;
 }
 .csw-layout-options button:hover,
@@ -226,7 +226,7 @@
 }
 .csw-layout-hint {
   padding: 6px 10px;
-  font-size: 11px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.733333);
   color: var(--csw-muted);
 }
 
@@ -251,13 +251,13 @@
   background: transparent;
   color: var(--csw-muted);
   text-align: center;
-  font-size: 18px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 1.2);
   cursor: pointer;
 }
 .csw-pane-arrange option {
   background: var(--csw-surface-opaque);
   color: var(--csw-text);
-  font-size: 12px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.8);
 }
 .csw-workbench-tabs {
   display: flex;
@@ -272,7 +272,7 @@
   color: var(--csw-muted);
   padding: 5px 10px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.8);
   cursor: grab;
   touch-action: none;
 }
@@ -294,7 +294,7 @@
   border-radius: 10px;
   background: color-mix(in srgb, var(--csw-accent) 14%, transparent);
   color: var(--csw-text);
-  font-size: 12px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.8);
 }
 .csw-workbench[data-arranging='true'] {
   user-select: none;
@@ -341,7 +341,7 @@
 .csw-association-hint {
   padding: 6px 10px;
   color: var(--csw-muted);
-  font-size: 11px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.733333);
 }
 .csw-association-hint:empty {
   display: none;
@@ -391,7 +391,7 @@
 .csw-menu-label {
   padding: 8px 10px 4px;
   color: var(--csw-muted);
-  font-size: 11px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.733333);
 }
 .csw-layout-options {
   max-height: min(70vh, var(--csw-menu-max-height, 540px));
@@ -484,7 +484,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 0.733333);
   white-space: nowrap;
   color: var(--csw-muted);
 }
@@ -534,7 +534,7 @@
   min-height: 36px;
 }
 .csw-feature-panes .csw-workbench-tabs button {
-  font-size: 15px;
+  font-size: calc(var(--csw-chrome-font, 16px) * 1);
   touch-action: none;
 }
 .csw-feature-panes .csw-feature-content {

@@ -1,11 +1,14 @@
 /* [INPUT]: Per-surface material and host appearance. [OUTPUT]: Shared colors and material styles.
  * [POS]: Presentation only; used by feature views and container tabs. [PROTOCOL]: Keep AGENTS.md in sync. */
+import { typographyStyle, layoutZoom } from '../../shared/typography';
 import type { CSSProperties } from 'react';
 export type SurfaceTheme = {
   theme: 'black' | 'matte' | 'frosted' | 'native-glass';
   liquidVariant: 'regular' | 'clear';
 };
 export type Appearance = {
+  typography?: import('../../shared/typography').Typography | null;
+  typographyPreferences?: import('../../shared/typography').TypographyPreferences;
   theme?: string | null;
   fontSize?: number;
   fontSizes?: import('../../shared/features').FontSizes;
@@ -36,7 +39,15 @@ export function surfaceStyle(appearance: Appearance, native = false): CSSPropert
     material === 'frosted'
       ? `color-mix(in srgb, ${dark ? '#252525' : '#ededed'} 72%, transparent)`
       : 'transparent';
+  const typography: Partial<ReturnType<typeof typographyStyle>> = appearance.typographyPreferences
+    ? typographyStyle(
+        appearance.typography,
+        appearance.typographyPreferences,
+        layoutZoom(document.documentElement),
+      )
+    : {};
   return {
+    '--csw-chrome-font': typography.fontSize,
     colorScheme: dark ? 'dark' : 'light',
     color: ink,
     background: translucent ? (native ? 'transparent' : tint) : paper,
@@ -51,5 +62,6 @@ export function surfaceStyle(appearance: Appearance, native = false): CSSPropert
     '--hover': colors.hover || `color-mix(in srgb, ${ink} 6%, transparent)`,
     '--line': colors.divider || `color-mix(in srgb, ${ink} 9%, transparent)`,
     fontSize: appearance.fontSize ? `${appearance.fontSize}px` : undefined,
+    ...typography,
   } as CSSProperties;
 }

@@ -1,5 +1,6 @@
 import { bridgeCall } from './state.js';
 import { installPromptEnhancer } from '../prompt-enhancement.js';
+import { createTypographyTracker } from '../typography.js';
 import { installTerminology } from '../../terminology/host.js';
 /*
  * [INPUT]: 宿主上下文、独立功能、设置协调、外壳与通知。
@@ -648,6 +649,11 @@ function install() {
     ),
   ];
   runtimeState.signalCleanup = () => stopSignals.forEach((stop) => stop());
+  if (!IS_POPOUT)
+    window.__codexBuddyTypography = createTypographyTracker(
+      chatRoot,
+      () => window.__codexBuddyModelControl?.inputTarget()?.composer,
+    );
   window[API_KEY] = {
     version: SCRIPT_VERSION,
     instanceId: INSTANCE_ID,
@@ -670,6 +676,12 @@ function install() {
     panelPreferences,
     exportPanelState,
     panelAppearance,
+    syncTypography: (value) => window.__codexBuddyTypography?.configure(value),
+    typography: () => {
+      const value = window.__codexBuddyTypography?.snapshot();
+      syncTheme();
+      return value;
+    },
     panelReadingState,
     panelWindowAnchor,
     blinkHandoff,

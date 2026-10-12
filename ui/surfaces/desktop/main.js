@@ -2,6 +2,7 @@
  * [OUTPUT]: Existing desktop chrome/material and spatial enter/return transitions.
  * [POS]: Desktop surface adapter; feature content and actions stay in features/content.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
+import { typographyStyle, layoutZoom } from '../../shared/typography';
 import { mountFeature } from '../workspace/mount';
 import { installFeatureLayout } from '../workspace/layout';
 import { installStyle } from '../embedded/shell/install-styles.js';
@@ -180,6 +181,12 @@ export function startDesktop(request, lease) {
     button.setAttribute('aria-label', value ? '取消窗口置顶' : '窗口置顶');
   });
   function appearance(value) {
+    if (value.typographyPreferences) {
+      const font = typographyStyle(value.typography, value.typographyPreferences, layoutZoom(root));
+      Object.assign(root.style, font);
+      root.style.setProperty('--csw-font-family', font.fontFamily);
+      root.style.setProperty('--csw-chrome-font', font.fontSize);
+    }
     const theme = value.surface?.theme || 'matte';
     const black = theme === 'black';
     const popover = root.querySelector('.csw-popover');

@@ -5,6 +5,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
+import { layoutZoom } from '../../../shared/typography';
 import { featureFontSize } from '../../../shared/features';
 import { iconSvg } from '../../../shared/icons/index.js';
 import {
@@ -141,6 +142,18 @@ function setPixelVariable(element, property, value) {
 
 function applyTypographyVariables() {
   if (!shellState.root) return;
+  const shared = window.__codexBuddyTypography?.resolved() || shellState.sharedTypography;
+  if (shared) {
+    const size = (shared.fontSize * shared.zoom) / layoutZoom(shellState.root);
+    shellState.root.style.setProperty('--csw-font-family', shared.fontFamily);
+    shellState.root.style.fontFamily = shared.fontFamily;
+    shellState.root.style.setProperty('--csw-font-weight', shared.fontWeight);
+    shellState.root.style.setProperty('--csw-label-weight', shared.titleWeight);
+    for (const key of ['item', 'outline', 'next', 'chrome'])
+      setPixelVariable(shellState.root, `--csw-${key}-font`, size);
+    setPixelVariable(shellState.root, '--csw-icon-font', shellState.hostTypography.iconFontSize);
+    return;
+  }
   shellState.root.style.setProperty('--csw-font-family', shellState.hostTypography.fontFamily);
   shellState.root.style.setProperty(
     '--csw-font-weight',

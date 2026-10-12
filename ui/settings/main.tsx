@@ -1,7 +1,8 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 按职责组织的设置内容，保留自动保存与错误反馈。
+ * [OUTPUT]: 按职责组织的设置内容与共享字体，保留自动保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
+import { useTypography } from './use-typography';
 import { StrictMode, useEffect, useState } from 'react';
 import { TerminologySettings } from './terminology-settings';
 import { createRoot } from 'react-dom/client';
@@ -71,6 +72,7 @@ function editable(value: Settings): EditableSettings {
 
 function App() {
   const { view, live, error } = useCompanion();
+  useTypography(view?.panelTypography, view?.panelPreferences.typography);
   const [notice, setNotice] = useState({ text: '', failed: false });
   const notify = (text: string, failed = false) => setNotice({ text, failed });
   const editor = useSettingsForm(live, view?.configurationRevision, editable, notify);
