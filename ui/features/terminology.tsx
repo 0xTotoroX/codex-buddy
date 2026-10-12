@@ -4,6 +4,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useState, useRef, useLayoutEffect } from 'react';
 import { createTermPopover } from '../terminology/popover.js';
+import { sessionTypography } from '../codex/typography.js';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import type { Appearance } from '../surfaces/theme/appearance';
 import type { Reading } from '../shared/features';
@@ -74,7 +75,10 @@ export function TerminologyView({
     };
     const options = {
       preferences: state.preferences,
-      appearance: state.appearance || inheritedAppearance(module.current!),
+      appearance: {
+        ...(state.appearance || inheritedAppearance(module.current!)),
+        typography: sessionTypography(module.current!),
+      },
       locked,
       favorite: favorites.includes(term.id),
       mastered: mastered.includes(term.id),

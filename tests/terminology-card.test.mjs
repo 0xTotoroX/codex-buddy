@@ -10,7 +10,7 @@ const script = (
   await build({
     stdin: {
       resolveDir: process.cwd(),
-      contents: `import{createTermPopover}from'./ui/terminology/popover.js';window.fail=false;window.term={id:'one',name:'防抖',english:'Debouncing',definition:'连续触发时重新计时，等待输入停止后再执行。'};window.options={preferences:{cardMaterial:'matte'},appearance:{theme:'light',colors:{text:'#252525',accent:'#8745bf','surface-opaque':'#faf7ff',muted:'#665e71',divider:'#dfdae6'}},onFavorite:async()=>{if(window.fail)throw Error('模拟保存失败');},onMaster:async()=>{}};window.peer=createTermPopover();window.popup=createTermPopover();window.show=()=>window.popup.show(window.term,()=>document.getElementById('anchor').getBoundingClientRect(),window.options);window.show();`,
+      contents: `import{createTermPopover}from'./ui/terminology/popover.js';window.fail=false;window.term={id:'one',name:'防抖',english:'Debouncing',category:['程序基础','并发'],definition:'连续触发时重新计时，等待输入停止后再执行。'};window.options={preferences:{cardMaterial:'matte'},appearance:{theme:'light',colors:{text:'#252525',accent:'#8745bf','surface-opaque':'#faf7ff',muted:'#665e71',divider:'#dfdae6'}},onFavorite:async()=>{if(window.fail)throw Error('模拟保存失败');},onMaster:async()=>{}};window.peer=createTermPopover();window.popup=createTermPopover();window.show=()=>window.popup.show(window.term,()=>document.getElementById('anchor').getBoundingClientRect(),window.options);window.show();`,
     },
     bundle: true,
     write: false,
@@ -41,7 +41,16 @@ test('attached card preserves content, colors, transitions, errors and glass lif
     }));
     assert.equal(details.accent, '#8745bf');
     assert.equal(details.layout, true);
-    assert.ok(!details.text.includes('分类'));
+    assert.equal(await page.locator('.term-category').textContent(), '程序基础 › 并发');
+    assert.ok(
+      await page
+        .locator('.term-card')
+        .evaluate(
+          (c) =>
+            parseFloat(getComputedStyle(c.querySelector('.term-category')).fontSize) <
+            parseFloat(getComputedStyle(c.querySelector('p')).fontSize),
+        ),
+    );
     await page.evaluate(() => (window.fail = true));
     await page.getByRole('button', { name: '收藏术语', exact: true }).click();
     await page.getByText('模拟保存失败').waitFor();

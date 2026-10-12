@@ -12,7 +12,7 @@ test('terminology bricks preserve independent favorite and mastery states', asyn
       stdin: {
         resolveDir: process.cwd(),
         loader: 'tsx',
-        contents: `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{TerminologyView}from'./ui/features/terminology';const reading={};function App(){const[state,set]=useState({entries:[{id:'a',name:'防抖',english:'Debouncing',definition:'输入停止后执行',category:[]},{id:'b',name:'竞态条件',english:'Race Condition',definition:'结果依赖顺序',category:[]}],preferences:{favorites:[],mastered:[]},involved:['a'],context:'one',phase:'ready',message:''});return <TerminologyView state={state} reading={reading} locked={false} action={async({action,id})=>{set(s=>({...s,preferences:{favorites:action==='favorite'?[id]:action==='unfavorite'?[]:s.preferences.favorites,mastered:action==='master'?[id]:action==='restore'?[]:s.preferences.mastered}}));}}/>;}createRoot(document.getElementById('root')).render(<App/>);`,
+        contents: `import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{TerminologyView}from'./ui/features/terminology';window.__codexBuddyTerminology={typography:()=>({fontFamily:'Arial',fontSize:16,fontWeight:'430',lineHeight:26,zoom:1.3})};const reading={};function App(){const[state,set]=useState({entries:[{id:'a',name:'防抖',english:'Debouncing',definition:'输入停止后执行',category:[]},{id:'b',name:'竞态条件',english:'Race Condition',definition:'结果依赖顺序',category:[]}],preferences:{favorites:[],mastered:[]},involved:['a'],context:'one',phase:'ready',message:''});return <TerminologyView state={state} reading={reading} locked={false} action={async({action,id})=>{set(s=>({...s,preferences:{favorites:action==='favorite'?[id]:action==='unfavorite'?[]:s.preferences.favorites,mastered:action==='master'?[id]:action==='restore'?[]:s.preferences.mastered}}));}}/>;}createRoot(document.getElementById('root')).render(<App/>);`,
       },
       bundle: true,
       write: false,
@@ -26,6 +26,14 @@ test('terminology bricks preserve independent favorite and mastery states', asyn
     await page.addScriptTag({ content: js });
     await page.getByRole('button', { name: '防抖', exact: true }).click();
     assert.equal(await page.getByText('输入停止后执行').count(), 1);
+    assert.deepEqual(
+      await page.locator('.term-card').evaluate((c) => ({
+        zoom: getComputedStyle(c).zoom,
+        font: getComputedStyle(c.querySelector('p')).fontFamily,
+        size: getComputedStyle(c.querySelector('p')).fontSize,
+      })),
+      { zoom: '1.3', font: 'Arial', size: '16px' },
+    );
     await page.getByRole('button', { name: '收藏术语', exact: true }).click();
     await page.getByRole('button', { name: '已掌握，不再提示', exact: true }).click();
     await page.getByRole('button', { name: '收藏', exact: true }).click();

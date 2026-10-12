@@ -2,6 +2,7 @@
  * [OUTPUT]: 细下划线、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { readTypography } from '../codex/typography.js';
 import { textIndex, semanticSpans } from './text-ranges.js';
 import { createMatcher } from './matcher.js';
 import { createTermPopover } from './popover.js';
@@ -50,11 +51,15 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   highlightStyle.dataset.buddyTerms = 'true';
   document.head.append(highlightStyle);
   function appearance() {
-    return window.__companionFloatingPanel?.panelAppearance?.() || inheritedAppearance();
+    const panel =
+      /** @type {{ __companionFloatingPanel?: { panelAppearance?: () => import('../surfaces/theme/appearance').Appearance } }} */ (
+        window
+      );
+    return panel.__companionFloatingPanel?.panelAppearance?.() || inheritedAppearance();
   }
   function updateTheme() {
     const theme = appearance(),
-      key = JSON.stringify(theme);
+      key = JSON.stringify([theme, active && typography(active)]);
     if (key === appearanceKey) return;
     appearanceKey = key;
     const supplied = theme.colors?.accent;
@@ -87,13 +92,16 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       a.range.toString() === a.text
     );
   }
+  function typography(a) {
+    const source = a?.range.startContainer;
+    return readTypography(
+      source ? (source.nodeType === Node.ELEMENT_NODE ? source : source.parentElement) : root,
+    );
+  }
   function cardOptions(a) {
-    const source = a.range.startContainer;
-    const element = source.nodeType === Node.ELEMENT_NODE ? source : source.parentElement;
-    const fontSize = element ? Number.parseFloat(getComputedStyle(element).fontSize) : undefined;
     return {
       preferences: state.preferences,
-      appearance: { ...appearance(), fontSize },
+      appearance: { ...appearance(), typography: typography(a) },
       favorite: state.preferences.favorites?.includes(a.term.id),
       mastered: state.preferences.mastered.includes(a.term.id),
       onFavorite: async (id, value) => {
@@ -394,6 +402,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   const apiObject = {
     lastError: '',
     contextKey,
+    typography: () => (root?.isConnected ? typography() : null),
     verify: (id) => alive && pending === id && identity()?.key === lastAnalysis,
     refresh,
     destroy() {

@@ -2,6 +2,7 @@
  * [OUTPUT]: 两个入口共用的配色、背景与液态资源清理。
  * [POS]: 不修改宿主主题，不复制液态光学实现。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { layoutZoom } from '../codex/typography.js';
 import { surfaceStyle } from '../surfaces/theme/appearance';
 import { createSvgGlass } from '../surfaces/theme/glass/svg.js';
 export function inheritedAppearance(element = document.documentElement) {
@@ -81,7 +82,21 @@ export function attachCardAppearance(card) {
         danger: appearance.colors?.danger || '#bf4d4d',
       }))
         if (value) card.style.setProperty('--term-' + name, value);
-      const fontSize = Number(appearance.fontSize);
+      const typography = appearance.typography || {};
+      const fontSize = Number(typography.fontSize || appearance.fontSize);
+      for (const [key, value] of Object.entries({
+        'font-family': typography.fontFamily || 'system-ui,-apple-system,sans-serif',
+        'font-weight': typography.fontWeight || '400',
+        'line-height': typography.lineHeight ? `${typography.lineHeight}px` : '1.6',
+        'letter-spacing': typography.letterSpacing || 'normal',
+        'title-family': typography.titleFamily || typography.fontFamily || 'inherit',
+        'title-size': typography.titleSize ? `${typography.titleSize}px` : '1em',
+        'title-weight': typography.titleWeight || '600',
+      }))
+        card.style.setProperty('--term-' + key, value);
+      const zoom = (typography.zoom || 1) / layoutZoom(document.documentElement);
+      card.style.zoom = String(zoom);
+      card.dataset.scale = String(zoom);
       card.style.setProperty(
         '--term-font-size',
         `${Number.isFinite(fontSize) && fontSize > 0 ? fontSize : 16}px`,

@@ -2,6 +2,7 @@
  * [OUTPUT]: 可中断开合、视口定位、键盘关闭及资源回收。
  * [POS]: 正文与侧栏共用浮层；不拥有词库业务状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { layoutZoom } from '../codex/typography.js';
 import { cardStyles, createCard } from './card.js';
 export function createTermPopover({
   onEnter = () => {},
@@ -38,11 +39,15 @@ export function createTermPopover({
       hide(true);
       return;
     }
-    const c = { width: card.offsetWidth, height: card.offsetHeight },
+    const parentZoom = layoutZoom(box),
+      scale = parentZoom * (Number(card.dataset.scale) || 1);
+    card.style.maxWidth = `${Math.max(1, innerWidth - 20) / scale}px`;
+    card.style.maxHeight = `${Math.max(1, innerHeight - 24) / scale}px`;
+    const c = { width: box.offsetWidth * parentZoom, height: box.offsetHeight * parentZoom },
       m = 10;
     const above = r.bottom + c.height + 8 > innerHeight - m && r.top > c.height + 8;
-    box.style.left = `${Math.max(m, Math.min(r.left, innerWidth - c.width - m))}px`;
-    box.style.top = `${Math.max(m, Math.min(above ? r.top - c.height - 8 : r.bottom + 8, innerHeight - c.height - m))}px`;
+    box.style.left = `${Math.max(m, Math.min(r.left, innerWidth - c.width - m)) / parentZoom}px`;
+    box.style.top = `${Math.max(m, Math.min(above ? r.top - c.height - 8 : r.bottom + 8, innerHeight - c.height - m)) / parentZoom}px`;
     box.style.transformOrigin = above ? 'left bottom' : 'left top';
   }
   function release() {

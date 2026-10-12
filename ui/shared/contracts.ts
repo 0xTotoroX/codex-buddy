@@ -216,6 +216,17 @@ declare global {
       } | null;
     };
     __codexBuddyTerminology?: {
+      typography?(): {
+        fontFamily: string;
+        fontSize: number;
+        fontWeight: string;
+        lineHeight: number;
+        letterSpacing: string;
+        titleFamily: string;
+        titleSize: number;
+        titleWeight: string;
+        zoom: number;
+      } | null;
       verify(requestId: string): boolean;
       refresh(): Promise<void>;
       destroy(): void;

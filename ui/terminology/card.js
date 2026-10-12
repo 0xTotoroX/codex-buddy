@@ -1,12 +1,12 @@
 /* [INPUT]: 术语、主题/材质偏好、收藏与掌握动作。
  * [OUTPUT]: 已定稿贴字浮层的唯一卡片，两个入口和设置预览共用。
- * [POS]: 只呈现名称与释义；静态共享图标，不插入不受信任 HTML。
+ * [POS]: 呈现名称、释义与分类路径；静态共享图标，不插入不受信任 HTML。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { iconSvg } from '../shared/icons/index.js';
 import { attachCardAppearance } from './appearance.js';
 export const cardStyles = `
-.term-card{box-sizing:border-box;width:348px;max-width:100%;padding:13px 14px 10px;border:0;border-radius:14px;color:var(--term-fg,#202020);background:var(--term-bg,#fafafa);box-shadow:0 0 0 .5px var(--term-border,#dedee3),0 1px 2px #0000000d,0 16px 36px -14px #0000004d;font:var(--term-font-size,16px)/1.6 system-ui,-apple-system,sans-serif;overflow-wrap:anywhere;text-align:left;position:relative}
-.term-card header{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;min-width:0}.term-card strong{font-size:1em;line-height:1.6;font-weight:600;letter-spacing:.012em}.term-card small{font-size:1em;line-height:1.6;font-weight:500;letter-spacing:.035em;color:var(--term-muted,#72727b)}.term-card p{margin:1.6em 0 0;font-size:1em;line-height:1.6;text-indent:2em}.term-card footer{display:flex;justify-content:flex-end;gap:2px;margin-top:8px}
+.term-card{box-sizing:border-box;width:348px;max-width:100%;padding:13px 14px 10px;border:0;border-radius:14px;color:var(--term-fg,#202020);background:var(--term-bg,#fafafa);box-shadow:0 0 0 .5px var(--term-border,#dedee3),0 1px 2px #0000000d,0 16px 36px -14px #0000004d;font:var(--term-font-weight,400) var(--term-font-size,16px)/var(--term-line-height,1.6) var(--term-font-family,system-ui,-apple-system,sans-serif);letter-spacing:var(--term-letter-spacing,normal);overflow-wrap:anywhere;text-align:left;position:relative}
+.term-card header{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;min-width:0}.term-card strong{font-family:var(--term-title-family,inherit);font-size:var(--term-title-size,1em);line-height:inherit;font-weight:var(--term-title-weight,600);letter-spacing:inherit}.term-card small{font-family:var(--term-title-family,inherit);font-size:var(--term-title-size,1em);line-height:inherit;font-weight:var(--term-font-weight,400);letter-spacing:inherit;color:var(--term-muted,#72727b)}.term-card p{margin:6px 0 0;font-size:1em;line-height:inherit;text-indent:2em}.term-card footer{display:flex;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;gap:8px 12px;margin-top:16px}.term-category{flex:1 1 160px;min-width:0;align-self:center;color:var(--term-muted);font-size:.875em;line-height:1.5}.term-actions{display:flex;gap:2px;margin-left:auto}
 .term-action{position:relative;display:inline-flex}.term-action button{display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--term-muted,#72727b);cursor:pointer;transition:color 150ms,background-color 150ms,transform 120ms}.term-action button svg{width:18px;height:18px}.term-action button:hover{color:var(--term-fg,#202020);background:var(--term-hover,#0000000d)}.term-action button[aria-pressed=true]{color:var(--term-accent,currentColor);background:color-mix(in srgb,var(--term-accent,currentColor) 12%,transparent)}.term-action button:active{transform:scale(.94)}.term-action button:focus-visible{outline:2px solid var(--term-accent,currentColor);outline-offset:2px}.term-action button:disabled{opacity:.5;cursor:wait}.term-tooltip{position:absolute;bottom:calc(100% + 8px);right:0;padding:5px 8px;border-radius:6px;white-space:nowrap;max-width:260px;font:12px/1.5 system-ui;background:var(--term-fg,#202020);color:var(--term-bg,#fafafa);visibility:hidden;opacity:0;pointer-events:none;z-index:3}.term-action:hover .term-tooltip,.term-action:focus-within .term-tooltip{visibility:visible;opacity:1}.term-error{color:var(--term-danger,#bf4d4d);font-size:12px;margin-top:8px}.term-error:empty{display:none}
 .term-card[data-material=native-glass]{box-shadow:inset 0 1px 0 #ffffff25,inset 0 0 0 .5px #ffffff18,0 16px 36px -14px #0000004d}
 @media(pointer:coarse){.term-action button{width:44px;height:44px}}
@@ -37,7 +37,13 @@ export function createCard(term, options = {}) {
   header.append(name, english);
   const definition = document.createElement('p'),
     footer = document.createElement('footer'),
+    category = document.createElement('div'),
+    actions = document.createElement('div'),
     error = document.createElement('div');
+  category.className = 'term-category';
+  category.setAttribute('aria-label', '分类路径');
+  actions.className = 'term-actions';
+  footer.append(category, actions);
   error.className = 'term-error';
   error.setAttribute('role', 'status');
   const controls = {};
@@ -53,7 +59,7 @@ export function createCard(term, options = {}) {
     tip.setAttribute('role', 'tooltip');
     button.setAttribute('aria-describedby', tip.id);
     wrapper.append(button, tip);
-    footer.append(wrapper);
+    actions.append(wrapper);
     controls[action] = { button, tip };
     button.addEventListener('click', async () => {
       if (busy || opts.locked) return;
@@ -94,6 +100,11 @@ export function createCard(term, options = {}) {
     name.textContent = term.name;
     english.textContent = term.english === term.name ? '' : term.english || '';
     definition.textContent = term.definition;
+    const path = Array.isArray(term.category)
+      ? term.category.filter((part) => typeof part === 'string' && part.trim())
+      : [];
+    category.textContent = path.join(' › ');
+    category.hidden = !path.length;
     for (const action of ['favorite', 'mastered']) {
       const { button, tip } = controls[action];
       const chosen = !!opts[action],

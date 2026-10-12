@@ -240,8 +240,8 @@ test('long phrase popover follows hover point, clamps to viewport and stays stil
       title: '24px',
       text: '24px',
       indent: '48px',
-      gap: '38.4px',
-      line: '38.4px',
+      gap: '6px',
+      line: '43.2px',
     });
     const next = x - 130;
     await page.mouse.move(next, line.y);
@@ -263,6 +263,43 @@ test('long phrase popover follows hover point, clamps to viewport and stays stil
     await page.waitForTimeout(270);
     const bounded = await card.boundingBox();
     assert.ok(bounded.x >= 10 && bounded.x + bounded.width <= 771);
+    for (const zoom of [1.3, 1.75, 1]) {
+      await page.evaluate((zoom) => {
+        const main = document.querySelector('main');
+        main.style.zoom = zoom;
+        main.style.fontFamily = 'Arial';
+        main.style.fontWeight = '430';
+        document.documentElement.style.setProperty('--font-ui-family', 'monospace');
+        document.documentElement.style.setProperty('--text-base', '24px');
+      }, zoom);
+      await page.waitForTimeout(1100);
+      const styles = await card.evaluate((c) => {
+        const body = getComputedStyle(c.querySelector('p')),
+          title = getComputedStyle(c.querySelector('strong'));
+        const rect = c.getBoundingClientRect();
+        return {
+          zoom: Number(getComputedStyle(c).zoom),
+          font: body.fontFamily,
+          weight: body.fontWeight,
+          title: title.fontFamily,
+          size: body.fontSize,
+          indent: body.textIndent,
+          gap: body.marginTop,
+          line: body.lineHeight,
+          right: rect.right,
+          bottom: rect.bottom,
+        };
+      });
+      assert.equal(styles.zoom, zoom);
+      assert.equal(styles.font, 'Arial');
+      assert.equal(styles.title, 'monospace');
+      assert.equal(styles.weight, '430');
+      assert.equal(styles.size, '24px');
+      assert.equal(styles.indent, '48px');
+      assert.equal(styles.gap, '6px');
+      assert.ok(styles.right <= 771 && styles.bottom <= 691, JSON.stringify(styles));
+    }
+
     await page.evaluate(() => window.__codexBuddyTerminology.destroy());
   } finally {
     await browser.close();
