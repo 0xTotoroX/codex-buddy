@@ -1,7 +1,8 @@
-/* [INPUT]: 已确认的聊天根节点；排除编辑器、代码及自有界面。
- * [OUTPUT]: 规范化正文与原始文字节点的双向位置映射，可定位跨节点/跨段句段。
+/* [INPUT]: 已确认的聊天根节点、语义原句与对应词条；复用 matcher 的名称/别名和英文边界。
+ * [OUTPUT]: 规范化正文与原始文字节点的双向位置映射；原句内优先定位术语，没有名称时保留语义句段。
  * [POS]: 只读 DOM 定位，不改宿主正文、行距或选择区。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { createMatcher } from './matcher.js';
 export const normalizeQuote = (text) =>
   String(text || '')
     .replace(/[\s\u200b]+/gu, ' ')
@@ -62,16 +63,35 @@ export function textIndex(root) {
     },
   };
 }
-export function semanticSpans(text, quote) {
+export function semanticSpans(text, quote, term = null) {
   const needle = normalizeQuote(quote);
   if (!needle) return [];
+  // 原句用于限定已核对的语境，术语本身才是标注和悬停的范围。
+  const names = term
+    ? createMatcher(
+        [
+          {
+            ...term,
+            name: normalizeQuote(term.name),
+            english: normalizeQuote(term.english),
+            aliases: (term.aliases || []).map(normalizeQuote),
+          },
+        ],
+        [],
+        { contextVerified: true },
+      )(text)
+    : [];
   const ranges = [];
   let cursor = 0;
   while (cursor < text.length) {
     const start = text.indexOf(needle, cursor);
     if (start < 0) break;
-    ranges.push({ start, end: start + needle.length });
-    cursor = start + needle.length;
+    const end = start + needle.length;
+    const words = names.filter((word) => word.start >= start && word.end <= end);
+    ranges.push(
+      ...(words.length ? words.map(({ start, end }) => ({ start, end })) : [{ start, end }]),
+    );
+    cursor = end;
   }
   return ranges;
 }

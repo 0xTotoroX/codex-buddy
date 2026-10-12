@@ -1,4 +1,4 @@
-/* [INPUT]: 已验证词条、中文/英文名称、别名与已掌握编号。
+/* [INPUT]: 已验证词条、中文/英文名称、别名、已掌握编号与语境确认标记。
  * [OUTPUT]: 不重叠的字面匹配位置；不修改正文或执行外部内容。
  * [POS]: 术语检索纯逻辑，宿主与样式预览共用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -50,14 +50,15 @@ const ordinary = new Set([
   'label',
   'form',
 ]);
-export function createMatcher(entries, mastered = []) {
+export function createMatcher(entries, mastered = [], { contextVerified = false } = {}) {
   const ignored = new Set(mastered);
   const aliases = new Map();
   for (const term of entries) {
     if (ignored.has(term.id)) continue;
     for (const label of [term.name, term.english, ...(term.aliases || [])]) {
       const value = label?.trim();
-      if (!value || value.length < 2 || ordinary.has(value.toLowerCase())) continue;
+      if (!value || value.length < 2 || (!contextVerified && ordinary.has(value.toLowerCase())))
+        continue;
       const key = value.toLowerCase();
       // 别名歧义不猜测；规范名称在后续语义确认时仍可解析。
       if (aliases.has(key) && aliases.get(key)?.id !== term.id) aliases.set(key, null);

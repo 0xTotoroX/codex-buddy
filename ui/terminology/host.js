@@ -1,5 +1,5 @@
 /* [INPUT]: Buddy 已识别的聊天根节点、一问一答与受限后台请求。
- * [OUTPUT]: 细下划线、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
+ * [OUTPUT]: 术语优先的细下划线、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { readTypography } from '../codex/typography.js';
@@ -196,7 +196,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     for (const hint of confirmed) {
       const term = terms.get(hint.id);
       if (!term) continue;
-      for (const span of semanticSpans(index.text, hint.quote)) {
+      for (const span of semanticSpans(index.text, hint.quote, term)) {
         if (!hits.some((h) => h.start < span.end && h.end > span.start))
           hits.push({ ...span, term, semantic: true });
       }
