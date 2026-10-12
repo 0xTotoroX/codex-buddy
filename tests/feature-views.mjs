@@ -328,7 +328,7 @@ try {
     if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
     await view.getByRole('dialog', { name: '所有模型' }).waitFor();
   };
-  const closeOthers = () => view.getByRole('button', { name: '关闭所有模型' }).click();
+  const closeOthers = () => picker().click();
   const expandedBefore = structuredClone(model.preferences.expandedGroups);
   await picker().waitFor();
   assert.equal(await picker().innerText(), '所有');
@@ -397,13 +397,13 @@ try {
   );
   await tile('a').click();
   await view.locator('[data-model-tile="a"][aria-pressed="true"]').waitFor();
-  const refresh = view.getByRole('button', { name: '刷新可用模型', exact: true });
-  const close = view.getByRole('button', { name: '关闭所有模型', exact: true });
+  const refresh = page.locator('[data-refresh="model"]:visible');
+  const all = picker();
   const refreshBox = await refresh.boundingBox(),
-    closeBox = await close.boundingBox();
-  assert.ok(refreshBox.x + refreshBox.width <= closeBox.x + 1);
-  assert.ok(Math.abs(refreshBox.y - closeBox.y) < 1);
-  await page.mouse.move(499, 699);
+    allBox = await all.boundingBox();
+  assert.ok(allBox.x + allBox.width <= refreshBox.x + 1);
+  assert.ok(Math.abs(refreshBox.y - allBox.y) < 1);
+  await all.hover();
   assert.equal(await refresh.evaluate((n) => getComputedStyle(n).opacity), '1');
   await refresh.click();
   await refresh.evaluate(async (n) => {
@@ -512,8 +512,8 @@ try {
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
   assert.deepEqual(
     await view.locator('.model-fast').boundingBox(),
-    fixedFast,
-    'Fast stays fixed while dragging',
+    { ...fixedFast, x: fixedFast.x + 50 },
+    'Fast remains at the end of the resized name column',
   );
   assert.deepEqual(
     await page.locator('#edge-panel').boundingBox(),

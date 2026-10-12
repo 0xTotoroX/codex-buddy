@@ -187,6 +187,11 @@ input:focus-visible {
   min-height: 0;
 }
 
-.feature-view [data-refresh='model'] {
-  --feature-refresh-opacity: 1;
+@media (hover: hover) and (pointer: fine) {
+  .feature-view [data-refresh='model'] {
+    --feature-refresh-opacity: 0;
+  }
+  .feature-view .model-header-controls:hover [data-refresh='model'] {
+    --feature-refresh-opacity: 1;
+  }
 }

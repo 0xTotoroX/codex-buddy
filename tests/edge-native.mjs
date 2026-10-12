@@ -551,9 +551,7 @@ try {
     'native tile adds favorite',
   );
   assert.equal(telemetry.modelView.groups, 1, 'picker stays open with all models');
-  await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('[aria-label=\"关闭所有模型\"]').click()",
-  );
+  await command("document.querySelector('[data-model-picker]').click()");
   prefs.pinned = ['fixture-a'];
   revision++;
   await until(
@@ -595,9 +593,6 @@ try {
     'hold column-resize fixture open',
   );
   const columnBounds = windowInfo().kCGWindowBounds;
-  const fastBounds = await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
-  );
   const originalColumn = prefs.modelColumnWidth;
   for (const width of [100, 200, 560, originalColumn]) {
     prefs.modelColumnWidth = width;
@@ -611,12 +606,14 @@ try {
       columnBounds,
       'column width must not move or resize the native frame',
     );
-    assert.deepEqual(
-      await command(
-        "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
-      ),
-      fastBounds,
-      'native Fast control does not follow the column divider',
+    assert.ok(
+      await command(`(() => {
+      const root = document.querySelector('.edge-view').shadowRoot;
+      const fast = root.querySelector('.model-fast').getBoundingClientRect();
+      const grip = root.querySelector('.model-column-resize').getBoundingClientRect();
+      return fast.right <= grip.left && Math.abs(fast.y - grip.y) < 1;
+    })()`),
+      'native Fast control stays beside the header grip',
     );
     assert.equal(telemetry.native.layoutWidth, preparedWidth);
     assert.ok(

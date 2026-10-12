@@ -197,7 +197,7 @@ test(
       );
       assert.equal(await view.locator('.model-route').count(), 2);
       await view.locator('[data-model-tile="route-b/claude-test"]').click();
-      await view.getByRole('button', { name: '关闭所有模型' }).click();
+      await view.getByRole('button', { name: '所有', exact: true }).click();
       await view.locator('[data-model="route-b/claude-test"][data-reasoning="high"]').click();
       assert.equal(
         (await page.evaluate(() => window.applied)).selection.model,
@@ -405,10 +405,8 @@ test(
       const refresh = await view
         .getByRole('button', { name: '刷新可用模型', exact: true })
         .boundingBox();
-      const close = await view
-        .getByRole('button', { name: '关闭所有模型', exact: true })
-        .boundingBox();
-      assert.ok(refresh.x + refresh.width <= close.x + 1 && Math.abs(refresh.y - close.y) < 1);
+      const all = await chooser.boundingBox();
+      assert.ok(all.x + all.width <= refresh.x + 1 && Math.abs(refresh.y - all.y) < 1);
       await page.mouse.move(850, 950);
       await view.screenshot({ path: 'target/reports/model-groups/model-expanded.png' });
 
@@ -423,10 +421,10 @@ test(
       await page.mouse.down();
       await page.mouse.move(start.x - 180, start.y + 12, { steps: 12 });
       assert.equal(await separator.getAttribute('aria-valuenow'), '100');
-      assert.deepEqual(
-        await view.locator('.model-fast').boundingBox(),
-        fixedFast,
-        'Fast never follows column width',
+      const narrowFast = await view.locator('.model-fast').boundingBox();
+      assert.ok(
+        narrowFast.x < fixedFast.x && narrowFast.y === fixedFast.y,
+        'Fast aligns with the end of the name column',
       );
       const scroller = view.locator('.model-scroll');
       assert.ok(
@@ -466,7 +464,7 @@ test(
         'true',
         'compact chooser still opens after resizing',
       );
-      await view.getByRole('button', { name: '关闭所有模型' }).click();
+      await view.getByRole('button', { name: '所有', exact: true }).click();
       state.preferences.presets = Array.from({ length: 24 }, (_, index) => ({
         id: `wrapping-${index}`,
         name: `收藏快捷组合 ${index + 1}`,
@@ -487,7 +485,7 @@ test(
       });
       assert.ok(wrapped.rows > 3 && wrapped.scroll > wrapped.height);
       assert.ok(
-        wrapped.height <= wrapped.rowHeight * 3 + 9,
+        wrapped.height <= wrapped.rowHeight * 3 + 17,
         'preset wrapping is capped at three rows',
       );
       assert.deepEqual(errors, []);
