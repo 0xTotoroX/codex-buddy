@@ -66,6 +66,19 @@ function indexSettings(): Entry[] {
     },
   );
 }
+function searchEntries(entries: Entry[], query: string) {
+  const normalized = normalize(query);
+  if (!normalized) return [];
+  const terms = normalized.split(' ').filter(Boolean);
+  return entries
+    .filter((entry) => terms.every((term) => entry.keywords.includes(term)))
+    .sort(
+      (a, b) =>
+        Number(!normalize(a.label).includes(normalized)) -
+        Number(!normalize(b.label).includes(normalized)),
+    )
+    .slice(0, 8);
+}
 export function SettingsSearch({
   navigate,
 }: {
@@ -86,15 +99,7 @@ export function SettingsSearch({
     if (content) observer.observe(content, { childList: true, subtree: true });
     return () => observer.disconnect();
   }, [query]);
-  const terms = normalize(query).split(' ').filter(Boolean);
-  const results = entries
-    .filter((entry) => terms.every((term) => entry.keywords.includes(term)))
-    .sort(
-      (a, b) =>
-        Number(!normalize(a.label).includes(normalize(query))) -
-        Number(!normalize(b.label).includes(normalize(query))),
-    )
-    .slice(0, 8);
+  const results = searchEntries(entries, query);
   function select(entry: Entry) {
     navigate(entry.category, `#settings-${entry.category}/${encodeURIComponent(entry.id)}`);
     setQuery('');
@@ -119,9 +124,13 @@ export function SettingsSearch({
               resultsRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
               event.preventDefault();
             }
-            if (event.key === 'Enter' && results[0]) {
-              select(results[0]);
-              event.preventDefault();
+            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+              // 快速输入后回车可能早于 effect 建立索引，按当前输入和已挂载控件重新匹配。
+              const first = searchEntries(indexSettings(), event.currentTarget.value)[0];
+              if (first) {
+                select(first);
+                event.preventDefault();
+              }
             }
           }}
         />

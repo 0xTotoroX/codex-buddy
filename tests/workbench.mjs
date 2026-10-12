@@ -88,6 +88,8 @@ async function setup(page) {
       fixture.requests.push({ path, payload });
       let reply;
       if (path === '/features' && payload.op === 'state') reply = { features: [] };
+      else if (path === '/terminology' && payload.action === 'state')
+        reply = { preferences: { enabled: false, semantic: false, mastered: [] }, entries: [] };
       else if (path === '/settings/open') reply = { status: 'ok' };
       else if (path === '/stepwise/settings') reply = { settings: fixture.settings };
       else if (path === '/stepwise/generate' && fixture.deferred) {
@@ -727,6 +729,10 @@ const cases = [
         await page.evaluate((open) => window.__companionFloatingPanel.setOpen(open), expanded);
         const count = await page.evaluate(() => window.workbenchFixture.detaches.length);
         await icon.dblclick({ delay: 180 });
+        await page.waitForFunction(
+          (previous) => window.workbenchFixture.detaches.length === previous + 1,
+          count,
+        );
         assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), count + 1);
         assert.equal(
           await page.evaluate(() => window.workbenchFixture.detaches.at(-1).dockOpen),
@@ -734,6 +740,7 @@ const cases = [
         );
       }
       await icon.press('Alt+Enter');
+      await page.waitForFunction(() => window.workbenchFixture.detaches.length === 3);
       assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), 3);
       const settingsCount = await page.evaluate(
         () => window.workbenchFixture.requests.filter((r) => r.path === '/settings/open').length,
@@ -842,7 +849,7 @@ const cases = [
           .getByRole('button', { name: 'CodexBuddy', exact: true })
           .boundingBox();
         near(chip.width, 36, 'rail button width');
-        near(chip.height, 36, 'rail button height');
+        near(chip.height, 28, 'rail button height');
         await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
         await page.locator('.csw-workbench').waitFor({ state: 'visible' });
         await page.waitForFunction(() => !window.__companionFloatingPanel.state.morphAnimation);
@@ -853,7 +860,7 @@ const cases = [
         );
         assert.equal(await page.locator('.csw-workbench-face').isVisible(), false);
         const face = page.getByRole('button', { name: 'CodexBuddy', exact: true });
-        near((await face.boundingBox()).height, 36, 'expanded expression shares slim geometry');
+        near((await face.boundingBox()).height, 28, 'expanded expression shares slim geometry');
         await face.hover();
         await page.mouse.down();
         assert.equal(await face.evaluate((n) => getComputedStyle(n).outlineStyle), 'none');
@@ -942,26 +949,37 @@ const cases = [
     async (page) => {
       await mode(page, false);
       await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
-      await page.locator('.csw-popover[data-morphing=true]').waitFor();
-      assert.equal(
-        await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(),
-        false,
-        'opening keeps capsule hidden',
+      await page.evaluate(() => {
+        const popover = document.querySelector('.csw-popover');
+        window.workbenchFixture.morphSamples = [];
+        window.workbenchFixture.morphObserver = new MutationObserver(() => {
+          if (popover.dataset.morphing !== 'true') return;
+          window.workbenchFixture.morphSamples.push({
+            open: window.__companionFloatingPanel.state.open,
+            hidden: !document.querySelector('.csw-fab:not(.csw-launcher-face)').checkVisibility(),
+          });
+        });
+        window.workbenchFixture.morphObserver.observe(popover, {
+          attributes: true,
+          attributeFilter: ['data-morphing'],
+        });
+      });
+      for (const open of [true, false]) {
+        await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
+        await page.waitForFunction(
+          (open) =>
+            window.workbenchFixture.morphSamples.some((sample) => sample.open === open) &&
+            document.querySelector('.csw-popover').dataset.morphing === 'false',
+          open,
+        );
+      }
+      assert.ok(
+        await page.evaluate(() =>
+          window.workbenchFixture.morphSamples.every((sample) => sample.hidden),
+        ),
+        'capsule stays hidden throughout opening and closing',
       );
-      await page
-        .getByRole('button', { name: 'CodexBuddy', exact: true })
-        .waitFor({ state: 'visible' });
-      await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
-      await page.locator('.csw-popover[data-morphing=true]').waitFor();
-      assert.equal(
-        await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(),
-        false,
-        'closing keeps capsule hidden',
-      );
-      await page.waitForFunction(
-        () => document.querySelector('.csw-popover').dataset.morphing === 'false',
-      );
+      await page.evaluate(() => window.workbenchFixture.morphObserver.disconnect());
       await mode(page, true);
       await page.evaluate(() => {
         const original = window.__companionHostRequest;
@@ -974,6 +992,7 @@ const cases = [
         };
       });
       await page.getByRole('button', { name: 'CodexBuddy', exact: true }).dblclick({ delay: 180 });
+      await page.waitForFunction(() => window.workbenchFixture.detaches.length === 1);
       assert.equal(await page.evaluate(() => window.workbenchFixture.detaches.length), 1);
       assert.equal(await page.evaluate(() => window.workbenchFixture.detaches[0].dockOpen), true);
       assert.equal(
@@ -2757,7 +2776,7 @@ const cases = [
         );
         assert.ok(anchor, 'collapsed rail has a window anchor');
         near(anchor.width, 36, 'space collapse returns to the rail');
-        near(anchor.height, 36, 'rail button height');
+        near(anchor.height, 28, 'rail button height');
         await page.evaluate(() => window.__companionFloatingPanel.setDetached(true));
         const detachedAnchor = await page.evaluate(() =>
           window.__companionFloatingPanel.panelWindowAnchor(),

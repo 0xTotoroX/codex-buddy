@@ -216,13 +216,17 @@ try {
   assert.equal(await page.getByRole('button', { name: '新增分组', exact: true }).count(), 0);
   const settings = await browser.newPage({ viewport: { width: 980, height: 900 } });
   await settings.goto(`http://127.0.0.1:${runtime.port}/#token=${runtime.token}`);
-  await settings.getByRole('link', { name: '看板', exact: true }).click();
+  await settings.getByRole('button', { name: '详细设置', exact: true }).click();
+  await settings.getByRole('link', { name: '功能与交互', exact: true }).click();
   await settings.getByText('看板分组', { exact: true }).click();
   await settings.getByLabel('分组名称：待办', { exact: true }).fill('准备做');
   await settings.getByRole('button', { name: '保存分组：待办', exact: true }).click();
   await settings.getByLabel('分组名称：准备做', { exact: true }).waitFor();
   await settings.getByLabel('新分组名称', { exact: true }).fill('等待确认');
-  await settings.getByRole('button', { name: '新增分组', exact: true }).click();
+  await settings
+    .locator('#settings-tasks')
+    .getByRole('button', { name: '新增分组', exact: true })
+    .click();
   await settings.getByLabel('分组名称：等待确认', { exact: true }).waitFor();
   await settings
     .locator('#settings-tasks')

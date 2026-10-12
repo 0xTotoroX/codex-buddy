@@ -57,3 +57,5 @@ View.connection.status支持unresponsive：主标题显示页面暂未响应，�
 - `terminology-settings.tsx`：详细功能设置中的标注开关、独立模型/联网选项、三个真实卡片预览、词库检索、已掌握恢复、手动自动分类、JSON 导入和两份中文文档导出。失败时保留输入，样式选择持久化。
 
 settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/标题索引分类和控件ID，Enter/点击通过settings-outline导航到详细分类并展开祖先details；搜索本身不提交表单，也不索引输入值、密钥或聊天。main以data-settings-page标记归属，锚点字段支持URL解码。提示词优化开关共用SettingsEditor独立控制补丁，避免提交其他未保存凭据。
+
+设置搜索的 Enter 操作根据当前输入与已挂载控件即时重新匹配，避免快速输入早于异步索引时失效；输入法组合期间不提交，仍只索引标签而不读取配置值。

@@ -1,5 +1,5 @@
 // [INPUT]: Fixed feature identities, authenticated UI requests and existing business services.
-// [OUTPUT]: One main placement, enabled legacy membership recovery, checked layouts and view handoff.
+// [OUTPUT]: One main placement, checked layouts/view handoff and owner-guarded model display preferences.
 // [POS]: Presentation lifecycle only; business validation remains in tasks/codex/model_control.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -644,10 +644,11 @@ impl App {
                             "pinned",
                             "presets",
                             "modelOrder",
-                            "modelColumnWidth"
+                            "modelColumnWidth",
+                            "expandedGroups"
                         ]
                         .contains(&k.as_str()))),
-                        "此视图只能调整模型预设"
+                        "此视图只能调整模型显示和预设"
                     );
                     self.model_control_preferences(data).await
                 }
@@ -1242,13 +1243,17 @@ mod tests {
         app.model_control.lock().await.preferences.enabled = true;
         let owner = open(&app, "model").await;
         let revision = app.model_control.lock().await.revision;
-        let result = app.feature_request(json!({"op":"action","id":"model","owner":owner,"action":"preferences","data":{"revision":revision,"patch":{"modelOrder":["b","a"]}}})).await.unwrap();
+        let result = app.feature_request(json!({"op":"action","id":"model","owner":owner,"action":"preferences","data":{"revision":revision,"patch":{"modelOrder":["b","a"],"expandedGroups":["vendor:OpenAI","custom:work"]}}})).await.unwrap();
         assert_eq!(result["preferences"]["modelOrder"], json!(["b", "a"]));
         let saved: Value = serde_json::from_slice(
             &std::fs::read(app.paths.root.join("model-control.json")).unwrap(),
         )
         .unwrap();
         assert_eq!(saved["modelOrder"], json!(["b", "a"]));
+        assert_eq!(
+            saved["expandedGroups"],
+            json!(["vendor:OpenAI", "custom:work"])
+        );
         for (lease, patch, revision) in [
             ("stale", json!({"modelOrder":["a","b"]}), revision + 1),
             (
@@ -1257,6 +1262,13 @@ mod tests {
                 revision + 1,
             ),
             (owner.as_str(), json!({"enabled":false}), revision + 1),
+            (
+                owner.as_str(),
+                json!({"expandedGroups":["unknown","unknown"]}),
+                revision + 1,
+            ),
+            (owner.as_str(), json!({"groups":[]}), revision + 1),
+            (owner.as_str(), json!({"modelOverrides":{}}), revision + 1),
             (owner.as_str(), json!({"modelOrder":["a","b"]}), revision),
         ] {
             assert!(app.feature_request(json!({"op":"action","id":"model","owner":lease,"action":"preferences","data":{"revision":revision,"patch":patch}})).await.is_err());

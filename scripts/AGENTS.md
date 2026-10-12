@@ -47,3 +47,5 @@ CodexHost接续：findDevelopmentHost仅在选择启用、显式restart-running�
 Dev生命周期修复：App入口串行openDevelopment、校验监督进程就绪，确认旧宿主退出后才清理旧Dev并启动一个替代；日志追加保留故障。dev-host按PID/启动时间/路径观察退出，连续缺失才清理，读取异常保留；dev.mjs在exit-with-host下调用统一且幂等的cleanup，回收后台、监听器和归属，终端默认不启用。脚本升级须正常停止现有Dev后台后重新打开入口，新会话生效。
 
 startBackgroundDevelopment可显式传入现有connection(endpoint/targetId)进行无宿主重启的接续；参数通过本机端点/窗口ID校验，以--cdp/--target固定目标。session.launchConnection用于stop校验完整进程参数，仍核对owner PID/nonce。CodexHost已选择但待启用时可用此路径重开Dev，不覆盖用户开关或隐式应用宿主重启。
+
+npm run check 将 Node 测试并发固定为 4；verify 沿用该入口，所有用例与后续工作台、Rust、端到端和生命周期检查保持。

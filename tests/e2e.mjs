@@ -292,6 +292,11 @@ try {
       unrelatedOption: { keep: true },
     }),
   );
+  // 此夹具只模拟建议生成；术语语义识别由独立用例覆盖，不混入模型请求计数。
+  writeFileSync(
+    join(dataDir, 'terminology-settings.json'),
+    JSON.stringify({ enabled: false, semantic: false }),
+  );
   writeFileSync(join(dataDir, 'secrets.json'), JSON.stringify({ apiKey: 'fixture-key' }), {
     mode: 0o600,
   });
@@ -1139,7 +1144,7 @@ try {
       theme: surfaceBefore.preferences.themes.sidebar,
     });
     await page.screenshot({ path: join(output, 'settings-single-liquid.png') });
-    await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+    await selectSettingsCategory(page, 'features');
     await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
     await waitFor(
       async () => (await panelState()).clickMode === 'hybrid',

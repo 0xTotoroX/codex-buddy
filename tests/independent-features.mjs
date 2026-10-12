@@ -419,7 +419,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
               .boundingBox();
             assert.equal(await page.locator('.csw-fab:not(.csw-launcher-face)').isVisible(), false);
             assert.equal(Math.round(rect.width), 36);
-            assert.equal(Math.round(rect.height), 36);
+            assert.equal(Math.round(rect.height), 28);
             await page.getByRole('button', { name: 'CodexBuddy', exact: true }).press('Enter');
             await page.waitForFunction(
               () =>

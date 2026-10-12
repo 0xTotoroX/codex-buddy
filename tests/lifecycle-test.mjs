@@ -30,6 +30,8 @@ const binDir = join(scratch, 'bin');
 const dataDir = join(scratch, 'data');
 const appDir = join(scratch, 'Applications');
 const binary = join(binDir, 'codex-buddy');
+// 所有测试子进程仅能发现临时程序，不能自动连接用户正在运行的 Codex。
+const lifecycleEnv = { ...process.env, CODEX_BUDDY_DESKTOP_BIN: binary };
 const artifact = prepareTestBinary('release');
 const source = artifact.binary;
 const hash = (path) => createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -39,7 +41,12 @@ const record = (text) => {
   console.log(`PASS ${text}`);
 };
 function run(program, args, expected = 0) {
-  const result = spawnSync(program, args, { cwd: tmpdir(), encoding: 'utf8', timeout: 25000 });
+  const result = spawnSync(program, args, {
+    cwd: tmpdir(),
+    env: lifecycleEnv,
+    encoding: 'utf8',
+    timeout: 25000,
+  });
   if (result.error) throw result.error;
   assert.equal(result.status, expected, result.stderr || result.stdout);
   return result.stdout;
@@ -92,6 +99,7 @@ try {
   assert.match(html, /assets\/index-.*\.js/);
   cli(['start', '--no-open']);
   assert.equal(runtime().pid, first.pid);
+  assert.deepEqual(JSON.parse(readFileSync(join(dataDir, 'config.json'))), config);
   record('脱离源码目录提供内嵌网页、启动复用');
   const guardStart = Date.now();
   cli(['launch', '--app', binary, '--no-open'], 1);
@@ -171,7 +179,7 @@ try {
   await new Promise((resolve) => modelServer.listen(0, '127.0.0.1', resolve));
   const modelUrl = `http://127.0.0.1:${modelServer.address().port}/v1`;
   const modelEnv = {
-    ...process.env,
+    ...lifecycleEnv,
     CODEX_BUDDY_PROVIDER: 'api',
     CODEX_BUDDY_MODEL: 'fixture',
     CODEX_BUDDY_BASE_URL: modelUrl,
@@ -233,7 +241,7 @@ try {
   mkdirSync(legacyData, { recursive: true });
   writeFileSync(join(legacyData, 'config.json'), JSON.stringify(config));
   writeFileSync(join(legacyData, 'secrets.json'), '{"apiKey":"fixture-only"}');
-  const migrationEnv = { ...process.env, HOME: migrationHome };
+  const migrationEnv = { ...lifecycleEnv, HOME: migrationHome };
   delete migrationEnv.CODEX_BUDDY_HOME;
   const migrated = spawnSync(
     process.execPath,

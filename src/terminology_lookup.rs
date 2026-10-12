@@ -196,10 +196,9 @@ pub(crate) async fn analyze(app: &Arc<App>, client: &Arc<Client>, input: &Value)
             }
             if let Ok(prefs) =
                 store::read::<Preferences>(&app.paths.root, "terminology-settings.json")
+                && (!prefs.enabled || !prefs.semantic)
             {
-                if !prefs.enabled || !prefs.semantic {
-                    break;
-                }
+                break;
             }
         }
     };
