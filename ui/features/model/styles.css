@@ -58,8 +58,19 @@
   border-radius: 5px;
   background: transparent;
 }
+.feature-model {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.feature-model > :not(.model-scroll, .model-picker) {
+  flex: none;
+}
 .model-scroll {
-  overflow-x: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
 }
 .model-matrix {
   position: relative;
@@ -173,10 +184,6 @@
   white-space: nowrap;
 }
 
-.model-group-label {
-  color: var(--muted);
-  margin: 8px 0 4px;
-}
 .model-disclosure {
   display: flex;
   align-items: center;
@@ -198,6 +205,7 @@
 }
 :host([data-measuring='true']) .feature-model {
   --name-width: 280px !important;
+  flex: none;
 }
 [data-reasoning-label] {
   display: inline-block;
@@ -207,11 +215,6 @@
 .model-column-resize:focus-visible:not([data-resizing='true'])::after {
   background: var(--ink);
 }
-.model-section-divider {
-  border: 0;
-  border-top: 1px solid var(--line);
-  margin: 10px 0;
-}
 .model-empty-favorites {
   color: var(--muted);
   margin: 8px 0;
@@ -219,4 +222,70 @@
 
 .model-picker-toggle[aria-expanded='true'] svg {
   transform: rotate(180deg);
+}
+
+.model-primary {
+  position: relative;
+}
+.model-picker {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  min-height: 0;
+  max-height: 50%;
+  margin-top: 12px;
+}
+.model-disclosure {
+  width: var(--name-width);
+  max-width: 100%;
+  gap: 8px;
+  margin-block: 2px;
+}
+.model-disclosure-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.model-count {
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.model-disclosure > span:last-child {
+  flex: none;
+}
+.model-other-list {
+  min-height: 0;
+  max-height: 20em;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin-top: 4px;
+}
+.model-group > .model-disclosure {
+  padding-left: 12px;
+}
+.model-group .model-name {
+  padding-left: 24px;
+}
+
+.model-group-current {
+  display: inline-block;
+  margin-left: 6px;
+}
+
+.feature-model .model-picker-toggle {
+  align-self: flex-start;
+  flex: none;
+  width: auto;
+  padding: 5px 10px;
+  gap: 8px;
+  color: var(--ink);
+  background: var(--hover);
+  white-space: nowrap;
+}
+.model-picker-toggle .model-count {
+  color: var(--muted);
+}
+.model-picker-toggle .model-disclosure-label {
+  flex: none;
 }

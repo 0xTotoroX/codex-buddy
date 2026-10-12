@@ -77,6 +77,11 @@ input:focus-visible {
   flex: 1;
   padding: 12px;
 }
+.feature-view[data-feature='model'] > .feature-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .feature-view[data-feature='board'] > .feature-body {
   padding: 0;
 }

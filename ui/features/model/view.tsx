@@ -171,7 +171,10 @@ export function ModelView({
             }}
             onDragEnd={() => setDrop('')}
           >
-            {label(m.label)}
+            <span>{label(m.label).split(' · ')[0]}</span>
+            {m.label.includes(' · ') && (
+              <span className="model-route">{m.label.split(' · ').slice(1).join(' · ')}</span>
+            )}
             {models.some((other) => other.id !== m.id && other.label === m.label) && (
               <small className="model-route">{m.id}</small>
             )}
@@ -370,125 +373,135 @@ export function ModelView({
       >
         <div className="model-matrix">
           <div className="model-intrinsic-width" data-intrinsic-width hidden />
-          <div
-            className="model-column-resize"
-            role="separator"
-            aria-label="模型名称列宽"
-            aria-orientation="vertical"
-            aria-valuemin={100}
-            aria-valuemax={maxNameWidth}
-            aria-valuenow={nameWidth}
-            aria-disabled={busy}
-            tabIndex={busy ? -1 : 0}
-            data-resizing={!!resize.current}
-            onPointerDown={(event) => {
-              if (event.button !== 0 || busy) return;
-              event.preventDefault();
-              event.stopPropagation();
-              event.currentTarget.focus({ preventScroll: true });
-              resize.current = {
-                pointer: event.pointerId,
-                x: event.clientX,
-                scale:
-                  matrix.current!.getBoundingClientRect().width / matrix.current!.offsetWidth || 1,
-                width: nameWidth,
-                value: nameWidth,
-              };
-              event.currentTarget.setPointerCapture(event.pointerId);
-              setColumnWidth(nameWidth);
-            }}
-            onPointerMove={(event) => {
-              const drag = resize.current;
-              if (!drag || drag.pointer !== event.pointerId) return;
-              drag.value = clampWidth(drag.width + (event.clientX - drag.x) / drag.scale);
-              setColumnWidth(drag.value);
-            }}
-            onPointerUp={(event) => {
-              const drag = resize.current;
-              if (!drag || drag.pointer !== event.pointerId) return;
-              resize.current = null;
-              event.currentTarget.releasePointerCapture(event.pointerId);
-              if (drag.value !== drag.width) void saveWidth(drag.value);
-              else setColumnWidth(null);
-            }}
-            onLostPointerCapture={() => {
-              if (!resize.current) return;
-              resize.current = null;
-              setColumnWidth(null);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Escape' && resize.current) {
+          <div className="model-primary">
+            <div
+              className="model-column-resize"
+              role="separator"
+              aria-label="模型名称列宽"
+              aria-orientation="vertical"
+              aria-valuemin={100}
+              aria-valuemax={maxNameWidth}
+              aria-valuenow={nameWidth}
+              aria-disabled={busy}
+              tabIndex={busy ? -1 : 0}
+              data-resizing={!!resize.current}
+              onPointerDown={(event) => {
+                if (event.button !== 0 || busy) return;
+                event.preventDefault();
                 event.stopPropagation();
-                event.currentTarget.releasePointerCapture(resize.current.pointer);
+                event.currentTarget.focus({ preventScroll: true });
+                resize.current = {
+                  pointer: event.pointerId,
+                  x: event.clientX,
+                  scale:
+                    matrix.current!.getBoundingClientRect().width / matrix.current!.offsetWidth ||
+                    1,
+                  width: nameWidth,
+                  value: nameWidth,
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+                setColumnWidth(nameWidth);
+              }}
+              onPointerMove={(event) => {
+                const drag = resize.current;
+                if (!drag || drag.pointer !== event.pointerId) return;
+                drag.value = clampWidth(drag.width + (event.clientX - drag.x) / drag.scale);
+                setColumnWidth(drag.value);
+              }}
+              onPointerUp={(event) => {
+                const drag = resize.current;
+                if (!drag || drag.pointer !== event.pointerId) return;
+                resize.current = null;
+                event.currentTarget.releasePointerCapture(event.pointerId);
+                if (drag.value !== drag.width) void saveWidth(drag.value);
+                else setColumnWidth(null);
+              }}
+              onLostPointerCapture={() => {
+                if (!resize.current) return;
                 resize.current = null;
                 setColumnWidth(null);
-                return;
-              }
-              if (busy || resize.current || !['ArrowLeft', 'ArrowRight'].includes(event.key))
-                return;
-              event.preventDefault();
-              event.stopPropagation();
-              const width = clampWidth(nameWidth + (event.key === 'ArrowLeft' ? -16 : 16));
-              if (width === nameWidth) return;
-              setColumnWidth(width);
-              void saveWidth(width);
-            }}
-          />
-          <div className="model-matrix-head">
-            <span>模型</span>
-            <div>
-              {columns.map((c) => (
-                <span key={c}>
-                  <span data-reasoning-label>{label(c) || '选择'}</span>
-                </span>
-              ))}
-            </div>
-          </div>
-          {!!models.length && <div className="model-group-label">常用</div>}
-          {!!models.length && !visible.length && (
-            <p className="model-empty-favorites">暂无常用模型</p>
-          )}
-          {rows(visible)}
-          {!!remaining.length && (
-            <>
-              <hr className="model-section-divider" />
-              <button
-                className="model-disclosure model-picker-toggle"
-                aria-expanded={others}
-                onClick={() => setOthers(!others)}
-              >
-                <span>其他模型 ({remaining.length})</span>
-                {icon('chevron-down')}
-              </button>
-            </>
-          )}
-          {others &&
-            groups.map((group) => (
-              <div key={group.id} className="model-group" data-model-group={group.id}>
-                <button
-                  className="model-disclosure"
-                  aria-expanded={expanded.includes(group.id)}
-                  disabled={busy}
-                  onClick={() =>
-                    void save({
-                      expandedGroups: expanded.includes(group.id)
-                        ? expanded.filter((id) => id !== group.id)
-                        : [...expanded, group.id],
-                    })
-                  }
-                >
-                  <span>
-                    {group.name} ({group.models.length})
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && resize.current) {
+                  event.stopPropagation();
+                  event.currentTarget.releasePointerCapture(resize.current.pointer);
+                  resize.current = null;
+                  setColumnWidth(null);
+                  return;
+                }
+                if (busy || resize.current || !['ArrowLeft', 'ArrowRight'].includes(event.key))
+                  return;
+                event.preventDefault();
+                event.stopPropagation();
+                const width = clampWidth(nameWidth + (event.key === 'ArrowLeft' ? -16 : 16));
+                if (width === nameWidth) return;
+                setColumnWidth(width);
+                void saveWidth(width);
+              }}
+            />
+            <div className="model-matrix-head">
+              <span>常用模型</span>
+              <div>
+                {columns.map((c) => (
+                  <span key={c}>
+                    <span data-reasoning-label>{label(c) || '选择'}</span>
                   </span>
-                  {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
-                  {group.models.some((m) => m.id === s.current?.model) && <small>当前</small>}
-                </button>
-                {expanded.includes(group.id) && rows(group.models)}
+                ))}
               </div>
-            ))}
-          {!models.length && <p>暂无可用模型</p>}
+            </div>
+            {!!models.length && !visible.length && (
+              <p className="model-empty-favorites">暂无常用模型</p>
+            )}
+            {rows(visible)}
+          </div>
         </div>
       </div>
+      {!!remaining.length && (
+        <div className="model-picker">
+          <button
+            className="model-disclosure model-picker-toggle"
+            aria-label={`其他模型，${remaining.length} 个模型`}
+            aria-expanded={others}
+            onClick={() => setOthers(!others)}
+          >
+            <span className="model-disclosure-label">其他模型</span>
+            <span className="model-count">{remaining.length}</span>
+            {icon('chevron-down')}
+          </button>
+          {others && (
+            <div className="model-other-list">
+              {groups.map((group) => (
+                <div key={group.id} className="model-group" data-model-group={group.id}>
+                  <button
+                    className="model-disclosure"
+                    aria-label={`${group.name}，${group.models.length} 个模型${group.models.some((m) => m.id === s.current?.model) ? '，当前模型所在分组' : ''}`}
+                    aria-expanded={expanded.includes(group.id)}
+                    disabled={busy}
+                    onClick={() =>
+                      void save({
+                        expandedGroups: expanded.includes(group.id)
+                          ? expanded.filter((id) => id !== group.id)
+                          : [...expanded, group.id],
+                      })
+                    }
+                  >
+                    <span className="model-disclosure-label">
+                      {group.name}
+                      {group.models.some((m) => m.id === s.current?.model) && (
+                        <small className="model-group-current">当前</small>
+                      )}
+                    </span>
+                    <span className="model-count">{group.models.length}</span>
+                    {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
+                  </button>
+                  {expanded.includes(group.id) && rows(group.models)}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!models.length && <p>暂无可用模型</p>}
       {(!prefs.enabled || s.message) && (
         <footer className="model-footer">
           <span role="status">

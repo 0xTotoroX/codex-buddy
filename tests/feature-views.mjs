@@ -359,7 +359,8 @@ try {
   await picker().waitFor();
   assert.equal(await picker().getAttribute('aria-expanded'), 'false');
   assert.equal(await view.locator('[data-model-group]').count(), 0, 'groups hidden by default');
-  await view.locator('.model-section-divider').waitFor();
+  assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
+  assert.equal(await view.locator('.model-matrix-head > span').textContent(), '常用模型');
   assert.equal(
     await view.locator('.model-row').count(),
     0,
@@ -396,9 +397,14 @@ try {
   const modelNameBox = await view.locator('.model-name strong').first().boundingBox();
   const disclosureBox = await view.locator('.model-disclosure').boundingBox();
   assert.ok(Math.abs(disclosureBox.x - modelNameBox.x) < 1);
+  const resizeBox = await view.getByRole('separator', { name: '模型名称列宽' }).boundingBox();
+  assert.ok(
+    resizeBox.y + resizeBox.height < disclosureBox.y,
+    'vertical divider ends before the picker',
+  );
   assert.equal(
     await view.locator('.model-disclosure').evaluate((node) => getComputedStyle(node).paddingLeft),
-    '0px',
+    '10px',
   );
   const visibility = view.getByLabel('隐藏 Model A', { exact: true });
   const headerRefresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
@@ -446,6 +452,13 @@ try {
   assert.equal(model.snapshot.current.speed, 'fast');
   assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
   await showOthers();
+  const groupHeader = view.locator('[data-model-group] > .model-disclosure').first();
+  assert.ok((await picker().boundingBox()).width < disclosureBox.width + 1);
+  const groupLabel = await groupHeader.locator('.model-disclosure-label').boundingBox();
+  assert.ok(
+    groupLabel.x >= disclosureBox.x + 12,
+    'manufacturer headings are nested beneath other models',
+  );
   await view.getByLabel('设为常用 Model B', { exact: true }).click();
   await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
   assert.deepEqual(model.preferences.pinned, ['a', 'b']);

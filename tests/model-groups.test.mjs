@@ -90,7 +90,7 @@ test(
     import {ModelControlSettings} from './ui/settings/model-control-settings';
     import {ModelView} from './ui/features/model/view';
     window.render = state => {
-      window.viewRoot ||= createRoot(document.getElementById('view'));
+      window.viewRoot ||= createRoot(document.getElementById('view-content'));
       window.viewRoot.render(<ModelView state={state} busy={false} reading={{}} action={async (data, action) => {
         if(action === 'apply') { window.applied = data; return; }
         const res = await fetch('/api/model-control/' + action, {method:'POST', body:JSON.stringify(data)});
@@ -147,7 +147,7 @@ test(
         if (!path.startsWith('/api/'))
           return route.fulfill({
             contentType: 'text/html',
-            body: '<div id="settings"></div><hr><div id="view"></div>',
+            body: '<div id="settings"></div><hr><div id="view"><div id="view-content" class="feature-body"></div></div>',
           });
         if (route.request().method() === 'POST') {
           writes++;
@@ -308,6 +308,134 @@ test(
         path: 'target/reports/model-groups/settings-narrow.png',
         fullPage: true,
       });
+      // Render the real component with a representative dense catalog, not a hand-drawn mockup.
+      const favoriteLabels = [
+        'GPT-6-Astra',
+        'GPT-6.1-Sol',
+        'Claude-opus-5-5-kiro',
+        'Claude-opus-5-5',
+        'Deepseek-V4.1-Flash · WorkBuddy',
+      ];
+      const catalogIds = [
+        'claude-preview',
+        'deepseek-preview',
+        'gemini-preview',
+        'gpt-preview',
+        'grok-preview',
+        'glm-preview',
+        'kimi-preview',
+        'hy3-preview',
+        'step-preview',
+        'minimax-preview',
+        'private-preview',
+      ];
+      state.snapshot.models = [
+        ...favoriteLabels.map((label, index) => model(`favorite-${index}`, label)),
+        ...catalogIds.map((id) => model(`catalog/${id}`, id)),
+      ].map((item) => ({ ...item, reasoning: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] }));
+      state.preferences.pinned = favoriteLabels.map((_, i) => `favorite-${i}`);
+      state.preferences.modelColumnWidth = 245;
+      state.preferences.modelOrder = state.snapshot.models.map((m) => m.id);
+      state.preferences.modelOverrides = {};
+      state.preferences.groups = [];
+      state.preferences.expandedGroups = [];
+      state.preferences.groupOrder = [];
+      state.preferences.presets = [
+        {
+          id: 'design',
+          name: 'sol',
+          selection: { model: 'favorite-1', reasoning: 'high', speed: 'standard' },
+        },
+      ];
+      state.snapshot.current = state.preferences.presets[0].selection;
+      await page.setViewportSize({ width: 860, height: 960 });
+      await page.addStyleTag({
+        content:
+          readFileSync('ui/surfaces/workspace/content.css', 'utf8') +
+          '\n#settings{display:none}#view{height:auto;overflow:hidden;padding:0;border-radius:18px;--paper:#000;--ink:#eee;--fg:#eee;--muted:#999;--accent:#eee;--line:#222;--hover:#171717;font:14px -apple-system,sans-serif;}#view-content{padding:18px;}',
+      });
+      await view.evaluate((node) => {
+        node.classList.add('feature-view');
+        node.dataset.feature = 'model';
+      });
+      await page.evaluate((state) => window.render(state), state);
+      const chooser = view.locator('.model-picker-toggle');
+      if ((await chooser.getAttribute('aria-expanded')) === 'true') await chooser.click();
+      await view.locator('[data-model-row="favorite-4"] .model-route').waitFor();
+      await page.mouse.move(850, 950);
+      await page.waitForFunction(
+        () => getComputedStyle(document.querySelector('#view .model-visibility')).opacity === '0',
+      );
+      assert.equal(await view.locator('.model-matrix-head > span').textContent(), '常用模型');
+      assert.equal(await view.locator('hr, .model-group-label').count(), 0);
+      const line = await view.locator('.model-column-resize').boundingBox();
+      const toggle = await chooser.boundingBox();
+      assert.ok(line.y + line.height < toggle.y, 'resize line stays within the favorites table');
+      await view.screenshot({ path: 'target/reports/model-groups/model-compact.png' });
+      await chooser.click();
+      const list = view.locator('.model-other-list');
+      assert.ok(
+        await list.evaluate((node) => node.scrollHeight > node.clientHeight),
+        'dense catalogs scroll within the chooser',
+      );
+      const chevrons = await view
+        .locator('.model-group > .model-disclosure > span:last-child')
+        .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().right));
+      assert.ok(
+        Math.max(...chevrons) - Math.min(...chevrons) < 1,
+        'counts and arrows have stable trailing alignment',
+      );
+      await page.mouse.move(850, 950);
+      await view.screenshot({ path: 'target/reports/model-groups/model-expanded.png' });
+
+      await chooser.click();
+      const fixedFrame = await view.boundingBox();
+      await view.evaluate((node, height) => (node.style.height = `${height}px`), fixedFrame.height);
+      const fixedButton = await chooser.boundingBox();
+      const separator = view.getByRole('separator', { name: '模型名称列宽' });
+      const start = await separator.boundingBox();
+      await page.mouse.move(start.x + start.width / 2, start.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(start.x - 180, start.y + 12, { steps: 12 });
+      assert.equal(await separator.getAttribute('aria-valuenow'), '100');
+      const scroller = view.locator('.model-scroll');
+      assert.ok(
+        await scroller.evaluate((n) => n.scrollHeight > n.clientHeight),
+        'wrapped names scroll inside the fixed table',
+      );
+      const narrowedButton = await chooser.boundingBox();
+      assert.ok(
+        Math.abs(narrowedButton.y - fixedButton.y) < 1,
+        `chooser button stays visible while rows grow: ${JSON.stringify({ fixedButton, narrowedButton, geometry: await view.evaluate((n) => [...n.querySelectorAll('.feature-body,.feature-model,.model-scroll,.model-picker,.model-picker-toggle')].map((el) => ({ class: el.className, height: el.clientHeight, scroll: el.scrollHeight, flex: getComputedStyle(el).flex, y: el.getBoundingClientRect().y }))) })}`,
+      );
+      assert.deepEqual(
+        await view.boundingBox(),
+        fixedFrame,
+        'column drag keeps the outer frame fixed',
+      );
+      await page.mouse.up();
+      await page.waitForFunction(
+        () =>
+          document.querySelector('.model-column-resize').getAttribute('aria-valuenow') === '100',
+      );
+      await scroller.evaluate((n) => (n.scrollTop = n.scrollHeight));
+      const lastChoice = view.locator('[data-model="favorite-4"][data-reasoning="high"]');
+      const lastBox = await lastChoice.boundingBox(),
+        scrollBox = await scroller.boundingBox();
+      assert.ok(
+        lastBox.y >= scrollBox.y && lastBox.y + lastBox.height <= scrollBox.y + scrollBox.height,
+        'last favorite remains reachable within the viewport',
+      );
+      await lastChoice.click();
+      assert.equal((await page.evaluate(() => window.applied)).selection.model, 'favorite-4');
+      await page.mouse.move(850, 950);
+      await view.screenshot({ path: 'target/reports/model-groups/model-narrow-column.png' });
+      await chooser.click();
+      assert.equal(
+        await chooser.getAttribute('aria-expanded'),
+        'true',
+        'compact chooser still opens after resizing',
+      );
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();

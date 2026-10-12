@@ -530,8 +530,8 @@ try {
   assert.equal(telemetry.featureVisible, true);
   assert.equal(telemetry.modelView.picker, 'false');
   assert.equal(telemetry.modelView.groups, 0);
-  assert.equal(telemetry.modelView.divider, '1px');
-  check('native model view defaults to favorites with a horizontal divider and collapsed picker');
+  assert.equal(telemetry.modelView.divider, null);
+  check('native model view defaults to favorites with a borderless collapsed picker');
   const favoriteHeight = telemetry.native.layoutHeight;
   await command(
     "document.querySelector('.edge-view').shadowRoot.querySelector('.model-picker-toggle').click()",
@@ -687,9 +687,57 @@ try {
     });
   }
 
-  prefs.keepOpen = false;
+  const savedModels = structuredClone(snapshot.models),
+    savedPinned = [...prefs.pinned];
+  const longFavorites = Array.from({ length: 5 }, (_, index) => ({
+    id: `long-${index}`,
+    label: `Claude-long-model-name-${index} · WorkBuddy`,
+    reasoning: ['low', 'high'],
+    fast: false,
+  }));
+  snapshot.models.push(...longFavorites);
+  prefs.pinned = longFavorites.map((m) => m.id);
+  prefs.modelColumnWidth = 245;
   revision++;
-  await until(() => !telemetry.native.keepOpen, 'restore fixture hover policy');
+  await until(
+    () => Number(telemetry.columnWidth) === 245 && telemetry.native.layoutHeight > shortHeight,
+    'native long favorites fixture',
+  );
+  const longBounds = windowInfo().kCGWindowBounds;
+  const pickerY = await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-picker-toggle').getBoundingClientRect().y",
+  );
+  prefs.modelColumnWidth = 100;
+  revision++;
+  await until(() => Number(telemetry.columnWidth) === 100, 'narrow long favorite names');
+  const overflow = await command(`(() => {
+    const root = document.querySelector('.edge-view').shadowRoot;
+    const list = root.querySelector('.model-scroll'), button = root.querySelector('.model-picker-toggle');
+    list.scrollTop = list.scrollHeight;
+    const last = root.querySelector('[data-model-row="long-4"] .model-choices').getBoundingClientRect();
+    const viewport = list.getBoundingClientRect();
+    return {scrollable: list.scrollHeight > list.clientHeight, buttonY: button.getBoundingClientRect().y,
+      lastVisible: last.top >= viewport.top && last.bottom <= viewport.bottom};
+  })()`);
+  assert.deepEqual(windowInfo().kCGWindowBounds, longBounds);
+  assert.ok(
+    overflow.scrollable && overflow.lastVisible,
+    'native long favorites stay reachable by internal scrolling',
+  );
+  assert.ok(Math.abs(overflow.buttonY - pickerY) < 1, 'native picker button stays in place');
+  check('native narrow column keeps the chooser visible and last favorite reachable', overflow);
+  snapshot.models = savedModels;
+  prefs.pinned = savedPinned;
+  prefs.modelColumnWidth = originalColumn;
+  revision++;
+  await until(
+    () =>
+      telemetry.native.layoutHeight === shortHeight &&
+      Number(telemetry.columnWidth) === originalColumn,
+    'restore native long-name fixture',
+  );
+
+  // 保持展开直到延迟接收场景开始，避免鼠标离开先触发收起。显式 collapse 会恢复 keepOpen=false。
   const stableBounds = windowInfo().kCGWindowBounds;
   await command('window.deferNative = true');
   await ipc({ action: 'collapse' });
@@ -709,6 +757,7 @@ try {
     "window.deferNative = false; window.dispatchEvent(new CustomEvent('edge-native',{detail:window.delayedNative}))",
   );
   await until(() => !telemetry.native.expanded, 'deliver held native geometry');
+  await until(() => !prefs.keepOpen && !telemetry.native.keepOpen, 'restore fixture hover policy');
   check('native contour collapses independently while WebView geometry delivery is withheld');
   await ipc({ action: 'expand' });
   await until(
