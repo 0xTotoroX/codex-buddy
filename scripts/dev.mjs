@@ -272,6 +272,7 @@ function changed(path) {
     path.startsWith('ui/surfaces/') ||
     path.startsWith('ui/shared/') ||
     path.startsWith('ui/features/') ||
+    path.startsWith('ui/terminology/') ||
     path === 'ui/settings/api.ts'
   )
     pendingPanel = true;

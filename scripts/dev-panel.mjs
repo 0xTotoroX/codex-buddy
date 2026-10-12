@@ -99,6 +99,7 @@ export async function buildDevPanel(root, output) {
     ...filesUnder(root, 'ui/codex'),
     ...filesUnder(root, 'ui/surfaces'),
     ...filesUnder(root, 'ui/features'),
+    ...(existsSync(join(root, 'ui/terminology')) ? filesUnder(root, 'ui/terminology') : []),
     ...filesUnder(root, 'ui/shared'),
     'ui/settings/api.ts',
   ];

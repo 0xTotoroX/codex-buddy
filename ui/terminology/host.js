@@ -124,11 +124,17 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       () => {
         if (!valid(a)) return null;
         const rects = [...a.range.getClientRects()].filter((r) => r.width && r.height);
-        return (
+        const line =
           rects.find(
             (r) =>
               point.y >= r.top && point.y <= r.bottom && point.x >= r.left && point.x <= r.right,
-          ) || rects[0]
+          ) || rects[0];
+        if (!line || keyboard) return line;
+        return new DOMRect(
+          Math.max(line.left, Math.min(point.x, line.right)),
+          line.top,
+          1,
+          line.height,
         );
       },
       { ...cardOptions(a), keyboard },
@@ -329,7 +335,6 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   }
   function move(e) {
     if (popup.contains(e)) return;
-    point = { x: e.clientX, y: e.clientY };
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
       const hit = annotations.find(
@@ -343,7 +348,9 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
               e.clientY <= r.bottom,
           ),
       );
+      if (hit) point = { x: e.clientX, y: e.clientY };
       if (hit === active) {
+        if (hit) popup.reposition();
         clearTimeout(closeTimer);
         return;
       }

@@ -200,3 +200,53 @@ test('semantic response paints a multi-paragraph phrase without a literal term a
     await browser.close();
   }
 });
+
+test('long phrase popover follows hover point, clamps to viewport and stays still for actions', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ viewport: { width: 1400, height: 700 } });
+    const phrase = '多个操作的执行先后不可预测，最终结果随完成顺序变化';
+    await page.setContent(
+      `<main style="margin:100px;font:24px/1.8 system-ui"><p>${phrase}</p></main>`,
+    );
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate(async (phrase) => {
+      window.state.entries[0].aliases = [phrase];
+      await window.__codexBuddyTerminology.refresh();
+    }, phrase);
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 1);
+    const line = await page.evaluate(() => {
+      const r = [...CSS.highlights.get('codex-buddy-terms')][0].getBoundingClientRect();
+      return { left: r.left, right: r.right, y: r.top + r.height / 2 };
+    });
+    const x = line.right - 15;
+    await page.mouse.move(x, line.y);
+    const card = page.getByRole('dialog');
+    await card.waitFor();
+    await page.waitForTimeout(270);
+    assert.ok(Math.abs((await card.boundingBox()).x - x) < 2);
+    const next = x - 130;
+    await page.mouse.move(next, line.y);
+    await page.waitForTimeout(50);
+    assert.ok(Math.abs((await card.boundingBox()).x - next) < 2);
+    const before = await card.boundingBox();
+    await page.getByRole('button', { name: '收藏术语', exact: true }).hover();
+    await page.waitForTimeout(220);
+    assert.deepEqual(await card.boundingBox(), before);
+    await page.setViewportSize({ width: 780, height: 700 });
+    await page.mouse.move(5, 5);
+    await page.keyboard.press('Escape');
+    const edge = await page.evaluate(() => {
+      const r = [...CSS.highlights.get('codex-buddy-terms')][0].getClientRects()[0];
+      return { x: r.right - 5, y: r.top + r.height / 2 };
+    });
+    await page.mouse.move(edge.x, edge.y);
+    await card.waitFor();
+    await page.waitForTimeout(270);
+    const bounded = await card.boundingBox();
+    assert.ok(bounded.x >= 10 && bounded.x + bounded.width <= 771);
+    await page.evaluate(() => window.__codexBuddyTerminology.destroy());
+  } finally {
+    await browser.close();
+  }
+});

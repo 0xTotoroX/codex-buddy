@@ -38,7 +38,7 @@ export function createTermPopover({
       hide(true);
       return;
     }
-    const c = card.getBoundingClientRect(),
+    const c = { width: card.offsetWidth, height: card.offsetHeight },
       m = 10;
     const above = r.bottom + c.height + 8 > innerHeight - m && r.top > c.height + 8;
     box.style.left = `${Math.max(m, Math.min(r.left, innerWidth - c.width - m))}px`;
@@ -160,6 +160,7 @@ export function createTermPopover({
         place();
       }
     },
+    reposition: place,
     hide,
     destroy() {
       disposed = true;
