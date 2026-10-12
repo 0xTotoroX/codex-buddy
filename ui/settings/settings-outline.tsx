@@ -16,6 +16,7 @@ const aliases: Record<string, SettingsPage> = {
   'settings-overview': 'features',
   'settings-outline': 'features',
   'settings-model-control': 'features',
+  'model-organization': 'features',
   'settings-next': 'features',
   'settings-board': 'features',
   'settings-tasks': 'features',

@@ -813,3 +813,16 @@
   padding: 12px;
   color: var(--buddy-muted);
 }
+
+.model-organization-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-block: 8px;
+}
+@media (max-width: 520px) {
+  .model-organization-row > label {
+    flex-basis: 100%;
+  }
+}

@@ -160,3 +160,7 @@ codex-host-settings.test验证独立API、版本修订与开关不隐式启动�
 `terminology.test.mjs` 检查合成聊天跨节点高亮、英文词边界、别名歧义、已掌握、三样式、原文/草稿不变、聊天切换取消与清理；卡片截图仅使用合成文本。Rust terminology 检查私有分文件持久化、中文导出与损坏数据保护；真实联网来源可用性另行记录，不以模拟代替。
 
 settings-search.test检查跨隐藏分类定位/展开、草稿保持及不索引凭据；prompt-enhancement.test增加关闭即取消，以及CodexHost相邻顺序/菜单保持展开检查。settings-modes核对5项常用开关；标准fixture补齐新布尔字段。Rust设置测试确认保存/并发校验且不推进Stepwise生成版本。target/reports/optimizer-codex-host-layout.json记录旧/新复现场景的重排4→0与菜单状态。
+
+- `model-groups.test.mjs`：保守厂家识别、渠道身份隔离、分组设置真实组件及矩阵联动；验证批量归属/恢复、增删改名/顺序、失败草稿与并发冲突、刷新保留手动值、暂不可用模型和窄屏布局。Rust model_control 单测验证旧配置兼容、引用校验及冷启动恢复。
+
+model-control-e2e 使用当前简易/详细设置导航，并通过真实 Rust/HTTP 保存厂家和自定义组，重载后确认恢复、删除后回到厂家、恢复自动，以及常用/预设/原顺序保持。

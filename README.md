@@ -159,7 +159,7 @@ The workbench has three main forms: a compact capsule, an expanded in-chat workb
 
 ### Model quick switch
 
-Enable the model feature in settings or run `codex-buddy model-control`. It initially opens in the shared edge form and subsequently uses its saved placement. Search, pinned models, reasoning, speed and presets are available in every form; next-step generation settings remain independent.
+Enable the model feature in settings or run `codex-buddy model-control`. It initially opens in the shared edge form and subsequently uses its saved placement. Favorites, reasoning, speed and presets are available in every form; next-step generation settings remain independent. Other models appear in collapsible manufacturer groups. In detailed Web settings, open **功能与交互 → 模型快切 → 模型分组** to correct manufacturers, create custom groups, move models in bulk, reorder groups/models, or restore automatic classification. Refreshing preserves manual choices and preferences for temporarily unavailable models. Different model IDs remain separate even when their names match.
 
 The edge/notch form now hosts all four features. Use **显示与布局** settings for its theme, display, edge, position and keep-open preference. Hover to expand, leave for roughly half a second to collapse, or press `⌘⇧M` to toggle. Editing and business operations suppress automatic collapse; collapsing or switching tabs preserves drafts. The panel stays on its selected display across Spaces and full-screen apps regardless of Codex focus. Stopping Buddy closes it.
 

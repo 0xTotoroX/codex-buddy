@@ -457,9 +457,60 @@ try {
   const settingsPage = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
+  await settingsPage.getByRole('button', { name: '详细设置', exact: true }).click();
+  {
+    const modelSettings = settingsPage.locator('#settings-model-control');
+    await modelSettings.locator('#model-organization > summary').click();
+    const preserved = (await api('state')).preferences;
+    await modelSettings.getByLabel('新模型分组名称').fill('合成分组');
+    await modelSettings.getByRole('button', { name: '新增分组', exact: true }).click();
+    const created = await waitFor(
+      async () => (await api('state')).preferences.groups.find((g) => g.name === '合成分组'),
+      'custom model group persisted',
+    );
+    await modelSettings.locator('[data-model-id="alpha"] input[type="checkbox"]').check();
+    await modelSettings.getByLabel('批量指定厂家').fill('合成厂家');
+    await modelSettings.getByRole('button', { name: '指定厂家', exact: true }).click();
+    await waitFor(
+      async () =>
+        (await api('state')).preferences.modelOverrides.alpha?.manufacturer === '合成厂家',
+      'manufacturer persisted through settings',
+    );
+    await modelSettings.getByLabel('批量移动分组').selectOption(created.id);
+    await modelSettings.getByRole('button', { name: '移动模型', exact: true }).click();
+    await waitFor(
+      async () => (await api('state')).preferences.modelOverrides.alpha?.groupId === created.id,
+      'model group persisted through settings',
+    );
+    await settingsPage.reload();
+    await modelSettings.locator('#model-organization > summary').click();
+    await modelSettings
+      .getByRole('region', { name: '分组：合成分组' })
+      .locator('[data-model-id="alpha"]')
+      .waitFor();
+    const restored = (await api('state')).preferences;
+    assert.deepEqual(restored.pinned, preserved.pinned);
+    assert.deepEqual(restored.presets, preserved.presets);
+    assert.deepEqual(restored.modelOrder, preserved.modelOrder);
+    await modelSettings.getByRole('button', { name: '删除分组', exact: true }).click();
+    await modelSettings
+      .getByRole('region', { name: '分组：合成厂家' })
+      .locator('[data-model-id="alpha"]')
+      .waitFor();
+    await modelSettings.locator('[data-model-id="alpha"] input[type="checkbox"]').check();
+    await modelSettings.getByRole('button', { name: '恢复自动分类', exact: true }).click();
+    await waitFor(
+      async () => !(await api('state')).preferences.modelOverrides.alpha,
+      'automatic classification restored',
+    );
+    record(
+      'real settings persist manufacturer and custom group across reload, delete safely and preserve favorites/order/presets',
+    );
+  }
+
   await settingsPage
     .getByRole('navigation', { name: '设置分类' })
-    .getByRole('link', { name: '显示与布局', exact: true })
+    .getByRole('link', { name: '外观与布局', exact: true })
     .click();
   const section = settingsPage.locator('#settings-surfaces');
   const themeControl = async (placement, label) => {

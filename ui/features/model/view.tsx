@@ -1,30 +1,19 @@
 /* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Compact model matrix, favorites, persisted drag order, presets and capability-driven selection.
+ * [OUTPUT]: Grouped model matrix, favorites, persisted expansion/order, presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { Reading } from '../../shared/features';
-type Selection = { model: string; reasoning: string; speed: string };
-export type ModelState = {
-  revision: number;
-  snapshot: {
-    target: unknown;
-    revision: string;
-    status: string;
-    message: string;
-    current: Selection | null;
-    models: { id: string; label: string; reasoning: string[]; fast: boolean }[];
-  };
-  preferences: {
-    enabled: boolean;
-    modelColumnWidth?: number;
-    pinned: string[];
-    modelOrder?: string[] | null;
-    presets: { id: string; name: string; selection: Selection }[];
-  };
-};
+import {
+  groupedModels,
+  modelGroup,
+  orderedModelIds,
+  type ModelState,
+  type Selection,
+} from './catalog';
+export type { ModelState } from './catalog';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const icon = (name: string) => <span dangerouslySetInnerHTML={{ __html: iconSvg(name) }} />;
 export function ModelView({
@@ -41,7 +30,6 @@ export function ModelView({
   busy: boolean;
 }) {
   const [tools, setTools] = useState(reading.modelTools || false),
-    [others, setOthers] = useState(reading.modelOthers || false),
     [drop, setDrop] = useState(''),
     [columnWidth, setColumnWidth] = useState<number | null>(null),
     [presetDraft, setPresetDraft] = useState<{
@@ -78,15 +66,15 @@ export function ModelView({
           (!m.reasoning.length && !selection.reasoning)) &&
         (selection.speed !== 'fast' || m.fast),
     );
-  const modelOrder = [
-    ...new Set([...(prefs.modelOrder || prefs.pinned), ...s.models.map((m) => m.id)]),
-  ];
+  const modelOrder = orderedModelIds(s.models, prefs);
   const models = modelOrder.flatMap((id) => {
     const model = s.models.find((m) => m.id === id);
     return model ? [model] : [];
   });
   const visible = models.filter((m) => prefs.pinned.includes(m.id));
   const remaining = models.filter((m) => !prefs.pinned.includes(m.id));
+  const groups = groupedModels(remaining, prefs);
+  const expanded = prefs.expandedGroups ?? (reading.modelOthers ? groups.map((g) => g.id) : []);
   const dragType = 'application/x-codex-buddy-model';
   const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   const columns = [
@@ -119,7 +107,12 @@ export function ModelView({
           if (
             id === m.id ||
             !models.some((model) => model.id === id) ||
-            prefs.pinned.includes(id) !== prefs.pinned.includes(m.id)
+            prefs.pinned.includes(id) !== prefs.pinned.includes(m.id) ||
+            (!prefs.pinned.includes(id) &&
+              modelGroup(
+                models.find((item) => item.id === id)!,
+                prefs,
+              ).id !== modelGroup(m, prefs).id)
           )
             return;
           const next = modelOrder.filter((item) => item !== id);
@@ -143,6 +136,9 @@ export function ModelView({
             onDragEnd={() => setDrop('')}
           >
             {label(m.label)}
+            {models.some((other) => other.id !== m.id && other.label === m.label) && (
+              <small className="model-route">{m.id}</small>
+            )}
           </strong>
           <button
             className="model-visibility"
@@ -403,17 +399,31 @@ export function ModelView({
               ))}
             </div>
           </div>
+          {!!visible.length && <div className="model-group-label">常用</div>}
           {rows(visible)}
-          {!!remaining.length && (
-            <button
-              className="model-disclosure"
-              aria-expanded={others}
-              onClick={() => setOthers((reading.modelOthers = !others))}
-            >
-              其他模型 ({remaining.length})
-            </button>
-          )}
-          {others && rows(remaining)}
+          {groups.map((group) => (
+            <div key={group.id} className="model-group" data-model-group={group.id}>
+              <button
+                className="model-disclosure"
+                aria-expanded={expanded.includes(group.id)}
+                disabled={busy}
+                onClick={() =>
+                  void save({
+                    expandedGroups: expanded.includes(group.id)
+                      ? expanded.filter((id) => id !== group.id)
+                      : [...expanded, group.id],
+                  })
+                }
+              >
+                <span>
+                  {group.name} ({group.models.length})
+                </span>
+                {icon(expanded.includes(group.id) ? 'chevron-down' : 'chevron-right')}
+                {group.models.some((m) => m.id === s.current?.model) && <small>当前</small>}
+              </button>
+              {expanded.includes(group.id) && rows(group.models)}
+            </div>
+          ))}
           {!models.length && <p>暂无可用模型</p>}
         </div>
       </div>

@@ -173,3 +173,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.model-group-label {
+  color: var(--muted);
+  margin: 8px 0 4px;
+}
+.model-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.model-disclosure small {
+  color: var(--fg);
+}
+.model-route {
+  display: block;
+  color: var(--muted);
+  font-weight: normal;
+  overflow-wrap: anywhere;
+}

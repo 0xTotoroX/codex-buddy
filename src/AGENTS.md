@@ -87,3 +87,5 @@ features.task_command承接原server看板命令协调：主界面已接管时�
 - `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句与规范术语；未命中时仅向固定公共百科发送短术语，校验资料相关性与分类后新增，切换上下文或关闭功能拒绝迟到结果。
 
 settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修订保存；model.same_generation_config忽略这一工具开关。prompt_enhancement在开始和取消校验中检查开关，关闭后拒绝请求并终止在途操作。
+
+模型分类扩展 model_control::Preferences：保存自定义组、按模型 ID 的厂家/分组覆盖、组序与展开状态；新字段缺省兼容旧配置。保存统一校验非空名称、重复组名、归属引用与修订号，不裁剪暂不可用模型，不改变常用、预设或宿主模型身份。

@@ -1,5 +1,5 @@
 // [INPUT]: 已连接的 CDP Client、宿主模型适配器及独立业务偏好。
-// [OUTPUT]: 模型状态、串行切换、常用与顺序/预设保存与私有末次操作诊断；呈现交给 features。
+// [OUTPUT]: 模型状态、串行切换、常用、顺序、分类与预设保存与私有末次操作诊断；呈现交给 features。
 // [POS]: 宿主模型控制服务；不读写建议生成配置或工作台的来源/布局。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -10,7 +10,7 @@ use crate::{
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use std::time::Duration;
+use std::{collections::BTreeMap, time::Duration};
 use tokio::sync::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -30,6 +30,22 @@ pub struct Preset {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelGroup {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelOverride {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manufacturer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 pub struct Preferences {
     pub enabled: bool,
@@ -37,6 +53,10 @@ pub struct Preferences {
     pub pinned: Vec<String>,
     pub model_order: Option<Vec<String>>,
     pub presets: Vec<Preset>,
+    pub groups: Vec<ModelGroup>,
+    pub model_overrides: BTreeMap<String, ModelOverride>,
+    pub group_order: Vec<String>,
+    pub expanded_groups: Option<Vec<String>>,
 }
 
 impl Default for Preferences {
@@ -47,6 +67,10 @@ impl Default for Preferences {
             pinned: vec![],
             model_order: None,
             presets: vec![],
+            groups: vec![],
+            model_overrides: BTreeMap::new(),
+            group_order: vec![],
+            expanded_groups: None,
         }
     }
 }
@@ -69,6 +93,34 @@ impl Preferences {
         if !(100. ..=560.).contains(&self.model_column_width) {
             bail!("模型列宽无效");
         }
+        let mut group_ids = std::collections::HashSet::new();
+        let mut group_names = std::collections::HashSet::new();
+        for group in &self.groups {
+            if group.id.trim().is_empty()
+                || group.id.len() > 128
+                || group.name.trim().is_empty()
+                || group.name.chars().count() > 60
+                || !group_ids.insert(group.id.as_str())
+                || !group_names.insert(group.name.trim().to_lowercase())
+            {
+                bail!("分组名称或标识无效，名称不能重复");
+            }
+        }
+        for (id, item) in &self.model_overrides {
+            if id.is_empty()
+                || id.len() > 256
+                || item
+                    .manufacturer
+                    .as_ref()
+                    .is_some_and(|name| name.trim().is_empty() || name.chars().count() > 60)
+                || item
+                    .group_id
+                    .as_ref()
+                    .is_some_and(|group| !group_ids.contains(group.as_str()))
+            {
+                bail!("模型分类无效，所选分组可能已被删除");
+            }
+        }
         let mut ids = std::collections::HashSet::new();
         for preset in &self.presets {
             if preset.id.is_empty()
@@ -83,6 +135,11 @@ impl Preferences {
         }
         for (models, message) in [
             (self.pinned.as_slice(), "常用模型无效"),
+            (self.group_order.as_slice(), "分组顺序无效"),
+            (
+                self.expanded_groups.as_deref().unwrap_or_default(),
+                "展开分组无效",
+            ),
             (
                 self.model_order.as_deref().unwrap_or_default(),
                 "模型顺序无效",
@@ -402,6 +459,56 @@ mod tests {
         assert!(!paths.config().exists());
         assert!(app.model_control_apply(json!({"target":{"id":"a"},"expectedRevision":"old","selection":{"model":"a","reasoning":"high","speed":"fast"}})).await.is_err());
     }
+    #[test]
+    fn model_group_preferences_preserve_legacy_and_validate_references() {
+        let original: Preferences = serde_json::from_value(json!({
+            "pinned":["route/claude"], "modelOrder":["route/claude", "offline"],
+            "presets":[{"id":"p", "name":"旧预设", "selection":{"model":"route/claude", "reasoning":"high", "speed":"standard"}}]
+        })).unwrap();
+        let next = original
+            .patched(&json!({
+                "groups":[{"id":"work", "name":"工作"}],
+                "modelOverrides":{"offline":{"manufacturer":"自定义厂家", "groupId":"work"}},
+                "groupOrder":["custom:work", "vendor:Anthropic"],
+                "expandedGroups":["custom:work"]
+            }))
+            .unwrap();
+        assert_eq!(next.pinned, original.pinned);
+        assert_eq!(next.model_order, original.model_order);
+        assert_eq!(next.presets, original.presets);
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(temp.path().into())).unwrap();
+        write_private(
+            &paths.root.join("model-control.json"),
+            &serde_json::to_vec(&next).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(Control::load(&paths).preferences, next);
+        assert!(next.patched(&json!({"groups":[]})).is_err());
+        assert!(
+            next.patched(&json!({"groups":[{"id":"a","name":"同名"},{"id":"b","name":"同名"}]}))
+                .is_err()
+        );
+        assert!(
+            next.patched(&json!({"modelOverrides":{"a":{"manufacturer":" "}}}))
+                .is_err()
+        );
+        assert!(
+            next.patched(&json!({"expandedGroups":["unknown","unknown"]}))
+                .is_err()
+        );
+        let removed = next
+            .patched(
+                &json!({"groups":[],"modelOverrides":{"offline":{"manufacturer":"自定义厂家"}}}),
+            )
+            .unwrap();
+        assert_eq!(removed.presets, original.presets);
+        assert_eq!(
+            removed.model_overrides["offline"].manufacturer.as_deref(),
+            Some("自定义厂家")
+        );
+    }
+
     #[test]
     fn defaults_do_not_open_windows_or_change_workbench() {
         let prefs: Preferences = serde_json::from_value(json!({})).unwrap();

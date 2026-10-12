@@ -152,7 +152,7 @@ function App() {
               disabled={tasks.busy || !tasks.state || !!tasks.state.error}
               onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
             />
-            <ModelControlSettings live={live} />
+            <ModelControlSettings live={live} detailed={!simple} />
             <div id="settings-prompt-enhancement">
               <FeatureSwitch
                 name="提示词优化"

@@ -346,14 +346,14 @@ try {
     '0s',
   );
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await view.getByRole('button', { name: /其他模型/ }).waitFor();
+  await view.getByRole('button', { name: /未分类/ }).waitFor();
   assert.equal(
     await view.locator('.model-row').count(),
     0,
     'no favorites means all models stay hidden',
   );
   assert.equal(await view.locator('.model-footer [role="status"]').count(), 0);
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /未分类/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
   assert.equal(
@@ -402,14 +402,15 @@ try {
   await headerRefresh.evaluate((node) => node.blur());
   await waitOpacity(headerRefresh, '0');
   record('model arrows and header actions follow hover visibility and remain keyboard accessible');
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /未分类/ }).click();
+  await view.getByRole('button', { name: /未分类/, expanded: false }).waitFor();
   assert.equal(await view.locator('.model-row').count(), 1);
   await view.locator('[data-model="a"][data-reasoning="low"]').click();
   await view.locator('[data-reasoning="low"][aria-pressed="true"]').waitFor();
   assert.equal(await view.evaluate((node) => getComputedStyle(node).color), 'rgb(30, 35, 40)');
   assert.equal(model.snapshot.current.speed, 'fast');
   assert.equal(actions.find((action) => action.action === 'apply').data.expectedRevision, 'v1');
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /未分类/ }).click();
   await view.getByLabel('设为常用 Model B', { exact: true }).click();
   await view.getByLabel('隐藏 Model B', { exact: true }).waitFor();
   assert.deepEqual(model.preferences.pinned, ['a', 'b']);
@@ -424,13 +425,14 @@ try {
   assert.deepEqual(model.preferences.modelOrder, ['b', 'a']);
   await view.getByLabel('隐藏 Model A', { exact: true }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).waitFor();
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /未分类/ }).click();
+  await view.getByRole('button', { name: /未分类/, expanded: false }).waitFor();
   assert.equal(
     await view.locator('[data-model-row="a"]').count(),
     0,
     'current model also hides when removed from favorites',
   );
-  await view.getByRole('button', { name: /其他模型/ }).click();
+  await view.getByRole('button', { name: /未分类/ }).click();
   await view.getByLabel('设为常用 Model A', { exact: true }).click();
   await view.getByLabel('隐藏 Model A', { exact: true }).waitFor();
   const compactModelHeight = await page
@@ -589,7 +591,8 @@ try {
   });
   model.preferences.modelColumnWidth = 280;
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
-  await view.getByRole('button', { name: /其他模型/, expanded: true }).waitFor();
+  await view.getByRole('button', { name: /Google/ }).click();
+  await view.getByRole('button', { name: /Google/, expanded: true }).waitFor();
   await view.locator('.model-scroll').evaluate((node) => {
     node.scrollLeft = 160;
   });
@@ -604,7 +607,7 @@ try {
   const modelReading = entries.find((e) => e.id === 'model').view;
   assert.ok(modelReading.modelLeft > 0);
   assert.equal(modelReading.modelTools, true);
-  assert.equal(modelReading.modelOthers, true);
+  assert.ok(model.preferences.expandedGroups.includes('vendor:Google'));
   for (const entry of entries) entry.placement = 'desktop';
   await page.goto(
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
@@ -619,7 +622,7 @@ try {
   await waitModelRefresh('0');
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
-    await view.getByRole('button', { name: /其他模型/ }).getAttribute('aria-expanded'),
+    await view.getByRole('button', { name: /Google/ }).getAttribute('aria-expanded'),
     'true',
   );
   assert.equal(
