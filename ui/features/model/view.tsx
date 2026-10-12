@@ -1,5 +1,5 @@
 /* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Opus model layout, grouped picker, wrapping presets and capability-driven selection.
+ * [OUTPUT]: Favorites matrix, complete grouped picker, wrapping presets and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -38,13 +38,12 @@ export function ModelView({
   const root = useRef<HTMLElement>(null);
   const picker = useRef<HTMLDivElement>(null);
   const pickerToggle = useRef<HTMLButtonElement>(null);
-  const headerControls = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!others) return;
     const document = root.current!.ownerDocument;
     const outside = (event: PointerEvent) => {
       const path = event.composedPath();
-      if (!path.includes(picker.current!) && !path.includes(headerControls.current!))
+      if (!path.includes(picker.current!) && !path.includes(pickerToggle.current!))
         setOthers(false);
     };
     const escape = (event: KeyboardEvent) => {
@@ -130,7 +129,7 @@ export function ModelView({
   const widths = columns.length ? columns.map((_, i) => metrics.widths[i] || 63) : [28];
   const reasoningWidth = widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 4;
   const maxNameWidth = metrics.available
-    ? Math.max(100, Math.min(560, Math.floor(metrics.available - 40 - reasoningWidth)))
+    ? Math.max(100, Math.min(560, Math.floor(metrics.available - 8 - reasoningWidth)))
     : 560;
   const clampWidth = (width: number) => Math.max(100, Math.min(maxNameWidth, Math.round(width)));
   const nameWidth = clampWidth(columnWidth ?? prefs.modelColumnWidth ?? 140);
@@ -224,8 +223,6 @@ export function ModelView({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 4,
-        width: 'auto',
-        opacity: 1,
         border: 0,
         background: 'transparent',
       }}
@@ -236,23 +233,6 @@ export function ModelView({
     >
       所有{icon('chevron-down')}
     </button>
-  );
-  const controls = (
-    <span
-      ref={headerControls}
-      className="model-header-controls"
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-    >
-      {allButton}
-      <button
-        data-refresh="model"
-        aria-label="刷新可用模型"
-        disabled={busy || !prefs.enabled}
-        onClick={() => void action({}, 'refresh')}
-      >
-        {icon('refresh')}
-      </button>
-    </span>
   );
   return (
     <section
@@ -269,9 +249,9 @@ export function ModelView({
       }
     >
       {headerActions ? (
-        createPortal(controls, headerActions)
+        createPortal(allButton, headerActions)
       ) : (
-        <header className="model-toolbar">{controls}</header>
+        <header className="model-toolbar">{allButton}</header>
       )}
       <div
         className="model-scroll"
@@ -352,7 +332,7 @@ export function ModelView({
               {icon('grip')}
             </button>
             <div className="model-matrix-head">
-              <span className="model-name-tools">
+              <span className="model-fixed-tools">
                 <button
                   className="model-fast"
                   aria-label="Fast"
@@ -371,7 +351,7 @@ export function ModelView({
                     })
                   }
                 >
-                  Fast
+                  {icon('bolt')}
                 </button>
               </span>
               <div>
@@ -510,6 +490,25 @@ export function ModelView({
       </section>
       {others && (
         <div className="model-picker" ref={picker} role="dialog" aria-label="所有模型">
+          <div className="model-picker-actions">
+            <button
+              data-refresh="model"
+              aria-label="刷新可用模型"
+              disabled={busy || !prefs.enabled}
+              onClick={() => void action({}, 'refresh')}
+            >
+              {icon('refresh')}
+            </button>
+            <button
+              aria-label="关闭所有模型"
+              onClick={() => {
+                setOthers(false);
+                pickerToggle.current?.focus({ preventScroll: true });
+              }}
+            >
+              {icon('close')}
+            </button>
+          </div>
           <div className="model-other-list">
             {groups.map((group) => (
               <section

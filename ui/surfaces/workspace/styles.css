@@ -665,12 +665,3 @@
 .csw-feature-header-actions button:hover {
   color: var(--csw-text);
 }
-
-@media (hover: hover) and (pointer: fine) {
-  .csw-feature-header-actions [data-refresh='model'] {
-    --feature-refresh-opacity: 0;
-  }
-  .csw-feature-header-actions .model-header-controls:hover [data-refresh='model'] {
-    --feature-refresh-opacity: 1;
-  }
-}

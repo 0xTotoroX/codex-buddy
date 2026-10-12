@@ -1,5 +1,5 @@
 /* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
- * [OUTPUT]: Opus spacing, header Fast control and contained neutral popovers.
+ * [OUTPUT]: Stable columns, fixed Fast control and contained neutral popovers.
  * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 .feature-model {
@@ -9,15 +9,15 @@
   flex: 1;
   min-height: 0;
   --model-popup: color-mix(in srgb, var(--paper) 92%, var(--ink));
-  --model-tile: color-mix(in srgb, var(--paper) 88%, var(--ink));
-  --model-tile-on: color-mix(in srgb, var(--paper) 80%, var(--ink));
-  --model-preset-height: max(32px, calc(1.4em + 10px));
+  --model-tile: color-mix(in srgb, var(--paper) 86%, var(--ink));
+  --model-tile-on: color-mix(in srgb, var(--paper) 78%, var(--ink));
+  --model-preset-height: max(28px, calc(1.4em + 10px));
 }
 .feature-model button {
   border: 0;
   min-width: 28px;
   min-height: 28px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
 }
 .feature-model button:hover:not(:disabled) {
@@ -34,7 +34,7 @@
 .model-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 .model-picker-toggle {
   color: var(--muted);
@@ -44,15 +44,12 @@
 }
 .model-scroll {
   min-height: 0;
-  flex: 1 1 252px;
-  height: 252px;
-  max-height: 252px;
+  flex: 1 1 auto;
   overflow: auto;
-  overscroll-behavior: contain;
 }
 .model-matrix {
   position: relative;
-  min-width: calc(var(--name-width) + 40px + var(--reasoning-min-width));
+  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
 }
 .model-primary {
   position: relative;
@@ -60,8 +57,8 @@
 .feature-model .model-column-resize {
   position: absolute;
   z-index: 1;
-  left: calc(var(--name-width) + 6px);
-  top: 2px;
+  left: calc(var(--name-width) - 10px);
+  top: 0;
   width: 28px;
   height: 28px;
   padding: 5px;
@@ -79,29 +76,27 @@
 .model-row {
   display: grid;
   grid-template-columns: var(--name-width) minmax(0, 1fr);
-  gap: 40px;
+  gap: 8px;
   align-items: center;
-  min-width: calc(var(--name-width) + 40px + var(--reasoning-min-width));
+  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
 }
 .model-matrix-head {
-  min-height: 32px;
+  min-height: 28px;
   color: var(--muted);
   font-size: inherit;
 }
-.model-name-tools {
+.model-fixed-tools {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .feature-model .model-fast {
-  height: 28px;
-  padding: 0 12px;
-  font-size: 0.93em;
+  padding: 5px;
   color: var(--muted);
-  background: var(--model-popup);
+  background: transparent;
 }
 .feature-model .model-fast[aria-pressed='true'] {
-  color: var(--paper);
-  background: var(--ink);
+  color: var(--ink);
+  background: transparent;
 }
 .model-matrix-head > div,
 .model-choices {
@@ -112,7 +107,7 @@
   text-align: center;
 }
 .model-row {
-  min-height: 44px;
+  min-height: 36px;
   padding-block: 4px;
 }
 .model-name {
@@ -149,16 +144,13 @@
 }
 .model-route {
   display: block;
-  margin-top: 1px;
-  font-size: 0.86em;
-  line-height: 1.25;
   color: var(--muted);
   font-weight: normal;
   overflow-wrap: anywhere;
 }
 /* 自然尺寸与拖动列宽分离，避免贴边窗口追随名称换行跳动。 */
 .model-intrinsic-width {
-  min-width: max(432px, calc(280px + 40px + var(--reasoning-min-width)));
+  min-width: max(432px, calc(280px + 8px + var(--reasoning-min-width)));
 }
 :host([data-measuring='true']) .feature-model {
   --name-width: 280px !important;
@@ -173,24 +165,21 @@
   margin: 8px 0;
 }
 .model-collections {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 .model-collections-heading {
   display: flex;
   align-items: center;
   gap: 4px;
   min-height: 28px;
-  margin-bottom: 4px;
-  font-size: 0.93em;
   color: var(--muted);
 }
 .model-presets {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px;
-  max-height: calc(3 * var(--model-preset-height) + 16px);
+  gap: 4px;
+  max-height: calc(3 * var(--model-preset-height) + 8px);
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -198,21 +187,18 @@
   flex: none;
   max-width: 100%;
   height: var(--model-preset-height);
-  padding: 5px 11px;
-  color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--model-popup);
+  background: var(--hover);
 }
 .feature-model .model-presets > button[aria-pressed='true'] {
   background: var(--model-tile-on);
-  color: var(--ink);
 }
 .feature-model .model-presets > .model-add-preset {
   width: var(--model-preset-height);
   padding: 5px;
-  background: var(--model-popup);
+  background: transparent;
 }
 .model-preset {
   display: flex;
@@ -233,29 +219,19 @@
   padding: 8px 0;
 }
 .model-preset-editor {
-  position: absolute;
-  z-index: 6;
-  right: 0;
-  bottom: 0;
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 10px;
-  width: min(300px, 100%);
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--model-popup);
-  box-shadow: 0 18px 50px #0007;
+  gap: 4px;
+  padding: 8px 0;
 }
 .model-preset-editor input {
-  flex: 1 1 100%;
+  flex: 1 1 120px;
   min-width: 0;
   width: 100%;
-  padding: 8px 10px;
+  padding: 5px 8px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--model-tile);
+  border-radius: 5px;
+  background: transparent;
 }
 .model-picker {
   --picker-top: clamp(0px, calc(100% - 180px), 32px);
@@ -267,15 +243,31 @@
   flex-direction: column;
   width: min(430px, 100%);
   max-height: min(24em, calc(100% - var(--picker-top)));
-  padding: 14px;
+  padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--model-popup);
-  box-shadow: 0 18px 50px #0007;
+  box-shadow: 0 10px 28px #0003;
 }
 .feature-model[data-header-actions='true'] .model-picker {
   top: 0;
   max-height: min(24em, 100%);
+}
+.model-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-bottom: 8px;
+}
+.feature-model .model-picker-actions button {
+  color: var(--muted);
+  background: transparent;
+}
+.feature-model .model-picker-actions button:hover {
+  color: var(--ink);
+  background: transparent;
 }
 .model-other-list {
   min-height: 0;
@@ -283,12 +275,11 @@
   overscroll-behavior: contain;
 }
 .model-group + .model-group {
-  margin-top: 14px;
+  margin-top: 16px;
 }
 .model-group h3 {
-  margin: 0 0 7px;
+  margin: 0 0 6px;
   font: inherit;
-  font-size: 0.86em;
   color: var(--muted);
 }
 .model-tiles {
@@ -301,16 +292,16 @@
   flex-direction: column;
   justify-content: center;
   align-items: flex-start;
-  min-height: 32px;
   max-width: 100%;
-  padding: 6px 11px;
+  padding: 6px 10px;
   text-align: left;
   overflow-wrap: anywhere;
   background: var(--model-tile);
-  color: color-mix(in srgb, var(--ink) 78%, var(--paper));
+  color: var(--ink);
 }
 .feature-model .model-tile[aria-pressed='true'] {
   background: var(--model-tile-on);
+  color: var(--ink);
 }
 .feature-model .model-tile:hover:not(:disabled) {
   background: color-mix(in srgb, var(--model-tile) 80%, var(--ink));
@@ -337,16 +328,4 @@
   .model-collections-heading button:focus-visible {
     opacity: 1;
   }
-}
-
-.feature-model .model-preset-editor button[type='submit'] {
-  background: var(--ink);
-  color: var(--paper);
-}
-
-.feature-model .model-fast[aria-pressed='true']:hover:not(:disabled) {
-  background: var(--ink);
-}
-.feature-model .model-presets > button:hover:not(:disabled) {
-  color: var(--ink);
 }
