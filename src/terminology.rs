@@ -64,6 +64,7 @@ impl Default for Preferences {
 struct Seen {
     context: String,
     sessions: BTreeMap<String, BTreeSet<String>>,
+    verified_sessions: BTreeMap<String, BTreeSet<String>>,
     phase: String,
     message: String,
 }
@@ -297,7 +298,12 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
                 .take(180)
                 .collect();
             if !context.is_empty() {
-                let ids = seen.sessions.entry(context.into()).or_default();
+                let sessions = if input["contextVerified"] == true {
+                    &mut seen.verified_sessions
+                } else {
+                    &mut seen.sessions
+                };
+                let ids = sessions.entry(context.into()).or_default();
                 for id in input["ids"]
                     .as_array()
                     .into_iter()
@@ -356,7 +362,8 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
                     known(&terms, &term.name).or_else(|| known(&terms, &term.english))
                 {
                     ensure!(
-                        existing.id == term.id && stored.iter().any(|t| t.id == term.id),
+                        (existing.id == term.id && stored.iter().any(|t| t.id == term.id))
+                            || existing.name != term.name,
                         "术语或别名已存在：{}",
                         term.name
                     );
@@ -399,11 +406,12 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
         _ => bail!("未知术语操作"),
     }
     let seen: Seen = read(root, "terminology-seen.json")?;
-    let involved = seen
-        .sessions
-        .get(&seen.context)
-        .cloned()
-        .unwrap_or_default();
+    let sessions = if prefs.semantic {
+        &seen.verified_sessions
+    } else {
+        &seen.sessions
+    };
+    let involved = sessions.get(&seen.context).cloned().unwrap_or_default();
     if action == "view" {
         terms.retain(|t| {
             involved.contains(&t.id)
@@ -516,7 +524,7 @@ mod tests {
         command(&app, json!({"action":"favorite","id":"TERM-1"}))
             .await
             .unwrap();
-        command(&app,json!({"action":"observe","context":"chat-a","ids":["TERM-1","unknown"],"phase":"ready"})).await.unwrap();
+        command(&app,json!({"action":"observe","context":"chat-a","ids":["TERM-1","unknown"],"phase":"ready","contextVerified":true})).await.unwrap();
         let a = command(&app, json!({"action":"state"})).await.unwrap();
         assert_eq!(a["involved"], json!(["TERM-1"]));
         assert_eq!(a["preferences"]["favorites"], json!(["TERM-1"]));
@@ -558,6 +566,52 @@ mod tests {
                 .contains("自定义工作流")
         );
         assert!(!exported["markdown"].as_str().unwrap().contains("防抖"));
+    }
+    #[tokio::test]
+    async fn unverified_history_is_retained_but_not_shown_as_context_confirmed() {
+        let dir = tempfile::tempdir().unwrap();
+        save(
+            dir.path(),
+            "terminology-seen.json",
+            &json!({"context":"a","sessions":{"a":["wrong"]}}),
+        )
+        .unwrap();
+        let app = App::new(
+            crate::config::Paths::new(Some(dir.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let view = command(&app, json!({"action":"view"})).await.unwrap();
+        assert_eq!(view["involved"], json!([]));
+        let stored: Seen = read(dir.path(), "terminology-seen.json").unwrap();
+        assert!(stored.sessions["a"].contains("wrong"));
+    }
+    #[tokio::test]
+    async fn qualified_senses_can_be_restored_from_export_without_overwriting_each_other() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = App::new(
+            crate::config::Paths::new(Some(dir.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let entries = json!([
+            {"id":"physical","name":"背景材质","english":"Background Material","definition":"低放射性物理材料","category":["物理"]},
+            {"id":"interface","name":"背景材质（界面设计）","english":"Background Material","aliases":["背景材质"],"definition":"界面的透明、模糊与层次","category":["界面设计"]}
+        ]);
+        command(&app, json!({"action":"import","entries":entries}))
+            .await
+            .unwrap();
+        let exported = command(&app, json!({"action":"export"})).await.unwrap();
+        assert_eq!(exported["entries"].as_array().unwrap().len(), 2);
+        command(
+            &app,
+            json!({"action":"import","entries":exported["entries"]}),
+        )
+        .await
+        .unwrap();
+        assert_eq!(library(dir.path()).unwrap().len(), 2);
     }
     #[test]
     fn separate_storage_and_chinese_export() {

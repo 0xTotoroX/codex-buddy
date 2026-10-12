@@ -154,12 +154,12 @@ export function TerminologyView({
       )}
       {filter === 'current' && state.phase === 'analyzing' && (
         <p className="term-status" role="status">
-          正在识别句段含义…
+          正在核对上下文词义…
         </p>
       )}
       {filter === 'current' && state.phase === 'error' && (
         <p className="term-status" role="status">
-          {state.message || '本次语义分析未完成，已保留本地匹配结果。'}
+          {state.message || '本次词义核对未完成，仅保留已确认的结果。'}
         </p>
       )}
     </div>

@@ -305,3 +305,72 @@ test('long phrase popover follows hover point, clamps to viewport and stays stil
     await browser.close();
   }
 });
+
+test('context-approved sense replaces a conflicting literal match and failure does not restore it', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent(
+      '<main style="margin:80px"><p>背景材质使用磨砂和液态，在界面中调整透明度。</p></main>',
+    );
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate(async () => {
+      window.state.entries = [
+        {
+          id: 'physics',
+          name: '背景材质',
+          english: 'Background Material',
+          definition: '低放射性物理材料',
+          aliases: [],
+          category: ['物理'],
+        },
+        {
+          id: 'ui',
+          name: '界面材质',
+          english: 'UI Material',
+          definition: '通过模糊和透明度形成界面层次',
+          aliases: [],
+          category: ['界面设计'],
+        },
+      ];
+      window.state.preferences.semantic = true;
+      await window.__codexBuddyTerminology.refresh();
+    });
+    await page.waitForFunction(() => window.semanticReply !== null);
+    assert.equal(await page.evaluate(() => CSS.highlights.get('codex-buddy-terms')?.size), 0);
+    await page.evaluate(() =>
+      window.semanticReply({
+        matches: [{ id: 'ui', quote: '背景材质使用磨砂和液态，在界面中调整透明度。' }],
+      }),
+    );
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 1);
+    await page.keyboard.press('Alt+Shift+KeyT');
+    await page.getByRole('dialog', { name: '界面材质释义' }).waitFor();
+    assert.ok(!(await page.locator('.term-card').innerText()).includes('放射'));
+    assert.ok(
+      await page.evaluate(() =>
+        window.calls.some(
+          (c) =>
+            c.payload.action === 'observe' &&
+            c.payload.contextVerified &&
+            c.payload.ids.includes('ui') &&
+            !c.payload.ids.includes('physics'),
+        ),
+      ),
+    );
+    await page.evaluate(() => {
+      window.session = 'two';
+      window.answer = '新的界面背景材质问题';
+      window.semanticReply = null;
+    });
+    await page.waitForFunction(() => window.semanticReply !== null);
+    await page.evaluate(() => window.semanticReply({ error: '模拟语义服务失败' }));
+    await page.waitForFunction(
+      () => window.__codexBuddyTerminology.lastError === '模拟语义服务失败',
+    );
+    assert.equal(await page.evaluate(() => CSS.highlights.get('codex-buddy-terms')?.size), 0);
+    await page.evaluate(() => window.__codexBuddyTerminology.destroy());
+  } finally {
+    await browser.close();
+  }
+});

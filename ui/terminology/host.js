@@ -160,6 +160,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       context: contextKey(),
       ids: [...new Set(ids)].sort(),
       phase: state.preferences.enabled ? phase : 'disabled',
+      contextVerified: !!state.preferences.semantic,
       message: apiObject.lastError || '',
     };
     const signature = JSON.stringify(payload);
@@ -185,8 +186,14 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     }
     const index = textIndex(root),
       terms = new Map(state.entries.map((t) => [t.id, t]));
-    const hits = createMatcher(state.entries)(index.text);
-    for (const hint of semanticMatches) {
+    // 语义模式下字面命中只作候选，绝不盖过已核对的词义。
+    const hits = state.preferences.semantic ? [] : createMatcher(state.entries)(index.text);
+    const confirmed = state.preferences.semantic
+      ? [...cache.values()]
+          .filter((entry) => entry.context === contextKey())
+          .flatMap((entry) => entry.matches)
+      : [];
+    for (const hint of confirmed) {
       const term = terms.get(hint.id);
       if (!term) continue;
       for (const span of semanticSpans(index.text, hint.quote)) {
@@ -217,6 +224,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     try {
       const value = await api({ action: 'state' });
       if (!alive) return;
+      const entriesChanged = JSON.stringify(value.entries) !== JSON.stringify(state.entries);
       const changed =
         JSON.stringify([value.preferences, value.entries]) !==
         JSON.stringify([state.preferences, state.entries]);
@@ -225,7 +233,8 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
         value.preferences.enabled !== state.preferences.enabled;
       state = value;
       if (changed) {
-        if (toggled) {
+        if (toggled || entriesChanged) {
+          cache.clear();
           pending = '';
           lastAnalysis = '';
           failures = 0;
@@ -236,12 +245,6 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       apiObject.lastError = e.message;
     } finally {
       loading = false;
-      let phase = 'waiting',
-        lastReport = '',
-        reportQueue = Promise.resolve(),
-        retryAt = 0,
-        failures = 0;
-      const cache = new Map();
     }
   }
   function identity() {
@@ -258,7 +261,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     const exchange = identity();
     if (!exchange || exchange.key === lastAnalysis || Date.now() < retryAt) return;
     if (cache.has(exchange.key)) {
-      semanticMatches = cache.get(exchange.key);
+      semanticMatches = cache.get(exchange.key).matches;
       lastAnalysis = exchange.key;
       phase = 'ready';
       scan();
@@ -284,7 +287,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       if (!alive || pending !== id || root !== originalRoot || identity()?.key !== exchange.key)
         return;
       semanticMatches = result.matches || [];
-      cache.set(exchange.key, semanticMatches);
+      cache.set(exchange.key, { context: exchange.sessionId, matches: semanticMatches });
       if (cache.size > 32) cache.delete(cache.keys().next().value);
       failures = 0;
       retryAt = 0;

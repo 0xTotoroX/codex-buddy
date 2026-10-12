@@ -84,7 +84,7 @@ Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，
 features.task_command承接原server看板命令协调：主界面已接管时，未登记看板的打开/启用进入共享容器；旧窗口草稿仍按原规则保护。restore_unregistered_main_features在feature_operation内只补缺失条目。模型preferences白名单加入modelOrder，继续校验owner、唯一ID及revision。state.handle_refresh_failure保留仍存活客户端上的Elapsed；Connection.status新增unresponsive，下一次正常refresh即恢复connected。
 
 - `terminology.rs`：本机私有术语/手动词库、背景材质/液态变体/自定义色/宽度偏好及已掌握状态（兼容旧样式字段），认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
-- `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句与规范术语；未命中时仅向固定公共百科发送短术语，校验资料相关性与分类后新增，切换上下文或关闭功能拒绝迟到结果。
+- `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句、含义与领域，并批量核对同名词条的定义；未命中时仅向固定公共百科发送带领域消歧的短检索词，先核对原文证据，再生成释义与分类，异义词独立编号保存，切换上下文或关闭功能拒绝迟到结果。
 
 settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修订保存；model.same_generation_config忽略这一工具开关。prompt_enhancement在开始和取消校验中检查开关，关闭后拒绝请求并终止在途操作。
 
@@ -92,4 +92,4 @@ settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修�
 
 模型功能视图的受限 preferences 白名单允许 expandedGroups，与常用/顺序/预设一样校验 owner 和 revision；厂家及自定义分组仍只经设置服务保存，视图不能写 enabled、groups 或 modelOverrides。
 
-terminology 的 seen 文件只保存聊天身份、术语编号和分析状态；收藏与已掌握独立保存。features 增加 terms 业务分发与已有主界面缺失成员补登记，不覆盖关闭状态和布局。
+terminology 的 seen 文件只保存聊天身份、术语编号和分析状态；verifiedSessions 单独保留经语境确认的编号，旧字面 sessions 保留但不作为语义模式当前聊天结果；收藏与已掌握独立保存。features 增加 terms 业务分发与已有主界面缺失成员补登记，不覆盖关闭状态和布局。

@@ -249,7 +249,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
                     })
                   }
                 />{' '}
-                根据问答含义识别概念
+                结合问答核对词义与识别概念
               </label>
             </div>
             <div className="settings-row">
