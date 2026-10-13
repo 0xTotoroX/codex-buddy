@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 宿主输入框、已校验上下文与显式写入意图。
- * [OUTPUT]: 输入框定位、保留草稿写入与发送就绪重试。
+ * [OUTPUT]: 输入框定位、保留多行/空行的草稿读取与写入、发送就绪重试。
  * [POS]: 宿主写入边界，不生成建议或调用大纲。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -196,14 +196,34 @@ function setEditableText(target, prompt, append = false) {
 function rawComposerText(target) {
   if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)
     return target.value;
-  const read = (node) => {
+  const block = (node) =>
+    node instanceof Element && /^(P|DIV|LI|UL|OL|PRE|BLOCKQUOTE|H[1-6])$/.test(node.tagName);
+  const read = (node, trailingBreak = null) => {
     if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || '';
     if (!(node instanceof Element)) return '';
-    if (node.tagName === 'BR') return node.parentElement?.childNodes.length === 1 ? '' : '\n';
-    const value = Array.from(node.childNodes, read).join('');
-    return /^(P|DIV|LI)$/.test(node.tagName) ? `${value}\n` : value;
+    if (node.tagName === 'BR') return node === trailingBreak ? '' : '\n';
+    // 编辑器在末尾放置 BR 作为空行的光标占位；只忽略这个节点，不裁剪原始文本换行。
+    if (node === target || block(node)) {
+      let tail = node.lastChild;
+      while (tail instanceof Element && !block(tail) && tail.lastChild) tail = tail.lastChild;
+      trailingBreak = tail instanceof Element && tail.tagName === 'BR' ? tail : null;
+    }
+    let value = '',
+      previousBlock = false,
+      seen = false;
+    for (const child of node.childNodes) {
+      const isBlock = block(child),
+        text = read(child, trailingBreak);
+      if (!isBlock && !text) continue;
+      // 块之间，以及裸文本与块之间各隔一行；空块也占一行，内联格式不增加分隔。
+      if (seen && (previousBlock || (isBlock && !value.endsWith('\n')))) value += '\n';
+      value += text;
+      previousBlock = isBlock;
+      seen = true;
+    }
+    return value;
   };
-  return Array.from(target.childNodes, read).join('').replace(/\n$/, '');
+  return target ? read(target) : '';
 }
 
 export {

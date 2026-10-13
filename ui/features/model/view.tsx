@@ -1,11 +1,11 @@
 /* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Favorites matrix, in-panel catalog, wrapping presets and capability-driven selection.
+ * [OUTPUT]: Favorites matrix, in-panel catalog, wrapping presets with synchronous draft handoff and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
-import type { Reading } from '../../shared/features';
+import type { ModelPresetDraft, Reading } from '../../shared/features';
 import { groupedModels, orderedModelIds, type ModelState, type Selection } from './catalog';
 export type { ModelState } from './catalog';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
@@ -29,12 +29,15 @@ export function ModelView({
     [drop, setDrop] = useState(''),
     [columnWidth, setColumnWidth] = useState<number | null>(null),
     [metrics, setMetrics] = useState({ available: 0, widths: [] as number[] }),
-    [presetDraft, setPresetDraft] = useState<{
-      id: string;
-      name: string;
-      selection: Selection;
-      creating: boolean;
-    } | null>(null);
+    [presetDraft, renderPresetDraft] = useState<ModelPresetDraft | null>(() =>
+      structuredClone(reading.modelPresetDraft || null),
+    );
+  function setPresetDraft(draft: ModelPresetDraft | null) {
+    // 输入事件内同步交接副本，确保紧接着卸载或移动时 capture 不依赖 effect 时机。
+    if (draft) reading.modelPresetDraft = structuredClone(draft);
+    else delete reading.modelPresetDraft;
+    renderPresetDraft(draft);
+  }
   const matrix = useRef<HTMLDivElement>(null);
   const main = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLElement>(null);

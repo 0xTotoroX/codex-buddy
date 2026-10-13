@@ -1,5 +1,5 @@
 /* [INPUT]: Authenticated feature transport and shared business DTOs.
- * [OUTPUT]: Five-feature placement, main ownership, default fonts, recursive split geometry and transient view contracts.
+ * [OUTPUT]: Five-feature placement, main ownership, default fonts, recursive split geometry and transient view/preset-draft contracts.
  * [POS]: Presentation boundary. [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import type { BoardView } from '../features/board/app';
 export const titles = {
@@ -26,6 +26,12 @@ export function featureFontSize(id: FeatureId, sizes?: FontSizes, legacySize?: n
   return Math.round(Math.max(10, Math.min(24, size)) * 10) / 10;
 }
 export type Placement = 'sidebar' | 'overlay' | 'desktop' | 'edge';
+export type ModelPresetDraft = {
+  id: string;
+  name: string;
+  selection: { model: string; reasoning: string; speed: string };
+  creating: boolean;
+};
 export type Reading = {
   token?: string;
   top?: number;
@@ -39,6 +45,7 @@ export type Reading = {
   modelTools?: boolean;
   modelOthers?: boolean;
   modelLeft?: number;
+  modelPresetDraft?: ModelPresetDraft;
 };
 export type Entry = {
   id: FeatureId;
