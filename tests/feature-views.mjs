@@ -925,11 +925,25 @@ try {
   await outlineView.locator('[data-outline-id="outline-child"]').focus();
   await page.keyboard.press('Tab');
   await page.keyboard.press('Shift+Tab');
-  await outlineView.locator('[data-outline-id="outline-child"]:focus-visible').waitFor();
   assert.equal(
-    await outlineView
-      .locator('[data-outline-id="outline-child"]')
-      .evaluate((node) => getComputedStyle(node).outlineStyle),
+    await outlineView.locator('[data-outline-id="outline-child"]').evaluate(async (node) => {
+      const deadline = performance.now() + 5000;
+      while (!node.matches(':focus-visible') || getComputedStyle(node).outlineStyle !== 'solid') {
+        if (performance.now() > deadline)
+          throw Error(
+            JSON.stringify({
+              connected: node.isConnected,
+              disabled: node.disabled,
+              focused: node.getRootNode().activeElement === node,
+              visibleFocus: node.matches(':focus-visible'),
+              outline: getComputedStyle(node).outlineStyle,
+              textColor: getComputedStyle(node).getPropertyValue('--csw-text'),
+            }),
+          );
+        await new Promise(requestAnimationFrame);
+      }
+      return getComputedStyle(node).outlineStyle;
+    }),
     'solid',
   );
   await page.locator('#root').evaluate((node) => node.style.removeProperty('zoom'));
