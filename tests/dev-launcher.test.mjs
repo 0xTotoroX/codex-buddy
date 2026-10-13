@@ -371,8 +371,9 @@ test('background launch survives the launcher, logs privately, reuses its owner 
     join(root, 'scripts/dev.mjs'),
     `
     import fs from 'node:fs';
+    import {claimLease} from ${JSON.stringify(new URL('../scripts/dev-sources.mjs', import.meta.url).href)};
     const lock = 'target/dev/owner.json';
-    fs.writeFileSync(lock, JSON.stringify({ pid: process.pid }));
+    let release = () => {};
     const at=process.argv.indexOf('--cdp');
     if(at>=0)fs.writeFileSync('target/dev/session.json',JSON.stringify({launchConnection:{endpoint:process.argv[at+1],targetId:process.argv[at+3]}}));
     console.log('background ready');
@@ -380,9 +381,10 @@ test('background launch survives the launcher, logs privately, reuses its owner 
     const timer = setInterval(() => {}, 100);
     process.on('SIGTERM', () => {
       clearInterval(timer);
-      fs.unlinkSync(lock);
+      release();
       fs.writeFileSync('target/dev/stopped', 'normal');
     });
+    release = claimLease(lock);
   `,
   );
   let pid;

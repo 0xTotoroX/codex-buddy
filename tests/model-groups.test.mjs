@@ -239,7 +239,22 @@ test(
       );
       await settings.getByLabel('选择 私有别名', { exact: true }).check();
       await settings.getByLabel('批量指定厂家').fill('私人厂家');
-      await settings.getByRole('button', { name: '指定厂家', exact: true }).click();
+      const [manufacturerSaved] = await Promise.all([
+        page.waitForResponse((response) => {
+          const request = response.request();
+          return (
+            response.url().endsWith('/api/model-control/preferences') &&
+            request.method() === 'POST' &&
+            request.postDataJSON().patch?.modelOverrides?.custom?.manufacturer === '私人厂家'
+          );
+        }),
+        settings.getByRole('button', { name: '指定厂家', exact: true }).click(),
+      ]);
+      assert.equal(manufacturerSaved.status(), 200);
+      assert.equal(
+        (await manufacturerSaved.json()).preferences.modelOverrides.custom.manufacturer,
+        '私人厂家',
+      );
       await settings.getByText('私人厂家 · 手动', { exact: true }).waitFor();
       await settings.getByLabel('批量移动分组').selectOption(groupId);
       await settings.getByRole('button', { name: '移动模型' }).click();

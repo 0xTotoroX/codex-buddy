@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 临时 Git worktrees、进程租约和合成开发交接回调。
- * [OUTPUT]: 来源白名单、互斥占用、失效租约恢复与孤儿后台保护、并发/失败回退及认证网关行为验收。
+ * [OUTPUT]: 来源白名单、原子租约发布与互斥占用、失效租约恢复与孤儿后台保护、并发/失败回退及认证网关行为验收。
  * [POS]: 开发切换契约；不连接官方宿主、不终止真实开发会话。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { Worker } from 'node:worker_threads';
 import {
   worktrees,
   selectSource,
@@ -33,6 +34,37 @@ const temporary = (t) => {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 };
+test('lease publication never exposes partial JSON to a concurrent reader', async (t) => {
+  const root = temporary(t),
+    path = join(root, 'owner.json'),
+    shared = new SharedArrayBuffer(4),
+    stop = new Int32Array(shared);
+  const reader = new Worker(
+    `const {workerData,parentPort}=require('node:worker_threads');
+     const {readFileSync}=require('node:fs');
+     const stop=new Int32Array(workerData.shared);
+     let reads=0,invalid=0;
+     parentPort.postMessage('ready');
+     while(!Atomics.load(stop,0)) {
+       try { JSON.parse(readFileSync(workerData.path,'utf8')); reads++; }
+       catch(error) { if(error.code!=='ENOENT') invalid++; }
+     }
+     parentPort.postMessage({reads,invalid});`,
+    { eval: true, workerData: { path, shared } },
+  );
+  t.after(() => reader.terminate());
+  await once(reader, 'message');
+  const done = once(reader, 'message');
+  const payload = 'x'.repeat(256 * 1024);
+  for (let index = 0; index < 64; index++) {
+    const release = claimLease(path, { index, payload });
+    release();
+  }
+  Atomics.store(stop, 0, 1);
+  const [result] = await done;
+  assert.ok(result.reads > 0, 'reader sampled published leases');
+  assert.equal(result.invalid, 0, 'readers see complete JSON or no lease');
+});
 test('worktree discovery handles spaces, dirty files, shared preferences and rejects arbitrary paths', (t) => {
   const directory = temporary(t),
     root = join(directory, 'main tree'),

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Git worktree 清单、私有进程记录与开发服务交接回调。
- * [OUTPUT]: 可选源码清单、可安全恢复失效记录的独占租约、串行且可回退的来源切换。
+ * [OUTPUT]: 可选源码清单、原子发布且可安全恢复失效记录的独占租约、串行且可回退的来源切换。
  * [POS]: dev.mjs 的跨 worktree 协调层；不操作宿主或终止其他进程。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -10,6 +10,7 @@ import {
   readFileSync,
   writeFileSync,
   mkdirSync,
+  linkSync,
   unlinkSync,
   realpathSync,
 } from 'node:fs';
@@ -128,6 +129,16 @@ function assertLeaseStopped(prior, path) {
       );
   }
 }
+function publishLease(path, record) {
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+    // Publish the complete inode exclusively: readers never see a half-written JSON record.
+    linkSync(temporary, path);
+  } finally {
+    if (existsSync(temporary)) unlinkSync(temporary);
+  }
+}
 function recoverLease(path, record) {
   const guard = `${path}.recovery`;
   try {
@@ -143,7 +154,7 @@ function recoverLease(path, record) {
       unlinkSync(path);
     }
     // A normal claimant may win after unlink. Never retry deletion in that case.
-    writeFileSync(path, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+    publishLease(path, record);
   } catch (error) {
     if (error.code === 'EEXIST') throw new Error('另一个开发会话已取得占用，请重新打开入口。');
     throw error;
@@ -155,7 +166,7 @@ export function claimLease(path, metadata = {}) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const record = { ...metadata, pid: process.pid, nonce: randomUUID() };
   try {
-    writeFileSync(path, JSON.stringify(record), { flag: 'wx', mode: 0o600 });
+    publishLease(path, record);
   } catch (error) {
     if (error.code !== 'EEXIST') throw error;
     const prior = leaseRecord(path);

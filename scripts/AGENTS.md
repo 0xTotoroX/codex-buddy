@@ -49,3 +49,5 @@ Dev生命周期修复：App入口串行openDevelopment、校验监督进程就�
 startBackgroundDevelopment可显式传入现有connection(endpoint/targetId)进行无宿主重启的接续；参数通过本机端点/窗口ID校验，以--cdp/--target固定目标。session.launchConnection用于stop校验完整进程参数，仍核对owner PID/nonce。CodexHost已选择但待启用时可用此路径重开Dev，不覆盖用户开关或隐式应用宿主重启。
 
 npm run check 将 Node 测试并发固定为 4；verify 沿用该入口，所有用例与后续工作台、Rust、端到端和生命周期检查保持。
+
+Dev 租约先在同目录写完整私有临时文件，再通过独占硬链接原子发布；正常领取与失效恢复共用该方式，冲突不覆盖既有记录。并发读取只会看到完整 JSON 或记录不存在；损坏、活动及无法确认退出的旧记录仍保留并拒绝接管。
