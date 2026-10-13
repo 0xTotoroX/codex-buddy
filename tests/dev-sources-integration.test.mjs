@@ -50,6 +50,7 @@ test(
     const git = (...args) => execFileSync('git', ['-C', main, ...args], { stdio: 'pipe' });
     let dev,
       browser,
+      browserServer,
       logs = '',
       stage = 'prepare fixture',
       cleanupPromise;
@@ -81,7 +82,8 @@ test(
     await once(host, 'listening');
     const cleanup = () =>
       (cleanupPromise ||= (async () => {
-        await browser?.close();
+        // Terminate only this fixture's browser process, including pending page evaluations.
+        await browserServer?.kill();
         await stopChild(dev);
         for (const socket of sockets.clients) socket.terminate();
         sockets.close();
@@ -246,10 +248,11 @@ test(
       );
       // Render the complete React page together with the injected source selector.
       stage = 'launch pinned browser';
-      browser = await chromium.launch({
+      browserServer = await chromium.launchServer({
         headless: true,
         executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
       });
+      browser = await chromium.connect(browserServer.wsEndpoint(), { timeout: 20000 });
       const page = await browser.newPage();
       page.setDefaultTimeout(15000);
       page.setDefaultNavigationTimeout(20000);
@@ -328,24 +331,30 @@ test(
       switchStarted = true;
       await Promise.all([
         page.waitForEvent('domcontentloaded', { timeout: 30000 }),
-        page.getByRole('button', { name: '切换来源' }).click(),
+        page.getByRole('button', { name: '切换来源' }).click({ noWaitAfter: true }),
       ]);
+      stage = 'wait for switched source widget';
       await page.getByText(/开发来源 · main/).waitFor({ timeout: 30000 });
+      stage = 'wait for switched resource confirmation';
       await page.getByText(/界面资源已确认/).waitFor();
       switchingSource = false;
       assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
+      stage = 'check switched settings usability';
       await navigation.getByRole('link', { name: '功能与交互', exact: true }).click();
       await outlineSwitch.waitFor();
       await until(() => outlineSwitch.isEnabled(), 'settings remain usable after switching');
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
+      stage = 'drain switched page responses';
       await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'settings must still render after switching source');
+      stage = 'save through switched source identity';
       assert.equal(
         await page.evaluate(
           async () =>
             (
               await fetch('/api/settings', {
                 method: 'POST',
+                signal: AbortSignal.timeout(10000),
                 headers: {
                   Authorization: `Bearer ${sessionStorage.getItem('companion-token')}`,
                   'Content-Type': 'application/json',
@@ -408,6 +417,7 @@ test(
       assert.equal(existsSync(join(main, 'target/dev/owner.json')), false);
       assert.equal(existsSync(join(other, 'target/dev/owner.json')), false);
     } catch (error) {
+      context.diagnostic(`Failed during ${stage}: ${error.message}`);
       throw new Error(
         `Stage: ${stage}\nBrowser errors: ${errors.join('\n')}\nSupervisor log:\n${logs}`,
         {
