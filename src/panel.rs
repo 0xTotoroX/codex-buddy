@@ -681,7 +681,7 @@ impl App {
     pub(crate) async fn execute_panel_command(&self, command: &Value) -> Result<Value> {
         let client = self.desktop_client().await.context("Codex 连接已断开")?;
         let result = client.evaluate(format!(
-            "window.__companionFloatingPanel?.panelCommand({}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}", command
+            "window.__companionFloatingPanel?.panelCommand({command}) ?? {{ok:false,message:'Codex 胶囊正在重载'}}"
         )).await?;
         if result["ok"] == true
             && ["fill", "quick-fill", "outline-jump", "outline-anchor"]
