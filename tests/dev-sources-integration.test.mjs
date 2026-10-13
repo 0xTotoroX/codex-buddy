@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 完整 dev.mjs、临时双 worktree、模拟编译器/CDP/后台及真实 Vite/Chromium。
- * [OUTPUT]: 固定地址下切换源码、回退、资源更新、前端选择器、失效租约恢复与清理的进程级验收。
+ * [OUTPUT]: 固定地址下切换源码、回退、资源更新、前端选择器、失效租约恢复与有界清理的进程级验收及超时阶段诊断。
  * [POS]: 开发调试集成回归；所有端口、进程、配置均为隔离夹具。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -33,10 +33,12 @@ import { fixtureSettings } from './fixtures.mjs';
 
 test(
   'Dev switches isolated worktrees without restarting its host or losing the settings address',
-  { timeout: 90000 },
-  async () => {
+  { timeout: 180000 },
+  async (context) => {
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-source-flow-')));
     const project = resolve(import.meta.dirname, '..');
+    const fetch = (url, options = {}) =>
+      globalThis.fetch(url, { ...options, signal: AbortSignal.timeout(20000) });
     const main = join(base, 'main'),
       other = join(base, 'Stepwise'),
       bin = join(base, 'bin');
@@ -48,7 +50,9 @@ test(
     const git = (...args) => execFileSync('git', ['-C', main, ...args], { stdio: 'pipe' });
     let dev,
       browser,
-      logs = '';
+      logs = '',
+      stage = 'prepare fixture',
+      cleanupPromise;
     const errors = [];
     const host = createServer((req, res) =>
       res.end(
@@ -75,6 +79,21 @@ test(
     );
     host.listen(0, '127.0.0.1');
     await once(host, 'listening');
+    const cleanup = () =>
+      (cleanupPromise ||= (async () => {
+        await browser?.close();
+        await stopChild(dev);
+        for (const socket of sockets.clients) socket.terminate();
+        sockets.close();
+        host.closeAllConnections();
+        await new Promise((r) => host.close(r));
+        rmSync(base, { recursive: true, force: true });
+      })());
+    context.after(async () => {
+      if (context.signal.aborted)
+        context.diagnostic(`Timed out during ${stage}\nSupervisor log:\n${logs}`);
+      await cleanup();
+    });
     try {
       for (const dir of ['ui', 'scripts'])
         cpSync(join(project, dir), join(main, dir), { recursive: true });
@@ -146,6 +165,7 @@ test(
           ${JSON.stringify(join(base, 'home/Library/Caches/codex-buddy/dev-targets'))});
       `,
       ]);
+      stage = 'start supervisor';
       launch();
       const session = await until(
         () => {
@@ -172,6 +192,7 @@ test(
         403,
       );
       assert.match(await (await fetch(session.url)).text(), /__buddy_dev.js/);
+      stage = 'source preparation and rollback';
       const originalPID = JSON.parse(readFileSync(join(base, 'injection.json'))).pid;
       writeFileSync(join(other, 'fail-build'), '');
       assert.equal((await send('dev/sources', { path: other })).status, 409);
@@ -224,13 +245,14 @@ test(
         'selected worktree hot update applied',
       );
       // Render the complete React page together with the injected source selector.
-      const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+      stage = 'launch pinned browser';
       browser = await chromium.launch({
         headless: true,
-        executablePath:
-          process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
+        executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
       });
       const page = await browser.newPage();
+      page.setDefaultTimeout(15000);
+      page.setDefaultNavigationTimeout(20000);
       const previousEpoch = readRecord(join(main, 'target/dev/session.json')).sourceEpoch;
       let switchingSource = false,
         switchStarted = false;
@@ -276,6 +298,7 @@ test(
           })(),
         );
       });
+      stage = 'render complete settings';
       await page.goto(`${session.url}/#token=${session.token}`);
       const navigation = page.getByRole('navigation', { name: '设置分类' });
       await page.getByRole('heading', { name: '设置', exact: true }).waitFor({ state: 'attached' });
@@ -299,6 +322,7 @@ test(
         Math.abs(alignment.source - alignment.settings) <= 1,
         'source and settings share the same content edge',
       );
+      stage = 'switch source from settings';
       await page.getByLabel('调试 worktree').selectOption(main);
       switchingSource = true;
       switchStarted = true;
@@ -336,6 +360,7 @@ test(
       await navigation.getByRole('link', { name: '启动与开发', exact: true }).click();
       mkdirSync(join(project, 'target/reports'), { recursive: true });
       await page.screenshot({ path: join(project, 'target/reports/dev-source-selector.png') });
+      stage = 'check missing and expired credentials';
       const unauthenticated = await browser.newPage();
       await unauthenticated.goto(`${session.url}/#settings-dev`);
       await unauthenticated.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
@@ -361,6 +386,7 @@ test(
         assert.equal(event.endpoint, endpoint);
       }
       assert.equal(readRecord(join(base, 'injection.json')).root, main);
+      stage = 'stop and restore remembered source';
       await stopChild(dev);
       assert.equal(existsSync(join(base, 'injection.json')), false);
       assert.equal(existsSync(join(main, 'target/dev/owner.json')), false);
@@ -382,17 +408,14 @@ test(
       assert.equal(existsSync(join(main, 'target/dev/owner.json')), false);
       assert.equal(existsSync(join(other, 'target/dev/owner.json')), false);
     } catch (error) {
-      throw new Error(`Browser errors: ${errors.join('\n')}\nSupervisor log:\n${logs}`, {
-        cause: error,
-      });
+      throw new Error(
+        `Stage: ${stage}\nBrowser errors: ${errors.join('\n')}\nSupervisor log:\n${logs}`,
+        {
+          cause: error,
+        },
+      );
     } finally {
-      await browser?.close();
-      await stopChild(dev);
-      for (const socket of sockets.clients) socket.terminate();
-      sockets.close();
-      host.closeAllConnections();
-      await new Promise((r) => host.close(r));
-      rmSync(base, { recursive: true, force: true });
+      await cleanup();
     }
   },
 );

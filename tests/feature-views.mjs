@@ -1,8 +1,8 @@
 /* [INPUT]: Built shared feature page and synthetic owner/model/task transport.
- * [OUTPUT]: Edge tab/collapse draft retention and shared model controls.
+ * [OUTPUT]: Edge tab/collapse draft retention, shared model controls and real keyboard focus with pinned Chromium.
  * [POS]: Browser behavior acceptance; no real chat or reminder changes. [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { chromium } from 'playwright';
 import { prepareTestBinary } from '../scripts/verify.mjs';
@@ -10,9 +10,8 @@ const root = resolve(import.meta.dirname, '..');
 prepareTestBinary();
 const output = join(root, 'target/reports/feature-views');
 mkdirSync(output, { recursive: true });
-const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const browser = await chromium.launch({
-  executablePath: existsSync(chrome) ? chrome : undefined,
+  executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
   headless: true,
 });
 const report = { passed: false, checks: [] };
@@ -917,8 +916,11 @@ try {
   assert.equal(actions.at(-1).data.kind, 'outline-jump');
   assert.equal(actions.at(-1).data.id, 'outline-child');
   await outlineView.locator('[data-outline-id="outline-child"]:enabled').waitFor();
-  await page.keyboard.press('Tab');
+  await page.bringToFront();
   await outlineView.locator('[data-outline-id="outline-child"]').focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await outlineView.locator('[data-outline-id="outline-child"]:focus-visible').waitFor();
   assert.equal(
     await outlineView
       .locator('[data-outline-id="outline-child"]')

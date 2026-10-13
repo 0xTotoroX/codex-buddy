@@ -185,3 +185,5 @@ settings-modes 使用实际保存响应与 data-save-state 确认队列完成，
 设置模式回归使用统一 typography 自定义字号，核对未保存草稿跨模式保留且旧 ui.fontSizes 不被覆盖；设置自动保存夹具提供字体读取所需的 panelPreferences。完整 verify 在用例前准备当前 target/web，避免缺少或陈旧构建影响验收。
 
 原生探针读取当前收回／放大／置顶控件，缺失节点回传 null；核对旧头部表情不可见及 44px 盒模型，不依赖已移除的设置按钮或眼睛节点。
+
+CI 稳定性：提示词会话／输入框替换使用浏览器可控时钟推进 300ms 轮询，再验 IME；功能视图通过实际 Tab／Shift+Tab 验证 focus-visible。功能视图与 Dev 来源集成默认使用锁定的 Playwright Chromium，显式 CODEX_BUDDY_CHROME_BIN 仍可覆盖。Dev 集成设置 HTTP／导航时限、阶段诊断与超时 after 清理，避免失败后一直保留夹具进程；总用例预算包含冷启动、两次来源回退与重开。

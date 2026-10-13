@@ -1,5 +1,5 @@
 /* [INPUT]: Real composer adapter and controlled async model replies in an isolated browser.
- * [OUTPUT]: Explicit optimize/restore, cancellation and draft/session/IME protection.
+ * [OUTPUT]: Explicit optimize/restore, cancellation and draft/session/IME protection with controlled polling time.
  * [POS]: Synthetic drafts only; does not send messages or use a paid model.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import test from 'node:test';
@@ -26,6 +26,7 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   try {
+    await page.clock.install();
     await page.setContent(
       '<main data-codex-composer-root><textarea aria-label="草稿"></textarea></main>',
     );
@@ -88,7 +89,7 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
     await page.evaluate(() => (window.session = 'two'));
     await page.evaluate(() => window.replies.shift()({ prompt: '错误会话' }));
     assert.equal(await editor.inputValue(), '我正在继续编辑');
-    await page.waitForTimeout(350);
+    await page.clock.runFor(350);
     await optimize().click();
     await page.evaluate(() => {
       const old = document.querySelector('textarea');
@@ -98,7 +99,7 @@ test('optimize and restore protect drafts, sessions, IME and cancellation withou
       window.replies.shift()({ prompt: '旧输入框结果' });
     });
     assert.equal(await editor.inputValue(), '新输入框');
-    await page.waitForTimeout(350);
+    await page.clock.runFor(350);
     await editor.dispatchEvent('compositionstart');
     assert.equal(await optimize().isDisabled(), true);
     await editor.dispatchEvent('compositionend');
