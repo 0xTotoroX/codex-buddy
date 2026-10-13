@@ -186,7 +186,7 @@ settings-modes 使用实际保存响应与 data-save-state 确认队列完成，
 
 原生探针读取当前收回／放大／置顶控件，缺失节点回传 null；核对旧头部表情不可见及 44px 盒模型，不依赖已移除的设置按钮或眼睛节点。
 
-CI 稳定性：提示词会话／输入框替换使用浏览器可控时钟推进 300ms 轮询，再验 IME；功能视图通过实际 Tab／Shift+Tab 验证 focus-visible。功能视图与 Dev 来源集成默认使用锁定的 Playwright Chromium，显式 CODEX_BUDDY_CHROME_BIN 仍可覆盖。Dev 集成设置 HTTP／导航时限、阶段诊断与超时 after 清理，避免失败后一直保留夹具进程；总用例预算包含冷启动、两次来源回退与重开。
+CI 稳定性：提示词会话／输入框替换使用浏览器可控时钟推进 300ms 轮询，再验 IME；功能视图通过实际方向键 验证 focus-visible。功能视图与 Dev 来源集成默认使用锁定的 Playwright Chromium，显式 CODEX_BUDDY_CHROME_BIN 仍可覆盖。Dev 集成设置 HTTP／导航时限、阶段诊断与超时 after 清理，避免失败后一直保留夹具进程；总用例预算包含冷启动、两次来源回退与重开。
 
 Dev 租约回归由并发 Worker 读取大记录，验证发布不暴露半写 JSON；后台启动夹具复用真实 claimLease，并在退出处理器就绪后发布记录。模型分组回归等待匹配的厂家保存响应，先核对返回值再核对实际渲染，不依赖失焦或轮询时间。
 
@@ -195,3 +195,5 @@ Dev 租约回归由并发 Worker 读取大记录，验证发布不暴露半写 J
 键盘轮廓验收在同一次浏览器读取中等待 focus-visible 与实际 solid outline 同时成立；超时记录连接、禁用、真实焦点和颜色变量，不在两次 CDP 请求之间假定焦点不变。
 
 Dev 来源集成显式等待 domcontentloaded，切换按钮不再叠加 Playwright 自动导航等待；隔离 browserServer 在清理时单独终止，取消所有在途页面求值。切换后的来源、资源确认、设置可用性、响应与保存分别记录阶段，页内合成保存也有10秒请求时限。
+
+macOS 的 Tab 遍历受运行器系统键盘导航偏好影响；轮廓验收对已聚焦标题发送真实方向键以进入键盘模式，保持目标不变，仍要求实际 focus-visible 和 solid outline。

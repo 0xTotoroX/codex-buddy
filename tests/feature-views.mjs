@@ -923,8 +923,9 @@ try {
   await outlineView.locator('[data-outline-id="outline-child"]:enabled').waitFor();
   await page.bringToFront();
   await outlineView.locator('[data-outline-id="outline-child"]').focus();
-  await page.keyboard.press('Tab');
-  await page.keyboard.press('Shift+Tab');
+  // macOS Tab traversal depends on the runner's system keyboard-navigation preference.
+  // A real direction key establishes keyboard modality without moving focus to another control.
+  await outlineView.locator('[data-outline-id="outline-child"]').press('ArrowRight');
   assert.equal(
     await outlineView.locator('[data-outline-id="outline-child"]').evaluate(async (node) => {
       const deadline = performance.now() + 5000;
