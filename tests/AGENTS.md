@@ -16,7 +16,6 @@ model-control-host 覆盖能力延迟到达、空列表刷新超时及重试、�
 - [dev-sources-integration.test.mjs](dev-sources-integration.test.mjs)：完整监督脚本、真实 Vite/浏览器、临时双 worktree 的进程级交接/回退、热更新、稳定设置地址、旧标签页写保护与重开恢复及失效 controller/target 租约启动；全部使用合成宿主。 覆盖完整 React 设置表单与来源选择器同页渲染、切换后继续可用，以及缺失/过期凭据提示；不剥离主页面模块。
 - [dev-source-fixture.mjs](dev-source-fixture.mjs)：上项测试的可控编译器和单实例后台夹具，不连接用户应用。
 
-
 - [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、新聊天临时目标及其替换/身份建立/双聊天隔离、引用身份隔离、新旧菜单/内联/隐藏视图、菜单打开占位文字/速度可访问标签/高级视图返回、推理滑块、锁定选项、重复失败清理与完整回读、单次菜单事务、生成期间调整与官方禁用、迟到/部分失败及清理的合成宿主回归。
 - [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删/改名、禁用原生 prompt 时的名称输入/取消/失败重试与完整配置保留、四功能独立字号同步且不放大标签、桌面长模型名称完整换行及超280px列宽保存、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
@@ -42,10 +41,10 @@ model-control-host 覆盖能力延迟到达、空列表刷新超时及重试、�
 
 - [embedded-glass.mjs](embedded-glass.mjs)：真实 Chromium 中用固定高对比背景验证正式构建的 SVG 背景像素、实时更新、B 版 Regular/Clear 液态变体与原生变体隔离、清理及正式构建集成；系统合成器允许透明时要求可见像素差，CI 主机启用“减少透明度”时核对不同效果契约，产品回退由 e2e 单独覆盖；独立命令 test:glass，不读取真实聊天。
 
-- [e2e.mjs](e2e.mjs)：端到端测试入口；设置总览覆盖只读、保存值与草稿区分、分类切换后更新、看板分组计数/模型预设长名称、属性链接定位及宽窄/明暗布局，验证三种协议下超过旧桥接大小限制的完整中文/emoji 问答与显式限长与完整性标记；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好双向同步；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
+- [e2e.mjs](e2e.mjs)：端到端测试入口；设置总览覆盖只读、保存值与草稿区分、分类切换后更新、看板分组计数/模型预设长名称、属性链接定位及宽窄/明暗布局，验证三种协议下超过旧桥接大小限制的完整中文/emoji 问答与显式限长与完整性标记；--popout-only 单独运行窗口协议、外观及交接回归，报告写入 target/reports/popout；按实际系统版本核对弹出能力并验证 Web 与内嵌偏好及统一字体双向同步、旧独立字号保留；macOS 14 只跑内嵌并确认弹出入口禁用，macOS 15+ 委托 popout-checks 验证窗口协议及外观同步；正式内嵌液态覆盖 SVG、浏览器不支持及“减少透明度”回退；同时验证表情单击 100ms 延迟、双击取消或中断收放并切换窗口、拖动不误触及左右固定对角缩放；报告写入 target/reports/e2e。
 - [popout-checks.mjs](popout-checks.mjs)：端到端测试的弹出窗口子流程；检查快捷词只填入不发送及草稿保护、三材质单入口与双向保存、投影、宿主强调色动态同步及回退、收回、受限操作、隐藏像素、表面偏色、哑光/磨砂的单层圆角浅阴影，以及宿主 reset 有无变化时的公共几何、内边距和字体。
 - [lifecycle-test.mjs](lifecycle-test.mjs)：进程生命周期测试入口，不使用真实聊天数据；验证启动器在不支持浮窗时保留内嵌、其他错误仍提示，以及旧默认目录迁移、安装、服务复用、升级、回滚和模型请求取消；报告写入 target/reports/lifecycle.json。 正式程序冷启动覆盖旧胶囊配置、工作台开合意图与独立宽度/比例。
-- [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--header-only 仅验证三材质透明头部与真实置顶开关层级、偏好保存和退出，写入 native-header，不发送鼠标事件；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×36 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 与宿主主题一致及语义色同步、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；默认走免截图的 appearance-only，只有显式 --screenshots 才运行像素采样；`--appearance-only` 可免截图检查主题、材质能力、通过公共头部进入设置并切换三材质后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。
+- [native-check.mjs](native-check.mjs)：macOS 原生背景验收；--header-only 仅验证三材质透明头部与真实置顶开关层级、偏好保存和退出，写入 native-header，不发送鼠标事件；--genie-only 额外启用开发版私有网格，在哑光、磨砂和液态 Regular/Clear 中确认接口实际成功、形变完成后复位及收回取消，结果写入 target/reports/native-genie，追加 --chip-anchor 验证 84×36 胶囊锚点并写入 native-genie-chip；--motion-only 免截图单测提起、三材质回程取消、不同高度与中间偏好隔离，报告写入 target/reports/native-motion；验证闲置后的投影持续更新、窗口/WebView 与宿主主题一致及语义色同步、明暗材质与展开尺寸；`--workbench-only` 免截图检查原生工作台双轴布局、交换/重置与双面板、设置返回、独立滚动及三材质缩放，使用系统鼠标事件验证面板拖拽合并/专注/拆分且原生窗口不移动；默认走免截图的 appearance-only，只有显式 --screenshots 才运行像素采样；`--appearance-only` 可免截图检查主题、材质能力、通过保留的设置测试入口切换三材质后的 传统磨砂 HUDWindow/Active 状态/液态星星的 Regular/Clear 切换和拒绝收起及 AppKit 回读、跨材质保持展开与原生尺寸同步；同时验证 WebKit 的共同标题栏与盒模型，不证明原生折射像素。
 - [native-backdrop.test.mjs](native-backdrop.test.mjs)：暂停动画帧时仍发送原生材质与收放状态通知，背景按宿主明暗设置自有窗口；不提供系统切换 IPC，且不重复发送未变状态；并发尺寸请求保留最后展开尺寸；旧样式迁入新材质后不覆盖后续选择。
 
 - [dev-host.test.mjs](dev-host.test.mjs)：真实目标筛选、安装版连接恢复与配置/存储隔离；覆盖开发配置优先与首次继承日常策略、Dev 无连接准备/取消/复用及显式目标保护、无宿主启动不触发旧恢复、错误透传和失效旧目标保留归档；只使用合成本机服务。
@@ -145,7 +144,9 @@ workbench的closed independent views定向用例检查全部视图关闭后释�
 
 设置导航用例改为总览承载大纲/模型快切开关，保留草稿切换及保存并发检查；旧分类锚点仍需定位到总览相应控件。
 
-`prompt-enhancement.test.mjs`：隔离浏览器检查优化/还原、取消、用户输入/IME、会话或输入节点变化、复杂引用、错误、单实例清理；原始换行与$字符完整。直接测试宿主inputTarget在无模型能力、新草稿和重复身份下的行为。Rust prompt_enhancement测试三种协议与完整输入、不依赖Stepwise开关/方向；ignored的live_prompt_enhancement需显式CODEX_BUDDY_PROMPT_SMOKE_DATA，只用合成草稿调用配置模型，不接触真实输入框。
+`prompt-enhancement.test.mjs`：隔离浏览器检查优化/还原、取消、用户输入/IME、会话或输入节点变化、复杂引用、错误、单实例清理；用实际 DOM 和键盘 Enter/Shift+Enter 验证裸文本与 P/DIV/BR 混排、首尾/连续空行、末尾占位及原始换行/$字符往返。列表只验证读取，不代表浏览器富文本列表写入验收。直接测试宿主inputTarget在无模型能力、新草稿和重复身份下的行为。Rust prompt_enhancement测试三种协议与完整输入、不依赖Stepwise开关/方向；ignored的live_prompt_enhancement需显式CODEX_BUDDY_PROMPT_SMOKE_DATA，只用合成草稿调用配置模型，不接触真实输入框。
+
+- `model-preset-draft.test.mjs`：真实 FeatureView/ModelView 与合成 owner 交接/重新挂载，验证新增和改名草稿、捕获模型配置、保存失败、成功/取消/Esc 清空，以及输入后同一任务内卸载的同步 capture；不启动原生窗口或操作真实宿主。
 
 settings-connection.test.mjs验证多标签初次连接、旧页恢复、凭据轮换、关闭全部标签后重开、隔离浏览器存储、旧session迁移及写入不重试；不使用真实凭据。
 
@@ -167,7 +168,7 @@ model-control-e2e 使用当前简易/详细设置导航，并通过真实 Rust/H
 
 完整验证的 Node 用例并发上限为 4，避免多个浏览器/进程夹具争抢资源；不减少用例。工作台夹具仅响应术语state与启动等待/禁用状态的空observe上报（禁用语义分析），其他术语/模型调用继续视为越界；入口尺寸按 36×28px，窗口往返等待明确回执，动画通过页内观察记录中间状态。e2e 的建议模型夹具显式关闭独立术语功能，术语由专属用例覆盖；看板及指令执行模式导航使用当前详细设置分类。生命周期所有子进程用临时 CODEX_BUDDY_DESKTOP_BIN 隔离真实宿主发现，并继续断言配置原样保留。
 
-模型列宽回归检查拖动/保存/取消不发送新的content-size、不改变外框，Fast固定于表头左侧，握柄不跨入模型行。所有目录覆盖全部已常用与未常用模型，点击只保存pinned，不切换当前模型；刷新与关闭并排、无图钉或对勾。收藏默认换行并保留新增/改名/删除/失败草稿。edge-native在合成AppKit窗口内验证窗口坐标、贴边与真实指针拖动，不申请截图权限。
+模型列宽回归检查拖动/保存/取消不发送新的content-size、不改变外框，Fast固定于表头左侧，握柄不跨入模型行。所有目录覆盖全部已常用与未常用模型，点击只保存pinned，不切换当前模型；目录打开时矩阵隐藏，关闭目录后再核对新常用行可见；刷新与关闭并排、无图钉或对勾。收藏默认换行并保留新增/改名/删除/失败草稿。edge-native在合成AppKit窗口内验证窗口坐标、贴边与真实指针拖动，不申请截图权限。
 
 settings-modes 使用实际保存响应与 data-save-state 确认队列完成，再验证新的草稿在模式切换中不保存，避免普通失焦保存的延迟回执污染导航断言。
 
@@ -180,3 +181,7 @@ settings-modes 使用实际保存响应与 data-save-state 确认队列完成，
 正文术语定位回归覆盖长句右侧悬停、句内跟随、移入操作区固定，以及缩放动画期间按未变换尺寸避让视口。
 
 `typography.test.mjs` 合成浏览器验证三个来源、稳定取样、聊天切换空档、比例/自定义、卡片/缩放工作台/独立设置的实际字体一致及草稿保留；panel-settings 验证统一字段保存和模式值保留，Rust panel 测试验证默认、持久化、旧偏好保留及无效/过期写入拒绝。
+
+设置模式回归使用统一 typography 自定义字号，核对未保存草稿跨模式保留且旧 ui.fontSizes 不被覆盖；设置自动保存夹具提供字体读取所需的 panelPreferences。完整 verify 在用例前准备当前 target/web，避免缺少或陈旧构建影响验收。
+
+原生探针读取当前收回／放大／置顶控件，缺失节点回传 null；核对旧头部表情不可见及 44px 盒模型，不依赖已移除的设置按钮或眼睛节点。

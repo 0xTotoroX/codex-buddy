@@ -242,11 +242,13 @@ function probePage() {
             ),
             pin: workbench.querySelector('[data-action=pin]')?.getAttribute('aria-pressed'),
             headerSurfaces: [
-              '.csw-workbench-face',
-              '[data-workbench-settings]',
+              '[data-window-control=dock]',
+              '[data-window-control=maximize]',
               '[data-action=pin]',
             ].map((selector) => {
-              const style = getComputedStyle(workbench.querySelector(selector));
+              const node = workbench.querySelector(selector);
+              if (!node) return null;
+              const style = getComputedStyle(node);
               return {
                 background: style.backgroundColor,
                 shadow: style.boxShadow,
@@ -275,9 +277,12 @@ function probePage() {
           effectiveMaterial: current?.popover?.dataset.effectiveMaterial,
           nativeDataset: document.documentElement.dataset.nativeBackdrop,
           headHeight: document.querySelector('.csw-head')?.getBoundingClientRect().height,
-          eyeBox:
-            document.querySelector('.csw-fab-eye') &&
-            getComputedStyle(document.querySelector('.csw-fab-eye')).boxSizing,
+          headerBox: workbench && getComputedStyle(workbench.querySelector('.csw-head')).boxSizing,
+          headerFaceVisible:
+            measure(workbench?.querySelector('.csw-workbench-face'))?.visible || false,
+          windowControls: [...document.querySelectorAll('[data-window-control]')]
+            .filter((node) => measure(node)?.visible)
+            .map((node) => node.dataset.windowControl),
           rect: current?.glass?.getBoundingClientRect(),
           animations: current?.glass?.getAnimations().filter((a) => a.playState === 'running')
             .length,
@@ -674,6 +679,7 @@ try {
         if (
           initial.headerSurfaces.some(
             (style) =>
+              !style ||
               style.background !== 'rgba(0, 0, 0, 0)' ||
               style.shadow !== 'none' ||
               style.border !== '0px',
@@ -1064,8 +1070,13 @@ try {
         resized: telemetry.rect,
       });
     }
-    if (telemetry.headHeight !== 44 || telemetry.eyeBox !== 'border-box')
-      throw Error('WebKit workbench header differs from the shared 44px layout');
+    if (
+      telemetry.headHeight !== 44 ||
+      telemetry.headerBox !== 'border-box' ||
+      telemetry.headerFaceVisible ||
+      telemetry.windowControls.join(',') !== 'dock,maximize'
+    )
+      throw Error('WebKit workbench header differs from the shared desktop controls');
     if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
     if (appearanceOnly) {
       writeFileSync(
@@ -1159,8 +1170,8 @@ try {
       }
       if (telemetry.native !== true || telemetry.nativeDataset !== 'true')
         throw Error('Native backdrop capability is absent');
-      if (telemetry.headHeight !== 48 || telemetry.eyeBox !== 'border-box')
-        throw Error('WebKit capsule baseline differs from embedded layout');
+      if (telemetry.headHeight !== 44 || telemetry.headerBox !== 'border-box')
+        throw Error('WebKit workbench header differs from the shared layout');
       if (telemetry.errors.length) throw Error(telemetry.errors.join('\n'));
       writeFileSync(
         output + '/report.json',

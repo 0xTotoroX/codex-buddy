@@ -68,6 +68,9 @@ export function prepareTestBinary(profile) {
   } catch {}
   if (
     !existsSync(binary) ||
+    ['index.html', 'board.html', 'feature.html'].some(
+      (file) => !existsSync(join(root, 'target/web', file)),
+    ) ||
     previous?.source !== source ||
     previous?.sha256 !== hash(readFileSync(binary))
   ) {
@@ -86,12 +89,13 @@ export function prepareTestBinary(profile) {
 }
 async function verify() {
   rmSync(join(root, 'target/reports/verify.json'), { force: true });
+  // 设置浏览器用例读取 target/web，必须先准备当前源码的网页与程序。
+  const artifact = prepareTestBinary();
   run('npm', ['run', 'check']);
   run(process.execPath, ['tests/workbench.mjs']);
   run(process.execPath, ['tests/model-control-host.mjs']);
   run(process.execPath, ['tests/feature-views.mjs']);
   run('cargo', ['fmt', '--check']);
-  const artifact = prepareTestBinary();
   run('cargo', ['test', '--locked']);
   run('cargo', ['clippy', '--locked', '--', '-D', 'warnings']);
   const env = { ...process.env, CODEX_BUDDY_TEST_BINARY: artifact.binary };

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 独立 Chromium、合成 fixture、release/debug 程序与模型 stub。
- * [OUTPUT]: target/reports/e2e 下的 CDP、设置、完整长上下文三协议传输、建议、大纲及弹出交互验收报告。
+ * [OUTPUT]: target/reports/e2e 下的 CDP、设置与统一字体双向同步、完整长上下文三协议传输、建议、大纲及弹出交互验收报告。
  * [POS]: 端到端测试入口，委托 popout-checks 验证窗口协议。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -1164,20 +1164,24 @@ try {
     assert.notEqual(staleAppearance.status, 200);
     await page.getByRole('link', { name: '外观与布局', exact: true }).click();
     await page.locator('#settings-fonts summary').click();
-    await page.getByLabel('大纲字号（px）', { exact: true }).fill('16');
-    await page.getByLabel('大纲字号（px）', { exact: true }).blur();
-    await waitFor(
-      async () =>
-        await desktop.evaluate(() => {
-          const s = window.__companionFloatingPanel.state;
-          return s.fontSizes.outline === 16;
-        }),
-      'Web font size did not match panel pixels',
-    );
+    await page.getByLabel('字体大小', { exact: true }).selectOption('custom');
+    await page.getByLabel('自定义字号（px）', { exact: true }).fill('18');
+    await page.getByLabel('自定义字号（px）', { exact: true }).blur();
+    await waitFor(async () => {
+      const saved = (await api('appearance')).body;
+      const fontSize = await desktop.evaluate(
+        () => window.__codexBuddyTypography?.resolved().fontSize,
+      );
+      return (
+        saved.typography.mode === 'custom' && saved.typography.customSize === 18 && fontSize === 18
+      );
+    }, 'Web unified font size did not save and reach the host');
+    assert.deepEqual((await api('appearance')).body.ui.fontSizes, appearanceBefore.ui.fontSizes);
     const currentAppearance = (await api('appearance')).body;
     await api('appearance', {
       expectedRevision: currentAppearance.revision,
       ui: appearanceBefore.ui,
+      typography: appearanceBefore.typography,
     });
     await waitFor(
       async () => (await panelState()).material === appearanceBefore.ui.material,

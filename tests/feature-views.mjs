@@ -608,8 +608,10 @@ try {
   await view.locator('[data-model="a"][data-reasoning="max"]').waitFor();
   await showOthers();
   await tile('c').click();
-  await view.locator('[data-model-row="c"]').waitFor();
+  await view.locator('[data-model-row="c"]').waitFor({ state: 'attached' });
+  assert.equal(await view.locator('[data-model-row="c"]').isVisible(), false);
   await closeOthers();
+  await view.locator('[data-model-row="c"]').waitFor();
   await view.locator('.model-scroll').evaluate((node) => {
     node.scrollLeft = 160;
   });
@@ -955,6 +957,9 @@ try {
   record(
     'outline dots share next typography, preserve numbering under zoom and keep navigation accessible',
   );
+  const tabFontBeforeContentResize = await page
+    .getByRole('tab', { name: '大纲', exact: true })
+    .evaluate((node) => getComputedStyle(node).fontSize);
   projection.hostTypography = { baseItemFontSize: 13 };
   projection.display = { labelOnly: false, promptClickMode: 'fill', fontSize: 19.4 };
   for (const size of [19.4, 23.1]) {
@@ -977,7 +982,7 @@ try {
     await page
       .getByRole('tab', { name: '大纲', exact: true })
       .evaluate((node) => getComputedStyle(node).fontSize),
-    '15px',
+    tabFontBeforeContentResize,
   );
   record('saved content font updates outline and next labels without resizing the tab chrome');
   fontSizes = { outline: 18.2, next: 20.5, board: 17.4, model: 16.3 };

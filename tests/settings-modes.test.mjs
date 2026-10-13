@@ -24,6 +24,7 @@ test(
       alwaysOnTop: true,
       launcherAction: 'inside',
       position: null,
+      typography: { mode: 'custom', source: 'body', scale: 100, customSize: 17 },
       ui: {
         width: 500,
         height: 620,
@@ -301,14 +302,15 @@ test(
       );
       await page.getByRole('link', { name: '外观与布局', exact: true }).click();
       await page.locator('#settings-fonts summary').click();
-      await page.getByLabel('大纲字号（px）', { exact: true }).waitFor();
-      assert.equal(await page.getByLabel('大纲字号（px）', { exact: true }).inputValue(), '17');
-      const font = page.getByLabel('大纲字号（px）', { exact: true });
+      await page.getByLabel('自定义字号（px）', { exact: true }).waitFor();
+      assert.equal(await page.getByLabel('自定义字号（px）', { exact: true }).inputValue(), '17');
+      const font = page.getByLabel('自定义字号（px）', { exact: true });
       const beforeFont = writes.length;
       await font.fill('19.5');
       await simple();
       await detail();
       assert.equal(await font.inputValue(), '19.5');
+      assert.equal(appearance.typography.customSize, 17);
       assert.equal(appearance.ui.fontSizes.outline, 17);
       assert.equal(writes.length, beforeFont, 'mode switch keeps unsaved font input');
       const theme = page.locator('#theme-sidebar');
