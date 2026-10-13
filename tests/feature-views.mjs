@@ -484,6 +484,11 @@ try {
   await rename.getByRole('textbox').fill('工作');
   await rename.getByRole('textbox').press('Enter');
   await view.getByRole('button', { name: '工作', exact: true }).waitFor();
+  await rename.waitFor({ state: 'hidden' });
+  // The renamed preset can render before its editor closes and edge sizing catches up.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   assert.deepEqual(model.preferences.presets[0].selection, savedSelection);
   record(
     'preset create/rename/cancel work without native prompt; failed save keeps draft and captured model/effort/speed',
