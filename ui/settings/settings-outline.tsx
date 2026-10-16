@@ -4,6 +4,7 @@
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NativeSelect } from './components/ui/native-select';
+import { Icon } from '../shared/icons/react';
 export const pageTitles = {
   features: '功能与交互',
   model: '模型与生成',
@@ -215,6 +216,9 @@ export function SettingsOutline({
       hidden={mode === 'simple'}
       data-settings-navigation
     >
+      <div className="settings-nav-caption" aria-hidden="true">
+        工作空间设置
+      </div>
       <NativeSelect
         className="settings-category-select"
         aria-label="详细设置分类"
@@ -230,7 +234,7 @@ export function SettingsOutline({
         ))}
       </NativeSelect>
       <div className="settings-category-links">
-        {(Object.keys(pageTitles) as SettingsPage[]).map((id) => (
+        {(Object.keys(pageTitles) as SettingsPage[]).map((id, index) => (
           <a
             key={id}
             href={`#settings-${id}`}
@@ -241,7 +245,11 @@ export function SettingsOutline({
               navigate(id, event.currentTarget.hash);
             }}
           >
-            {pageTitles[id]}
+            <span className="settings-nav-number" aria-hidden="true">
+              0{index + 1}
+            </span>
+            <span>{pageTitles[id]}</span>
+            <Icon name="chevron-right" />
           </a>
         ))}
       </div>

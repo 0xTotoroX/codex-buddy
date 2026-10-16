@@ -41,7 +41,11 @@ export function NextSettings({
           常用提示词
         </h2>
         <p className="mb-4 text-[14px] text-muted-foreground">
-          显示在下一步面板中，点击只填入，不自动发送。
+          {appearance?.ui.promptClickMode === 'direct'
+            ? '与推荐指令相同，点击直接发送；已有草稿时只追加。'
+            : appearance?.ui.promptClickMode === 'hybrid'
+              ? '与推荐指令相同，单击填入、双击发送；已有草稿时只追加。'
+              : '显示在下一步面板中，点击只填入，不自动发送。'}
         </p>
         <div className="space-y-3">
           {form.quickPrompts.map((item, index) => (

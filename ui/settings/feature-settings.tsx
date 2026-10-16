@@ -1,5 +1,5 @@
 /* [INPUT]: 四功能的归属、版本化布局与旧布局兼容读取。
- * [OUTPUT]: 唯一主界面形式、功能放置与四功能布局设置。
+ * [OUTPUT]: 唯一主界面形式、功能放置与布局设置，以及预览用的只读已加载快照。
  * [POS]: 设置页编排；写入 features，不再写旧两功能 dockLayout/popoutLayout。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useEffect, useRef, useState } from 'react';
@@ -13,12 +13,14 @@ export function FeatureSettings({
   live,
   desktopSupported,
   onPlacement,
+  onSnapshot,
   simple = false,
 }: {
   simple?: boolean;
   live: boolean;
   desktopSupported: boolean;
   onPlacement: (placement: string) => void;
+  onSnapshot?: (state: FeatureState | null) => void;
 }) {
   const [state, setState] = useState<FeatureState>({ features: [] }),
     [ready, setReady] = useState(false),
@@ -56,6 +58,7 @@ export function FeatureSettings({
   }, [live]);
   const primary = state.mainPlacement || 'sidebar';
   useEffect(() => onPlacement(primary), [primary, onPlacement]);
+  useEffect(() => onSnapshot?.(ready ? state : null), [state, ready, onSnapshot]);
   async function change(input: object) {
     if (writing.current) return;
     writing.current = true;

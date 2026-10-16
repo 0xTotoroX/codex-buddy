@@ -1,4 +1,4 @@
-/* [INPUT]: Model state and revision-checked API. [OUTPUT]: Feature switch and serialized organization settings.
+/* [INPUT]: Model state and revision-checked API. [OUTPUT]: Feature switch, serialized organization settings and read-only preview snapshot.
  * [POS]: Business enablement only; all placement and themes belong to shared settings.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
@@ -9,9 +9,11 @@ import type { ModelState, ModelPreferences } from '../features/model/catalog';
 export function ModelControlSettings({
   live,
   detailed = true,
+  onSnapshot,
 }: {
   live: boolean;
   detailed?: boolean;
+  onSnapshot?: (state: ModelState | null) => void;
 }) {
   const [state, setState] = useState<ModelState | null>(null);
   const [enabled, setEnabled] = useState<boolean | null>(null),
@@ -19,6 +21,7 @@ export function ModelControlSettings({
     [message, setMessage] = useState('');
   const writing = useRef(false);
   const generation = useRef(0);
+  useEffect(() => onSnapshot?.(state), [state, onSnapshot]);
   useEffect(() => {
     if (!live) return;
     let disposed = false;

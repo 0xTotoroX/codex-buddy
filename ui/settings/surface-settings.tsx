@@ -1,4 +1,4 @@
-/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Per-form themes and edge placement.
+/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Per-form themes, edge placement and read-only preview snapshots.
  * [POS]: Presentation settings, no feature enable/disable or business state.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { PanelSettings } from './panel-settings';
 import type { AppearanceSettings } from '../shared/contracts';
 import type { SurfaceTheme } from '../surfaces/theme/appearance';
+import type { FeatureState } from '../shared/features';
 const labels = { sidebar: '侧栏', overlay: '页面浮层', desktop: '桌面窗口', edge: '贴边 / 刘海' };
 type Edge = { edge: string; screen: string; position: number; keepOpen: boolean };
 export type SurfaceState = {
@@ -23,12 +24,16 @@ export function SurfaceSettings({
   appearance,
   fontBase,
   simple = false,
+  onFeatures,
+  onSnapshot,
 }: {
   simple?: boolean;
   live: boolean;
   desktopSupported: boolean;
   appearance?: AppearanceSettings;
   fontBase?: number;
+  onFeatures?: (state: FeatureState | null) => void;
+  onSnapshot?: (state: SurfaceState | null) => void;
 }) {
   const [state, setState] = useState<SurfaceState | null>(null),
     [displays, setDisplays] = useState<Displays>({ screens: [], nativeGlassAvailable: false }),
@@ -38,6 +43,7 @@ export function SurfaceSettings({
     [primary, setPrimary] = useState('sidebar');
   const writing = useRef(false),
     generation = useRef(0);
+  useEffect(() => onSnapshot?.(state), [state, onSnapshot]);
   useEffect(() => {
     if (!live) return;
     let disposed = false;
@@ -106,6 +112,7 @@ export function SurfaceSettings({
         live={live}
         desktopSupported={desktopSupported}
         onPlacement={setPrimary}
+        onSnapshot={onFeatures}
         simple={simple}
       />
       <section className="settings-section settings-surface-group">

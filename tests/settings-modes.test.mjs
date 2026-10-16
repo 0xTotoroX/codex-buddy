@@ -12,10 +12,11 @@ import { fixtureSettings } from './fixtures.mjs';
 
 test(
   'settings modes retain drafts, details, custom preferences and reading without saving on switch',
-  { timeout: 30000 },
+  { timeout: 60000 },
   async () => {
     let settings = structuredClone(fixtureSettings),
-      rejectNext = false;
+      rejectNext = false,
+      rejectSurface = false;
     const writes = [];
     let appearance = {
       revision: 1,
@@ -125,9 +126,23 @@ test(
             };
           }
           value = settings;
-        } else if (path === '/api/features') value = features;
-        else if (path === '/api/surfaces') {
+        } else if (path === '/api/features') {
+          if (body?.op === 'main-placement') {
+            features.mainPlacement = body.placement;
+            for (const entry of features.features)
+              if (entry.placement !== 'edge') entry.placement = body.placement;
+          }
+          if (body?.op === 'main-layout') features.layouts[body.placement] = body.layout;
+          value = features;
+        } else if (path === '/api/surfaces') {
           if (body?.op === 'save') {
+            if (rejectSurface) {
+              rejectSurface = false;
+              res
+                .writeHead(409, { 'Content-Type': 'application/json' })
+                .end('{"message":"合成材质保存失败"}');
+              return;
+            }
             surfaces = {
               ...surfaces,
               revision: surfaces.revision + 1,
@@ -365,6 +380,147 @@ test(
       assert.equal(settings.directionSource, fixtureSettings.directionSource);
       assert.equal(appearance.ui.fontSizes.outline, 17);
       assert.equal(tasks.store.syncEnabled, false);
+
+      // Previews consume existing saved snapshots; rejected saves never look successful.
+      await page.setViewportSize({ width: 1360, height: 900 });
+      await page.getByRole('link', { name: '外观与布局', exact: true }).click();
+      const preview = page.getByRole('complementary', { name: '联动预览' });
+      await preview.locator('[data-ready="true"]').waitFor();
+      assert.equal(
+        await preview.locator('.preview-workspace').getAttribute('data-material'),
+        'frosted',
+      );
+      if (!(await theme.evaluate((n) => n.open))) await theme.locator('summary').click();
+      rejectSurface = true;
+      await page.getByLabel('侧栏主题', { exact: true }).selectOption('black');
+      await page.getByText('合成材质保存失败', { exact: false }).waitFor();
+      assert.equal(
+        await preview.locator('.preview-workspace').getAttribute('data-material'),
+        'frosted',
+      );
+      await page.getByLabel('侧栏主题', { exact: true }).selectOption('black');
+      await preview.locator('.preview-workspace[data-material="black"]').waitFor();
+      await page.getByLabel('主界面布局', { exact: true }).selectOption('horizontal');
+      await preview.locator('.preview-split[data-axis="horizontal"]').waitFor();
+      assert.equal(
+        await preview.locator('.preview-pane').count(),
+        3,
+        'only opened main features appear',
+      );
+      await page.getByRole('button', { name: '页面浮层', exact: true }).click();
+      await preview.locator('.preview-host[data-placement="overlay"]').waitFor();
+      assert.equal(
+        await preview.locator('.preview-workspace').getAttribute('data-material'),
+        'frosted',
+        'each placement keeps its own material',
+      );
+      const previewWrites = writes.length;
+      await preview.getByRole('button', { name: '贴边 / 刘海', exact: true }).click();
+      await preview.locator('.preview-host[data-placement="edge"]').waitFor();
+      await preview.getByRole('button', { name: '主界面', exact: true }).click();
+      assert.equal(writes.length, previewWrites, 'preview navigation never moves real features');
+
+      features.layouts.overlay = {
+        axis: 'vertical',
+        groups: [
+          { ids: ['outline'], active: 'outline', weight: 1 },
+          {
+            axis: 'horizontal',
+            weight: 2,
+            groups: [
+              { ids: ['board'], active: 'board', weight: 1 },
+              { ids: ['next'], active: 'next', weight: 2 },
+            ],
+          },
+        ],
+      };
+      await preview
+        .locator('.preview-split[data-axis="vertical"] .preview-split[data-axis="horizontal"]')
+        .waitFor();
+      assert.equal(
+        await preview.locator('.preview-pane').count(),
+        3,
+        'nested layout comes from the saved tree',
+      );
+      features.features.find((entry) => entry.id === 'board').open = false;
+      await page.waitForFunction(() => document.querySelectorAll('.preview-pane').length === 2);
+      assert.equal(await preview.getByRole('button', { name: '看板', exact: true }).count(), 0);
+
+      await page.getByRole('link', { name: '功能与交互', exact: true }).click();
+      const demoWrites = writes.length;
+      await preview.getByRole('button', { name: /完善实现方案/ }).click();
+      assert.equal(await preview.getByRole('status').textContent(), '完善实现方案');
+      assert.equal(writes.length, demoWrites, 'sample interactions do not write or send');
+      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await model.fill('新的预览模型草稿');
+      await preview.getByText('新的预览模型草稿', { exact: true }).waitFor();
+      assert.ok((await preview.textContent()).includes('未全部保存'));
+      const draftWrites = writes.length;
+      await simple();
+      await preview.getByRole('button', { name: '贴边 / 刘海', exact: true }).click();
+      assert.equal(writes.length, draftWrites);
+      await detail();
+      assert.equal(await model.inputValue(), '新的预览模型草稿');
+      assert.equal((await preview.textContent()).includes('fixture-unsaved-key'), false);
+
+      for (const colorScheme of ['light', 'dark']) {
+        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        // Chromium applies a changed media preference on its next rendering update.
+        await page.waitForFunction(
+          (expected) => getComputedStyle(document.documentElement).backgroundColor === expected,
+          colorScheme === 'light' ? 'rgb(250, 250, 250)' : 'rgb(25, 25, 27)',
+          { timeout: 3000 },
+        );
+        assert.equal(
+          await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+          colorScheme === 'light' ? 'rgb(250, 250, 250)' : 'rgb(25, 25, 27)',
+          'production CSS chunk ordering must not overwrite the approved settings palette',
+        );
+        for (const width of [360, 900, 1360]) {
+          await page.setViewportSize({ width, height: 900 });
+          for (const id of ['surfaces', 'features', 'model', 'connection']) {
+            if (width <= 760) await category(id);
+            else
+              await page
+                .getByRole('link', {
+                  name: {
+                    surfaces: '外观与布局',
+                    features: '功能与交互',
+                    model: '模型与生成',
+                    connection: '启动与开发',
+                  }[id],
+                  exact: true,
+                })
+                .click();
+            assert.equal(
+              await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+              false,
+              `${colorScheme} ${width} ${id} fits`,
+            );
+          }
+          if (width <= 760) await category('surfaces');
+          else await page.getByRole('link', { name: '外观与布局', exact: true }).click();
+          await page.screenshot({
+            path: `target/reports/settings-tom-${colorScheme}-${width}.png`,
+            fullPage: true,
+          });
+          assert.equal(
+            await page.evaluate(
+              () =>
+                document.querySelector('.settings-content').getAnimations({ subtree: true }).length,
+            ),
+            0,
+            'reduced motion has no active animations',
+          );
+        }
+      }
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+      await page.getByRole('button', { name: '桌面窗口', exact: true }).click();
+      await preview.locator('.preview-host[data-placement="desktop"]').waitFor();
+      assert.ok(
+        await preview.locator('.preview-workspace').evaluate((n) => n.getAnimations().length > 0),
+        'placement changes animate only the illustration',
+      );
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();

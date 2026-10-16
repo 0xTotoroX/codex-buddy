@@ -6,7 +6,7 @@
 
 成员清单：
 
-- [main.tsx](main.tsx)：双模式入口、共享功能开关、唯一任务状态与分类容器，版本位于页面末尾右下角，短页面贴近底部，不覆盖内容；组合各设置模块，不持有任务或模型业务。
+- [main.tsx](main.tsx)：Tom Modern 双模式入口、共享功能开关、唯一任务状态与分类容器；组合现有模块及其只读预览快照，表单保持单份挂载；版本位于页面末尾，不覆盖内容，不持有任务或模型业务。
 - [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
 - [settings-outline.tsx](settings-outline.tsx)：默认简易模式，模式/四分类导航、浏览器历史、旧锚点按字段分流、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
 - [settings-disclosure.tsx](settings-disclosure.tsx)：原生details的展示强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
@@ -24,7 +24,11 @@
 - [task-settings.tsx](task-settings.tsx)：看板分组管理及看板开关；同步授权/列表界面保留源码但不挂载；不修改同步规则。
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
-- [styles.css](styles.css)：Tailwind v4、语义主题、分类导航、设置行和窄屏布局、焦点及减少动效规则；只扫描本目录，不注入宿主。
+- [styles.css](styles.css)：Tailwind v4、语义主题映射、搜索和保留的旧总览样式；只扫描本目录，不注入宿主。
+- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。
+- [settings-preview.tsx](settings-preview.tsx)：只读联动预览。复用既有模块回读的功能、材质、模型和看板快照；嵌套布局复用 resolveFeatureLayout，过滤关闭功能。生成参数显示当前草稿并标识未保存；主形式与材质只显示成功保存的值。示例操作只改变本组件状态，不请求 API、不读任务正文或凭据。
+- [settings-preview.css](settings-preview.css)：预览画布、功能示例、生成路径和连接示意的样式，材质为近似效果，不用于实际业务视图。
+- [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，尊重运行期间的减少动态效果偏好；不重新挂载控件、不存储配置。
 - [index.html](index.html)：设置网页入口，图标复用 ../icon.png。
 - [board.html](board.html)：旧独立看板 HTML 入口，仍挂载 ../surfaces/desktop/legacy-board.tsx 及共用看板内容。
 - [feature.html](feature.html)：桌面和贴边通用 HTML 入口。
