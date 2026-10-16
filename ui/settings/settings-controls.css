@@ -29,27 +29,31 @@
   accent-color: var(--settings-switch-on);
 }
 .settings-app [data-slot='switch'] {
-  border-radius: var(--settings-control-radius);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 999px;
   width: 36px;
   height: 22px;
   min-height: 22px;
   background: var(--switch-track);
+  background-clip: padding-box;
 }
 .settings-app [data-slot='switch'][data-state='checked'] {
-  background: var(--settings-switch-on);
+  background-color: var(--settings-switch-on);
 }
 .settings-app [data-slot='switch-thumb'] {
-  border-radius: 2px;
+  border-radius: 999px;
   box-shadow: none;
   width: 16px;
   height: 16px;
   background: var(--settings-switch-thumb);
+  transition: translate 160ms var(--settings-ease);
 }
 .settings-app [data-slot='switch-thumb'][data-state='checked'] {
-  translate: 17px 0;
+  translate: 16px 0;
 }
 .settings-app [data-slot='switch-thumb'][data-state='unchecked'] {
-  translate: 3px 0;
+  translate: 2px 0;
 }
 .settings-suggestion-input {
   position: relative;
