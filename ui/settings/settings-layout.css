@@ -1,5 +1,5 @@
 /* [INPUT]: Tom Modern visual direction, shared typography and resolved settings theme.
- * [OUTPUT]: Settings-only tokens, responsive single-row/wrapped header and form rhythm.
+ * [OUTPUT]: Settings-only tokens, compact header with direct responsive category navigation and form rhythm.
  * [POS]: Does not alter the workspace or host theme tokens.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 /* Shared tokens may be emitted after the entry CSS by Vite; specificity keeps both builds aligned. */
@@ -71,7 +71,6 @@ html:root
   :is(
     .settings-header,
     .settings-topline,
-    .settings-nav,
     .settings-feature-list .settings-row,
     .settings-surface-group,
     .settings-save,
@@ -99,9 +98,9 @@ html:root
   flex-direction: column;
   min-height: 100dvh;
   width: 100%;
-  max-width: 1440px;
+  max-width: 1200px;
   margin: auto;
-  padding: 28px 36px 24px;
+  padding: 24px 32px;
   font-size: var(--buddy-type-size, 16px);
 }
 .settings-header {
@@ -109,178 +108,193 @@ html:root
   top: 0;
   z-index: 10;
   background: var(--buddy-page);
-  border-top: var(--settings-top-rule-width) solid var(--settings-rule);
+  padding-bottom: 1px;
 }
 .settings-topline {
-  display: grid;
-  grid-template-columns: auto minmax(160px, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 24px;
-  min-height: 76px;
-  border-bottom: 1px solid var(--settings-rule);
+  gap: 16px 28px;
+  min-height: 44px;
 }
 .settings-brand {
   display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 9px;
   font-size: 1.25em;
   font-weight: 650;
   letter-spacing: -0.035em;
+  white-space: nowrap;
   text-decoration: none;
 }
 .settings-brand img {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-}
-.settings-header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-}
-.settings-theme {
-  display: flex;
-  flex-shrink: 0;
-  padding: 0;
-  border: 0;
-}
-.settings-theme button {
-  display: grid;
-  place-items: center;
-  min-width: 32px;
-  min-height: 32px;
-  padding: 4px 7px;
-  color: var(--buddy-muted);
-  font-size: 0.75em;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.settings-theme button:hover {
-  color: var(--buddy-text);
-}
-.settings-theme button[aria-pressed='true'] {
-  color: var(--settings-selected-text);
-  background: transparent;
-  box-shadow: none;
+  border-radius: 9px;
 }
 .settings-edition {
   font-size: 0.6em;
   font-weight: 450;
   color: var(--buddy-muted);
   letter-spacing: 0;
-  border-left: 1px solid var(--buddy-border);
-  padding-left: 10px;
+  margin-left: 3px;
+}
+.settings-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-left: auto;
+  min-width: 0;
+}
+.settings-theme {
+  position: relative;
+  flex-shrink: 0;
+}
+.settings-theme button {
+  cursor: pointer;
+  color: var(--buddy-muted);
+}
+.settings-theme .settings-theme-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  font-size: 0.8125em;
+  white-space: nowrap;
+}
+.settings-theme-trigger:hover {
+  background: var(--buddy-subtle);
+  color: var(--buddy-text);
+}
+.settings-theme-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  min-width: 172px;
+  max-width: calc(100vw - 32px);
+  padding: 5px;
+  border: 1px solid var(--buddy-border);
+  border-radius: 9px;
+  background: var(--buddy-surface);
+  box-shadow: var(--settings-menu-shadow);
+}
+.settings-theme-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 0.875em;
+}
+.settings-theme-menu button:hover,
+.settings-theme-menu button[aria-pressed='true'] {
+  background: var(--buddy-subtle);
+  color: var(--buddy-text);
+}
+.settings-theme-check {
+  margin-left: auto;
+}
+.settings-theme-menu button:not([aria-pressed='true']) .settings-theme-check {
+  visibility: hidden;
 }
 .settings-connection-status {
   display: flex;
-  gap: 7px;
   align-items: center;
   font-size: 0.75em;
   color: var(--buddy-muted);
-  white-space: nowrap;
 }
-.settings-connection-status::before {
-  content: '';
-  width: 6px;
-  height: 6px;
-  background: var(--buddy-muted);
-}
-.settings-connection-status[data-connected='true']::before {
-  background: var(--settings-orange);
+/* 正常连接保留可读状态，异常仍在页头显示文字。 */
+.settings-connection-status[data-connected='true'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
 }
 .settings-topline > .settings-search {
-  min-width: 0;
-  width: 100%;
-  margin: 0;
+  min-width: 160px;
+  flex: 1;
+  max-width: 280px;
+  margin: 0 0 0 auto;
 }
-.settings-search-input {
-  border-radius: var(--settings-control-radius);
-  background: var(--buddy-surface);
+html:root .settings-search-input {
+  min-height: 36px;
+  border-radius: 7px;
+}
+.settings-search input {
+  font-size: 0.875em;
+  padding-block: 7px;
+}
+.settings-search kbd {
+  font-size: 0.6875em;
+  white-space: nowrap;
+  color: var(--buddy-muted);
+  font-family: inherit;
 }
 .settings-search ul {
-  border-radius: var(--settings-control-radius);
+  border-radius: 9px;
   border-color: var(--settings-rule);
   box-shadow: var(--settings-menu-shadow);
 }
 .settings-search li button {
   border-radius: var(--settings-control-radius);
 }
-.settings-mode {
-  position: relative;
-  isolation: isolate;
+.settings-app .settings-mode {
   display: flex;
   flex-shrink: 0;
-  border: 0;
-  padding: 0;
+  padding: 3px;
+  border-radius: 7px;
+  background: var(--buddy-subtle);
 }
 .settings-mode button {
-  position: relative;
-  min-width: 50px;
-  min-height: 32px;
-  padding: 4px 10px;
+  min-width: 46px;
+  min-height: 28px;
+  padding: 2px 10px;
+  border-radius: 5px;
   font-size: 0.8125em;
   cursor: pointer;
   color: var(--buddy-muted);
 }
 .settings-mode button[aria-pressed='true'] {
-  color: var(--settings-selected-text);
-  box-shadow: none;
+  color: var(--buddy-text);
+  background: var(--buddy-surface);
+  box-shadow: 0 1px 3px #00000013;
 }
 .settings-layout {
   flex: 1;
-  display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
-  gap: 36px;
-  align-content: start;
-  align-items: start;
-}
-.settings-nav {
-  position: sticky;
-  top: var(--settings-sticky-offset, 100px);
   min-width: 0;
-  margin-top: 30px;
-  padding-right: 22px;
-  border-right: 1px solid var(--buddy-border);
 }
-.settings-nav > .relative {
-  display: none;
+html:root .settings-nav {
+  margin-top: 20px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--buddy-border);
 }
 .settings-category-links {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 26px;
 }
 .settings-nav a {
   display: flex;
   align-items: center;
-  gap: 9px;
-  min-height: 50px;
-  font-size: 0.8125em;
+  min-height: 36px;
+  padding: 6px 0;
+  font-size: 0.9375em;
   color: var(--buddy-muted);
   text-decoration: none;
-}
-.settings-nav-number {
-  font:
-    0.78em ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-}
-.settings-nav a > .buddy-icon {
-  margin-left: auto;
-  visibility: hidden;
 }
 .settings-nav a[aria-current='page'] {
   color: var(--buddy-text);
   font-weight: 650;
-}
-.settings-nav a[aria-current='page'] > .buddy-icon {
-  visibility: visible;
-  color: var(--settings-orange);
 }
 .settings-nav a:hover {
   color: var(--buddy-text);
@@ -293,8 +307,8 @@ html:root
   margin-bottom: 32px;
 }
 .settings-title {
-  margin: 10px 0 8px;
-  font-size: 1.9em;
+  margin: 0 0 8px;
+  font-size: 1.5625em;
   line-height: 1.2;
   letter-spacing: -0.045em;
   font-weight: 650;
@@ -500,16 +514,6 @@ html:root
   color: var(--buddy-muted);
 }
 @media (max-width: 1190px) {
-  .settings-app {
-    padding-inline: 24px;
-  }
-  .settings-layout {
-    grid-template-columns: 156px minmax(0, 1fr);
-    gap: 26px;
-  }
-  .settings-nav {
-    padding-right: 12px;
-  }
   .settings-body {
     gap: 24px;
     grid-template-columns: minmax(0, 1fr);
@@ -529,51 +533,22 @@ html:root
 }
 @media (max-width: 1100px) {
   .settings-topline {
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 14px 20px;
-    padding-block: 14px;
+    gap: 16px;
   }
   .settings-topline > .settings-search {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    order: 3;
+    flex-basis: 100%;
+    min-width: 0;
+    max-width: none;
+    margin: 0;
   }
 }
 @media (max-width: 760px) {
   .settings-app {
-    padding: 16px 20px 24px;
-  }
-  .settings-topline {
-    min-height: 64px;
-    gap: 12px;
-  }
-  .settings-brand {
-    font-size: 1.125em;
-    gap: 8px;
-  }
-  .settings-mode button {
-    padding-inline: 10px;
-  }
-  .settings-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
-  .settings-nav {
-    position: static;
-    margin-top: 16px;
-    border: 0;
-    padding: 0;
-  }
-  .settings-nav > .relative {
-    display: block;
-  }
-  .settings-category-links {
-    display: none;
+    padding: 20px 20px 24px;
   }
   .settings-content {
     padding-top: 26px;
-  }
-  .settings-title {
-    font-size: 1.65em;
   }
   .settings-page-heading {
     margin-bottom: 26px;
@@ -585,24 +560,56 @@ html:root
     gap: 24px;
   }
 }
-@media (max-width: 640px) {
-  .settings-topline {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .settings-topline > .settings-search {
-    grid-row: 3;
-  }
-  .settings-header-actions {
-    justify-content: space-between;
-    gap: 8px;
-  }
-}
-@media (max-width: 440px) {
-  .settings-app {
-    padding-inline: 16px;
-  }
+@media (max-width: 600px) {
+  .settings-theme-trigger > span:not(.buddy-icon),
   .settings-edition {
     display: none;
+  }
+  .settings-theme .settings-theme-trigger {
+    min-width: 34px;
+    padding-inline: 0;
+  }
+  .settings-header-actions {
+    gap: 10px;
+  }
+  .settings-category-links {
+    justify-content: space-between;
+    gap: 4px 14px;
+  }
+}
+@media (max-width: 460px) {
+  .settings-app {
+    padding: 16px 16px 24px;
+  }
+  .settings-brand {
+    font-size: 1.1875em;
+    gap: 7px;
+  }
+  .settings-brand img {
+    width: 27px;
+    height: 27px;
+  }
+  .settings-topline {
+    gap: 12px;
+  }
+  .settings-header-actions {
+    gap: 7px;
+  }
+  .settings-mode button {
+    min-width: 42px;
+    padding-inline: 8px;
+  }
+  html:root .settings-nav {
+    margin-top: 16px;
+    padding-bottom: 14px;
+  }
+  .settings-category-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 20px;
+  }
+  .settings-nav a {
+    overflow-wrap: anywhere;
   }
   .settings-field {
     grid-template-columns: 1fr;

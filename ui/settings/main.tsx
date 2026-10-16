@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、精简工具栏、主题/字体及联动预览，保留保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、紧凑头部与常驻分类导航、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -144,9 +144,9 @@ function App() {
             </span>
           </div>
         </div>
+        <SettingsOutline page={page} mode={mode} dev={dev} navigate={navigate} />
       </header>
       <div className="settings-layout">
-        <SettingsOutline page={page} mode={mode} dev={dev} navigate={navigate} />
         <main className="settings-content min-w-0" ref={contentRef}>
           <div className="settings-page-heading">
             <h1 className="settings-title">{simple ? '设置' : pageTitles[page]}</h1>

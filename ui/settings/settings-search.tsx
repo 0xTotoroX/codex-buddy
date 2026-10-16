@@ -1,5 +1,5 @@
 /* [INPUT]: Mounted settings labels and category navigation.
- * [OUTPUT]: Local search results that open the original control without remounting forms.
+ * [OUTPUT]: Local search with Cmd/Ctrl+K and original-control navigation without remounting forms.
  * [POS]: Presentation only; never indexes input values, credentials or chat content.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useRef, useState } from 'react';
@@ -87,7 +87,25 @@ export function SettingsSearch({
 }) {
   const [query, setQuery] = useState('');
   const [entries, setEntries] = useState<Entry[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (
+        event.isComposing ||
+        event.altKey ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.key.toLowerCase() !== 'k'
+      )
+        return;
+      // 原生模态抽屉拥有当前焦点范围，不抢走抽屉内的编辑焦点。
+      if (document.querySelector('dialog[open]')) return;
+      event.preventDefault();
+      inputRef.current?.focus();
+    };
+    document.addEventListener('keydown', shortcut);
+    return () => document.removeEventListener('keydown', shortcut);
+  }, []);
   useEffect(() => {
     if (!query.trim()) {
       setEntries([]);
@@ -110,7 +128,9 @@ export function SettingsSearch({
       <div className="settings-search-input">
         <Icon name="search" />
         <input
+          ref={inputRef}
           type="search"
+          aria-keyshortcuts="Meta+K Control+K"
           aria-label="搜索设置"
           placeholder="搜索设置"
           value={query}
@@ -135,6 +155,7 @@ export function SettingsSearch({
             }
           }}
         />
+        <kbd aria-hidden="true">⌘ K</kbd>
       </div>
       {query.trim() && (
         <ul id="settings-search-results" aria-label="设置搜索结果" ref={resultsRef}>

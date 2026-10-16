@@ -1,8 +1,8 @@
-/* [INPUT]: Authenticated Codex theme snapshot, shared sun/moon icons and this origin's display preference.
- * [OUTPUT]: Light/dark settings theme and a three-way selector with explicit Codex-follow text and light/dark icons.
+/* [INPUT]: Authenticated Codex theme snapshot, shared icons and this origin's display preference.
+ * [OUTPUT]: Light/dark settings theme and a compact trigger with three retained preference options.
  * [POS]: Presentation only; never writes Codex appearance or business configuration.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shared/icons/react';
 
 type Theme = 'light' | 'dark';
@@ -25,6 +25,22 @@ function readPreference(): Preference {
 }
 
 export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  useLayoutEffect(() => {
+    if (open) menu.current?.querySelector<HTMLButtonElement>('[aria-pressed=true]')?.focus();
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const outside = (event: PointerEvent) => {
+      if (!root.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [open]);
   const [preference, setPreference] = useState<Preference>(readPreference);
   const [systemTheme, setSystemTheme] = useState<Theme>(() =>
     matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
@@ -67,19 +83,77 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
     }
   }
 
+  const label = options.find(([value]) => value === preference)![1];
+  const symbol = (value: Preference) =>
+    value === 'codex' ? 'layout' : value === 'light' ? 'sun' : 'moon';
   return (
-    <div className="settings-theme" role="group" aria-label="设置页主题" data-settings-navigation>
-      {options.map(([value, label]) => (
-        <button
-          key={value}
-          type="button"
-          aria-label={label}
-          aria-pressed={preference === value}
-          onClick={() => select(value)}
-        >
-          {value === 'codex' ? label : <Icon name={value === 'light' ? 'sun' : 'moon'} />}
-        </button>
-      ))}
+    <div
+      className="settings-theme"
+      ref={root}
+      data-settings-navigation
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && open) {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+          trigger.current?.focus();
+        }
+      }}
+    >
+      <button
+        ref={trigger}
+        type="button"
+        className="settings-theme-trigger"
+        aria-label={`设置页主题：${label}`}
+        aria-expanded={open}
+        aria-controls={menuId}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name={symbol(preference)} />
+        <span>{label}</span>
+      </button>
+      <div
+        id={menuId}
+        ref={menu}
+        className="settings-theme-menu"
+        role="group"
+        aria-label="设置页主题"
+        hidden={!open}
+        onKeyDown={(event) => {
+          if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          const buttons = Array.from(event.currentTarget.querySelectorAll('button'));
+          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+          const next =
+            event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? buttons.length - 1
+                : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+          buttons[next]?.focus();
+        }}
+      >
+        {options.map(([value, name]) => (
+          <button
+            key={value}
+            type="button"
+            aria-label={name}
+            aria-pressed={preference === value}
+            onClick={() => {
+              select(value);
+              setOpen(false);
+              trigger.current?.focus();
+            }}
+          >
+            <Icon name={symbol(value)} />
+            <span>{name}</span>
+            <Icon name="check" className="settings-theme-check" />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

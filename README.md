@@ -65,15 +65,15 @@ Open **详细设置 → 启动与开发 → CodexHost** for installed/running ve
 
 ## Prompt enhancement
 
-Toggle prompt enhancement in the common feature switches, or **功能与交互** in detailed settings. The settings search finds controls across categories and opens their original location.
+Toggle prompt enhancement in the common feature switches, or **功能与交互** in detailed settings. The settings search finds controls across categories and opens their original location; press `⌘K` or `Ctrl+K` to focus it.
 
 Write a draft in the chat composer and click the pencil-and-sparkle icon. The result replaces the draft without sending it. Cancel while it runs, or restore the original afterward. Typing, switching chats, or replacing the editor invalidates old results; special reference nodes are left untouched. This uses Buddy’s existing model and credentials under **详细设置 → 模型与生成**, and sends only the draft, without chat history.
 
 ## Simple and detailed settings
 
-Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Narrow panels use a category selector. Both modes use the same forms and save queue; switching retains unfinished edits and reading position without changing advanced values. Common settings stay visible; advanced settings, terminology management and model groups use right-side drawers. Closing a drawer retains its unfinished inputs and scroll position. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
+Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Categories remain visible below the header and wrap into two columns in narrow panels. Both modes use the same forms and save queue; switching retains unfinished edits and reading position without changing advanced values. Common settings stay visible; advanced settings, terminology management and model groups use right-side drawers. Closing a drawer retains its unfinished inputs and scroll position. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
 
-The Tom Modern settings design includes linked workspace, feature, generation and connection previews. Saved placement, nested layout and materials update the workspace diagram; generation previews identify unsaved edits. Sample interactions stay inside the preview. Settings follow Codex's light/dark appearance by default; the page header also offers a saved light or dark override, while the brand icon retains its original appearance. Reduced-motion preferences and existing shared font settings remain in effect.
+The Tom Modern settings design includes linked workspace, feature, generation and connection previews. Saved placement, nested layout and materials update the workspace diagram; generation previews identify unsaved edits. Sample interactions stay inside the preview. Settings follow Codex's light/dark appearance by default; the compact theme control in the page header also offers a saved light or dark override, while the brand icon retains its original appearance. Reduced-motion preferences and existing shared font settings remain in effect.
 
 ## Task board
 

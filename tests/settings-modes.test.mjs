@@ -260,9 +260,29 @@ test(
     page.on('pageerror', (e) => errors.push(e.message));
     const simple = () => page.getByRole('button', { name: '简易', exact: true }).click();
     const detail = () => page.getByRole('button', { name: '详细设置', exact: true }).click();
-    const category = (id) => page.getByLabel('详细设置分类').selectOption(id);
+    const category = (id) =>
+      page
+        .getByRole('link', {
+          name: {
+            features: '功能与交互',
+            model: '模型与生成',
+            surfaces: '外观与布局',
+            connection: '启动与开发',
+          }[id],
+          exact: true,
+        })
+        .click();
     const themeButton = (name) =>
-      page.getByRole('group', { name: '设置页主题' }).getByRole('button', { name, exact: true });
+      page
+        .locator('.settings-theme-menu')
+        .getByRole('button', { name, exact: true, includeHidden: true });
+    const chooseTheme = async (name, target = page) => {
+      await target.locator('.settings-theme-trigger').click();
+      await target
+        .getByRole('group', { name: '设置页主题' })
+        .getByRole('button', { name, exact: true })
+        .click();
+    };
     const expectTheme = async (theme) => {
       await page.waitForFunction(
         (expected) =>
@@ -385,13 +405,13 @@ test(
       await page.locator('.settings-save[data-save-state="dirty"]').waitFor({ state: 'attached' });
       writes.length = 0;
       await key.fill('fixture-unsaved-key');
-      await themeButton('深色').click();
+      await chooseTheme('深色');
       await expectTheme('dark');
       publishTheme('light');
       await expectTheme('dark');
-      await themeButton('浅色').click();
+      await chooseTheme('浅色');
       await expectTheme('light');
-      await themeButton('跟随 Codex').click();
+      await chooseTheme('跟随 Codex');
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
       assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
       assert.equal(writes.length, 0, 'theme buttons preserve focused drafts without auto-saving');
@@ -632,7 +652,7 @@ test(
           colorScheme: colorScheme === 'light' ? 'dark' : 'light',
           reducedMotion: 'reduce',
         });
-        await themeButton(colorScheme === 'light' ? '浅色' : '深色').click();
+        await chooseTheme(colorScheme === 'light' ? '浅色' : '深色');
         await expectTheme(colorScheme);
         // Chromium applies a changed media preference on its next rendering update.
         await page.waitForFunction(
@@ -755,10 +775,7 @@ test(
       const peer = await context.newPage();
       await peer.goto(origin);
       await peer.locator('html[data-settings-theme="dark"]').waitFor();
-      await peer
-        .getByRole('group', { name: '设置页主题' })
-        .getByRole('button', { name: '浅色', exact: true })
-        .click();
+      await chooseTheme('浅色', peer);
       await expectTheme('light');
       assert.equal(
         await model.inputValue(),
@@ -766,7 +783,7 @@ test(
         'other tabs do not replace form drafts',
       );
       await page.reload();
-      await themeButton('浅色').waitFor();
+      await themeButton('浅色').waitFor({ state: 'attached' });
       assert.equal(await themeButton('浅色').getAttribute('aria-pressed'), 'true');
       await expectTheme('light');
       await peer.evaluate(() => localStorage.setItem('codex-buddy-settings-theme', 'unknown'));
@@ -776,7 +793,7 @@ test(
       publishTheme('dark');
       await expectTheme('dark');
       await peer.evaluate(() => localStorage.removeItem('codex-buddy-settings-theme'));
-      await themeButton('跟随 Codex').click();
+      await chooseTheme('跟随 Codex');
       await peer.close();
       assert.equal(
         writes.length,
@@ -837,7 +854,7 @@ test(
       const source = page.getByLabel('调试 worktree', { exact: true });
       const sourceWrites = writes.length;
       for (const mode of ['浅色', '深色']) {
-        await themeButton(mode).click();
+        await chooseTheme(mode);
         await page.setViewportSize({ width: 360, height: 900 });
         await source.click();
         await page.locator('#buddy-dev-sources select:open').waitFor();
@@ -874,12 +891,58 @@ test(
       const restrictedPage = await restricted.newPage();
       restrictedPage.on('pageerror', (e) => errors.push(e.message));
       await restrictedPage.goto(origin + '/#token=fixture');
-      await restrictedPage
-        .getByRole('group', { name: '设置页主题' })
-        .getByRole('button', { name: '浅色', exact: true })
-        .click();
+      await chooseTheme('浅色', restrictedPage);
       await restrictedPage.locator('html[data-settings-theme="light"]').waitFor();
       await restricted.close();
+      await detail();
+      await category('model');
+      const headerWrites = writes.length;
+      await page.locator('.settings-theme-trigger').click();
+      await page.keyboard.press('End');
+      assert.equal(await themeButton('深色').evaluate((n) => n === document.activeElement), true);
+      await page.keyboard.press('Escape');
+      assert.equal(
+        await page.locator('.settings-theme-trigger').getAttribute('aria-expanded'),
+        'false',
+      );
+      assert.equal(
+        await page.locator('.settings-theme-trigger').evaluate((n) => n === document.activeElement),
+        true,
+      );
+      await page.keyboard.press('Control+k');
+      assert.equal(
+        await page
+          .getByRole('searchbox', { name: '搜索设置' })
+          .evaluate((n) => n === document.activeElement),
+        true,
+      );
+      for (const color of ['浅色', '深色']) {
+        await chooseTheme(color);
+        for (const width of [390, 680, 1100]) {
+          await page.setViewportSize({ width, height: 850 });
+          await page.evaluate(() => scrollTo(0, 0));
+          await page.locator('.settings-theme-trigger').click();
+          const box = await page.locator('.settings-theme-menu').boundingBox();
+          assert.ok(box.x >= 0 && box.x + box.width <= width);
+          await page.keyboard.press('Escape');
+          const links = await page.locator('.settings-category-links a').evaluateAll((nodes) =>
+            nodes.map((n) => ({
+              width: n.clientWidth,
+              content: n.scrollWidth,
+              visible: !!n.getBoundingClientRect().height,
+            })),
+          );
+          assert.ok(links.length === 4 && links.every((n) => n.visible && n.width >= n.content));
+          await page.screenshot({
+            path: `target/reports/settings-header-${color === '浅色' ? 'light' : 'dark'}-${width}.png`,
+          });
+        }
+      }
+      assert.equal(
+        writes.length,
+        headerWrites,
+        'header navigation and keyboard theme selection never save',
+      );
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();

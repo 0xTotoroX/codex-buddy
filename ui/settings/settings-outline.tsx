@@ -1,11 +1,9 @@
 /* [INPUT]: URL anchors, local presentation preference and the Dev source widget.
- * [OUTPUT]: Simple/detail navigation with per-mode/category reading restoration and legacy anchors.
+ * [OUTPUT]: Direct category links and simple/detail navigation with per-mode/category reading restoration and legacy anchors.
  * [POS]: Presentation state only; never changes backend configuration or remounts forms.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeSettingsDrawers, revealSettingsDrawer } from './settings-drawer';
-import { NativeSelect } from './components/ui/native-select';
-import { Icon } from '../shared/icons/react';
 export const pageTitles = {
   features: '功能与交互',
   model: '模型与生成',
@@ -213,22 +211,8 @@ export function SettingsOutline({
       hidden={mode === 'simple'}
       data-settings-navigation
     >
-      <NativeSelect
-        className="settings-category-select"
-        aria-label="详细设置分类"
-        value={page}
-        onChange={(event) =>
-          navigate(event.target.value as SettingsPage, `#settings-${event.target.value}`)
-        }
-      >
-        {Object.entries(pageTitles).map(([id, title]) => (
-          <option key={id} value={id}>
-            {title}
-          </option>
-        ))}
-      </NativeSelect>
       <div className="settings-category-links">
-        {(Object.keys(pageTitles) as SettingsPage[]).map((id, index) => (
+        {(Object.keys(pageTitles) as SettingsPage[]).map((id) => (
           <a
             key={id}
             href={`#settings-${id}`}
@@ -239,11 +223,7 @@ export function SettingsOutline({
               navigate(id, event.currentTarget.hash);
             }}
           >
-            <span className="settings-nav-number" aria-hidden="true">
-              0{index + 1}
-            </span>
             <span>{pageTitles[id]}</span>
-            <Icon name="chevron-right" />
           </a>
         ))}
       </div>
