@@ -5,15 +5,23 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../../../shared/icons/react';
 export type ActionState = 'idle' | 'pending' | 'success';
-export function ActionIcon({ name, state }: { name: string; state: ActionState }) {
+export function ActionIcon({
+  name,
+  state,
+  retainSuccess = false,
+}: {
+  name: string;
+  state: ActionState;
+  retainSuccess?: boolean;
+}) {
   const [expired, setExpired] = useState(false);
   useEffect(() => {
     setExpired(false);
-    if (state !== 'success') return;
+    if (state !== 'success' || retainSuccess) return;
     const timer = setTimeout(() => setExpired(true), 1200);
     return () => clearTimeout(timer);
-  }, [state]);
-  const current = state === 'success' && expired ? 'idle' : state;
+  }, [state, retainSuccess]);
+  const current = state === 'success' && !retainSuccess && expired ? 'idle' : state;
   return (
     <span className="settings-action-icon" aria-hidden="true" data-action-state={current}>
       {(['idle', 'pending', 'success'] as const).map((phase) => (
@@ -35,7 +43,9 @@ export function ActionLabel({ text, labels }: { text: string; labels: readonly s
           {label}
         </span>
       ))}
-      <span>{text}</span>
+      <span key={`current:${text}`} className="settings-action-label-value">
+        {text}
+      </span>
     </span>
   );
 }

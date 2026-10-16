@@ -152,6 +152,74 @@ html[data-settings-input='keyboard'] .settings-app button:active {
 html[data-settings-input='keyboard'] .settings-action-layer {
   transition: none;
 }
-html[data-settings-input='keyboard'] .settings-action-wait {
+/* Waiting is task feedback even when invoked with the keyboard. */
+.settings-action-label-value {
+  animation: settings-action-label-enter 160ms var(--settings-ease);
+}
+@keyframes settings-action-label-enter {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.settings-app .settings-connection-test {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.settings-app .settings-connection-test[data-connection-state='pending'] {
+  opacity: 1;
+  color: var(--foreground);
+  background: var(--accent);
+  cursor: progress;
+}
+.settings-connection-test::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 2px;
+  background: currentColor;
+  opacity: 0;
+  pointer-events: none;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.settings-connection-test[data-connection-state='pending']::after {
+  opacity: 0.5;
+  transform: none;
+  animation: settings-connection-wait 1100ms var(--settings-ease) infinite;
+}
+.settings-connection-test[data-connection-state='success']::after {
+  opacity: 0.5;
+  transform: scaleX(1);
+  transition:
+    transform 200ms var(--settings-ease),
+    opacity 200ms var(--settings-ease);
+}
+@keyframes settings-connection-wait {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  50% {
+    clip-path: inset(0 20% 0 20%);
+  }
+  to {
+    clip-path: inset(0 0 0 100%);
+  }
+}
+.settings-connection-test .settings-action-wait {
+  animation-duration: 900ms;
+}
+html[data-settings-input='keyboard'] .settings-action-label-value {
   animation: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-connection-test[data-connection-state='pending']::after {
+    clip-path: none;
+    opacity: 0.2;
+  }
 }

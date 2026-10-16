@@ -297,7 +297,7 @@ test(
         content: await readFile('ui/settings/settings-controls.css', 'utf8'),
       });
       await page.addScriptTag({ content: script });
-      const testButton = page.getByRole('button', { name: '测试连接', exact: true });
+      const testButton = page.locator('.settings-connection-test');
       const feedback = page.locator('#model-test-feedback');
       const input = page.getByRole('combobox', { name: '模型名称', exact: true });
       await testButton.click();

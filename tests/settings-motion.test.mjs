@@ -146,8 +146,9 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
           .evaluate((el) => el.getAnimations({ subtree: true }).length),
         0,
       );
-      const testButton = page.getByRole('button', { name: '测试连接', exact: true });
+      const testButton = page.locator('.settings-connection-test');
       const width = (await testButton.boundingBox()).width;
+      delay = 1000;
       await testButton.click();
       const pending = page.getByRole('button', { name: '正在测试…', exact: true });
       await pending.waitFor();
@@ -160,8 +161,34 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
         await pending.locator('[data-action-state]').getAttribute('data-action-state'),
         'pending',
       );
+      assert.equal(
+        await pending.evaluate((el) => getComputedStyle(el).opacity),
+        '1',
+        'busy feedback stays readable',
+      );
+      const motion = await pending.evaluate(async (el) => {
+        const frames = [];
+        for (let i = 0; i < 8; i++) {
+          frames.push({
+            bar: getComputedStyle(el, '::after').clipPath,
+            spin: getComputedStyle(el.querySelector('.settings-action-wait')).transform,
+          });
+          await new Promise(requestAnimationFrame);
+        }
+        return frames;
+      });
+      assert.ok(new Set(motion.map((x) => x.bar)).size > 2, 'waiting line visibly travels');
+      assert.ok(new Set(motion.map((x) => x.spin)).size > 2, 'wait icon visibly rotates');
       await testButton.locator('[data-action-state="success"]').waitFor();
       assert.equal((await testButton.boundingBox()).width, width);
+      await page.getByRole('button', { name: '连接成功', exact: true }).waitFor();
+      await page.waitForTimeout(1350);
+      assert.equal(
+        await testButton.locator('[data-action-state]').getAttribute('data-action-state'),
+        'success',
+        'connection result remains until the next action or edit',
+      );
+      delay = 320;
       const iconDurations = await testButton
         .locator('.settings-action-layer')
         .first()
@@ -210,7 +237,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
         await save.locator('[data-action-state]').getAttribute('data-action-state'),
         'idle',
       );
-      await page.getByText('自定义模型分组', { exact: true }).click();
+      await page.getByRole('button', { name: '模型分组', exact: true }).click();
       status = 200;
       const refresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
       await refresh.click();
@@ -223,6 +250,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
         await refresh.locator('[data-action-state]').getAttribute('data-action-state'),
         'idle',
       );
+      await page.getByRole('button', { name: '关闭模型分组', exact: true }).click();
       // Reduced motion cancels in-flight WAAPI and suppresses spinner/CSS transforms, but keeps state feedback.
       await tabs.getByRole('button', { name: '大纲', exact: true }).click();
       await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -271,6 +299,24 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
           .evaluate((el) => el.getAnimations({ subtree: true }).length),
         0,
       );
+      await testButton.focus();
+      await page.keyboard.press('Enter');
+      await pending.waitFor();
+      assert.notEqual(
+        await pending
+          .locator('.settings-action-wait')
+          .evaluate((el) => getComputedStyle(el).animationName),
+        'none',
+        'keyboard keeps real waiting feedback',
+      );
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(
+        await pending.evaluate((el) => getComputedStyle(el, '::after').animationName),
+        'none',
+        'reduce stops the waiting line',
+      );
+      await testButton.locator('[data-action-state="success"]').waitFor();
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
       await mkdir('target/reports', { recursive: true });
       await page.screenshot({ path: 'target/reports/settings-motion-light.png', fullPage: true });
       await page.evaluate(() => (document.documentElement.dataset.settingsTheme = 'dark'));

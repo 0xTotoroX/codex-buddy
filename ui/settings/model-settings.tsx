@@ -221,15 +221,33 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                 variant="outline"
                 disabled={!!busy || remoteChanged}
                 onClick={() => void test()}
+                className="settings-connection-test"
+                data-connection-state={
+                  busy
+                    ? 'pending'
+                    : testFeedback?.success
+                      ? 'success'
+                      : testFeedback?.failed
+                        ? 'error'
+                        : 'idle'
+                }
                 aria-busy={!!busy}
                 aria-describedby={busy || testFeedback ? 'model-test-feedback' : undefined}
               >
                 <ActionIcon
                   name="connection"
+                  retainSuccess
                   state={busy ? 'pending' : testFeedback?.success ? 'success' : 'idle'}
                 />
                 <ActionLabel
-                  labels={['正在保存…', '正在测试…', '保存并测试', '测试连接']}
+                  labels={[
+                    '正在保存…',
+                    '正在测试…',
+                    '保存并测试',
+                    '测试连接',
+                    '连接成功',
+                    '重新测试',
+                  ]}
                   text={
                     busy === 'saving'
                       ? '正在保存…'
@@ -237,7 +255,11 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                         ? '正在测试…'
                         : dirty
                           ? '保存并测试'
-                          : '测试连接'
+                          : testFeedback?.success
+                            ? '连接成功'
+                            : testFeedback?.failed
+                              ? '重新测试'
+                              : '测试连接'
                   }
                 />
               </Button>
