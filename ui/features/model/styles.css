@@ -311,8 +311,11 @@
   margin-left: auto;
   gap: 0;
 }
+.feature-model .model-preset-actions .model-icon-button {
+  color: var(--muted);
+  opacity: 1;
+}
 .feature-model .model-preset-edit[aria-pressed='true'] {
-  color: var(--ink);
   background: var(--hover);
 }
 .model-preset-editor {
