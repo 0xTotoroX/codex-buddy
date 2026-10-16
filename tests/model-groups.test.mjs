@@ -554,7 +554,7 @@ test(
       stdin: {
         contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ModelView} from './ui/features/model/view';
       const root = createRoot(document.getElementById('view')); const reading = {};
-      window.calls = []; window.state = {revision: 1, preferences: {enabled: true, pinned: ['gpt-test'], modelColumnWidth: 220, presets: [{id:'kept',name:'旧预设',selection:{model:'gpt-test',reasoning:'high',speed:'standard'}}]}, snapshot: {target:{id:'fixture'},revision:'v1',status:'ready',models:[{id:'gpt-test',label:'GPT test',reasoning:['low','high'],fast:true}],current:{model:'gpt-test',reasoning:'high',speed:'standard'}}};
+      window.calls = []; window.state = {revision: 1, preferences: {enabled: true, pinned: ['gpt-test'], modelColumnWidth: 220, presets: [{id:'kept',name:'旧预设',selection:{model:'gpt-test',reasoning:'high',speed:'standard'}},{id:'fast-kept',name:'快速预设',selection:{model:'gpt-test',reasoning:'high',speed:'fast'}}]}, snapshot: {target:{id:'fixture'},revision:'v1',status:'ready',models:[{id:'gpt-test',label:'GPT test',reasoning:['low','high'],fast:true}],current:{model:'gpt-test',reasoning:'high',speed:'standard'}}};
       window.render = () => root.render(<ModelView headerActions={document.getElementById("model-header")} state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(action==='apply' && window.delay) await new Promise(resolve=>setTimeout(resolve,window.delay)); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
         resolveDir: process.cwd(),
         loader: 'tsx',
@@ -569,7 +569,7 @@ test(
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.setContent(
-        '<header style="width:700px;height:34px;display:flex;align-items:center"><nav>模型快切</nav><span id="model-header"></span></header><div id="view" style="width:700px;--paper:#000;--ink:#eee;--muted:#999;--hover:#222"></div>',
+        '<header style="width:700px;height:34px;display:flex;align-items:center"><nav><button aria-pressed="true">模型快切</button></nav><span id="model-header"></span></header><div id="view" style="width:700px;--paper:#000;--ink:#eee;--muted:#999;--hover:#222"></div>',
       );
       await page.addStyleTag({
         content:
@@ -580,6 +580,26 @@ test(
       const fast = page.getByRole('button', { name: 'Fast', exact: true });
       const line = page.getByRole('button', { name: '调整模型名称宽度' });
       await fast.waitFor();
+      const fillClip = () =>
+        fast.locator('.model-fast-fill').evaluate((n) => getComputedStyle(n).clipPath);
+      assert.match(await fillClip(), /^inset\(100%/, 'standard mode has no visible filled layer');
+      assert.equal(
+        await page
+          .getByRole('button', { name: '快速预设', exact: true })
+          .locator('[data-icon="bolt-filled"]')
+          .count(),
+        1,
+      );
+      assert.equal(
+        await page.getByRole('button', { name: '旧预设', exact: true }).locator('svg').count(),
+        0,
+      );
+      const plus = await page.locator('.model-preset-add').evaluate((n) => ({
+        button: n.getBoundingClientRect().width,
+        glyph: n.querySelector('path').getBoundingClientRect().width,
+      }));
+      assert.equal(plus.button, 28);
+      assert.ok(plus.glyph >= 15.5, 'larger visible plus, same button hit area');
       assert.deepEqual(
         await page
           .locator('.model-preset-actions button')
@@ -725,6 +745,7 @@ test(
         0,
       );
       assert.equal(await fast.getAttribute('data-filled'), 'false');
+      assert.match(await fillClip(), /^inset\(100%/, 'turning Fast off removes the actual fill');
       await fast.click();
       assert.equal(await fast.getAttribute('data-filled'), 'true');
       assert.equal(await fast.getAttribute('data-phase'), 'idle');
@@ -742,6 +763,7 @@ test(
         'false',
         'failed apply preserves actual state',
       );
+      assert.match(await fillClip(), /^inset\(100%/, 'failure leaves the actual icon hollow');
       const catalogWidth = await line.getAttribute('data-column-max');
       await page.getByRole('button', { name: '所有模型', exact: true }).click();
       await page.evaluate(
@@ -753,6 +775,10 @@ test(
         'hidden headings preserve column metrics',
       );
       assert.equal(await fast.isVisible(), false);
+      assert.equal(
+        await page.getByRole('button', { name: '模型快切', exact: true }).isVisible(),
+        false,
+      );
       const catalogTop = await page.locator('.model-group h3').first().boundingBox();
       const closeTop = await page.getByRole('button', { name: '关闭所有模型' }).boundingBox();
       assert.ok(
@@ -766,6 +792,10 @@ test(
       assert.ok(Math.abs(catalogTop.x - title.x) < 1, 'catalog aligns with the title');
       await page.getByRole('button', { name: '关闭所有模型' }).click();
       assert.equal(await fast.isVisible(), true);
+      assert.equal(
+        await page.getByRole('button', { name: '模型快切', exact: true }).isVisible(),
+        true,
+      );
       assert.equal(await alignment(), true);
       assert.equal(
         await page
@@ -775,6 +805,18 @@ test(
       );
       assert.equal(await page.getByRole('button', { name: '旧预设', exact: true }).count(), 1);
       assert.equal(await page.evaluate(() => window.state.preferences.presets[0].id), 'kept');
+      await page.evaluate(() => {
+        window.state.snapshot.models[0].fast = false;
+        window.state.snapshot.current.speed = 'fast';
+        window.render();
+      });
+      await page.waitForFunction(() => document.querySelector('.model-fast').disabled);
+      assert.equal(await fast.getAttribute('aria-pressed'), 'false');
+      assert.match(
+        await fillClip(),
+        /^inset\(100%/,
+        'unsupported Fast remains hollow even with stale speed data',
+      );
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();

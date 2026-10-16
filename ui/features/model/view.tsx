@@ -117,6 +117,8 @@ export function ModelView({
   }, []);
   const s = state.snapshot,
     prefs = state.preferences;
+  const currentModel = s.models.find((model) => model.id === s.current?.model);
+  const fastActive = !!currentModel?.fast && s.current?.speed === 'fast';
   const allowed = !!s.target && ['ready', 'waiting'].includes(s.status) && prefs.enabled;
   const apply = (selection: Selection, preserveSpeed = false) =>
     action({ target: s.target, expectedRevision: s.revision, selection, preserveSpeed }, 'apply');
@@ -405,16 +407,12 @@ export function ModelView({
                   ref={fastButton}
                   className="model-icon-button model-fast"
                   aria-label="Fast"
-                  aria-pressed={s.current?.speed === 'fast'}
+                  aria-pressed={fastActive}
                   data-phase={motion.phase}
-                  data-filled={s.current?.speed === 'fast'}
+                  data-filled={fastActive}
                   style={{ left: nameWidth - 6 }}
                   disabled={
-                    busy ||
-                    motion.phase !== 'idle' ||
-                    !allowed ||
-                    !s.current ||
-                    !s.models.find((m) => m.id === s.current?.model)?.fast
+                    busy || motion.phase !== 'idle' || !allowed || !s.current || !currentModel?.fast
                   }
                   onClick={async () => {
                     if (!s.current) return;
@@ -602,7 +600,7 @@ export function ModelView({
                         else if (allowed && valid(p.selection)) void apply(p.selection);
                       }}
                     >
-                      {p.selection.speed === 'fast' && icon('bolt')}
+                      {p.selection.speed === 'fast' && icon('bolt-filled')}
                       <span>{p.name}</span>
                     </button>
                   )}
@@ -643,7 +641,7 @@ export function ModelView({
                   disabled={busy || !allowed || !s.current}
                   onClick={addPreset}
                 >
-                  {icon('plus')}
+                  {icon('plus-large')}
                 </button>
                 {allButton}
               </div>
