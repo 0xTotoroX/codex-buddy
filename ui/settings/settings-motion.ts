@@ -1,5 +1,5 @@
 /* [INPUT]: Presentation identity, header/preview geometry and input modality.
- * [OUTPUT]: Sticky offsets and interruptible navigation/layout/scene transitions; keyboard and reduced motion stay immediate.
+ * [OUTPUT]: Sticky offsets and interruptible navigation/layout/scene and provider-field transitions; keyboard and reduced motion stay immediate.
  * [POS]: Settings-only motion, never remounts controls or changes configuration.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useLayoutEffect, useRef } from 'react';
@@ -153,5 +153,57 @@ export function usePreviewTransition(identity: string) {
       window.removeEventListener('keydown', cancel, true);
     };
   }, [identity]);
+  return ref;
+}
+
+// Animate the existing fields together; no wrapper, remount key or save interception.
+export function useProviderFieldsMotion(provider: string | undefined) {
+  const ref = useRef<HTMLDivElement>(null);
+  const previous = useRef(provider);
+  useLayoutEffect(() => {
+    const before = previous.current;
+    previous.current = provider;
+    const root = ref.current;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+    if (
+      !root ||
+      !before ||
+      before === provider ||
+      reduce.matches ||
+      document.documentElement.dataset.settingsInput === 'keyboard'
+    )
+      return;
+    const fields = new Set<HTMLElement>();
+    root
+      .querySelectorAll(
+        'label[for="protocol"], label[for="base-url"], label[for="api-key"], label[for="model"]',
+      )
+      .forEach((label) => {
+        const field = label.closest<HTMLElement>('.settings-field');
+        if (field?.getBoundingClientRect().height) fields.add(field);
+      });
+    const animations = [...fields].map((field) =>
+      field.animate(
+        [
+          { opacity: 0, transform: 'translateY(4px)' },
+          { opacity: 1, transform: 'none' },
+        ],
+        {
+          duration: 180,
+          easing:
+            getComputedStyle(root).getPropertyValue('--settings-ease').trim() ||
+            'cubic-bezier(.2,.7,.2,1)',
+        },
+      ),
+    );
+    const cancel = () => animations.forEach((animation) => animation.cancel());
+    reduce.addEventListener('change', cancel);
+    window.addEventListener('keydown', cancel, true);
+    return () => {
+      cancel();
+      reduce.removeEventListener('change', cancel);
+      window.removeEventListener('keydown', cancel, true);
+    };
+  }, [provider]);
   return ref;
 }

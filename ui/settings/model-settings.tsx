@@ -2,6 +2,7 @@
  * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced controls stay collapsed; connection tests report progress and results beside the action.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { useProviderFieldsMotion } from './settings-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -15,6 +16,7 @@ import { ActionIcon, ActionLabel } from './components/ui/action-feedback';
 import { ModelApiKey, DeleteModelApiKey } from './model-credentials';
 export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple: boolean }) {
   const { form, saved, change, dirty, save, remoteChanged, apiKey, clearKey } = editor;
+  const fieldsRef = useProviderFieldsMotion(form?.provider);
   const [busy, setBusy] = useState('');
   const [testFeedback, setTestFeedback] = useState<{
     text: string;
@@ -140,7 +142,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
   return (
     <>
       <Card tabIndex={-1} id="settings-model" aria-labelledby="model-title">
-        <div className="settings-model-editor">
+        <div ref={fieldsRef} className="settings-model-editor">
           <div>
             <h2 id="model-title" hidden={simple}>
               生成模型

@@ -127,6 +127,9 @@ export function SettingsForm({
   return (
     <form
       onBlurCapture={(e) => {
+        // Confirmation controls can blur when busy/removed; they are not draft edits.
+        if (e.target instanceof Element && e.target.closest('dialog[data-settings-navigation]'))
+          return;
         if (!(
           e.relatedTarget instanceof Element &&
           e.relatedTarget.closest('button[type="submit"], [data-settings-navigation]')

@@ -2,6 +2,7 @@
  * [OUTPUT]: 自定义模型分组、厂家纠正与稳定排序；删除和恢复分类统一确认并校验修订。
  * [POS]: 只管理模型展示偏好，不切换模型或修改预设。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { useSettingsListMotion } from './settings-list-motion';
 import { useState } from 'react';
 import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
@@ -34,6 +35,7 @@ export function ModelOrganization({
   save: (patch: Partial<ModelPreferences>) => Promise<boolean>;
   refresh: () => Promise<boolean>;
 }) {
+  const listRef = useSettingsListMotion();
   const [refreshState, setRefreshState] = useState<ActionState>('idle');
   const prefs = state.preferences;
   const [selected, setSelected] = useState<string[]>([]);
@@ -90,7 +92,7 @@ export function ModelOrganization({
   return (
     <details id="model-organization" className="settings-details mt-3">
       <summary>自定义模型分组</summary>
-      <div className="space-y-5">
+      <div ref={listRef} data-settings-list="model-groups" className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
@@ -242,7 +244,13 @@ export function ModelOrganization({
         {groups.map((group, index) => {
           const custom = prefs.groups?.find((g) => `custom:${g.id}` === group.id);
           return (
-            <section key={group.id} className="space-y-2" aria-label={`分组：${group.name}`}>
+            <section
+              key={group.id}
+              data-settings-list-item={group.id}
+              data-settings-list={group.id}
+              className="space-y-2"
+              aria-label={`分组：${group.name}`}
+            >
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="mr-auto font-medium">
                   {group.name} · {group.models.length}
@@ -332,7 +340,12 @@ export function ModelOrganization({
                 const manual = prefs.modelOverrides?.[model.id];
                 const offline = !available.some((m) => m.id === model.id);
                 return (
-                  <div key={model.id} className="model-organization-row" data-model-id={model.id}>
+                  <div
+                    key={model.id}
+                    data-settings-list-item={model.id}
+                    className="model-organization-row"
+                    data-model-id={model.id}
+                  >
                     <label className="flex min-w-0 flex-1 items-start gap-3">
                       <input
                         type="checkbox"

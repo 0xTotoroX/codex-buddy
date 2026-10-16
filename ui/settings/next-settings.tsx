@@ -1,7 +1,8 @@
 /* [INPUT]: Shared settings editor, direction credentials and appearance preferences.
- * [OUTPUT]: Next-step directions, quick prompts with confirmed scoped deletion, and click/display options.
+ * [OUTPUT]: Next-step directions, quick prompts with stable visual identity, smooth reflow and confirmed scoped deletion, and click/display options.
  * [POS]: Functional settings only; shared model configuration lives in model-settings.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { usePromptKeys, useSettingsListMotion } from './settings-list-motion';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
@@ -19,6 +20,11 @@ export function NextSettings({
   appearance?: View['panelPreferences'];
 }) {
   const { form, saved, change } = editor;
+  const listRef = useSettingsListMotion();
+  const { keys: promptKeys, trackRemoval } = usePromptKeys(
+    form?.quickPrompts ?? [],
+    saved?.configurationRevision,
+  );
   if (!form || !saved) return null;
   return (
     <>
@@ -31,10 +37,11 @@ export function NextSettings({
         <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
           常用提示词
         </h2>
-        <div className="space-y-3">
+        <div ref={listRef} data-settings-list="quick-prompts" className="space-y-3">
           {form.quickPrompts.map((item, index) => (
             <div
-              key={index}
+              key={promptKeys[index]}
+              data-settings-list-item={promptKeys[index]}
               className="grid grid-cols-[120px_minmax(0,1fr)_auto] gap-3 items-start max-[600px]:grid-cols-[minmax(0,1fr)_auto] [&>textarea]:max-[600px]:col-span-full [&>textarea]:max-[600px]:row-start-2"
             >
               <Input
@@ -77,7 +84,11 @@ export function NextSettings({
                 title={`删除提示词“${item.label || '未命名'}”？`}
                 description="会删除这条常用提示词的名称与内容，其他提示词保持不变。"
                 confirmLabel="确认删除"
-                onConfirm={() => editor.removeEntry('prompt', index, saved.configurationRevision)}
+                onConfirm={() =>
+                  trackRemoval(index, () =>
+                    editor.removeEntry('prompt', index, saved.configurationRevision),
+                  )
+                }
               >
                 <Icon name="trash" />
               </ConfirmationButton>
@@ -87,6 +98,7 @@ export function NextSettings({
             type="button"
             variant="outline"
             size="icon"
+            data-settings-list-item="add"
             aria-label="添加提示词"
             disabled={form.quickPrompts.length >= 8}
             onClick={() =>

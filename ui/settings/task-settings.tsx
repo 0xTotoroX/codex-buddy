@@ -2,6 +2,7 @@
  * [OUTPUT]: Direct group personalization with accessible save/add actions; retained sync authorization and single-list binding UI.
  * [POS]: Task settings do not modify model-control or workbench preferences.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
+import { useSettingsListMotion } from './settings-list-motion';
 import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -17,6 +18,7 @@ import {
 // Retain the integration UI for later; no authorization/list controls are mounted today.
 const remindersSettingsVisible = false;
 export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) {
+  const listRef = useSettingsListMotion();
   const { state, error, busy, command } = tasks;
   const [groupNames, setGroupNames] = useState<Record<string, string>>({});
   const [newGroup, setNewGroup] = useState('');
@@ -43,10 +45,11 @@ export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) 
     <section id="settings-tasks" className="settings-section space-y-5">
       <section id="board-groups">
         <h2>看板分组</h2>
-        <div className="space-y-3">
+        <div ref={listRef} data-settings-list="board-groups" className="space-y-3">
           {(state?.store.columns ?? defaultColumns).map((column) => (
             <form
               key={column.id}
+              data-settings-list-item={column.id}
               className="flex items-center gap-3"
               onSubmit={(event) => {
                 event.preventDefault();
@@ -88,6 +91,7 @@ export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) 
             </form>
           ))}
           <form
+            data-settings-list-item="add"
             className="flex items-center gap-3"
             onSubmit={(event) => {
               event.preventDefault();

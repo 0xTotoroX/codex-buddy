@@ -4,6 +4,7 @@
  * [POS]: Web 设置中的 Stepwise 方向配置，不在日常面板增加控制项。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { useSettingsListMotion } from './settings-list-motion';
 import { useState } from 'react';
 import { Icon } from '../shared/icons/react';
 import { Card } from './components/ui/card';
@@ -20,6 +21,7 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
   const { form: draft, saved: baseline, change, schedule } = editor;
   const form = draft!,
     saved = baseline!;
+  const listRef = useSettingsListMotion<HTMLElement>();
   const [adding, setAdding] = useState('');
   const library = form.directionLibrary;
   function slots(ids: string[]) {
@@ -32,7 +34,7 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
     slots(ids);
   }
   return (
-    <Card tabIndex={-1} id="settings-directions" aria-labelledby="direction-title">
+    <Card ref={listRef} tabIndex={-1} id="settings-directions" aria-labelledby="direction-title">
       <h2 id="direction-title" className="mb-5 text-[15px] font-semibold">
         建议方向
       </h2>
@@ -65,9 +67,9 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
           />
         </div>
       ) : (
-        <div className="mt-4 space-y-3">
+        <div data-settings-list="direction-slots" className="mt-4 space-y-3">
           {form.selectedDirections.map((id, index) => (
-            <div key={id} className="flex items-center gap-2">
+            <div key={id} data-settings-list-item={id} className="flex items-center gap-2">
               <label htmlFor={`direction-slot-${index}`} className="shrink-0 text-[14px]">
                 {index + 1}
               </label>
@@ -122,7 +124,7 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
               </Button>
             </div>
           ))}
-          <div className="flex items-center gap-2">
+          <div data-settings-list-item="add" className="flex items-center gap-2">
             <NativeSelect
               aria-label="添加方向位置"
               value={adding}
@@ -161,9 +163,13 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
       {form.directionSource !== 'auto' && (
         <section className="mt-5">
           <h3 className="text-[14px] font-medium">方向库</h3>
-          <div className="mt-4 space-y-5">
+          <div data-settings-list="direction-library" className="mt-4 space-y-5">
             {library.map((item, index) => (
-              <div key={item.id} className="space-y-2 border-b border-border pb-4">
+              <div
+                key={item.id}
+                data-settings-list-item={item.id}
+                className="space-y-2 border-b border-border pb-4"
+              >
                 <div className="flex items-center gap-2">
                   {form.directionSource === 'smart' && (
                     <input
@@ -231,6 +237,7 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
               type="button"
               variant="outline"
               size="icon"
+              data-settings-list-item="add"
               aria-label="添加自定义方向"
               disabled={library.length >= 24}
               onClick={() =>
