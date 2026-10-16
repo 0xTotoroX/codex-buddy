@@ -31,7 +31,7 @@
 .settings-app [data-slot='switch'] {
   box-sizing: border-box;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 6px;
   width: 36px;
   height: 22px;
   min-height: 22px;
@@ -42,7 +42,7 @@
   background-color: var(--settings-switch-on);
 }
 .settings-app [data-slot='switch-thumb'] {
-  border-radius: 999px;
+  border-radius: 4px;
   box-shadow: none;
   width: 16px;
   height: 16px;
