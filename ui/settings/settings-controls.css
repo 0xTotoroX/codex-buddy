@@ -180,3 +180,22 @@
     }
   }
 }
+
+/* Native dialog provides focus containment and Escape; colors follow the settings theme. */
+.settings-key-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 24px;
+  color: var(--buddy-text);
+  background: var(--buddy-surface);
+  border: 1px solid var(--buddy-border);
+  border-radius: var(--settings-control-radius);
+  box-shadow: var(--settings-menu-shadow);
+}
+.settings-key-dialog::backdrop {
+  background: rgb(0 0 0 / 30%);
+}

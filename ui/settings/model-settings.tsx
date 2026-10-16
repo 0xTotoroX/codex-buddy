@@ -1,4 +1,4 @@
-/* [INPUT]: Shared model editor, serialized save queue, saved-connection model API and free-text dropdown.
+/* [INPUT]: Shared model editor, serialized save queue, saved-connection model API, credential controls and free-text dropdown.
  * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced controls stay collapsed; connection tests report progress and results beside the action.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -12,21 +12,10 @@ import { Field } from './settings-controls';
 import { request, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
 import { Icon } from '../shared/icons/react';
+import { ModelApiKey, DeleteModelApiKey } from './model-credentials';
 export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple: boolean }) {
-  const {
-    form,
-    saved,
-    change,
-    dirty,
-    save,
-    remoteChanged,
-    apiKey,
-    clearKey,
-    setApiKey,
-    setClearKey,
-  } = editor;
-  const [showKey, setShowKey] = useState(false),
-    [busy, setBusy] = useState('');
+  const { form, saved, change, dirty, save, remoteChanged, apiKey, clearKey } = editor;
+  const [busy, setBusy] = useState('');
   const [testFeedback, setTestFeedback] = useState<{ text: string; failed?: boolean } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const testing = useRef(false);
@@ -193,47 +182,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                     spellCheck={false}
                   />
                 </Field>
-                <Field id="api-key" label="API 密钥">
-                  <div className="relative flex items-center [&_input]:pr-[43px]">
-                    <Input
-                      id="api-key"
-                      type={showKey ? 'text' : 'password'}
-                      value={apiKey}
-                      onChange={(e) => {
-                        setApiKey(e.target.value);
-                        setClearKey(false, false);
-                      }}
-                      placeholder={saved.storedApiKey ? '已保存 · 留空保留' : '输入 API key'}
-                      autoComplete="off"
-                      spellCheck={false}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1"
-                      aria-label={showKey ? '隐藏密钥' : '显示密钥'}
-                      onClick={() => setShowKey(!showKey)}
-                    >
-                      {showKey ? <Icon name="eye-off" /> : <Icon name="eye" />}
-                    </Button>
-                  </div>
-                </Field>
-                {saved.storedApiKey && (
-                  <label
-                    hidden={simple}
-                    className="-mt-1.5 mb-5 flex items-center gap-1.5 text-[14px] text-muted-foreground [&_input]:accent-primary"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={clearKey}
-                      onChange={(e) => {
-                        setClearKey(e.target.checked);
-                      }}
-                    />
-                    保存时清除已存密钥
-                  </label>
-                )}
+                <ModelApiKey editor={editor} busy={!!busy} />
               </>
             )}
             <Field id="model" label="模型名称">
@@ -308,6 +257,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                   spellCheck={false}
                 />
               </Field>
+              <DeleteModelApiKey editor={editor} busy={!!busy} />
             </details>
           </div>
         </div>

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 版本化设置 API、连接状态与服务端修订。
- * [OUTPUT]: 生成/Jev 独立密钥及表单的失焦/选择自动保存与手动保存共用队列，功能开关单独保存，保留在途编辑和失败草稿。
+ * [OUTPUT]: 生成/Jev 独立密钥及表单的失焦/选择自动保存与手动保存共用队列，功能开关及确认后的密钥删除单独保存，保留在途编辑和失败草稿。
  * [POS]: 设置表单事务；不执行模型生成、宿主重启或窗口操作。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -13,6 +13,7 @@ type ControlPatch = {
   enabled?: boolean;
   answerOutlineEnabled?: boolean;
   promptEnhancementEnabled?: boolean;
+  clearApiKey?: true;
 };
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 type Draft = {
@@ -257,6 +258,14 @@ export function useSettingsForm(
   function setApiKey(value: string) {
     update({ ...current.current, apiKey: value });
   }
+  function removeApiKey(expectedRevision: number) {
+    if (flight.current) return Promise.reject(new Error('正在保存配置，请稍后重试。'));
+    if (baseline.current?.configurationRevision !== expectedRevision)
+      return Promise.reject(new Error('设置已变化，请关闭后重新确认删除。'));
+    if (current.current.apiKey)
+      return Promise.reject(new Error('请先保存或取消新密钥，再删除已保存的密钥。'));
+    return save(current.current, { clearApiKey: true });
+  }
   function setClearKey(value: boolean, autoSave = true) {
     update({ ...current.current, clearKey: value });
     if (autoSave) schedule();
@@ -285,6 +294,7 @@ export function useSettingsForm(
     save,
     schedule,
     setApiKey,
+    removeApiKey,
     setClearKey,
   };
 }
