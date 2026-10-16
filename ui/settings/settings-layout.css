@@ -1,5 +1,5 @@
 /* [INPUT]: Tom Modern visual direction, shared typography and resolved settings theme.
- * [OUTPUT]: Settings-only tokens, compact header with direct responsive category navigation and form rhythm.
+ * [OUTPUT]: Settings-only tokens, compact narrow header and wide sidebar navigation and form rhythm.
  * [POS]: Does not alter the workspace or host theme tokens.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 /* Shared tokens may be emitted after the entry CSS by Vite; specificity keeps both builds aligned. */
@@ -274,6 +274,10 @@ html:root .settings-search-input {
   min-width: 0;
 }
 html:root .settings-nav {
+  position: sticky;
+  top: calc(var(--settings-sticky-offset, 100px) - 18px);
+  z-index: 9;
+  background: var(--buddy-page);
   margin-top: 20px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--buddy-border);
@@ -512,6 +516,56 @@ html:root .settings-nav {
   margin-top: 36px;
   font-size: 0.6875em;
   color: var(--buddy-muted);
+}
+/* The approved compact treatment is the narrow layout; desktop keeps its sidebar. */
+@media (min-width: 761px) {
+  .settings-app {
+    max-width: 1440px;
+    padding: 28px 36px 24px;
+  }
+  .settings-topline {
+    min-height: 76px;
+    gap: 24px;
+  }
+  .settings-layout {
+    display: grid;
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 36px;
+    align-content: start;
+    align-items: start;
+  }
+  html:root .settings-nav {
+    top: var(--settings-sticky-offset, 100px);
+    min-width: 0;
+    margin-top: 30px;
+    padding: 0 22px 0 0;
+    border-bottom: 0;
+  }
+  .settings-category-links {
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .settings-nav a {
+    min-height: 50px;
+    font-size: 0.8125em;
+  }
+  .settings-title {
+    margin: 10px 0 8px;
+    font-size: 1.9em;
+  }
+}
+@media (min-width: 761px) and (max-width: 1190px) {
+  .settings-app {
+    padding-inline: 24px;
+  }
+  .settings-layout {
+    grid-template-columns: 156px minmax(0, 1fr);
+    gap: 26px;
+  }
+  html:root .settings-nav {
+    padding-right: 12px;
+  }
 }
 @media (max-width: 1190px) {
   .settings-body {

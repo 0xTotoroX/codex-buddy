@@ -918,7 +918,7 @@ test(
       );
       for (const color of ['浅色', '深色']) {
         await chooseTheme(color);
-        for (const width of [390, 680, 1100]) {
+        for (const width of [390, 680, 760, 761, 1100, 1440]) {
           await page.setViewportSize({ width, height: 850 });
           await page.evaluate(() => scrollTo(0, 0));
           await page.locator('.settings-theme-trigger').click();
@@ -933,6 +933,22 @@ test(
             })),
           );
           assert.ok(links.length === 4 && links.every((n) => n.visible && n.width >= n.content));
+          const layout = await page.evaluate(() => {
+            const nav = document.querySelector('.settings-nav').getBoundingClientRect();
+            const content = document.querySelector('.settings-content').getBoundingClientRect();
+            return {
+              navRight: nav.right,
+              navBottom: nav.bottom,
+              contentLeft: content.left,
+              contentTop: content.top,
+              overflow: document.documentElement.scrollWidth > innerWidth,
+            };
+          });
+          assert.equal(layout.overflow, false, `no horizontal overflow at ${width}px`);
+          if (width <= 760)
+            assert.ok(layout.navBottom <= layout.contentTop, 'narrow navigation precedes content');
+          else
+            assert.ok(layout.navRight < layout.contentLeft, 'wide navigation sits left of content');
           await page.screenshot({
             path: `target/reports/settings-header-${color === '浅色' ? 'light' : 'dark'}-${width}.png`,
           });
