@@ -25,7 +25,7 @@
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
 - [styles.css](styles.css)：Tailwind v4、语义主题映射、搜索和保留的旧总览样式；只扫描本目录，不注入宿主。
-- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。深色使用低对比灰线与深灰选中底，不将正文白色复用作结构线或大面积选中底。
+- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。深色使用低对比灰线与深灰选中底，不将正文白色复用作结构线或大面积选中底。浅色取消背景网格、页头/列表/预览内的重复线条，选择器使用浅灰面与字重；保留大组和输入控件的轻边界，以原间距和对齐表达层次。
 - [settings-preview.tsx](settings-preview.tsx)：只读联动预览。复用既有模块回读的功能、材质、模型和看板快照；嵌套布局复用 resolveFeatureLayout，过滤关闭功能。生成参数显示当前草稿并标识未保存；主形式与材质只显示成功保存的值。示例操作只改变本组件状态，不请求 API、不读任务正文或凭据。
 - [settings-preview.css](settings-preview.css)：预览画布、功能示例、生成路径和连接示意的样式，材质为近似效果，不用于实际业务视图。
 - [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，尊重运行期间的减少动态效果偏好；不重新挂载控件、不存储配置。

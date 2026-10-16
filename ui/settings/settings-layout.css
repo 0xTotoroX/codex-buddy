@@ -9,7 +9,7 @@ html:root {
   --buddy-surface: #fff;
   --buddy-text: #27272a;
   --buddy-muted: #64646e;
-  --buddy-border: #d4d4d8;
+  --buddy-border: #e2e2e6;
   --buddy-input: #fff;
   --buddy-accent: #c94300;
   --buddy-focus: #c94300;
@@ -23,14 +23,14 @@ html:root {
   --error-border: #e6cccc;
   --error-foreground: #9d5353;
   --settings-orange: #ff5a00;
-  --settings-grid: #9696960b;
-  --settings-shadow: 6px 6px 0 #9696961f;
-  --settings-rule: var(--buddy-text);
-  --settings-top-rule-width: 3px;
-  --settings-selected: var(--buddy-text);
-  --settings-selected-text: var(--buddy-page);
+  --settings-grid: transparent;
+  --settings-shadow: 0 4px 18px #00000006;
+  --settings-rule: #e2e2e6;
+  --settings-top-rule-width: 1px;
+  --settings-selected: #e7e7eb;
+  --settings-selected-text: var(--buddy-text);
   --settings-selected-border: transparent;
-  --settings-switch-on: var(--buddy-text);
+  --settings-switch-on: #5d5d66;
   --settings-switch-thumb: var(--buddy-page);
   --settings-glass-highlight: #ffffff65;
   --settings-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -63,6 +63,34 @@ html:root[data-settings-theme='dark'] {
   --settings-switch-on: #62626c;
   --settings-switch-thumb: #dedee3;
   --settings-glass-highlight: #ffffff1c;
+}
+/* Light mode uses spacing and tonal surfaces; transparent rules retain existing geometry. */
+html[data-settings-theme='light']
+  :is(
+    .settings-header,
+    .settings-topline,
+    .settings-nav,
+    .settings-feature-list .settings-row,
+    .settings-surface-group,
+    .settings-save,
+    .settings-footer,
+    .preview-heading,
+    .preview-note
+  ) {
+  border-color: transparent;
+}
+html[data-settings-theme='light'] :is(.settings-theme, .settings-mode, .preview-selector) {
+  border-color: transparent;
+  background: var(--buddy-subtle);
+}
+html[data-settings-theme='light'] .settings-search-input {
+  border-color: transparent;
+  background: var(--buddy-subtle);
+}
+html[data-settings-theme='light']
+  :is(.settings-theme, .settings-mode, .settings-choice, .preview-selector)
+  button[aria-pressed='true'] {
+  font-weight: 600;
 }
 body {
   background-image:
