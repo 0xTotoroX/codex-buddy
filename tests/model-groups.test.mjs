@@ -390,7 +390,7 @@ test(
       await view.locator('[data-model-row="favorite-4"] .model-route').waitFor();
       await page.mouse.move(850, 950);
       assert.equal(await view.locator('.model-visibility, hr, .model-group-label').count(), 0);
-      assert.equal(await view.locator('.model-primary > .model-fast').count(), 1);
+      assert.equal(await view.locator('.model-inline-heading > .model-fast').count(), 1);
       const line = await view.locator('.model-column-resize').boundingBox();
       const head = await view.locator('.model-matrix-head').boundingBox();
       assert.ok(line.y >= head.y + head.height, 'divider starts below the Fast button');
@@ -555,7 +555,7 @@ test(
         contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ModelView} from './ui/features/model/view';
       const root = createRoot(document.getElementById('view')); const reading = {};
       window.calls = []; window.state = {revision: 1, preferences: {enabled: true, pinned: ['gpt-test'], modelColumnWidth: 220, presets: [{id:'kept',name:'旧预设',selection:{model:'gpt-test',reasoning:'high',speed:'standard'}}]}, snapshot: {target:{id:'fixture'},revision:'v1',status:'ready',models:[{id:'gpt-test',label:'GPT test',reasoning:['low','high'],fast:true}],current:{model:'gpt-test',reasoning:'high',speed:'standard'}}};
-      window.render = () => root.render(<ModelView state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
+      window.render = () => root.render(<ModelView headerActions={document.getElementById("model-header")} state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
         resolveDir: process.cwd(),
         loader: 'tsx',
       },
@@ -565,10 +565,11 @@ test(
     const browser = await chromium.launch({ headless: true });
     try {
       const page = await browser.newPage({ viewport: { width: 760, height: 650 } });
+      page.setDefaultTimeout(5000);
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
       await page.setContent(
-        '<div id="view" style="width:700px;--paper:#000;--ink:#eee;--muted:#999;--hover:#222"></div>',
+        '<header style="width:700px;height:34px;display:flex;align-items:center"><nav>模型快切</nav><span id="model-header"></span></header><div id="view" style="width:700px;--paper:#000;--ink:#eee;--muted:#999;--hover:#222"></div>',
       );
       await page.addStyleTag({
         content:
@@ -595,13 +596,55 @@ test(
         ),
         true,
       );
-      const animations = await fast.evaluate((n) => {
-        n.click();
-        return n.closest('.feature-model').querySelector('.model-discharge').getAnimations().length;
-      });
-      assert.equal(animations, 1);
+      const title = await page.locator('header nav').boundingBox();
+      const initialFast = await fast.boundingBox();
+      assert.ok(Math.abs(initialFast.y + 14 - title.y - title.height / 2) < 1);
+      const firstRow = await page.locator('.model-row').boundingBox();
+      const headerBox = await page.locator('header').boundingBox();
+      assert.ok(
+        Math.abs(firstRow.y - headerBox.y - headerBox.height) < 1,
+        'no separate header row',
+      );
+      const alignment = () =>
+        page.evaluate(() => {
+          const heads = [
+            ...document.querySelectorAll('.model-inline-heading .model-choices > span'),
+          ];
+          const cells = [...document.querySelectorAll('.model-row .model-choices button')];
+          return heads.every((head, i) => {
+            const a = head.getBoundingClientRect(),
+              b = cells[i].getBoundingClientRect();
+            return Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 1;
+          });
+        });
+      assert.equal(await alignment(), true);
+      await fast.click();
       await page.waitForFunction(
-        () => document.querySelector('.model-discharge').getAnimations().length === 0,
+        () => document.querySelector('.model-fast').dataset.phase === 'charging',
+      );
+      assert.equal(
+        await page.locator('.model-discharge').evaluate((n) => n.getAnimations().length),
+        0,
+      );
+      assert.equal(
+        await fast.getAttribute('data-filled'),
+        'false',
+        'readback cannot skip charging',
+      );
+      await page.waitForFunction(
+        () => document.querySelector('.model-fast').dataset.phase === 'striking',
+      );
+      assert.equal(
+        await page.locator('.model-discharge').evaluate((n) => n.getAnimations().length),
+        1,
+      );
+      await page.waitForFunction(
+        () => document.querySelector('.model-fast').dataset.phase === 'idle',
+      );
+      assert.equal(await fast.getAttribute('data-filled'), 'true');
+      assert.equal(
+        await fast.locator('.model-fast-fill').evaluate((n) => getComputedStyle(n).clipPath),
+        'inset(0px)',
       );
       assert.equal(await fast.getAttribute('aria-pressed'), 'true');
       assert.equal(
@@ -622,6 +665,7 @@ test(
       );
       const after = await fast.boundingBox();
       assert.equal(after.x - before.x, 40);
+      assert.equal(await alignment(), true);
       await line.press('ArrowLeft');
       assert.equal(await line.getAttribute('data-column-width'), '244');
       await fast.press('ArrowRight');
@@ -637,11 +681,15 @@ test(
       assert.equal(
         await fast.evaluate((n) => {
           n.click();
-          return n.closest('.feature-model').querySelector('.model-discharge').getAnimations()
-            .length;
+          return document.querySelector('.model-discharge').getAnimations().length;
         }),
         0,
       );
+      assert.equal(await fast.getAttribute('data-filled'), 'false');
+      await fast.click();
+      assert.equal(await fast.getAttribute('data-filled'), 'true');
+      assert.equal(await fast.getAttribute('data-phase'), 'idle');
+      await fast.click();
       await page.emulateMedia({ reducedMotion: 'no-preference' });
       await page.evaluate(() => {
         window.fail = true;
@@ -655,8 +703,20 @@ test(
         'false',
         'failed apply preserves actual state',
       );
+      const catalogWidth = await line.getAttribute('data-column-max');
       await page.getByRole('button', { name: '所有模型', exact: true }).click();
+      await page.evaluate(
+        () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+      );
+      assert.equal(
+        await page.locator('.model-column-resize').getAttribute('data-column-max'),
+        catalogWidth,
+        'hidden headings preserve column metrics',
+      );
+      assert.equal(await fast.isVisible(), false);
       await page.getByRole('button', { name: '关闭所有模型' }).click();
+      assert.equal(await fast.isVisible(), true);
+      assert.equal(await alignment(), true);
       assert.equal(
         await page
           .getByRole('button', { name: '所有模型', exact: true })

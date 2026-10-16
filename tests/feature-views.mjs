@@ -362,8 +362,8 @@ try {
       .evaluate((n) => getComputedStyle(n).fontSize),
     '16.3px',
   );
-  const resizeBox = await view.getByRole('button', { name: 'Fast', exact: true }).boundingBox();
-  const headerBox = await view.locator('.model-matrix-head').boundingBox();
+  const resizeBox = await page.getByRole('button', { name: 'Fast', exact: true }).boundingBox();
+  const headerBox = await page.locator('.model-matrix-head:visible').boundingBox();
   assert.ok(
     resizeBox.y + resizeBox.height <= headerBox.y + headerBox.height + 1,
     'grip stays in header',
@@ -529,7 +529,7 @@ try {
   const beforeResize = preferenceCount();
   const applyBeforeResize = actions.filter((item) => item.action === 'apply').length;
   const columnFrame = await page.locator('#edge-panel').boundingBox();
-  const fixedFast = await view.locator('.model-fast').boundingBox();
+  const fixedFast = await page.locator('.model-fast:visible').boundingBox();
   const sizeMessages = () =>
     page.evaluate(() => window.nativeMessages.filter((m) => m.action === 'content-size').length);
   const beforeSizes = await sizeMessages();
@@ -544,7 +544,7 @@ try {
   assert.equal(await columnHandle.getAttribute('data-column-width'), '190');
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
   assert.deepEqual(
-    await view.locator('.model-fast').boundingBox(),
+    await page.locator('.model-fast:visible').boundingBox(),
     { ...fixedFast, x: fixedFast.x + 50 },
     'Fast remains aligned above the independent divider',
   );
@@ -606,12 +606,11 @@ try {
   await page.mouse.move(limitBox.x + 650, limitBox.y + 10, { steps: 10 });
   assert.equal(Number(await columnHandle.getAttribute('data-column-width')), limitValue);
   assert.deepEqual(await page.locator('#edge-panel').boundingBox(), limitFrame);
-  const clearColumns = await view.locator('.model-matrix-head').evaluate((node) => {
+  const clearColumns = await page.locator('.model-matrix-head:visible').evaluate((node) => {
     const name = node.children[0].getBoundingClientRect();
-    const choices = node.children[1].getBoundingClientRect();
     const labels = [...node.querySelectorAll('[data-reasoning-label]')];
     return (
-      name.right <= choices.left &&
+      name.right <= labels[0].getBoundingClientRect().left + 1 &&
       labels.every((label) => label.offsetWidth <= label.parentElement.clientWidth)
     );
   });
@@ -680,7 +679,7 @@ try {
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
-  await view.getByRole('button', { name: 'Fast', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Fast', exact: true }).waitFor();
   assert.equal(await view.locator('[data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(

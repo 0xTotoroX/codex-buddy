@@ -27,3 +27,5 @@ grip 使用同一固定提交的 DotsVertical.tsx 路径，分别平移 −4 / +
 catalog 摘取同一固定公开提交的 Grid.tsx，四个空心圆表示模型目录，使用原路径及24px画布，以18px显示。
 
 pencil 摘取同一固定公开提交的 Pencil.tsx，原路径和24px画布，用于模型预设统一编辑模式。
+
+bolt-filled 复用同一固定提交 Bolt 的外轮廓路径，去除内轮廓形成实心变体，用于 Fast 开启状态与充电填充；保留来源署名、24px画布及18px显示。

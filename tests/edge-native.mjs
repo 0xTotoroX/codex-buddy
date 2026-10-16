@@ -613,7 +613,7 @@ try {
     assert.equal(
       await command(`(() => {
       const root = document.querySelector('.edge-view').shadowRoot;
-      const fast = root.querySelector('.model-fast').getBoundingClientRect();
+      const fast = document.querySelector('#edge-panel > header .model-fast').getBoundingClientRect();
       const line = root.querySelector('.model-column-resize').getBoundingClientRect();
       return Math.abs(fast.x + fast.width / 2 - line.x - line.width / 2) < 1 && fast.bottom <= line.y;
     })()`),

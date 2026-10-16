@@ -1,8 +1,10 @@
 /* [INPUT]: Existing model control envelope and serialized actions.
- * [OUTPUT]: Content-sized favorites matrix, independent Fast/animated divider controls, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
+ * [OUTPUT]: Title-aligned reasoning headings, content-sized favorites matrix, independent Fast charge/strike and divider controls, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { ModelHeading } from './heading';
+import { useFastMotion } from './fast-motion';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { ModelPresetDraft, Reading } from '../../shared/features';
 import {
@@ -23,6 +25,7 @@ export function ModelView({
   action,
   busy,
   reading,
+  headerActions,
 }: {
   headerActions?: HTMLElement;
   reading: Reading;
@@ -64,52 +67,12 @@ export function ModelView({
       pickerToggle.current?.focus({ preventScroll: true });
     }
   }, [others]);
-  const fastButton = useRef<HTMLButtonElement>(null);
-  const discharge = useRef<HTMLDivElement>(null);
-  const dischargePath = useRef<SVGGElement>(null);
-  const dischargeAnimations = useRef<Animation[]>([]);
-  function stopDischarge() {
-    dischargeAnimations.current.forEach((animation) => animation.cancel());
-    dischargeAnimations.current = [];
-  }
-  function playDischarge() {
-    stopDischarge();
-    const button = fastButton.current;
-    const beam = discharge.current;
-    const path = dischargePath.current;
-    if (!button || !beam || !path) return;
-    const reduced = button.ownerDocument.defaultView?.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
-    const pulse = button.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 130 });
-    const animations = reduced
-      ? [pulse]
-      : [
-          pulse,
-          path.animate([{ clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)' }], {
-            duration: 145,
-            easing: 'cubic-bezier(.18,.7,.28,1)',
-            fill: 'forwards',
-          }),
-          beam.animate(
-            [
-              { opacity: 0, offset: 0 },
-              { opacity: 1, offset: 0.1 },
-              { opacity: 0.95, offset: 0.44 },
-              { opacity: 0, offset: 1 },
-            ],
-            { duration: 340, easing: 'linear' },
-          ),
-        ];
-    dischargeAnimations.current = animations;
-    void animations
-      .at(-1)!
-      .finished.then(() => {
-        if (dischargeAnimations.current === animations) stopDischarge();
-      })
-      .catch(() => {});
-  }
-  useEffect(() => stopDischarge, []);
+  const headings = useRef<HTMLDivElement>(null);
+  const motion = useFastMotion();
+  const fastButton = motion.button,
+    discharge = motion.beam,
+    dischargePath = motion.path;
+  const stopDischarge = motion.stop;
   useEffect(() => {
     if (others) stopDischarge();
   }, [others]);
@@ -199,9 +162,11 @@ export function ModelView({
   useLayoutEffect(() => {
     const node = matrix.current;
     if (!node) return;
-    const labels = [...node.querySelectorAll<HTMLElement>('[data-reasoning-label]')];
+    const labels = [
+      ...(headings.current?.querySelectorAll<HTMLElement>('[data-reasoning-label]') || []),
+    ];
     const measure = () => {
-      if (!node.clientWidth) return;
+      if (!node.clientWidth || (columns.length && !headings.current?.offsetWidth)) return;
       const widths = labels.map((label) => Math.max(28, label.offsetWidth + 12));
       const available = node.clientWidth;
       setMetrics((previous) =>
@@ -217,7 +182,7 @@ export function ModelView({
     labels.forEach((label) => observer.observe(label));
     measure();
     return () => observer.disconnect();
-  }, [columns.join('|')]);
+  }, [columns.join('|'), headerActions]);
   const widths = columns.length ? columns.map((_, i) => metrics.widths[i] || 63) : [28];
   const reasoningWidth = widths.reduce((sum, width) => sum + width, 0) + (widths.length - 1) * 4;
   const maxNameWidth = metrics.available
@@ -398,22 +363,34 @@ export function ModelView({
           >
             <div className="model-matrix">
               <div className="model-intrinsic-width" data-intrinsic-width hidden />
-              <div className="model-primary">
+              <ModelHeading
+                actions={headerActions}
+                matrix={matrix}
+                headings={headings}
+                nameWidth={nameWidth}
+                widths={widths}
+                hidden={others}
+              >
                 <button
                   type="button"
                   ref={fastButton}
                   className="model-icon-button model-fast"
                   aria-label="Fast"
                   aria-pressed={s.current?.speed === 'fast'}
+                  data-phase={motion.phase}
+                  data-filled={s.current?.speed === 'fast' && motion.phase === 'idle'}
+                  style={{ left: nameWidth - 6 }}
                   disabled={
                     busy ||
+                    motion.phase !== 'idle' ||
                     !allowed ||
                     !s.current ||
                     !s.models.find((m) => m.id === s.current?.model)?.fast
                   }
                   onClick={async () => {
                     if (!s.current) return;
-                    playDischarge();
+                    if (s.current.speed !== 'fast') void motion.start();
+                    else stopDischarge();
                     const result = await apply({
                       ...s.current,
                       speed: s.current.speed === 'fast' ? 'standard' : 'fast',
@@ -422,7 +399,27 @@ export function ModelView({
                   }}
                 >
                   {icon('bolt')}
+                  <span
+                    ref={motion.fill}
+                    className="model-fast-fill"
+                    aria-hidden="true"
+                    dangerouslySetInnerHTML={{ __html: iconSvg('bolt-filled') }}
+                  />
                 </button>
+                <div
+                  className="model-choices"
+                  style={{
+                    gridTemplateColumns: widths.map((width) => `minmax(${width}px, 1fr)`).join(' '),
+                  }}
+                >
+                  {columns.map((c) => (
+                    <span key={c}>
+                      <span data-reasoning-label>{label(c) || '选择'}</span>
+                    </span>
+                  ))}
+                </div>
+              </ModelHeading>
+              <div className="model-primary">
                 <button
                   type="button"
                   className="model-column-resize"
@@ -523,16 +520,6 @@ export function ModelView({
                       />
                     </g>
                   </svg>
-                </div>
-                <div className="model-matrix-head">
-                  <div aria-hidden="true" />
-                  <div className="model-choices">
-                    {columns.map((c) => (
-                      <span key={c}>
-                        <span data-reasoning-label>{label(c) || '选择'}</span>
-                      </span>
-                    ))}
-                  </div>
                 </div>
                 {!!models.length && !visible.length && (
                   <p className="model-empty-favorites">暂无模型</p>

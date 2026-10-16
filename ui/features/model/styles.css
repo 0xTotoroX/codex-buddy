@@ -79,7 +79,7 @@
   position: absolute;
   z-index: 1;
   left: var(--name-width);
-  top: 32px;
+  top: 4px;
   bottom: 4px;
   width: 16px;
   min-width: 16px;
@@ -116,7 +116,7 @@
 .model-discharge {
   position: absolute;
   left: calc(var(--name-width) - 8px);
-  top: 26px;
+  top: 0;
   bottom: 4px;
   width: 32px;
   pointer-events: none;
