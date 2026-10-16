@@ -160,7 +160,7 @@ settings-modes 继续覆盖 Tom Modern 联动预览：材质保存失败回读�
 
 settings-modes 使用真实键盘和鼠标验收原生定制菜单：Escape 取消不写入，选择继续进入原保存队列；深浅主题与三档宽度检查菜单视口边界，Dev 来源长路径菜单只读展开，不执行来源交接。
 
-settings-suggestions.test.mjs 使用真实 SuggestionInput 与合成数据，核对候选去重、底部向上展示、键盘/指针选择不提前失焦保存或提交、Esc 取消、自由输入失焦保留，以及输入法确认不误选；同时通过真实 ModelSettings/保存队列及合成接口核对显式下拉、当前 ID 不过滤其他候选、读取中/失败/空列表、连接变更拒绝旧结果和展开零写入；不访问真实模型或配置。
+settings-suggestions.test.mjs 使用真实 SuggestionInput 与合成数据，核对候选去重、底部向上展示、键盘/指针选择不提前失焦保存或提交、Esc 取消、自由输入失焦保留，以及输入法确认不误选；同时通过真实 ModelSettings/保存队列及合成接口核对显式下拉、当前 ID 不过滤其他候选、读取中/失败/空列表、连接变更拒绝旧结果和展开零写入；连接测试覆盖等待计时、成功/失败/未实际生成、重试、保存失败停止、先保存后测试及在途编辑拒绝旧成功；不访问真实模型或配置。
 
 codex-host-settings.test验证独立API、版本修订与开关不隐式启动；codex-host-compatibility.test验证输入框Agent隔离。Rust codex_host验证旧配置/额外字段保留、过期写入拒绝、安装身份、取消不退出；host验证动态端口/固定绑定；dev-host验证仅显式Dev准备应用选择。本轮不自动执行真实宿主重启或安装。
 

@@ -79,8 +79,8 @@ function App(){const[value,setValue]=useState('');const[blur,setBlur]=useState(0
   }
 });
 
-test('model dropdown loads saved-connection candidates without saving drafts and handles failure', async () => {
-  const script = (
+async function modelSettingsScript() {
+  return (
     await build({
       stdin: {
         loader: 'jsx',
@@ -96,7 +96,7 @@ function App(){
  const editor=useSettingsForm(false,undefined,v=>v,()=>{});
  useEffect(()=>editor.load(baseline),[]);
  return <div className="settings-app"><SettingsForm editor={editor} notify={()=>{}} active>
- <ModelSettings editor={editor} notify={()=>{}} simple={false}/>
+ <ModelSettings editor={editor} simple={false}/>
  <button type="button" data-settings-navigation onClick={()=>editor.load({...baseline,configurationRevision:baseline.configurationRevision+1,baseUrl:'http://changed.invalid'})}>模拟连接变更</button>
  </SettingsForm></div>
 };createRoot(document.getElementById('root')).render(<App/>);`,
@@ -107,6 +107,10 @@ function App(){
       define: { 'process.env.NODE_ENV': '"production"' },
     })
   ).outputFiles[0].text;
+}
+
+test('model dropdown loads saved-connection candidates without saving drafts and handles failure', async () => {
+  const script = await modelSettingsScript();
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -230,3 +234,138 @@ function App(){
     await browser.close();
   }
 });
+
+test(
+  'connection test shows inline waiting, outcomes, retry and save failure without stale success',
+  { timeout: 30000 },
+  async () => {
+    const script = await modelSettingsScript();
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage();
+      page.setDefaultTimeout(4000);
+      await page.clock.install();
+      let requests = 0;
+      const { fixtureSettings } = await import('./fixtures.mjs');
+      let savedSettings = { ...fixtureSettings, model: 'Alpha' };
+      let rejectSave = true;
+      let saveHold;
+      let releaseSave;
+      let response = { generationAttempted: true, items: [{}, {}] };
+      let status = 200;
+      let release;
+      let hold = new Promise((resolve) => {
+        release = resolve;
+      });
+      await page.route('http://settings.test/**', async (route) => {
+        if (route.request().url().endsWith('/api/settings/test')) {
+          requests++;
+          assert.equal(
+            route.request().postData(),
+            '{}',
+            'test uses server sample, not form or chat contents',
+          );
+          const body = JSON.stringify(response);
+          const resultStatus = status;
+          if (hold) await hold;
+          await route.fulfill({ status: resultStatus, contentType: 'application/json', body });
+        } else if (route.request().url().endsWith('/api/settings')) {
+          if (saveHold) await saveHold;
+          if (rejectSave) {
+            await route.fulfill({
+              status: 400,
+              contentType: 'application/json',
+              body: '{"message":"配置保存失败"}',
+            });
+          } else {
+            const { apiKey, clearApiKey, jevApiKey, clearJevApiKey, expectedRevision, ...patch } =
+              JSON.parse(route.request().postData());
+            savedSettings = {
+              ...savedSettings,
+              ...patch,
+              configurationRevision: savedSettings.configurationRevision + 1,
+            };
+            await route.fulfill({
+              contentType: 'application/json',
+              body: JSON.stringify(savedSettings),
+            });
+          }
+        } else await route.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' });
+      });
+      await page.goto('http://settings.test/');
+      await page.addStyleTag({
+        content: await readFile('ui/settings/settings-controls.css', 'utf8'),
+      });
+      await page.addScriptTag({ content: script });
+      const testButton = page.getByRole('button', { name: '测试连接', exact: true });
+      const feedback = page.locator('#model-test-feedback');
+      const input = page.getByRole('combobox', { name: '模型名称', exact: true });
+      await testButton.click();
+      await page.getByRole('button', { name: '正在测试…' }).waitFor();
+      assert.equal(await page.getByRole('button', { name: '正在测试…' }).isDisabled(), true);
+      await page.clock.runFor(2200);
+      assert.match(await feedback.textContent(), /正在用固定示例请求模型.*已等待 2 秒/);
+      assert.equal(requests, 1, 'waiting does not repeat a paid generation call');
+      release();
+      hold = undefined;
+      await page.getByText(/连接成功.*已生成 2 条测试建议/).waitFor();
+      assert.equal(await feedback.getAttribute('role'), 'status');
+      assert.equal(await testButton.isEnabled(), true);
+      assert.equal(await testButton.getAttribute('aria-describedby'), 'model-test-feedback');
+
+      status = 401;
+      response = { message: 'API 密钥无效' };
+      await testButton.click();
+      await page.getByRole('alert').getByText('连接测试失败：API 密钥无效').waitFor();
+      assert.equal(await testButton.isEnabled(), true, 'failure is retryable');
+      status = 200;
+      response = { generationAttempted: false, items: [] };
+      await testButton.click();
+      await page.getByText('测试未完成：示例没有合适方向，尚未验证模型连接。').waitFor();
+      assert.doesNotMatch(await feedback.textContent(), /连接成功/);
+
+      response = { generationAttempted: true, items: [] };
+      await testButton.click();
+      await page.getByText(/连接成功.*已生成 0 条测试建议/).waitFor();
+      await input.fill('unsaved-model');
+      await input.press('Escape');
+      assert.equal(await feedback.count(), 0, 'editing clears a previous success');
+      const beforeSaveFailure = requests;
+      await page.getByRole('button', { name: '保存并测试', exact: true }).click();
+      await page.getByText('保存失败，尚未测试：配置保存失败').waitFor();
+      assert.equal(requests, beforeSaveFailure, 'save failure must not test older saved config');
+      assert.equal(await input.inputValue(), 'unsaved-model');
+
+      rejectSave = false;
+      saveHold = new Promise((resolve) => {
+        releaseSave = resolve;
+      });
+      await page.getByRole('button', { name: '保存并测试', exact: true }).click();
+      await page.getByRole('button', { name: '正在保存…' }).waitFor();
+      assert.match(await feedback.textContent(), /正在保存配置/);
+      assert.equal(requests, beforeSaveFailure);
+      releaseSave();
+      saveHold = undefined;
+      await page.getByText(/连接成功.*已生成 0 条测试建议/).waitFor();
+      assert.equal(savedSettings.model, 'unsaved-model');
+      assert.equal(requests, beforeSaveFailure + 1, 'testing waits for successful save');
+
+      hold = new Promise((resolve) => {
+        release = resolve;
+      });
+      await testButton.click();
+      await page.getByRole('button', { name: '正在测试…' }).waitFor();
+      await input.fill('edited-during-test');
+      release();
+      hold = undefined;
+      await page.getByText('配置已更改，请重新测试。').waitFor();
+      assert.doesNotMatch(
+        await feedback.textContent(),
+        /连接成功/,
+        'late response does not validate new draft',
+      );
+    } finally {
+      await browser.close();
+    }
+  },
+);

@@ -1,8 +1,8 @@
 /* [INPUT]: Shared model editor, serialized save queue, saved-connection model API and free-text dropdown.
- * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced connection credentials and generation limits remain collapsed by default.
+ * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced controls stay collapsed; connection tests report progress and results beside the action.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
@@ -12,15 +12,7 @@ import { Field } from './settings-controls';
 import { request, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
 import { Icon } from '../shared/icons/react';
-export function ModelSettings({
-  editor,
-  notify,
-  simple,
-}: {
-  editor: SettingsEditor;
-  notify: (text: string, failed?: boolean) => void;
-  simple: boolean;
-}) {
+export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple: boolean }) {
   const {
     form,
     saved,
@@ -35,6 +27,29 @@ export function ModelSettings({
   } = editor;
   const [showKey, setShowKey] = useState(false),
     [busy, setBusy] = useState('');
+  const [testFeedback, setTestFeedback] = useState<{ text: string; failed?: boolean } | null>(null);
+  const [elapsed, setElapsed] = useState(0);
+  const testing = useRef(false);
+  const latestEditor = useRef(editor);
+  latestEditor.current = editor;
+  useEffect(() => {
+    if (!testing.current) setTestFeedback(null);
+  }, [
+    form,
+    apiKey,
+    clearKey,
+    editor.jevApiKey,
+    editor.clearJevKey,
+    remoteChanged,
+    saved?.configurationRevision,
+  ]);
+  useEffect(() => {
+    if (!busy) return;
+    const start = Date.now();
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [busy]);
   const [catalog, setCatalog] = useState<{
     revision: number;
     models: string[];
@@ -82,28 +97,48 @@ export function ModelSettings({
       });
     }
   }
-  async function run(name: string, action: () => Promise<unknown>) {
-    if (busy) return;
-    setBusy(name);
+  async function test() {
+    if (testing.current || !saved || remoteChanged) return;
+    testing.current = true;
+    setTestFeedback(null);
+    setElapsed(0);
+    let phase = dirty || editor.saving ? 'saving' : 'test';
+    setBusy(phase);
+    const start = performance.now();
     try {
-      await action();
-    } catch (e) {
-      notify((e as Error).message, true);
+      const testedSettings = phase === 'saving' ? await save() : saved;
+      const revision = testedSettings?.configurationRevision ?? saved.configurationRevision;
+      phase = 'test';
+      setBusy(phase);
+      const result = await request<{ items: unknown[]; generationAttempted: boolean }>(
+        'settings/test',
+        {},
+      );
+      const current = latestEditor.current;
+      if (
+        current.dirty ||
+        current.saved?.configurationRevision !== revision ||
+        current.remoteChanged
+      ) {
+        setTestFeedback({ text: '配置已更改，请重新测试。' });
+      } else {
+        const duration = ((performance.now() - start) / 1000).toFixed(1);
+        setTestFeedback({
+          text:
+            result.generationAttempted === false
+              ? '测试未完成：示例没有合适方向，尚未验证模型连接。'
+              : `连接成功 · ${duration} 秒 · 已生成 ${result.items.length} 条测试建议。`,
+        });
+      }
+    } catch (error) {
+      setTestFeedback({
+        failed: true,
+        text: `${phase === 'saving' ? '保存失败，尚未测试' : '连接测试失败'}：${(error as Error).message}`,
+      });
     } finally {
+      testing.current = false;
       setBusy('');
     }
-  }
-  async function test() {
-    if (dirty) await save();
-    const r = await request<{ items: unknown[]; generationAttempted: boolean }>(
-      'settings/test',
-      {},
-    );
-    notify(
-      r.generationAttempted === false
-        ? '示例没有合适方向，生成服务尚未验证。'
-        : `连接正常，已生成 ${r.items.length} 条测试建议。`,
-    );
   }
   if (!form || !saved) return null;
   return (
@@ -225,16 +260,39 @@ export function ModelSettings({
                 type="button"
                 variant="outline"
                 disabled={!!busy || remoteChanged}
-                onClick={() => void run('test', test)}
+                onClick={() => void test()}
+                aria-describedby={busy || testFeedback ? 'model-test-feedback' : undefined}
               >
-                {busy === 'test' ? (
+                {busy ? (
                   <Icon name="refresh" className="animate-spin [animation-duration:1.2s]" />
                 ) : (
                   <Icon name="connection" />
                 )}
-                {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
+                {busy === 'saving'
+                  ? '正在保存…'
+                  : busy
+                    ? '正在测试…'
+                    : dirty
+                      ? '保存并测试'
+                      : '测试连接'}
               </Button>
             </div>
+            {(busy || testFeedback) && (
+              <p
+                id="model-test-feedback"
+                className={
+                  testFeedback?.failed ? 'settings-feedback settings-error' : 'settings-feedback'
+                }
+                role={testFeedback?.failed ? 'alert' : 'status'}
+              >
+                {busy === 'saving'
+                  ? '正在保存配置，随后测试连接。'
+                  : busy
+                    ? '正在用固定示例请求模型…'
+                    : testFeedback?.text}
+                {busy && <span aria-hidden="true"> 已等待 {elapsed} 秒</span>}
+              </p>
+            )}
             <details className="settings-section mt-5" hidden={simple || form.provider !== 'api'}>
               <summary>高级连接设置</summary>
               <Field

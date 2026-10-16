@@ -264,7 +264,7 @@ function App() {
                   <h2 className="settings-simple-model-title" hidden={!simple}>
                     生成模型
                   </h2>
-                  <ModelSettings editor={editor} notify={notify} simple={simple} />
+                  <ModelSettings editor={editor} simple={simple} />
                 </div>
                 <div data-settings-page="connection" hidden={simple || page !== 'connection'}>
                   <ConnectionSettings editor={editor} view={view} live={live} notify={notify} />

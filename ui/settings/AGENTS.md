@@ -12,7 +12,7 @@
 - [settings-disclosure.tsx](settings-disclosure.tsx)：保留的原生details展示兼容组件，当前常规配置已改为直接显示；支持强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
 - [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关及可选 onOpen 回调、反馈及自动/手动保存表单；功能可用时显示“打开”文字按钮，关闭/忙碌时隐藏，不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步的方向、常用提示词和点击/显示行为；共享模型配置移入model-settings，不复制表单。
-- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，两种模式均直接显示；详细模式增加协议；环境变量名仅在默认折叠的“高级连接设置”中编辑，高级生成参数也保留折叠；局部模型列表、密钥显示与草稿保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，箭头/方向键主动读取已保存连接的列表，展开显示全部候选、输入过滤；读取失败或空列表仍可手填。未保存连接不读旧候选，修订号及请求序号隔离迟到结果；展开不提交草稿，保留原失焦保存。
+- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，两种模式均直接显示；详细模式增加协议；环境变量名仅在默认折叠的“高级连接设置”中编辑，高级生成参数也保留折叠；局部模型列表、密钥显示与草稿保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，箭头/方向键主动读取已保存连接的列表，展开显示全部候选、输入过滤；读取失败或空列表仍可手填。未保存连接不读旧候选，修订号及请求序号隔离迟到结果；展开不提交草稿，保留原失焦保存。连接测试的保存中/等待耗时/成功/失败结果直接显示在按钮下方，不依赖页顶通知；保存失败不测试旧配置，编辑或修订变化清除旧结果，在途配置变更不显示为当前连接成功。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
 - [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
