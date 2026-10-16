@@ -59,6 +59,7 @@ export function ModelView({
   const main = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLElement>(null);
   const picker = useRef<HTMLDivElement>(null);
+  const pickerActions = useRef<HTMLDivElement>(null);
   const pickerToggle = useRef<HTMLButtonElement>(null);
   const restorePickerFocus = useRef(false);
   useLayoutEffect(() => {
@@ -81,7 +82,11 @@ export function ModelView({
     const document = root.current!.ownerDocument;
     const outside = (event: PointerEvent) => {
       const path = event.composedPath();
-      if (!path.includes(picker.current!) && !path.includes(pickerToggle.current!))
+      if (
+        !path.includes(picker.current!) &&
+        !path.includes(pickerToggle.current!) &&
+        !path.includes(pickerActions.current!)
+      )
         setOthers(false);
     };
     const escape = (event: KeyboardEvent) => {
@@ -337,6 +342,29 @@ export function ModelView({
       {icon('catalog')}
     </button>
   );
+  const catalogControls = (
+    <div className="model-picker-actions" ref={pickerActions}>
+      <button
+        className="model-icon-button"
+        data-refresh="model"
+        aria-label="刷新可用模型"
+        disabled={busy || !prefs.enabled}
+        onClick={() => void action({}, 'refresh')}
+      >
+        {icon('refresh')}
+      </button>
+      <button
+        className="model-icon-button"
+        aria-label="关闭所有模型"
+        onClick={() => {
+          restorePickerFocus.current = true;
+          setOthers(false);
+        }}
+      >
+        {icon('close')}
+      </button>
+    </div>
+  );
   return (
     <section
       ref={root}
@@ -370,6 +398,7 @@ export function ModelView({
                 nameWidth={nameWidth}
                 widths={widths}
                 hidden={others}
+                catalogActions={others ? catalogControls : undefined}
               >
                 <button
                   type="button"
@@ -378,7 +407,7 @@ export function ModelView({
                   aria-label="Fast"
                   aria-pressed={s.current?.speed === 'fast'}
                   data-phase={motion.phase}
-                  data-filled={s.current?.speed === 'fast' && motion.phase === 'idle'}
+                  data-filled={s.current?.speed === 'fast'}
                   style={{ left: nameWidth - 6 }}
                   disabled={
                     busy ||
@@ -389,13 +418,22 @@ export function ModelView({
                   }
                   onClick={async () => {
                     if (!s.current) return;
-                    if (s.current.speed !== 'fast') void motion.start();
-                    else stopDischarge();
-                    const result = await apply({
+                    const enabling = s.current.speed !== 'fast';
+                    if (!enabling) stopDischarge();
+                    const request = apply({
                       ...s.current,
-                      speed: s.current.speed === 'fast' ? 'standard' : 'fast',
+                      speed: enabling ? 'fast' : 'standard',
                     });
-                    if (result === null) stopDischarge();
+                    if (enabling) {
+                      await motion.start(
+                        request.then(
+                          (result) =>
+                            result !== null &&
+                            (result as ModelState | undefined)?.snapshot?.current?.speed !==
+                              'standard',
+                        ),
+                      );
+                    } else await request;
                   }}
                 >
                   {icon('bolt')}
@@ -614,25 +652,7 @@ export function ModelView({
         </div>
         {others && (
           <div className="model-picker" ref={picker} role="region" aria-label="所有模型">
-            <div className="model-picker-actions">
-              <button
-                data-refresh="model"
-                aria-label="刷新可用模型"
-                disabled={busy || !prefs.enabled}
-                onClick={() => void action({}, 'refresh')}
-              >
-                {icon('refresh')}
-              </button>
-              <button
-                aria-label="关闭所有模型"
-                onClick={() => {
-                  restorePickerFocus.current = true;
-                  setOthers(false);
-                }}
-              >
-                {icon('close')}
-              </button>
-            </div>
+            {!headerActions && catalogControls}
             <div className="model-other-list">
               {groups.map((group) => (
                 <section

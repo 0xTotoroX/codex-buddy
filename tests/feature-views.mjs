@@ -327,7 +327,7 @@ try {
     if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
     await view.getByRole('region', { name: '所有模型' }).waitFor();
   };
-  const closeOthers = () => view.getByRole('button', { name: '关闭所有模型' }).click();
+  const closeOthers = () => page.getByRole('button', { name: '关闭所有模型' }).click();
   const expandedBefore = structuredClone(model.preferences.expandedGroups);
   await picker().waitFor();
   assert.equal(await picker().innerText(), '');
@@ -401,8 +401,8 @@ try {
   );
   await tile('a').click();
   await view.locator('[data-model-tile="a"][aria-pressed="true"]').waitFor();
-  const refresh = view.getByRole('button', { name: '刷新可用模型', exact: true });
-  const close = view.getByRole('button', { name: '关闭所有模型', exact: true });
+  const refresh = page.getByRole('button', { name: '刷新可用模型', exact: true });
+  const close = page.getByRole('button', { name: '关闭所有模型', exact: true });
   const refreshBox = await refresh.boundingBox(),
     closeBox = await close.boundingBox();
   assert.ok(refreshBox.x + refreshBox.width <= closeBox.x + 1);

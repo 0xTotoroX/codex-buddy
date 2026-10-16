@@ -555,7 +555,7 @@ test(
         contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ModelView} from './ui/features/model/view';
       const root = createRoot(document.getElementById('view')); const reading = {};
       window.calls = []; window.state = {revision: 1, preferences: {enabled: true, pinned: ['gpt-test'], modelColumnWidth: 220, presets: [{id:'kept',name:'旧预设',selection:{model:'gpt-test',reasoning:'high',speed:'standard'}}]}, snapshot: {target:{id:'fixture'},revision:'v1',status:'ready',models:[{id:'gpt-test',label:'GPT test',reasoning:['low','high'],fast:true}],current:{model:'gpt-test',reasoning:'high',speed:'standard'}}};
-      window.render = () => root.render(<ModelView headerActions={document.getElementById("model-header")} state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
+      window.render = () => root.render(<ModelView headerActions={document.getElementById("model-header")} state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(action==='apply' && window.delay) await new Promise(resolve=>setTimeout(resolve,window.delay)); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
         resolveDir: process.cwd(),
         loader: 'tsx',
       },
@@ -618,6 +618,23 @@ test(
           });
         });
       assert.equal(await alignment(), true);
+      await page.evaluate(() => {
+        window.delay = 1100;
+        window.motionFrames = [];
+        let started = false;
+        function sample() {
+          const fast = document.querySelector('.model-fast');
+          const phase = fast.dataset.phase;
+          started ||= phase !== 'idle';
+          if (started)
+            window.motionFrames.push({
+              phase,
+              clip: getComputedStyle(fast.querySelector('.model-fast-fill')).clipPath,
+            });
+          if (!started || phase !== 'idle') requestAnimationFrame(sample);
+        }
+        requestAnimationFrame(sample);
+      });
       await fast.click();
       await page.waitForFunction(
         () => document.querySelector('.model-fast').dataset.phase === 'charging',
@@ -632,6 +649,18 @@ test(
         'readback cannot skip charging',
       );
       await page.waitForFunction(
+        () => document.querySelector('.model-fast').dataset.phase === 'charged',
+      );
+      assert.equal(
+        await fast.getAttribute('aria-pressed'),
+        'false',
+        'charge holds while the backend is pending',
+      );
+      assert.equal(
+        await fast.locator('.model-fast-fill').evaluate((n) => getComputedStyle(n).clipPath),
+        'inset(0px)',
+      );
+      await page.waitForFunction(
         () => document.querySelector('.model-fast').dataset.phase === 'striking',
       );
       assert.equal(
@@ -642,6 +671,16 @@ test(
         () => document.querySelector('.model-fast').dataset.phase === 'idle',
       );
       assert.equal(await fast.getAttribute('data-filled'), 'true');
+      const motionFrames = await page.evaluate(() => {
+        window.delay = 0;
+        return window.motionFrames;
+      });
+      const completedCharge = motionFrames.findIndex((frame) => frame.phase === 'charged');
+      assert.ok(completedCharge >= 0);
+      assert.ok(
+        motionFrames.slice(completedCharge).every((frame) => parseFloat(frame.clip.slice(6)) === 0),
+        'charged -> strike -> confirmed state never shows an empty frame',
+      );
       assert.equal(
         await fast.locator('.model-fast-fill').evaluate((n) => getComputedStyle(n).clipPath),
         'inset(0px)',
@@ -714,6 +753,17 @@ test(
         'hidden headings preserve column metrics',
       );
       assert.equal(await fast.isVisible(), false);
+      const catalogTop = await page.locator('.model-group h3').first().boundingBox();
+      const closeTop = await page.getByRole('button', { name: '关闭所有模型' }).boundingBox();
+      assert.ok(
+        Math.abs(catalogTop.y - firstRow.y) < 1,
+        'catalog does not reserve an extra toolbar row',
+      );
+      assert.ok(
+        Math.abs(closeTop.y + closeTop.height / 2 - title.y - title.height / 2) < 1,
+        'catalog actions share the title row',
+      );
+      assert.ok(Math.abs(catalogTop.x - title.x) < 1, 'catalog aligns with the title');
       await page.getByRole('button', { name: '关闭所有模型' }).click();
       assert.equal(await fast.isVisible(), true);
       assert.equal(await alignment(), true);

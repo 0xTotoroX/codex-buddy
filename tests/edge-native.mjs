@@ -554,7 +554,7 @@ try {
   );
   assert.equal(telemetry.modelView.groups, 1, 'picker stays open with all models');
   await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('[aria-label=\"关闭所有模型\"]').click()",
+    'document.querySelector(\'#edge-panel > header [aria-label="关闭所有模型"]\').click()',
   );
   prefs.pinned = ['fixture-a'];
   revision++;
