@@ -1,5 +1,5 @@
 /* [INPUT]: Shared model editor, serialized save queue, saved-connection model API and free-text dropdown.
- * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced limits remain collapsible.
+ * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced connection credentials and generation limits remain collapsed by default.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useRef, useState } from 'react';
@@ -199,21 +199,6 @@ export function ModelSettings({
                     保存时清除已存密钥
                   </label>
                 )}
-                <div hidden={simple}>
-                  <Field
-                    id="api-key-env"
-                    label="密钥环境变量名（可选）"
-                    hint="填变量名，不是密钥。后台读到非空值时优先使用；直接填写 API 密钥可留空。"
-                  >
-                    <Input
-                      id="api-key-env"
-                      value={form.apiKeyEnv}
-                      onChange={(e) => change('apiKeyEnv', e.target.value)}
-                      placeholder="CODEX_BUDDY_API_KEY"
-                      spellCheck={false}
-                    />
-                  </Field>
-                </div>
               </>
             )}
             <Field id="model" label="模型名称">
@@ -250,6 +235,22 @@ export function ModelSettings({
                 {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
               </Button>
             </div>
+            <details className="settings-section mt-5" hidden={simple || form.provider !== 'api'}>
+              <summary>高级连接设置</summary>
+              <Field
+                id="api-key-env"
+                label="密钥环境变量名（可选）"
+                hint="填变量名，不是密钥。后台读到非空值时优先使用；直接填写 API 密钥可留空。"
+              >
+                <Input
+                  id="api-key-env"
+                  value={form.apiKeyEnv}
+                  onChange={(e) => change('apiKeyEnv', e.target.value)}
+                  placeholder="CODEX_BUDDY_API_KEY"
+                  spellCheck={false}
+                />
+              </Field>
+            </details>
           </div>
         </div>
       </Card>
