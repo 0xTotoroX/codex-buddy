@@ -107,6 +107,92 @@ test('hover, style, mastery, navigation and cleanup preserve host content', asyn
   }
 });
 
+test('dark term marks remain visible and follow the host theme without recoloring text', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ colorScheme: 'light' });
+    await page.setContent(
+      '<main style="margin:80px;font:20px/1.8 system-ui"><p>这里出现竞态条件，请查看。</p></main>',
+    );
+    const original = await page.locator('main').innerHTML();
+    await page.evaluate(() => {
+      window.hostAppearance = {
+        theme: 'dark',
+        colors: { text: '#ffffff', accent: '#a67df2', 'surface-opaque': '#2d2d2d' },
+      };
+      window.__companionFloatingPanel = { panelAppearance: () => window.hostAppearance };
+    });
+    await page.addScriptTag({ content: bundle });
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 1);
+    for (const theme of ['dark', 'light', 'dark']) {
+      await page.evaluate((theme) => {
+        window.hostAppearance.theme = theme;
+        document.body.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+        document.body.style.color = theme === 'dark' ? '#ffffff' : '#202020';
+      }, theme);
+      // 等待已有主题轮询，覆盖打开卡片期间的实时主题切换。
+      await page.waitForTimeout(1100);
+      const metrics = await page.locator('main p').evaluate((node) => {
+        const style = getComputedStyle(node, '::highlight(codex-buddy-terms)');
+        const active = getComputedStyle(node, '::highlight(codex-buddy-terms-active)');
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        const luminance = (rgb) =>
+          [...rgb].slice(0, 3).reduce((sum, value, i) => {
+            const c = value / 255;
+            return (
+              sum +
+              (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4) *
+                [0.2126, 0.7152, 0.0722][i]
+            );
+          }, 0);
+        const contrast = (mark) => {
+          ctx.clearRect(0, 0, 1, 1);
+          for (const color of [
+            getComputedStyle(document.body).backgroundColor,
+            mark.backgroundColor,
+          ]) {
+            ctx.fillStyle = color;
+            ctx.fillRect(0, 0, 1, 1);
+          }
+          const background = luminance(ctx.getImageData(0, 0, 1, 1).data);
+          ctx.fillStyle = mark.textDecorationColor;
+          ctx.fillRect(0, 0, 1, 1);
+          const line = luminance(ctx.getImageData(0, 0, 1, 1).data);
+          return (Math.max(line, background) + 0.05) / (Math.min(line, background) + 0.05);
+        };
+        return {
+          normal: contrast(style),
+          active: contrast(active),
+          color: style.color,
+          text: getComputedStyle(node).color,
+        };
+      });
+      assert.equal(metrics.color, metrics.text, 'highlight keeps the original text color');
+      if (theme === 'dark') {
+        assert.ok(metrics.normal >= 3, `dark underline contrast ${metrics.normal.toFixed(2)} < 3`);
+        assert.ok(metrics.active >= 3, `dark active contrast ${metrics.active.toFixed(2)} < 3`);
+        await mkdir('target/reports/terminology', { recursive: true });
+        await writeFile(
+          'target/reports/terminology/dark-contrast.json',
+          JSON.stringify(metrics, null, 2),
+        );
+      }
+      const range = await page.evaluate(() => {
+        const r = [...CSS.highlights.get('codex-buddy-terms')][0].getBoundingClientRect();
+        return { x: r.x + 5, y: r.y + 5 };
+      });
+      await page.mouse.move(range.x, range.y);
+      await page.getByRole('dialog', { name: '竞态条件释义' }).waitFor();
+      assert.equal(await page.locator('main').innerHTML(), original);
+      await page.screenshot({ path: `target/reports/terminology/marks-${theme}.png` });
+    }
+  } finally {
+    await browser.close();
+  }
+});
+
 test('render current card styles without removed note variant', async () => {
   const result = (
     await build({

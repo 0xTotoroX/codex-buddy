@@ -64,7 +64,12 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     appearanceKey = key;
     const supplied = theme.colors?.accent;
     const accent = supplied && CSS.supports('color', supplied) ? supplied : 'currentColor';
-    highlightStyle.textContent = `::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${accent} 11%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${accent} 58%,transparent);text-decoration-thickness:1.5px;text-underline-offset:2px}::highlight(${ACTIVE}){background-color:color-mix(in srgb,${accent} 19%,transparent);text-decoration-color:color-mix(in srgb,${accent} 88%,transparent)}`;
+    const dark =
+      theme.theme === 'dark' ||
+      (!theme.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+    // 暗色下提亮标注并减少下划线透明度，避免深色强调色融入背景；正文颜色保持继承。
+    const mark = dark ? `color-mix(in srgb,${accent} 70%,#fff)` : accent;
+    highlightStyle.textContent = `::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${mark} ${dark ? 18 : 11}%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${mark} ${dark ? 86 : 58}%,transparent);text-decoration-thickness:1.5px;text-underline-offset:2px}::highlight(${ACTIVE}){background-color:color-mix(in srgb,${mark} ${dark ? 28 : 19}%,transparent);text-decoration-color:color-mix(in srgb,${mark} ${dark ? 100 : 88}%,transparent)}`;
     if (active) popup.update(active.term, cardOptions(active));
   }
   const api = async (payload, path = '/terminology') => {
