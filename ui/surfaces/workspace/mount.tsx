@@ -125,7 +125,7 @@ export function mountFeature(
       // Features may expose their minimum readable width; text/list views keep the existing width.
       const width = Math.ceil(
         Math.min(
-          696,
+          intrinsic ? 976 : 696,
           Math.max(
             296,
             intrinsic ? parseFloat(getComputedStyle(intrinsic).minWidth) + padding : 456,

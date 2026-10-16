@@ -330,14 +330,18 @@ try {
   const closeOthers = () => view.getByRole('button', { name: '关闭所有模型' }).click();
   const expandedBefore = structuredClone(model.preferences.expandedGroups);
   await picker().waitFor();
-  assert.equal(await picker().innerText(), '所有');
+  assert.equal(await picker().innerText(), '');
+  assert.equal(await picker().locator('[data-icon="catalog"]').count(), 1);
   assert.equal(await view.locator('[data-model-group], .model-visibility').count(), 0);
   assert.equal(await view.locator('.model-row, [data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
-  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 0);
+  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
   assert.equal(await view.locator('.model-quick-actions .model-fast').count(), 1);
   assert.equal(await view.locator('.model-quick-actions .model-add-preset').count(), 1);
-  assert.equal(await view.locator('.model-collections-heading').innerText(), '');
+  assert.equal(
+    await view.locator('.model-matrix-head .model-add-preset [data-icon="bookmark"]').count(),
+    1,
+  );
   await showOthers();
   assert.equal(await view.locator('.model-tile').count(), 2);
   assert.equal(await view.locator('.model-tile svg').count(), 0);
@@ -432,7 +436,7 @@ try {
     .evaluate((n) => n.getBoundingClientRect().height);
   assert.ok(compactModelHeight < 350, 'few model rows keep the edge panel compact');
   record(
-    'refresh lives beside the picker close button and presets use a wrapping footer with an icon-only add button',
+    'refresh lives beside the picker close button and presets wrap in an inset box with an icon-only save button in the matrix header',
   );
   const savedSelection = structuredClone(model.snapshot.current);
   const presetButton = view.getByRole('button', { name: '保存预设', exact: true });
@@ -602,7 +606,11 @@ try {
     'shared model view uses readback, preserves speed, hides/restores models, persists drag order and saves/removes presets',
   );
   assert.deepEqual(errors, []);
-  assert.equal(await view.getByLabel('模型工具').count(), 0, 'no empty preset tools');
+  assert.equal(
+    await view.getByRole('button', { name: '模型工具' }).count(),
+    0,
+    'no empty preset tools',
+  );
   await page.screenshot({ path: join(output, 'edge-model.png') });
   model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
   model.snapshot.models.push({

@@ -200,10 +200,9 @@ export async function buildDevPanel(root, output) {
     logLevel: 'silent',
   });
   const featureCode = feature.outputFiles[0].text;
-  const featureRevision = hash(featureCode);
   const featureClient = `
 ;(() => {
-    window.__buddyFeatureRevision = ${JSON.stringify(featureRevision)};
+    window.__buddyFeatureRevision = __BUDDY_FEATURE_REVISION__;
     let updating = false;
     let displayGeometry = [];
     window.addEventListener('edge-native', event => { displayGeometry = event.detail.displayGeometry || []; });
@@ -244,10 +243,14 @@ export async function buildDevPanel(root, output) {
       finally { updating = false; }
     }, 800);
   })();`;
+  // Include the dev client so geometry/readback changes also reload the native page.
+  const featureRevision = hash(featureCode + featureClient);
   const snapshot = {
     revision,
     featureRevision,
-    featureScript: featureCode + featureClient,
+    featureScript:
+      featureCode +
+      featureClient.replace('__BUDDY_FEATURE_REVISION__', JSON.stringify(featureRevision)),
     featureHtml: readFileSync(join(root, 'ui/settings/feature.html'), 'utf8').replace(
       '../surfaces/main.ts',
       '/feature-dev.js',

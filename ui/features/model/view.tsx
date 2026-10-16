@@ -1,5 +1,5 @@
 /* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Content-sized favorites matrix, footer controls, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
+ * [OUTPUT]: Content-sized favorites matrix, header icon controls, inset presets, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -106,7 +106,7 @@ export function ModelView({
   const dragType = 'application/x-codex-buddy-model';
   const order = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra'];
   const columns = [
-    ...new Set(models.flatMap((m) => (m.reasoning.length ? m.reasoning : ['']))),
+    ...new Set(visible.flatMap((m) => (m.reasoning.length ? m.reasoning : ['']))),
   ].sort((a, b) => order.indexOf(a) - order.indexOf(b));
   // 按实际表头文字保留思考列的可读宽度，不用最长标题把每一列都撑宽。
   useLayoutEffect(() => {
@@ -221,13 +221,15 @@ export function ModelView({
       ref={pickerToggle}
       className="model-picker-toggle"
       data-model-picker
-      aria-label="所有"
+      aria-label="所有模型"
       aria-expanded={others}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 4,
-        width: 'auto',
+        justifyContent: 'center',
+        width: 28,
+        height: 28,
+        padding: 5,
         flexShrink: 0,
         whiteSpace: 'nowrap',
         opacity: 1,
@@ -240,7 +242,7 @@ export function ModelView({
         setOthers(!others);
       }}
     >
-      所有{icon('chevron-down')}
+      {icon('catalog')}
     </button>
   );
   return (
@@ -344,8 +346,47 @@ export function ModelView({
                   {icon('grip')}
                 </button>
                 <div className="model-matrix-head">
-                  <span aria-hidden="true" />
-                  <div>
+                  <div className="model-quick-actions">
+                    <button
+                      className="model-fast"
+                      aria-label="Fast"
+                      aria-pressed={s.current?.speed === 'fast'}
+                      disabled={
+                        busy ||
+                        !allowed ||
+                        !s.current ||
+                        !s.models.find((m) => m.id === s.current?.model)?.fast
+                      }
+                      onClick={() =>
+                        s.current &&
+                        void apply({
+                          ...s.current,
+                          speed: s.current.speed === 'fast' ? 'standard' : 'fast',
+                        })
+                      }
+                    >
+                      {icon('bolt')}
+                    </button>
+                    <button
+                      className="model-add-preset"
+                      aria-label="保存预设"
+                      disabled={busy || !allowed || !s.current}
+                      onClick={() => {
+                        if (s.current) {
+                          setOthers(false);
+                          setPresetDraft({
+                            id: crypto.randomUUID(),
+                            name: '',
+                            selection: { ...s.current },
+                            creating: true,
+                          });
+                        }
+                      }}
+                    >
+                      {icon('bookmark')}
+                    </button>
+                  </div>
+                  <div className="model-choices">
                     {columns.map((c) => (
                       <span key={c}>
                         <span data-reasoning-label>{label(c) || '选择'}</span>
@@ -361,8 +402,28 @@ export function ModelView({
               </div>
             </div>
           </div>
-          <section className="model-collections" aria-label="收藏">
-            <div className="model-collections-heading">
+          <section
+            className="model-collections"
+            aria-label="收藏"
+            hidden={!prefs.presets.length && !presetDraft}
+          >
+            <div className="model-collections-row">
+              <div className="model-presets">
+                {prefs.presets.map((p) => (
+                  <button
+                    key={p.id}
+                    disabled={busy || !allowed || !valid(p.selection)}
+                    aria-pressed={
+                      s.current?.model === p.selection.model &&
+                      s.current.reasoning === p.selection.reasoning &&
+                      s.current.speed === p.selection.speed
+                    }
+                    onClick={() => void apply(p.selection)}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
               <button
                 className="model-preset-tools"
                 aria-label="模型工具"
@@ -371,64 +432,8 @@ export function ModelView({
                 disabled={!prefs.presets.length}
                 onClick={() => setTools((reading.modelTools = !tools))}
               >
-                {icon('bookmark')}
+                {icon('more')}
               </button>
-              <div className="model-quick-actions">
-                <button
-                  className="model-fast"
-                  aria-label="Fast"
-                  aria-pressed={s.current?.speed === 'fast'}
-                  disabled={
-                    busy ||
-                    !allowed ||
-                    !s.current ||
-                    !s.models.find((m) => m.id === s.current?.model)?.fast
-                  }
-                  onClick={() =>
-                    s.current &&
-                    void apply({
-                      ...s.current,
-                      speed: s.current.speed === 'fast' ? 'standard' : 'fast',
-                    })
-                  }
-                >
-                  {icon('bolt')}
-                </button>
-                <button
-                  className="model-add-preset"
-                  aria-label="保存预设"
-                  disabled={busy || !allowed || !s.current}
-                  onClick={() => {
-                    if (s.current) {
-                      setOthers(false);
-                      setPresetDraft({
-                        id: crypto.randomUUID(),
-                        name: '',
-                        selection: { ...s.current },
-                        creating: true,
-                      });
-                    }
-                  }}
-                >
-                  {icon('plus')}
-                </button>
-              </div>
-            </div>
-            <div className="model-presets">
-              {prefs.presets.map((p) => (
-                <button
-                  key={p.id}
-                  disabled={busy || !allowed || !valid(p.selection)}
-                  aria-pressed={
-                    s.current?.model === p.selection.model &&
-                    s.current.reasoning === p.selection.reasoning &&
-                    s.current.speed === p.selection.speed
-                  }
-                  onClick={() => void apply(p.selection)}
-                >
-                  {p.name}
-                </button>
-              ))}
             </div>
             {presetDraft && (
               <form
