@@ -19,9 +19,9 @@ import{SettingsForm}from'./ui/settings/settings-controls';
 import{useSettingsPage}from'./ui/settings/settings-outline';
 import{SettingsSearch}from'./ui/settings/settings-search';
 import{ConfirmationButton}from'./ui/settings/settings-confirmation';
-function App(){const{page,mode,navigate,switchMode}=useSettingsPage(true);const[draft,setDraft]=useState('原始内容');window.counts??={blur:0,submit:0,delete:0};
+function App(){const{page,navigate}=useSettingsPage(true);const[draft,setDraft]=useState('原始内容');window.counts??={blur:0,submit:0,delete:0};
 const editor={dirty:false,saving:false,remoteChanged:false,form:{},schedule:()=>window.counts.blur++,save:()=>{window.counts.submit++;return Promise.resolve(null)}};
-return <div className="settings-app"><SettingsSearch navigate={navigate}/><button data-settings-navigation onClick={()=>switchMode(mode==='simple'?'detail':'simple')}>切换模式</button><button data-settings-navigation onClick={()=>navigate('features','#settings-features')}>功能</button><button data-settings-navigation onClick={()=>navigate('model','#settings-model')}>模型</button><main className="settings-content"><SettingsForm editor={editor} notify={()=>{}} active><section data-settings-page="model" hidden={mode!=='detail'||page!=='model'}><SettingsDrawer id="settings-limits" title="高级设置"><label htmlFor="timeout">超时草稿</label><input id="timeout" required value={draft} onChange={e=>setDraft(e.target.value)}/><button type="button">普通操作</button><ConfirmationButton title="删除测试内容？" confirmLabel="确认删除" description="合成测试" onConfirm={async()=>{window.counts.delete++;return true}}>删除测试</ConfirmationButton><div style={{height:1200}}>滚动测试区域</div></SettingsDrawer></section><section data-settings-page="features" hidden={mode!=='detail'||page!=='features'}><SettingsDrawer id="library" title="词库管理"><label htmlFor="term">术语草稿</label><input id="term" defaultValue="词条"/></SettingsDrawer></section><button type="submit">提交测试</button></SettingsForm></main></div>};createRoot(document.getElementById('root')).render(<App/>);`,
+return <div className="settings-app"><SettingsSearch navigate={navigate}/><button data-settings-navigation onClick={()=>navigate('features','#settings-features')}>功能</button><button data-settings-navigation onClick={()=>navigate('model','#settings-model')}>模型</button><main className="settings-content"><SettingsForm editor={editor} notify={()=>{}} active><section data-settings-page="model" hidden={page!=='model'}><SettingsDrawer id="settings-limits" title="高级设置"><label htmlFor="timeout">超时草稿</label><input id="timeout" required value={draft} onChange={e=>setDraft(e.target.value)}/><button type="button">普通操作</button><ConfirmationButton title="删除测试内容？" confirmLabel="确认删除" description="合成测试" onConfirm={async()=>{window.counts.delete++;return true}}>删除测试</ConfirmationButton><div style={{height:1200}}>滚动测试区域</div></SettingsDrawer></section><section data-settings-page="features" hidden={page!=='features'}><SettingsDrawer id="library" title="词库管理"><label htmlFor="term">术语草稿</label><input id="term" defaultValue="词条"/></SettingsDrawer></section><button type="submit">提交测试</button></SettingsForm></main></div>};createRoot(document.getElementById('root')).render(<App/>);`,
     },
     bundle: true,
     write: false,
@@ -77,8 +77,8 @@ test('drawers retain mounted drafts and scroll without saving on close or naviga
       0,
       'backdrop navigation does not save',
     );
-    await page.getByRole('button', { name: '切换模式', exact: true }).click();
-    await page.getByRole('button', { name: '切换模式', exact: true }).click();
+    await page.getByRole('button', { name: '功能', exact: true }).click();
+    await page.getByRole('button', { name: '模型', exact: true }).click();
     await open.click();
     assert.equal(await input.inputValue(), '未完成的输入');
     await input.focus();

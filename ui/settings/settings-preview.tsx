@@ -3,7 +3,7 @@
  * [POS]: Settings presentation only; no requests, credentials, task bodies or host commands.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import type { SettingsMode, SettingsPage } from './settings-outline';
+import type { SettingsPage } from './settings-outline';
 import type { EditableSettings, View } from './api';
 import type { SurfaceState } from './surface-settings';
 import { titles, type FeatureId, type FeatureLayout, type FeatureState } from '../shared/features';
@@ -32,7 +32,6 @@ function suggestionLimit(form: EditableSettings | null) {
     : (form?.maxItems ?? 3);
 }
 type PreviewProps = {
-  mode: SettingsMode;
   page: SettingsPage;
   form: EditableSettings | null;
   dirty: boolean;
@@ -556,13 +555,12 @@ function ConnectionPreview({ view, live, form }: PreviewProps) {
 }
 
 export function SettingsPreview(props: PreviewProps) {
-  const workspace =
-    props.mode === 'simple' || props.page === 'surfaces' || props.page === 'appearance';
+  const workspace = props.page === 'surfaces' || props.page === 'appearance';
   return (
     <aside
       className="settings-preview"
       aria-label="联动预览"
-      hidden={props.mode !== 'simple' && ['terminology', 'codex-host', 'dev'].includes(props.page)}
+      hidden={['terminology', 'codex-host', 'dev'].includes(props.page)}
       data-preview-kind={workspace ? 'workspace' : props.page}
     >
       {workspace ? (

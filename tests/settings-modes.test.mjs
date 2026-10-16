@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
-  'settings modes retain drafts, drawers, custom preferences and reading without saving on switch',
+  'unified settings retain grouped pages, legacy links, drafts, drawers and reading without navigation writes',
   { timeout: 60000 },
   async () => {
     let settings = structuredClone(fixtureSettings),
@@ -258,8 +258,6 @@ test(
     const page = await context.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    const simple = () => page.getByRole('button', { name: '简易', exact: true }).click();
-    const detail = () => page.getByRole('button', { name: '详细设置', exact: true }).click();
     const category = async (id) => {
       const group = [
         'features',
@@ -280,6 +278,11 @@ test(
       if (!(await link.isVisible()))
         await page.getByRole('button', { name: group, exact: true }).click();
       await link.click();
+    };
+    const roundTrip = async () => {
+      const current = await page.locator('.settings-app').getAttribute('data-settings-category');
+      await category(current === 'features' ? 'model' : 'features');
+      await category(current);
     };
     const themeButton = (name) =>
       page
@@ -312,6 +315,9 @@ test(
       );
     };
     try {
+      await context.addInitScript(() => {
+        localStorage.setItem('buddy-settings-mode', 'simple');
+      });
       await page.goto(origin + '/#token=fixture');
       await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
       assert.equal(await themeButton('跟随 Codex').getAttribute('aria-pressed'), 'true');
@@ -329,6 +335,7 @@ test(
       await expectTheme('light');
       assert.equal(writes.length, 0, 'theme subscription never writes business preferences');
       // Exercise the styled native picker through actual keyboard/pointer input, not selectOption.
+      await category('next');
       const generation = page.getByLabel('建议生成方式', { exact: true });
       await generation.click();
       await page.locator('#generation-mode:open').waitFor();
@@ -359,47 +366,19 @@ test(
       await (await restoreSave).finished();
       assert.equal(settings.generationMode, 'manual', 'pointer selection uses the same queue');
       writes.length = 0;
-      assert.equal(
-        await page.locator('.settings-app').getAttribute('data-settings-mode'),
-        'simple',
-      );
-      assert.equal(await page.getByRole('navigation', { name: '设置分类' }).isVisible(), false);
+      await category('features');
+      assert.equal(await page.locator('.settings-mode').count(), 0);
+      assert.equal(await page.getByRole('navigation', { name: '设置分类' }).isVisible(), true);
       assert.equal(await page.getByRole('switch').count(), 5);
       assert.equal(await page.getByRole('button', { name: /^打开/ }).count(), 0);
-      await page.waitForFunction(
-        () =>
-          !document.querySelector('#main-placement button').disabled &&
-          [...document.querySelectorAll('[role=switch]')]
-            .filter((n) => n.checkVisibility())
-            .every((n) => n.getAttribute('aria-checked') === 'true'),
-      );
-      await mkdir('target/reports', { recursive: true });
-      await page.screenshot({ path: 'target/reports/settings-simple-default.png', fullPage: true });
-      await detail();
-      assert.equal(
-        await page
-          .getByRole('button', { name: /^打开(大纲|下一步|看板|模型快切|术语模块)$/ })
-          .count(),
-        0,
-        'feature switches do not have duplicate open actions',
-      );
-      writes.length = 0;
-      await simple();
+      await category('model');
+      await category('features');
       await page.goBack();
       await page.waitForFunction(
-        () =>
-          document.querySelector('.settings-app').getAttribute('data-settings-mode') === 'detail',
+        () => document.querySelector('.settings-app').dataset.settingsCategory === 'model',
       );
-      await page.goBack();
-      await page.waitForFunction(
-        () =>
-          document.querySelector('.settings-app').getAttribute('data-settings-mode') === 'simple',
-      );
-      assert.equal(
-        await page.getByLabel('模型名称', { exact: true }).isVisible(),
-        true,
-        'model configuration is visible without a disclosure',
-      );
+      assert.equal(await page.getByLabel('模型名称', { exact: true }).isVisible(), true);
+      assert.equal(writes.length, 0);
       const model = page.getByLabel('模型名称', { exact: true }),
         key = page.getByLabel('API 密钥', { exact: true });
       const modelNode = await model.elementHandle();
@@ -424,16 +403,14 @@ test(
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
       assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
       assert.equal(writes.length, 0, 'theme buttons preserve focused drafts without auto-saving');
-      await detail();
       await category('model');
       assert.equal(await model.inputValue(), '未保存模型草稿');
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
       assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
-      await simple();
+      await roundTrip();
       assert.equal(await model.isVisible(), true);
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
-      assert.equal(writes.length, 0, 'mode/category changes do not save typed drafts');
-      await detail();
+      assert.equal(writes.length, 0, 'page changes do not save typed drafts');
       const splitWrites = writes.length;
       for (const id of [
         'features',
@@ -491,8 +468,7 @@ test(
       assert.equal(await page.getByLabel('分组名称：待办', { exact: true }).isVisible(), true);
       const group = page.getByLabel('分组名称：待办', { exact: true });
       await group.fill('未保存分组');
-      await simple();
-      await detail();
+      await roundTrip();
       assert.equal(await group.inputValue(), '未保存分组');
       assert.equal(await group.isVisible(), true);
       await category('model');
@@ -505,15 +481,13 @@ test(
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await page.getByLabel('输入字符上限', { exact: true }).fill('18000');
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
-      await simple();
-      await detail();
+      await roundTrip();
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
       assert.equal(await limits.locator('dialog').getAttribute('open'), '');
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).inputValue(), '18000');
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       const before = writes.length;
-      await simple();
-      await detail();
+      await roundTrip();
       assert.equal(
         writes.length,
         before,
@@ -528,8 +502,7 @@ test(
       await page.evaluate(() => scrollTo({ top: 400, behavior: 'instant' }));
       const scroll = await page.evaluate(() => scrollY);
       assert.ok(scroll > 100);
-      await simple();
-      await detail();
+      await roundTrip();
       assert.ok(
         Math.abs((await page.evaluate(() => scrollY)) - scroll) < 3,
         `detail reading position restored: before=${scroll}, after=${await page.evaluate(() => scrollY)}`,
@@ -538,8 +511,7 @@ test(
       await model.fill('失败后保留模型');
       await page.getByRole('heading', { name: '生成模型', exact: true, level: 2 }).click();
       await page.locator('.settings-feedback').filter({ hasText: '合成保存失败' }).waitFor();
-      await simple();
-      await detail();
+      await roundTrip();
       assert.equal(await model.inputValue(), '失败后保留模型');
       await page.setViewportSize({ width: 1100, height: 850 });
       assert.equal(await page.getByLabel('详细设置分类').isVisible(), false);
@@ -560,25 +532,23 @@ test(
       const font = page.getByLabel('自定义字号（px）', { exact: true });
       const beforeFont = writes.length;
       await font.fill('19.5');
-      await simple();
-      await detail();
+      await roundTrip();
       assert.equal(await font.inputValue(), '19.5');
       assert.equal(appearance.typography.customSize, 17);
       assert.equal(appearance.ui.fontSizes.outline, 17);
-      assert.equal(writes.length, beforeFont, 'mode switch keeps unsaved font input');
+      assert.equal(writes.length, beforeFont, 'page navigation keeps unsaved font input');
       const theme = page.locator('#theme-sidebar');
       assert.equal(await theme.locator('summary').count(), 0);
-      await simple();
+      await roundTrip();
       await page.getByLabel('侧栏主题', { exact: true }).waitFor();
-      await detail();
       assert.equal(
         await page.getByLabel('侧栏主题', { exact: true }).isVisible(),
         true,
-        'theme controls stay visible after mode changes',
+        'theme controls stay visible after page navigation',
       );
 
       await page.setViewportSize({ width: 360, height: 800 });
-      await simple();
+      await category('features');
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
         false,
@@ -587,10 +557,9 @@ test(
       await mkdir('target/reports', { recursive: true });
       await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
       await page.screenshot({
-        path: 'target/reports/settings-simple-live-layout.png',
+        path: 'target/reports/settings-unified-switches.png',
         fullPage: true,
       });
-      await detail();
       await category('surfaces');
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
@@ -599,18 +568,25 @@ test(
       );
       await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
       await page.screenshot({
-        path: 'target/reports/settings-detail-live-layout.png',
+        path: 'target/reports/settings-unified-layout.png',
         fullPage: true,
       });
       const count = writes.length;
-      await simple();
+      await category('features');
       await page.reload();
       await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
       assert.equal(
-        await page.locator('.settings-app').getAttribute('data-settings-mode'),
-        'simple',
+        await page.locator('.settings-app').getAttribute('data-settings-category'),
+        'features',
       );
       assert.equal(writes.length, count);
+      for (const hash of ['settings-simple', 'settings-overview']) {
+        await page.goto(origin + '/#' + hash);
+        await page.getByRole('heading', { name: '常用开关', exact: true, level: 1 }).waitFor();
+        assert.equal(await page.getByRole('navigation', { name: '设置分类' }).isVisible(), true);
+        assert.equal(await page.locator('.settings-mode').count(), 0);
+      }
+      assert.equal(writes.length, count, 'legacy mode and hashes never reset configuration');
       await page.goto(origin + '/#settings-limits/timeout');
       await page.getByRole('heading', { name: '生成模型', exact: true, level: 1 }).waitFor();
       await page.getByLabel('请求超时（秒）', { exact: true }).waitFor();
@@ -698,10 +674,10 @@ test(
       await preview.getByText('新的预览模型草稿', { exact: true }).waitFor();
       assert.ok((await preview.textContent()).includes('未全部保存'));
       const draftWrites = writes.length;
-      await simple();
+      await category('surfaces');
       await preview.getByRole('button', { name: '贴边 / 刘海', exact: true }).click();
       assert.equal(writes.length, draftWrites);
-      await detail();
+      await category('model');
       assert.equal(await model.inputValue(), '新的预览模型草稿');
       assert.equal((await preview.textContent()).includes('fixture-unsaved-key'), false);
 
@@ -953,7 +929,6 @@ test(
       await chooseTheme('浅色', restrictedPage);
       await restrictedPage.locator('html[data-settings-theme="light"]').waitFor();
       await restricted.close();
-      await detail();
       await category('model');
       const headerWrites = writes.length;
       await page.locator('.settings-theme-trigger').click();

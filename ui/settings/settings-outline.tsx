@@ -1,4 +1,4 @@
-/* [INPUT]: URL anchors, local presentation preference and the Dev source widget.
+/* [INPUT]: URL anchors, saved page preference (legacy mode ignored) and the Dev source widget.
  * [OUTPUT]: Grouped two-level navigation, legacy/search/invalid-field routing and per-page reading restoration without remounting forms.
  * [POS]: Presentation state only; never changes backend configuration or remounts forms.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -19,7 +19,6 @@ export const pageTitles = {
   dev: '开发来源',
 };
 export type SettingsPage = keyof typeof pageTitles;
-export type SettingsMode = 'simple' | 'detail';
 export const pageGroups: { title: string; pages: SettingsPage[] }[] = [
   {
     title: '功能',
@@ -32,6 +31,7 @@ export const pageGroups: { title: string; pages: SettingsPage[] }[] = [
 export const pageGroup = (page: SettingsPage) =>
   pageGroups.find((group) => group.pages.includes(page))!;
 const aliases: Record<string, SettingsPage> = {
+  'settings-simple': 'features',
   'settings-overview': 'features',
   'settings-outline': 'features',
   'settings-model-control': 'model-control',
@@ -84,8 +84,8 @@ function remember(kind: 'localStorage' | 'sessionStorage', key: string, value: s
 }
 function savedPage(): SettingsPage {
   const value =
-    storage('sessionStorage', 'buddy-settings-detail-page') ||
-    storage('sessionStorage', 'buddy-settings-page');
+    storage('sessionStorage', 'buddy-settings-page') ||
+    storage('sessionStorage', 'buddy-settings-detail-page');
   return value in pageTitles ? (value as SettingsPage) : aliases['settings-' + value] || 'features';
 }
 function fromHash() {
@@ -95,15 +95,13 @@ function fromHash() {
     decoded = decodeURIComponent(field);
   } catch {}
   const fieldPage = targetPage(decoded);
-  if (fieldPage) return { mode: 'detail' as const, page: fieldPage };
-  if (section === 'settings-simple' || section === 'settings-overview')
-    return { mode: 'simple' as const, page: savedPage() };
+  if (fieldPage) return { page: fieldPage };
   const page =
     aliases[section] ||
     (section.replace(/^settings-/, '') in pageTitles
       ? (section.replace(/^settings-/, '') as SettingsPage)
       : null);
-  return page ? { mode: 'detail' as const, page } : null;
+  return page ? { page } : null;
 }
 let revealedField = 0;
 export function revealSettingsField(target: HTMLElement) {
@@ -130,36 +128,21 @@ function reportInvalidField(target: HTMLElement) {
 }
 export function useSettingsPage(ready: boolean) {
   const [selection, setSelection] = useState(() => ({
-    ...(fromHash() || {
-      mode:
-        storage('localStorage', 'buddy-settings-mode') === 'detail'
-          ? ('detail' as const)
-          : ('simple' as const),
-      page: savedPage(),
-    }),
+    ...(fromHash() || { page: savedPage() }),
     hash: location.hash,
   }));
-  const { page, mode, hash } = selection;
+  const { page, hash } = selection;
   const [dev, setDev] = useState(false);
   const positions = useRef(new Map<string, number>());
   const current = useRef(selection);
-  const positionKey = (value: { mode: SettingsMode; page: SettingsPage }) =>
-    value.mode === 'simple' ? 'simple' : `detail:${value.page}`;
-  function select(next: { mode: SettingsMode; page: SettingsPage }, hash: string) {
+  function select(next: { page: SettingsPage }, hash: string) {
     closeSettingsDrawers();
-    positions.current.set(positionKey(current.current), window.scrollY);
-    setSelection({ ...next, hash });
+    positions.current.set(current.current.page, window.scrollY);
+    setSelection({ page: next.page, hash });
   }
   function navigate(next: SettingsPage, hash: string) {
-    if (location.hash !== hash)
-      history.pushState({ buddySettings: { mode: 'detail', page: next } }, '', hash);
-    select({ mode: 'detail', page: next }, hash);
-  }
-  function switchMode(next: SettingsMode) {
-    if (mode === next) return;
-    const nextHash = next === 'simple' ? '#settings-simple' : `#settings-${page}`;
-    history.pushState({ buddySettings: { mode: next, page } }, '', nextHash);
-    select({ mode: next, page }, nextHash);
+    if (location.hash !== hash) history.pushState({ buddySettings: { page: next } }, '', hash);
+    select({ page: next }, hash);
   }
   useEffect(() => {
     const change = () => {
@@ -181,15 +164,14 @@ export function useSettingsPage(ready: boolean) {
   }, []);
   useLayoutEffect(() => {
     current.current = selection;
-    if (history.state?.buddySettings?.mode !== mode || history.state?.buddySettings?.page !== page)
-      history.replaceState({ ...history.state, buddySettings: { mode, page } }, '', location.href);
-    remember('localStorage', 'buddy-settings-mode', mode);
-    remember('sessionStorage', 'buddy-settings-detail-page', page);
+    if (history.state?.buddySettings?.page !== page)
+      history.replaceState({ ...history.state, buddySettings: { page } }, '', location.href);
+    remember('sessionStorage', 'buddy-settings-page', page);
     window.scrollTo({
-      top: positions.current.get(positionKey(selection)) || 0,
+      top: positions.current.get(page) || 0,
       behavior: 'instant',
     });
-    if (!ready || mode === 'simple') return;
+    if (!ready) return;
     const [section, encodedField] = hash.slice(1).split('/');
     let field = encodedField;
     try {
@@ -259,27 +241,20 @@ export function useSettingsPage(ready: boolean) {
     };
   }, []);
 
-  return { page, mode, dev, navigate, switchMode };
+  return { page, dev, navigate };
 }
 export function SettingsOutline({
   page,
-  mode = 'detail',
   dev = false,
   navigate,
 }: {
   page: SettingsPage;
-  mode?: SettingsMode;
   dev?: boolean;
   navigate: (page: SettingsPage, hash: string) => void;
 }) {
   const group = pageGroup(page);
   return (
-    <nav
-      aria-label="设置分类"
-      className="settings-nav"
-      hidden={mode === 'simple'}
-      data-settings-navigation
-    >
+    <nav aria-label="设置分类" className="settings-nav" data-settings-navigation>
       <div className="settings-mobile-groups" aria-label="设置分组">
         {pageGroups.map((item) => (
           <button

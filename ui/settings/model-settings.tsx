@@ -15,7 +15,7 @@ import { request, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
 import { ActionIcon, ActionLabel } from './components/ui/action-feedback';
 import { ModelApiKey, DeleteModelApiKey } from './model-credentials';
-export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple: boolean }) {
+export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple?: boolean }) {
   const { form, saved, change, dirty, save, remoteChanged, apiKey, clearKey } = editor;
   const fieldsRef = useProviderFieldsMotion(form?.provider);
   const [busy, setBusy] = useState('');

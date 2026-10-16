@@ -136,7 +136,6 @@ test(
         errors.push(error.message);
       });
       await page.goto(`http://127.0.0.1:${server.address().port}/#token=fixture`);
-      await page.getByRole('button', { name: '详细设置', exact: true }).click();
       await page.getByRole('link', { name: '启动与连接', exact: true }).click();
       const policy = page.getByLabel('ChatGPT 已打开，但没有调试连接时');
       await policy.waitFor();

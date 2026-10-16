@@ -88,9 +88,7 @@ html:root .settings-search-input {
   border-color: transparent;
   background: var(--buddy-subtle);
 }
-html:root
-  :is(.settings-theme, .settings-mode, .settings-choice, .preview-selector)
-  button[aria-pressed='true'] {
+html:root :is(.settings-theme, .settings-choice, .preview-selector) button[aria-pressed='true'] {
   font-weight: 600;
 }
 .settings-app {
@@ -248,27 +246,7 @@ html:root .settings-search-input {
 .settings-search li button {
   border-radius: var(--settings-control-radius);
 }
-.settings-app .settings-mode {
-  display: flex;
-  flex-shrink: 0;
-  padding: 3px;
-  border-radius: 7px;
-  background: var(--buddy-subtle);
-}
-.settings-mode button {
-  min-width: 46px;
-  min-height: 28px;
-  padding: 2px 10px;
-  border-radius: 5px;
-  font-size: 0.8125em;
-  cursor: pointer;
-  color: var(--buddy-muted);
-}
-.settings-mode button[aria-pressed='true'] {
-  color: var(--buddy-text);
-  background: var(--buddy-surface);
-  box-shadow: 0 1px 3px #00000013;
-}
+
 .settings-layout {
   flex: 1;
   min-width: 0;
@@ -327,20 +305,12 @@ html:root .settings-nav {
 .settings-form-column {
   min-width: 0;
 }
-.settings-app[data-settings-mode='simple'] .settings-layout {
-  grid-template-columns: minmax(0, 1fr);
-}
-.settings-app[data-settings-mode='simple'] .settings-content {
-  max-width: 1080px;
-  width: 100%;
-  margin: 0 auto;
-}
-.settings-app[data-settings-mode='detail'][data-settings-category='surfaces']
-  .settings-form-column {
+
+.settings-app[data-settings-category='surfaces'] .settings-form-column {
   grid-column: 2;
   grid-row: 1;
 }
-.settings-app[data-settings-mode='detail'][data-settings-category='surfaces'] .settings-preview {
+.settings-app[data-settings-category='surfaces'] .settings-preview {
   grid-column: 1;
   grid-row: 1;
 }
@@ -348,8 +318,7 @@ html:root .settings-nav {
   min-width: 0;
   margin-bottom: 30px;
 }
-.settings-section h2,
-.settings-simple-model-title {
+.settings-section h2 {
   font-size: 1em;
   font-weight: 600;
   margin: 0 0 20px;
@@ -481,32 +450,7 @@ html:root .settings-nav {
 .settings-section-heading > h2 {
   margin: 0;
 }
-.settings-app[data-settings-mode='simple'] .settings-common-surface .settings-section {
-  margin-bottom: 18px;
-}
-.settings-app[data-settings-mode='simple'] .settings-common-surface .settings-surface-group {
-  border: 0;
-  padding: 0;
-}
-.settings-app[data-settings-mode='simple'] .settings-placement-row {
-  display: grid;
-  grid-template-columns: minmax(90px, 0.8fr) minmax(0, 1.4fr);
-  gap: 18px;
-  align-items: center;
-  margin-bottom: 18px;
-  font-size: 0.875em;
-}
-.settings-app[data-settings-mode='simple'] .settings-choice {
-  margin: 0;
-  flex-wrap: nowrap;
-}
-.settings-app[data-settings-mode='simple'] .settings-choice button {
-  padding-inline: 5px;
-  font-size: 1em;
-}
-.settings-app[data-settings-mode='simple'] .settings-model-editor .settings-field {
-  grid-template-columns: 1fr;
-}
+
 .settings-footer {
   display: flex;
   justify-content: space-between;
@@ -572,17 +516,13 @@ html:root .settings-nav {
     gap: 24px;
     grid-template-columns: minmax(0, 1fr);
   }
-  .settings-app[data-settings-mode='detail'][data-settings-category='surfaces']
-    .settings-form-column {
+  .settings-app[data-settings-category='surfaces'] .settings-form-column {
     grid-column: auto;
     grid-row: auto;
   }
-  .settings-app[data-settings-mode='detail'][data-settings-category='surfaces'] .settings-preview {
+  .settings-app[data-settings-category='surfaces'] .settings-preview {
     grid-column: auto;
     grid-row: 1;
-  }
-  .settings-app[data-settings-mode='simple'] .settings-body {
-    grid-template-columns: minmax(0, 1fr) minmax(290px, 0.95fr);
   }
 }
 @media (max-width: 1100px) {
@@ -607,9 +547,7 @@ html:root .settings-nav {
   .settings-page-heading {
     margin-bottom: 26px;
   }
-  .settings-app[data-settings-mode='simple'] .settings-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
+
   .settings-body {
     gap: 24px;
   }
@@ -649,10 +587,7 @@ html:root .settings-nav {
   .settings-header-actions {
     gap: 7px;
   }
-  .settings-mode button {
-    min-width: 42px;
-    padding-inline: 8px;
-  }
+
   html:root .settings-nav {
     margin-top: 16px;
     padding-bottom: 14px;
@@ -671,10 +606,6 @@ html:root .settings-nav {
   }
   .settings-field > label {
     padding-top: 0;
-  }
-  .settings-app[data-settings-mode='simple'] .settings-placement-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
   }
 }
 

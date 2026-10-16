@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、分组与二级页面导航、主题/字体及联动预览，保留保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 统一设置、分组与二级页面导航、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -86,25 +86,24 @@ function App() {
   const [notice, setNotice] = useState({ text: '', failed: false });
   const notify = (text: string, failed = false) => setNotice({ text, failed });
   const editor = useSettingsForm(live, view?.configurationRevision, editable, notify);
-  const { page, mode, dev, navigate, switchMode } = useSettingsPage(!!editor.form);
+  const { page, dev, navigate } = useSettingsPage(!!editor.form);
   const [features, setFeatures] = useState<FeatureState | null>(null);
   const [surfaces, setSurfaces] = useState<SurfaceState | null>(null);
   const [model, setModel] = useState<ModelState | null>(null);
-  const contentRef = useSettingsMotion(`${mode}:${page}`);
+  const contentRef = useSettingsMotion(page);
   const tasks = useTasks(live);
-  const simple = mode === 'simple';
-  const common = simple || page === 'features';
+  const common = page === 'features';
   const featuresVisible = common || ['next', 'board', 'model-control'].includes(page);
-  const surfacesVisible = simple || page === 'surfaces' || page === 'appearance';
+  const surfacesVisible = page === 'surfaces' || page === 'appearance';
   useEffect(() => {
     setNotice((current) => (current.failed ? current : { text: '', failed: false }));
   }, [page]);
   const connected = live && view?.connection.status === 'connected';
   return (
-    <div className="settings-app" data-settings-mode={mode} data-settings-category={page}>
+    <div className="settings-app" data-settings-category={page}>
       <header className="settings-header">
         <div className="settings-topline">
-          <a href="#settings-simple" className="settings-brand" data-settings-navigation>
+          <a href="#settings-features" className="settings-brand" data-settings-navigation>
             <img src={icon} alt="" />
             CodexBuddy{' '}
             <span className="settings-edition">{import.meta.env.DEV ? '开发版' : '设置'}</span>
@@ -112,24 +111,6 @@ function App() {
           <SettingsSearch navigate={navigate} />
           <div className="settings-header-actions">
             <SettingsTheme codexTheme={view?.panelTheme} />
-            <div
-              className="settings-mode"
-              role="group"
-              aria-label="设置显示模式"
-              data-settings-navigation
-            >
-              <button type="button" aria-pressed={simple} onClick={() => switchMode('simple')}>
-                简易
-              </button>
-              <button
-                type="button"
-                aria-label="详细设置"
-                aria-pressed={!simple}
-                onClick={() => switchMode('detail')}
-              >
-                详细
-              </button>
-            </div>
             <span
               className="settings-connection-status"
               data-connected={connected}
@@ -147,10 +128,10 @@ function App() {
         </div>
       </header>
       <div className="settings-layout">
-        <SettingsOutline page={page} mode={mode} dev={dev} navigate={navigate} />
+        <SettingsOutline page={page} dev={dev} navigate={navigate} />
         <main className="settings-content min-w-0" ref={contentRef}>
           <div className="settings-page-heading">
-            <h1 className="settings-title">{simple ? '设置' : pageTitles[page]}</h1>
+            <h1 className="settings-title">{pageTitles[page]}</h1>
           </div>
           <Feedback text={error} failed />
           {!editor.form && !error && <p role="status">正在读取设置…</p>}
@@ -163,7 +144,7 @@ function App() {
                 className="settings-section settings-feature-list"
                 aria-label="常用功能"
               >
-                <h2 hidden={!simple}>常用功能</h2>
+                {/* Page heading names the common switches. */}
                 <div id="settings-outline" hidden={!common}>
                   <FeatureSwitch
                     name="大纲"
@@ -194,7 +175,7 @@ function App() {
                 >
                   <ModelControlSettings
                     live={live}
-                    detailed={!simple && page === 'model-control'}
+                    detailed={page === 'model-control'}
                     onSnapshot={setModel}
                   />
                 </div>
@@ -206,10 +187,7 @@ function App() {
                     onChange={(value) => editor.change('promptEnhancementEnabled', value)}
                   />
                 </div>
-                <div
-                  data-settings-page="next"
-                  hidden={!editor.form?.enabled || (!simple && page !== 'next')}
-                >
+                <div data-settings-page="next" hidden={!editor.form?.enabled || page !== 'next'}>
                   <Field id="generation-mode" label="建议生成方式">
                     <NativeSelect
                       id="generation-mode"
@@ -230,60 +208,55 @@ function App() {
                 hidden={!surfacesVisible}
                 className="settings-section settings-common-surface"
               >
-                <h2 hidden={!simple}>界面与操作</h2>
+                {/* Layout and appearance keep their existing section headings. */}
                 <SurfaceSettings
                   live={live}
                   desktopSupported={editor.saved?.popoutSupported === true}
                   appearance={view?.panelPreferences}
                   fontBase={view?.panelFontBase}
-                  simple={simple}
                   page={page === 'appearance' ? 'appearance' : 'surfaces'}
                   onFeatures={setFeatures}
                   onSnapshot={setSurfaces}
                 />
-                <div data-settings-page="appearance" hidden={!simple && page !== 'appearance'}>
+                <div data-settings-page="appearance" hidden={page !== 'appearance'}>
                   <LauncherSettings
                     value={view?.panelPreferences}
                     outsideAvailable={editor.saved?.popoutSupported === true}
                   />
                 </div>
               </section>
-              <div data-settings-page="terminology" hidden={simple || page !== 'terminology'}>
-                <TerminologySettings active={!simple && page === 'terminology'} />
+              <div data-settings-page="terminology" hidden={page !== 'terminology'}>
+                <TerminologySettings active={page === 'terminology'} />
               </div>
               <SettingsForm
                 editor={editor}
                 notify={notify}
-                active={
-                  simple || ['model', 'next', 'prompts', 'features', 'connection'].includes(page)
-                }
+                active={['model', 'next', 'prompts', 'features', 'connection'].includes(page)}
               >
-                <div hidden={simple || !['next', 'prompts'].includes(page)}>
+                <div hidden={!['next', 'prompts'].includes(page)}>
                   <NextSettings
                     editor={editor}
                     appearance={view?.panelPreferences}
                     section={page === 'prompts' ? 'prompts' : 'next'}
                   />
                 </div>
-                <div data-settings-page="model" hidden={!simple && page !== 'model'}>
-                  <h2 className="settings-simple-model-title" hidden={!simple}>
-                    生成模型
-                  </h2>
-                  <ModelSettings editor={editor} simple={simple} />
+                <div data-settings-page="model" hidden={page !== 'model'}>
+                  {/* The model form retains its own section heading. */}
+                  <ModelSettings editor={editor} />
                 </div>
-                <div data-settings-page="connection" hidden={simple || page !== 'connection'}>
+                <div data-settings-page="connection" hidden={page !== 'connection'}>
                   <ConnectionSettings editor={editor} view={view} live={live} notify={notify} />
                 </div>
               </SettingsForm>
-              <div data-settings-page="board" hidden={simple || page !== 'board'}>
+              <div data-settings-page="board" hidden={page !== 'board'}>
                 <TaskSettings tasks={tasks} />
               </div>
-              <div data-settings-page="codex-host" hidden={simple || page !== 'codex-host'}>
-                <CodexHostSettings live={live} active={!simple && page === 'codex-host'} />
+              <div data-settings-page="codex-host" hidden={page !== 'codex-host'}>
+                <CodexHostSettings live={live} active={page === 'codex-host'} />
               </div>
               <section
                 data-settings-page="dev"
-                hidden={simple || page !== 'dev' || !dev}
+                hidden={page !== 'dev' || !dev}
                 className="settings-section"
               >
                 <h2>开发来源</h2>
@@ -291,7 +264,6 @@ function App() {
               </section>
             </div>
             <SettingsPreview
-              mode={mode}
               page={page}
               form={editor.form}
               dirty={editor.dirty}

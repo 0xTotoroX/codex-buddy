@@ -28,7 +28,7 @@ import{useSettingsForm}from'./ui/settings/use-settings-form';
 import{useSettingsMotion}from'./ui/settings/settings-motion';
 import{fixtureSettings}from'./tests/fixtures.mjs';
 function App(){const [notice,setNotice]=useState('');const editor=useSettingsForm(false,undefined,({configurationRevision,generationRevision,...v})=>v,setNotice);useEffect(()=>editor.load(fixtureSettings),[]);const ref=useSettingsMotion('test');
-return <div className="settings-app" ref={ref}><div style={{width:430}}><SettingsPreview mode="detail" page="features" form={editor.form} dirty={editor.dirty} tasks={null} model={null} view={null} live={true}/></div>
+return <div className="settings-app" ref={ref}><div style={{width:430}}><SettingsPreview page="features" form={editor.form} dirty={editor.dirty} tasks={null} model={null} view={null} live={true}/></div>
 <SettingsForm editor={editor} notify={setNotice} active><ModelSettings editor={editor} simple={false}/></SettingsForm><div role="alert">{notice}</div>
 <ModelOrganization state={{preferences:{enabled:true,pinned:[],presets:[],groups:[]},snapshot:{models:[]}}} busy={false} save={async()=>true} refresh={async()=>{const r=await fetch('/refresh');return r.ok}}/>
 </div>};createRoot(document.getElementById('root')).render(<App/>);`,

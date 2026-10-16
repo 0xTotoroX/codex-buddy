@@ -457,7 +457,6 @@ try {
   const settingsPage = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   settingsPage.on('pageerror', (error) => pageErrors.push(error.message));
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
-  await settingsPage.getByRole('button', { name: '详细设置', exact: true }).click();
   {
     await settingsPage.getByRole('link', { name: '模型快切', exact: true }).click();
     const modelSettings = settingsPage.locator('#settings-model-control');
