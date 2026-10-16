@@ -93,7 +93,7 @@ import{useSettingsForm}from'./ui/settings/use-settings-form';
 import{fixtureSettings}from'./tests/fixtures.mjs';
 const baseline={...fixtureSettings,model:'Alpha'};
 function App(){
- const editor=useSettingsForm(false,undefined,v=>v,()=>{});
+ const editor=useSettingsForm(false,undefined,({configurationRevision,generationRevision,...form})=>form,()=>{});
  useEffect(()=>editor.load(baseline),[]);
  return <div className="settings-app"><SettingsForm editor={editor} notify={()=>{}} active>
  <ModelSettings editor={editor} simple={false}/>

@@ -1,5 +1,5 @@
 /* [INPUT]: Presentation identity, header/preview geometry and input modality.
- * [OUTPUT]: Sticky offsets and interruptible navigation/layout transitions; keyboard and reduced motion stay immediate.
+ * [OUTPUT]: Sticky offsets and interruptible navigation/layout/scene transitions; keyboard and reduced motion stay immediate.
  * [POS]: Settings-only motion, never remounts controls or changes configuration.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useLayoutEffect, useRef } from 'react';
@@ -104,6 +104,53 @@ export function usePreviewMotion(identity: string) {
     return () => {
       cancel();
       reduce.removeEventListener('change', cancel);
+    };
+  }, [identity]);
+  return ref;
+}
+
+// Keep scenes mounted so demo state survives; inactive scenes only contribute geometry.
+export function usePreviewTransition(identity: string) {
+  const ref = useRef<HTMLDivElement>(null);
+  const previous = useRef(identity);
+  useLayoutEffect(() => {
+    const root = ref.current;
+    const before = previous.current;
+    previous.current = identity;
+    if (!root || before === identity) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+    if (reduce.matches || document.documentElement.dataset.settingsInput === 'keyboard') return;
+    const options = { duration: 200, easing: 'cubic-bezier(.2,.7,.2,1)' };
+    const animations: Animation[] = [];
+    const outgoing = root.querySelector<HTMLElement>(`[data-preview-scene="${before}"]`);
+    const incoming = root.querySelector<HTMLElement>(`[data-preview-scene="${identity}"]`);
+    if (outgoing)
+      animations.push(
+        outgoing.animate(
+          [
+            { visibility: 'visible', opacity: 1 },
+            { visibility: 'visible', opacity: 0 },
+          ],
+          options,
+        ),
+      );
+    if (incoming)
+      animations.push(
+        incoming.animate(
+          [
+            { opacity: 0, transform: 'translateY(4px)' },
+            { opacity: 1, transform: 'none' },
+          ],
+          options,
+        ),
+      );
+    const cancel = () => animations.forEach((animation) => animation.cancel());
+    reduce.addEventListener('change', cancel);
+    window.addEventListener('keydown', cancel, true);
+    return () => {
+      cancel();
+      reduce.removeEventListener('change', cancel);
+      window.removeEventListener('keydown', cancel, true);
     };
   }, [identity]);
   return ref;

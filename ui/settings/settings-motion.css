@@ -22,11 +22,6 @@ body,
 .settings-app button:active:not(:disabled):not([role='switch']) {
   transform: scale(0.97);
 }
-.settings-mode::before {
-  transition:
-    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
-    background-color 180ms ease;
-}
 .settings-search ul,
 .settings-suggestion-list {
   transform-origin: top center;
@@ -95,7 +90,6 @@ body,
 html[data-settings-input='keyboard'],
 html[data-settings-input='keyboard'] :is(body, .settings-header, .preview-frame),
 html[data-settings-input='keyboard'] .settings-app :is(button, a, input, select, textarea),
-html[data-settings-input='keyboard'] .settings-mode::before,
 html[data-settings-input='keyboard'] .settings-search ul,
 html[data-settings-input='keyboard'] .settings-suggestion-list,
 html[data-settings-input='keyboard'] .settings-app details::details-content,
@@ -117,4 +111,47 @@ html[data-settings-input='keyboard'] .settings-app button:active {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+.settings-action-icon {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.settings-action-layer {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 160ms var(--settings-ease),
+    transform 160ms var(--settings-ease);
+}
+.settings-action-layer[data-active='true'] {
+  opacity: 1;
+  transform: none;
+}
+.settings-action-label {
+  display: inline-grid;
+}
+.settings-action-label > span {
+  grid-area: 1 / 1;
+}
+.settings-action-measure {
+  visibility: hidden;
+}
+.settings-action-wait {
+  animation: settings-action-spin 1200ms linear infinite;
+}
+@keyframes settings-action-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+html[data-settings-input='keyboard'] .settings-action-layer {
+  transition: none;
+}
+html[data-settings-input='keyboard'] .settings-action-wait {
+  animation: none;
 }

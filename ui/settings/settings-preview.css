@@ -633,3 +633,22 @@
     height: 300px;
   }
 }
+
+.preview-scenes {
+  display: grid;
+  align-items: start;
+  isolation: isolate;
+}
+.preview-scene {
+  grid-area: 1 / 1;
+  min-width: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.preview-scene[data-active='true'] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
+}

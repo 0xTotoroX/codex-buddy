@@ -74,13 +74,7 @@ function download(text: string, name: string, type = 'text/markdown;charset=utf-
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function TerminologySettings({
-  active,
-  canOpen = true,
-}: {
-  active: boolean;
-  canOpen?: boolean;
-}) {
+export function TerminologySettings({ active }: { active: boolean }) {
   const [data, setData] = useState<Library | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -145,21 +139,6 @@ export function TerminologySettings({
       </style>
       <div className="settings-section-heading">
         <h2>术语释义</h2>
-        {canOpen && prefs && !busy && !error && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="打开术语模块"
-            onClick={() =>
-              void request('features', { op: 'reveal', id: 'terms' }).catch((e) =>
-                setError(e.message),
-              )
-            }
-          >
-            打开
-          </Button>
-        )}
       </div>
       {error && (
         <p role="alert" className="text-destructive">

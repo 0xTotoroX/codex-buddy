@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、功能打开动作、紧凑工具栏、主题/字体及联动预览，保留保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、精简工具栏、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -13,7 +13,7 @@ import './settings-preview.css';
 import './settings-controls.css';
 import './settings-motion.css';
 import icon from '../icon.png';
-import { request, useCompanion, type Settings, type EditableSettings } from './api';
+import { useCompanion, type Settings, type EditableSettings } from './api';
 import { useSettingsForm } from './use-settings-form';
 import { SettingsOutline, useSettingsPage, pageTitles } from './settings-outline';
 import { SettingsForm, FeatureSwitch, Feedback } from './settings-controls';
@@ -98,16 +98,6 @@ function App() {
   useEffect(() => {
     setNotice((current) => (current.failed ? current : { text: '', failed: false }));
   }, [page]);
-  function openFeature(id: 'outline' | 'next' | 'board' | 'model') {
-    const action =
-      id === 'board'
-        ? tasks.command({ op: 'open' })
-        : request(
-            id === 'model' ? 'model-control/open' : 'features',
-            id === 'model' ? {} : { op: 'reveal', id },
-          );
-    void action.catch((error) => notify(error.message, true));
-  }
   const connected = live && view?.connection.status === 'connected';
   return (
     <div className="settings-app" data-settings-mode={mode} data-settings-category={page}>
@@ -176,7 +166,6 @@ function App() {
                 <div id="settings-outline">
                   <FeatureSwitch
                     name="大纲"
-                    onOpen={simple || !connected ? undefined : () => openFeature('outline')}
                     checked={editor.form?.answerOutlineEnabled ?? false}
                     disabled={!live || !editor.form}
                     onChange={(v) => editor.change('answerOutlineEnabled', v)}
@@ -184,24 +173,17 @@ function App() {
                 </div>
                 <FeatureSwitch
                   name="下一步"
-                  onOpen={simple || !connected ? undefined : () => openFeature('next')}
                   checked={editor.form?.enabled ?? false}
                   disabled={!live || !editor.form}
                   onChange={(v) => editor.change('enabled', v)}
                 />
                 <FeatureSwitch
                   name="看板"
-                  onOpen={simple || !connected ? undefined : () => openFeature('board')}
                   checked={tasks.state?.store.boardEnabled ?? false}
                   disabled={tasks.busy || !tasks.state || !!tasks.state.error}
                   onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
                 />
-                <ModelControlSettings
-                  live={live}
-                  detailed={!simple}
-                  onSnapshot={setModel}
-                  onOpen={simple || !connected ? undefined : () => openFeature('model')}
-                />
+                <ModelControlSettings live={live} detailed={!simple} onSnapshot={setModel} />
                 <div id="settings-prompt-enhancement">
                   <FeatureSwitch
                     name="提示词优化"
@@ -247,10 +229,7 @@ function App() {
                 />
               </section>
               <div data-settings-page="features" hidden={simple || page !== 'features'}>
-                <TerminologySettings
-                  active={!simple && page === 'features'}
-                  canOpen={!!connected}
-                />
+                <TerminologySettings active={!simple && page === 'features'} />
               </div>
               <SettingsForm
                 editor={editor}

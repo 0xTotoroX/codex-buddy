@@ -11,12 +11,16 @@ import { SuggestionInput } from './components/ui/suggestion-input';
 import { Field } from './settings-controls';
 import { request, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
-import { Icon } from '../shared/icons/react';
+import { ActionIcon, ActionLabel } from './components/ui/action-feedback';
 import { ModelApiKey, DeleteModelApiKey } from './model-credentials';
 export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simple: boolean }) {
   const { form, saved, change, dirty, save, remoteChanged, apiKey, clearKey } = editor;
   const [busy, setBusy] = useState('');
-  const [testFeedback, setTestFeedback] = useState<{ text: string; failed?: boolean } | null>(null);
+  const [testFeedback, setTestFeedback] = useState<{
+    text: string;
+    failed?: boolean;
+    success?: boolean;
+  } | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const testing = useRef(false);
   const latestEditor = useRef(editor);
@@ -44,6 +48,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
     models: string[];
     loading: boolean;
     message?: string;
+    success?: boolean;
   } | null>(null);
   const modelRequest = useRef(0);
   const connectionDirty =
@@ -68,6 +73,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
       setCatalog({
         revision,
         models: result.models,
+        success: true,
         loading: false,
         message:
           result.models.length > 0
@@ -113,6 +119,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
       } else {
         const duration = ((performance.now() - start) / 1000).toFixed(1);
         setTestFeedback({
+          success: result.generationAttempted !== false,
           text:
             result.generationAttempted === false
               ? '测试未完成：示例没有合适方向，尚未验证模型连接。'
@@ -197,6 +204,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                   label: '选择模型',
                   onOpen: () => void readModels(),
                   loading: !connectionDirty && currentCatalog?.loading,
+                  success: !connectionDirty && currentCatalog?.success,
                   message: connectionDirty
                     ? '请先保存连接配置，再读取模型列表；也可直接输入模型 ID。'
                     : currentCatalog?.message,
@@ -210,20 +218,25 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                 variant="outline"
                 disabled={!!busy || remoteChanged}
                 onClick={() => void test()}
+                aria-busy={!!busy}
                 aria-describedby={busy || testFeedback ? 'model-test-feedback' : undefined}
               >
-                {busy ? (
-                  <Icon name="refresh" className="animate-spin [animation-duration:1.2s]" />
-                ) : (
-                  <Icon name="connection" />
-                )}
-                {busy === 'saving'
-                  ? '正在保存…'
-                  : busy
-                    ? '正在测试…'
-                    : dirty
-                      ? '保存并测试'
-                      : '测试连接'}
+                <ActionIcon
+                  name="connection"
+                  state={busy ? 'pending' : testFeedback?.success ? 'success' : 'idle'}
+                />
+                <ActionLabel
+                  labels={['正在保存…', '正在测试…', '保存并测试', '测试连接']}
+                  text={
+                    busy === 'saving'
+                      ? '正在保存…'
+                      : busy
+                        ? '正在测试…'
+                        : dirty
+                          ? '保存并测试'
+                          : '测试连接'
+                  }
+                />
               </Button>
             </div>
             {(busy || testFeedback) && (

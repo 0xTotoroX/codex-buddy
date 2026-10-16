@@ -5,13 +5,19 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
 import { Input } from './input';
 import { Button } from './button';
-import { Icon } from '../../../shared/icons/react';
+import { ActionIcon } from './action-feedback';
 
 type Props = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'list' | 'ref'> & {
   value: string;
   options: readonly string[];
   onValueChange: (value: string) => void;
-  dropdown?: { label: string; onOpen: () => void; loading?: boolean; message?: string };
+  dropdown?: {
+    label: string;
+    onOpen: () => void;
+    loading?: boolean;
+    success?: boolean;
+    message?: string;
+  };
 };
 
 export function SuggestionInput({
@@ -141,6 +147,7 @@ export function SuggestionInput({
           className="settings-suggestion-trigger"
           tabIndex={-1}
           aria-label={dropdown.label}
+          aria-busy={!!dropdown.loading}
           aria-expanded={expanded}
           aria-controls={expanded ? id : undefined}
           disabled={props.disabled}
@@ -150,9 +157,9 @@ export function SuggestionInput({
             else openDropdown();
           }}
         >
-          <Icon
-            name={dropdown.loading ? 'refresh' : 'chevron-down'}
-            className={dropdown.loading ? 'animate-spin [animation-duration:1.2s]' : ''}
+          <ActionIcon
+            name="chevron-down"
+            state={dropdown.loading ? 'pending' : dropdown.success ? 'success' : 'idle'}
           />
         </Button>
       )}

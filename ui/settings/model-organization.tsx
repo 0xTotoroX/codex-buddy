@@ -7,6 +7,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { SuggestionInput } from './components/ui/suggestion-input';
+import { ActionIcon, type ActionState } from './components/ui/action-feedback';
 import { Icon } from '../shared/icons/react';
 import {
   automaticManufacturer,
@@ -30,8 +31,9 @@ export function ModelOrganization({
   state: ModelState;
   busy: boolean;
   save: (patch: Partial<ModelPreferences>) => Promise<boolean>;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
 }) {
+  const [refreshState, setRefreshState] = useState<ActionState>('idle');
   const prefs = state.preferences;
   const [selected, setSelected] = useState<string[]>([]);
   const [newName, setNewName] = useState('');
@@ -97,9 +99,17 @@ export function ModelOrganization({
             size="icon"
             aria-label="刷新可用模型"
             disabled={busy || !prefs.enabled}
-            onClick={() => void refresh()}
+            onClick={async () => {
+              setRefreshState('pending');
+              try {
+                setRefreshState((await refresh()) ? 'success' : 'idle');
+              } catch {
+                setRefreshState('idle');
+              }
+            }}
+            aria-busy={refreshState === 'pending'}
           >
-            <Icon name="refresh" />
+            <ActionIcon name="refresh" state={refreshState} />
           </Button>
           <span className="text-muted-foreground">{available.length} 个可用模型</span>
         </div>

@@ -347,39 +347,13 @@ test(
       await mkdir('target/reports', { recursive: true });
       await page.screenshot({ path: 'target/reports/settings-simple-default.png', fullPage: true });
       await detail();
-      const openOutline = page.getByRole('button', { name: '打开大纲', exact: true });
-      assert.equal(
-        (await openOutline.innerText()).trim(),
-        '打开',
-        'feature reveal has a clear visible action label',
-      );
-      const [revealed] = await Promise.all([
-        page.waitForResponse(
-          (response) =>
-            response.url().endsWith('/api/features') &&
-            response.request().postData()?.includes('reveal'),
-        ),
-        openOutline.click(),
-      ]);
-      await revealed.finished();
-      assert.ok(
-        writes.some(
-          (entry) =>
-            entry.path === '/api/features' &&
-            entry.body.op === 'reveal' &&
-            entry.body.id === 'outline',
-        ),
-      );
-      publishTheme('light', 'disconnected');
-      await openOutline.waitFor({ state: 'hidden' });
       assert.equal(
         await page
           .getByRole('button', { name: /^打开(大纲|下一步|看板|模型快切|术语模块)$/ })
           .count(),
         0,
+        'feature switches do not have duplicate open actions',
       );
-      publishTheme('light');
-      await openOutline.waitFor();
       writes.length = 0;
       await simple();
       await page.goBack();

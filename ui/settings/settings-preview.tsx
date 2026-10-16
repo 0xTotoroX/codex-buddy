@@ -1,5 +1,5 @@
 /* [INPUT]: Read-only snapshots from the existing forms, saved surfaces and feature layout.
- * [OUTPUT]: Linked configuration diagrams and isolated sample interactions.
+ * [OUTPUT]: Linked configuration diagrams and isolated, state-preserving samples in a stable transition frame.
  * [POS]: Settings presentation only; no requests, credentials, task bodies or host commands.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useState, type CSSProperties, type ReactNode } from 'react';
@@ -12,7 +12,7 @@ import type { TaskState } from '../features/board/api';
 import { columns as defaultColumns } from '../features/board/api';
 import { resolveFeatureLayout } from '../surfaces/workspace/layout';
 import { Icon } from '../shared/icons/react';
-import { usePreviewMotion } from './settings-motion';
+import { usePreviewMotion, usePreviewTransition } from './settings-motion';
 
 const placements = {
   sidebar: '侧栏',
@@ -288,12 +288,13 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
   const [tab, setTab] = useState<'outline' | 'next' | 'board' | 'model'>('next');
   const [selected, setSelected] = useState(0);
   const [demoDraft, setDemoDraft] = useState('');
-  const active = {
+  const transition = usePreviewTransition(tab);
+  const enabled = {
     outline: form?.answerOutlineEnabled,
     next: form?.enabled,
     board: tasks?.store.boardEnabled,
     model: model?.preferences.enabled,
-  }[tab];
+  };
   const groups = tasks?.store.columns || defaultColumns;
   const mode = view?.panelPreferences.ui.promptClickMode || 'fill';
   const clickLabels: Record<string, string> = {
@@ -311,128 +312,147 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
           </button>
         ))}
       </div>
-      <div className="preview-demo" data-enabled={active !== false}>
-        <div className="preview-demo-heading">
-          <strong>{titles[tab]}</strong>
-          <span>{active === undefined ? '读取中' : active ? '已开启' : '已关闭'}</span>
-        </div>
-        {tab === 'outline' && (
-          <>
+      <div className="preview-scenes" ref={transition}>
+        {(['outline', 'next', 'board', 'model'] as const).map((scene) => {
+          const active = enabled[scene];
+          return (
             <div
-              className="preview-outline"
-              role="group"
-              aria-label="大纲定位示例"
-              data-settings-navigation
+              key={scene}
+              className="preview-scene"
+              data-preview-scene={scene}
+              data-active={tab === scene}
+              aria-hidden={tab !== scene}
+              inert={tab !== scene}
             >
-              {['整体思路', '具体实现', '验证与交付'].map((label, index) => (
-                <button
-                  key={label}
-                  type="button"
-                  aria-pressed={selected === index}
-                  onClick={() => setSelected(index)}
-                >
-                  <span>0{index + 1}</span>
-                  {label}
-                  <Icon name="chevron-right" />
-                </button>
-              ))}
-            </div>
-            <div className="preview-answer">
-              <span>示例段落</span>
-              <strong>{['整体思路', '具体实现', '验证与交付'][selected]}</strong>
-              <i />
-              <i />
-              <i />
-            </div>
-          </>
-        )}
-        {tab === 'next' && (
-          <>
-            <div className="preview-suggestions" data-settings-navigation>
-              {examples
-                .slice(0, Math.max(0, Math.min(3, suggestionLimit(form))))
-                .map((text, index) => (
-                  <button type="button" key={text} onClick={() => setDemoDraft(text)}>
-                    <span>0{index + 1}</span>
-                    <div>
-                      <strong>{text}</strong>
-                      {!view?.panelPreferences.ui.labelOnly && (
-                        <small>
-                          {
-                            [
-                              '把已选方案分解成可执行的步骤。',
-                              '检查输入、异常和兼容情况。',
-                              '用具体场景核对预期行为。',
-                            ][index]
-                          }
-                        </small>
-                      )}
-                    </div>
-                    <Icon name="chevron-right" />
-                  </button>
-                ))}
-            </div>
-            <div className="preview-quick-prompts" data-settings-navigation>
-              {form?.quickPrompts.map((item, index) => (
-                <button type="button" key={index} onClick={() => setDemoDraft(item.prompt)}>
-                  {item.label || '未命名'}
-                </button>
-              ))}
-            </div>
-            <div className="preview-draft" role="status">
-              {demoDraft || '点选建议，查看示例输入效果'}
-            </div>
-          </>
-        )}
-        {tab === 'board' && (
-          <div className="preview-board">
-            {groups.map((group, index) => (
-              <div key={group.id}>
-                <h3>{group.title}</h3>
-                <div className="preview-task-sample">
-                  <i />
-                  {['梳理目标', '完善细节', '完成验证'][index % 3]}
+              <div className="preview-demo" data-enabled={active !== false}>
+                <div className="preview-demo-heading">
+                  <strong>{titles[scene]}</strong>
+                  <span>{active === undefined ? '读取中' : active ? '已开启' : '已关闭'}</span>
                 </div>
+                {scene === 'outline' && (
+                  <>
+                    <div
+                      className="preview-outline"
+                      role="group"
+                      aria-label="大纲定位示例"
+                      data-settings-navigation
+                    >
+                      {['整体思路', '具体实现', '验证与交付'].map((label, index) => (
+                        <button
+                          key={label}
+                          type="button"
+                          aria-pressed={selected === index}
+                          onClick={() => setSelected(index)}
+                        >
+                          <span>0{index + 1}</span>
+                          {label}
+                          <Icon name="chevron-right" />
+                        </button>
+                      ))}
+                    </div>
+                    <div className="preview-answer">
+                      <span>示例段落</span>
+                      <strong>{['整体思路', '具体实现', '验证与交付'][selected]}</strong>
+                      <i />
+                      <i />
+                      <i />
+                    </div>
+                  </>
+                )}
+                {scene === 'next' && (
+                  <>
+                    <div className="preview-suggestions" data-settings-navigation>
+                      {examples
+                        .slice(0, Math.max(0, Math.min(3, suggestionLimit(form))))
+                        .map((text, index) => (
+                          <button type="button" key={text} onClick={() => setDemoDraft(text)}>
+                            <span>0{index + 1}</span>
+                            <div>
+                              <strong>{text}</strong>
+                              {!view?.panelPreferences.ui.labelOnly && (
+                                <small>
+                                  {
+                                    [
+                                      '把已选方案分解成可执行的步骤。',
+                                      '检查输入、异常和兼容情况。',
+                                      '用具体场景核对预期行为。',
+                                    ][index]
+                                  }
+                                </small>
+                              )}
+                            </div>
+                            <Icon name="chevron-right" />
+                          </button>
+                        ))}
+                    </div>
+                    <div className="preview-quick-prompts" data-settings-navigation>
+                      {form?.quickPrompts.map((item, index) => (
+                        <button type="button" key={index} onClick={() => setDemoDraft(item.prompt)}>
+                          {item.label || '未命名'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="preview-draft" role="status">
+                      {demoDraft || '点选建议，查看示例输入效果'}
+                    </div>
+                  </>
+                )}
+                {scene === 'board' && (
+                  <div className="preview-board">
+                    {groups.map((group, index) => (
+                      <div key={group.id}>
+                        <h3>{group.title}</h3>
+                        <div className="preview-task-sample">
+                          <i />
+                          {['梳理目标', '完善细节', '完成验证'][index % 3]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {scene === 'model' && (
+                  <>
+                    <div className="preview-model-name">
+                      <span>当前模型</span>
+                      <strong>{model?.snapshot?.current?.model || '尚未识别'}</strong>
+                      <small>
+                        {[model?.snapshot?.current?.reasoning, model?.snapshot?.current?.speed]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </small>
+                    </div>
+                    <Facts
+                      items={[
+                        ['常用模型', String(model?.preferences.pinned?.length ?? 0)],
+                        ['收藏预设', String(model?.preferences.presets?.length ?? 0)],
+                        ['自定义分组', String(model?.preferences.groups?.length ?? 0)],
+                      ]}
+                    />
+                  </>
+                )}
               </div>
-            ))}
-          </div>
-        )}
-        {tab === 'model' && (
-          <>
-            <div className="preview-model-name">
-              <span>当前模型</span>
-              <strong>{model?.snapshot?.current?.model || '尚未识别'}</strong>
-              <small>
-                {[model?.snapshot?.current?.reasoning, model?.snapshot?.current?.speed]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </small>
+              {scene === 'next' && (
+                <Facts
+                  items={[
+                    [
+                      '生成时机',
+                      form?.generationMode === 'auto' ? '回答完成后自动生成' : '手动刷新',
+                    ],
+                    [
+                      '方向来源',
+                      { auto: '自动探索', manual: '自选方向', smart: '智能挑选' }[
+                        form?.directionSource || 'auto'
+                      ],
+                    ],
+                    ['数量上限', form ? `最多 ${suggestionLimit(form)} 条` : '读取中'],
+                    ['实际点击行为', clickLabels[mode] || mode],
+                  ]}
+                />
+              )}
             </div>
-            <Facts
-              items={[
-                ['常用模型', String(model?.preferences.pinned?.length ?? 0)],
-                ['收藏预设', String(model?.preferences.presets?.length ?? 0)],
-                ['自定义分组', String(model?.preferences.groups?.length ?? 0)],
-              ]}
-            />
-          </>
-        )}
+          );
+        })}
       </div>
-      {tab === 'next' && (
-        <Facts
-          items={[
-            ['生成时机', form?.generationMode === 'auto' ? '回答完成后自动生成' : '手动刷新'],
-            [
-              '方向来源',
-              { auto: '自动探索', manual: '自选方向', smart: '智能挑选' }[
-                form?.directionSource || 'auto'
-              ],
-            ],
-            ['数量上限', form ? `最多 ${suggestionLimit(form)} 条` : '读取中'],
-            ['实际点击行为', clickLabels[mode] || mode],
-          ]}
-        />
-      )}
       <p className="preview-note">示例操作不发送消息或修改任务。</p>
     </Frame>
   );

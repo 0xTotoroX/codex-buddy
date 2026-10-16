@@ -1,4 +1,4 @@
-/* [INPUT]: Model state, optional open callback and revision-checked API. [OUTPUT]: Feature switch, serialized organization settings and read-only preview snapshot.
+/* [INPUT]: Model state, revision-checked API. [OUTPUT]: Feature switch, serialized organization settings and read-only preview snapshot.
  * [POS]: Business enablement only; all placement and themes belong to shared settings.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
@@ -10,10 +10,8 @@ export function ModelControlSettings({
   live,
   detailed = true,
   onSnapshot,
-  onOpen,
 }: {
   live: boolean;
-  onOpen?: () => void;
   detailed?: boolean;
   onSnapshot?: (state: ModelState | null) => void;
 }) {
@@ -110,7 +108,6 @@ export function ModelControlSettings({
     >
       <FeatureSwitch
         name="模型快切"
-        onOpen={onOpen}
         checked={enabled ?? false}
         disabled={!live || busy || enabled === null}
         onChange={(value) => void change(value)}
@@ -122,9 +119,7 @@ export function ModelControlSettings({
             state={state}
             busy={busy || !live}
             save={(patch) => operate(patch)}
-            refresh={async () => {
-              await operate();
-            }}
+            refresh={() => operate()}
           />
         )}
       </div>
