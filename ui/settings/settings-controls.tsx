@@ -3,6 +3,7 @@
  * [POS]: 设置页组合组件，不持有业务数据或新增保存服务。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useId, useRef, useState, useEffect, type ReactNode } from 'react';
+import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import { ActionIcon, type ActionState } from './components/ui/action-feedback';
 import { Switch } from './components/ui/switch';
@@ -145,17 +146,16 @@ export function SettingsForm({
         {remoteChanged && (
           <div className="settings-feedback settings-error" role="alert">
             设置已在其他窗口更新，当前编辑已保留。
-            <Button
+            <ConfirmationButton
               type="button"
               variant="ghost"
-              onClick={() =>
-                void request<Settings>('settings')
-                  .then(load)
-                  .catch((e) => notify(e.message, true))
-              }
+              title="放弃当前草稿并重新载入？"
+              description="尚未保存的编辑和新输入密钥会被丢弃，重新读取其他窗口已保存的设置。"
+              confirmLabel="确认重新载入"
+              onConfirm={() => request<Settings>('settings').then(load)}
             >
               重新载入设置
-            </Button>
+            </ConfirmationButton>
           </div>
         )}
         <div

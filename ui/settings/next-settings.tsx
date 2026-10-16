@@ -1,5 +1,5 @@
 /* [INPUT]: Shared settings editor, direction credentials and appearance preferences.
- * [OUTPUT]: Advanced next-step directions, quick prompts and click/display options.
+ * [OUTPUT]: Next-step directions, quick prompts with confirmed scoped deletion, and click/display options.
  * [POS]: Functional settings only; shared model configuration lives in model-settings.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { Button } from './components/ui/button';
@@ -8,6 +8,7 @@ import { Card } from './components/ui/card';
 import type { View } from './api';
 import type { SettingsEditor } from './use-settings-form';
 import { Icon } from '../shared/icons/react';
+import { ConfirmationButton } from './settings-confirmation';
 import { DirectionSettings } from './direction-settings';
 import { PanelSettings } from './panel-settings';
 export function NextSettings({
@@ -17,8 +18,7 @@ export function NextSettings({
   editor: SettingsEditor;
   appearance?: View['panelPreferences'];
 }) {
-  const { form, saved, change, schedule, jevApiKey, clearJevKey, setJevApiKey, setClearJevKey } =
-    editor;
+  const { form, saved, change } = editor;
   if (!form || !saved) return null;
   return (
     <>
@@ -26,16 +26,7 @@ export function NextSettings({
         <h2>下一步交互</h2>
         <PanelSettings value={appearance} section="next" />
       </section>
-      <DirectionSettings
-        form={form}
-        saved={saved}
-        change={change}
-        schedule={schedule}
-        apiKey={jevApiKey}
-        clearKey={clearJevKey}
-        setApiKey={setJevApiKey}
-        setClearKey={setClearJevKey}
-      />
+      <DirectionSettings editor={editor} />
       <Card tabIndex={-1} id="settings-quick-prompts" aria-labelledby="quick-prompts-title">
         <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
           常用提示词
@@ -76,21 +67,20 @@ export function NextSettings({
                   )
                 }
               />
-              <Button
+              <ConfirmationButton
                 type="button"
                 variant="ghost"
                 size="icon"
                 aria-label={`删除常用提示词 ${index + 1}`}
-                onClick={() => {
-                  change(
-                    'quickPrompts',
-                    form.quickPrompts.filter((_, i) => i !== index),
-                  );
-                  schedule();
-                }}
+                revision={saved.configurationRevision}
+                disabled={editor.saving || editor.remoteChanged}
+                title={`删除提示词“${item.label || '未命名'}”？`}
+                description="会删除这条常用提示词的名称与内容，其他提示词保持不变。"
+                confirmLabel="确认删除"
+                onConfirm={() => editor.removeEntry('prompt', index, saved.configurationRevision)}
               >
                 <Icon name="trash" />
-              </Button>
+              </ConfirmationButton>
             </div>
           ))}
           <Button

@@ -3,12 +3,13 @@
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useState, useEffect } from 'react';
+import { ConfirmationButton, useConfirmation } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
 import { NativeSelect } from './components/ui/native-select';
 import { Field } from './settings-controls';
-import { request, type View, type EditableSettings } from './api';
+import { request, type View } from './api';
 import type { SettingsEditor } from './use-settings-form';
 import { Icon } from '../shared/icons/react';
 export function ConnectionSettings({
@@ -23,6 +24,10 @@ export function ConnectionSettings({
   notify: (text: string, failed?: boolean) => void;
 }) {
   const { form, change } = editor;
+  const { confirm, confirmation } = useConfirmation(
+    editor.saved?.configurationRevision,
+    editor.saving || editor.remoteChanged,
+  );
   const [endpoint, setEndpoint] = useState(''),
     [targetId, setTargetId] = useState(''),
     [connectionEdited, setConnectionEdited] = useState(false),
@@ -39,8 +44,10 @@ export function ConnectionSettings({
     setBusy(name);
     try {
       await action();
+      return true;
     } catch (e) {
       notify((e as Error).message, true);
+      throw e;
     } finally {
       setBusy('');
     }
@@ -52,6 +59,7 @@ export function ConnectionSettings({
   }
   return (
     <>
+      {confirmation}
       {form && (
         <>
           <Card tabIndex={-1} id="settings-startup" aria-labelledby="startup-title">
@@ -70,12 +78,21 @@ export function ConnectionSettings({
               <NativeSelect
                 id="host-restart-policy"
                 value={form.hostRestartPolicy}
-                onChange={(e) =>
-                  change(
-                    'hostRestartPolicy',
-                    e.target.value as EditableSettings['hostRestartPolicy'],
-                  )
-                }
+                onChange={(e) => {
+                  if (e.target.value === 'force') {
+                    e.stopPropagation();
+                    confirm({
+                      title: '允许直接强制重开？',
+                      description:
+                        '以后无法连接已打开的 Codex 时，将不再询问而直接强制退出，可能中断任务或丢失未保存内容。',
+                      confirmLabel: '确认启用',
+                      action: () => {
+                        change('hostRestartPolicy', 'force');
+                        return editor.save();
+                      },
+                    });
+                  } else change('hostRestartPolicy', 'ask');
+                }}
               >
                 <option value="ask">询问后正常重开</option>
                 <option value="force">直接强制重开</option>
@@ -91,8 +108,7 @@ export function ConnectionSettings({
             {view.connection.message}
           </p>
         )}
-        <details className="settings-details" open={import.meta.env.DEV ? undefined : true}>
-          <summary hidden={!import.meta.env.DEV}>连接详情</summary>
+        <div className="settings-details">
           <Field id="cdp-endpoint" label="本机调试端口">
             <Input
               id="cdp-endpoint"
@@ -127,13 +143,13 @@ export function ConnectionSettings({
               </NativeSelect>
             </Field>
           )}
-        </details>
+        </div>
         <div className="mt-4 flex items-center justify-between">
           <Button
             type="button"
             variant="outline"
             disabled={!live || !!busy}
-            onClick={() => void run('connect', connect)}
+            onClick={() => void run('connect', connect).catch(() => {})}
           >
             {busy === 'connect' ? (
               <Icon name="refresh" className="animate-spin [animation-duration:1.2s]" />
@@ -143,20 +159,23 @@ export function ConnectionSettings({
             {connected ? '重新连接' : '连接 Codex'}
           </Button>
           {connected && (
-            <Button
+            <ConfirmationButton
               type="button"
               variant="ghost"
               className="min-h-0 p-2"
               disabled={!!busy}
-              onClick={() =>
-                void run('disconnect', async () => {
+              title="断开与 Codex 的连接？"
+              description="Buddy 将暂时停止跟随当前聊天，并移除桌面浮窗。已有配置保持不变，可随时重新连接。"
+              confirmLabel="确认断开"
+              onConfirm={() =>
+                run('disconnect', async () => {
                   await request('disconnect', {});
                   notify('连接已断开，桌面浮窗已移除。');
                 })
               }
             >
               断开
-            </Button>
+            </ConfirmationButton>
           )}
         </div>
         {!import.meta.env.DEV && !connected && (
@@ -170,7 +189,7 @@ export function ConnectionSettings({
                 void run('copy', async () => {
                   await navigator.clipboard.writeText('codex-buddy launch --restart-running');
                   notify('已复制启动命令；将按启动行为设置处理已打开的 ChatGPT。');
-                })
+                }).catch(() => {})
               }
             >
               <code>codex-buddy launch</code>

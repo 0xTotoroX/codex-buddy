@@ -24,7 +24,7 @@ import{ModelSettings}from'./ui/settings/model-settings';
 import{SettingsForm}from'./ui/settings/settings-controls';
 import{useSettingsForm}from'./ui/settings/use-settings-form';
 import{fixtureSettings}from'./tests/fixtures.mjs';
-function App(){const[simple,setSimple]=useState(false);const editor=useSettingsForm(false,undefined,v=>v,()=>{});
+function App(){const[simple,setSimple]=useState(false);const editor=useSettingsForm(false,undefined,v=>Object.fromEntries(["enabled", "answerOutlineEnabled", "promptEnhancementEnabled", "generationMode", "hostRestartPolicy", "provider", "protocol", "model", "baseUrl", "apiKeyEnv", "maxItems", "directionSource", "directionLibrary", "selectedDirections", "jev", "quickPrompts", "maxInputChars", "maxOutputTokens", "timeoutMs"].map(key=>[key,v[key]])),()=>{});
 useEffect(()=>{editor.load({...fixtureSettings,storedApiKey:true});window.receiveSettings=editor.load},[]);
 return <div className="settings-app"><SettingsForm editor={editor} notify={()=>{}} active>
 <button type="button" data-settings-navigation onClick={()=>setSimple(!simple)}>切换模式</button>
@@ -78,7 +78,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       await page.addScriptTag({ content: script });
       const replace = page.getByRole('button', { name: '更换密钥', exact: true });
       const key = page.locator('input#api-key');
-      const advanced = page.getByText('高级连接设置', { exact: true });
+      const advanced = page.getByText('高级设置', { exact: true });
       const remove = page.getByRole('button', { name: '删除已保存的密钥', exact: true });
       const dialog = page.getByRole('dialog', { name: '删除已保存的 API 密钥？' });
       await page.getByText('密钥已配置', { exact: true }).waitFor();
@@ -165,7 +165,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       await page.evaluate((settings) => window.receiveSettings(settings), settings);
       const beforeConflict = writes.length;
       await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
-      await dialog.getByText('设置已变化，请关闭后重新确认删除。').waitFor();
+      await dialog.getByText('设置已变化，请关闭后重新确认。').waitFor();
       assert.equal(
         writes.length,
         beforeConflict,

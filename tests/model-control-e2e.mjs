@@ -494,11 +494,19 @@ try {
     assert.deepEqual(restored.modelOrder, preserved.modelOrder);
     await modelSettings.getByRole('button', { name: '删除分组', exact: true }).click();
     await modelSettings
+      .getByRole('dialog')
+      .getByRole('button', { name: '确认删除', exact: true })
+      .click();
+    await modelSettings
       .getByRole('region', { name: '分组：合成厂家' })
       .locator('[data-model-id="alpha"]')
       .waitFor();
     await modelSettings.locator('[data-model-id="alpha"] input[type="checkbox"]').check();
     await modelSettings.getByRole('button', { name: '恢复自动分类', exact: true }).click();
+    await modelSettings
+      .getByRole('dialog')
+      .getByRole('button', { name: '确认恢复', exact: true })
+      .click();
     await waitFor(
       async () => !(await api('state')).preferences.modelOverrides.alpha,
       'automatic classification restored',

@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 共用设置草稿、版本化保存队列和判断服务凭据状态。
- * [OUTPUT]: 三种方向来源、方向位置、方向库编辑和可关闭的 Jev 配置。
+ * [OUTPUT]: 三种方向来源、直接可见的方向库、确认删除与共用 Jev 密钥管理。
  * [POS]: Web 设置中的 Stepwise 方向配置，不在日常面板增加控制项。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -10,29 +10,16 @@ import { Card } from './components/ui/card';
 import { Input } from './components/ui/input';
 import { Button } from './components/ui/button';
 import { NativeSelect } from './components/ui/native-select';
-import type { EditableSettings, Settings } from '../shared/contracts';
+import { ModelApiKey, DeleteModelApiKey } from './model-credentials';
+import { ConfirmationButton } from './settings-confirmation';
+import type { SettingsEditor } from './use-settings-form';
+import type { EditableSettings } from '../shared/contracts';
 
-type Props = {
-  form: EditableSettings;
-  saved: Settings;
-  change: <K extends keyof EditableSettings>(key: K, value: EditableSettings[K]) => void;
-  schedule: () => void;
-  apiKey: string;
-  clearKey: boolean;
-  setApiKey: (value: string) => void;
-  setClearKey: (value: boolean) => void;
-};
 const labelClass = 'mb-2 block text-[14px] font-medium';
-export function DirectionSettings({
-  form,
-  saved,
-  change,
-  schedule,
-  apiKey,
-  clearKey,
-  setApiKey,
-  setClearKey,
-}: Props) {
+export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
+  const { form: draft, saved: baseline, change, schedule } = editor;
+  const form = draft!,
+    saved = baseline!;
   const [adding, setAdding] = useState('');
   const library = form.directionLibrary;
   function slots(ids: string[]) {
@@ -43,17 +30,6 @@ export function DirectionSettings({
     const ids = [...form.selectedDirections];
     [ids[index], ids[index + delta]] = [ids[index + delta], ids[index]];
     slots(ids);
-  }
-  function remove(id: string) {
-    change(
-      'directionLibrary',
-      library.filter((d) => d.id !== id),
-    );
-    change(
-      'selectedDirections',
-      form.selectedDirections.filter((selected) => selected !== id),
-    );
-    schedule();
   }
   return (
     <Card tabIndex={-1} id="settings-directions" aria-labelledby="direction-title">
@@ -183,8 +159,8 @@ export function DirectionSettings({
         </div>
       )}
       {form.directionSource !== 'auto' && (
-        <details className="mt-5" open={form.directionSource === 'smart' || undefined}>
-          <summary className="cursor-pointer text-[14px] font-medium">自定义方向库</summary>
+        <section className="mt-5">
+          <h3 className="text-[14px] font-medium">方向库</h3>
           <div className="mt-4 space-y-5">
             {library.map((item, index) => (
               <div key={item.id} className="space-y-2 border-b border-border pb-4">
@@ -217,15 +193,22 @@ export function DirectionSettings({
                       )
                     }
                   />
-                  <Button
+                  <ConfirmationButton
                     type="button"
                     variant="ghost"
                     size="icon"
                     aria-label={`删除方向 ${item.name}`}
-                    onClick={() => remove(item.id)}
+                    revision={saved.configurationRevision}
+                    disabled={editor.saving || editor.remoteChanged}
+                    title={`删除方向“${item.name || '未命名'}”？`}
+                    description="会删除名称和说明，并从已选方向中移除；不会删除已生成的建议。"
+                    confirmLabel="确认删除"
+                    onConfirm={() =>
+                      editor.removeEntry('direction', item.id, saved.configurationRevision)
+                    }
                   >
                     <Icon name="trash" />
-                  </Button>
+                  </ConfirmationButton>
                 </div>
                 <textarea
                   required
@@ -260,7 +243,7 @@ export function DirectionSettings({
               <Icon name="plus" />
             </Button>
           </div>
-        </details>
+        </section>
       )}
       {form.directionSource === 'smart' && (
         <div className="mt-5 space-y-4 border-t border-border pt-5">
@@ -302,34 +285,18 @@ export function DirectionSettings({
               onChange={(e) => change('jev', { ...form.jev, model: e.target.value })}
             />
           </div>
-          <div>
-            <label className={labelClass} htmlFor="jev-key">
-              Jev API 密钥
-            </label>
-            <Input
-              id="jev-key"
-              type="password"
-              autoComplete="off"
-              value={apiKey}
-              placeholder={saved.jevKeyConfigured ? '已配置 · 留空保留' : '输入独立 API key'}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </div>
+          <ModelApiKey editor={editor} busy={editor.saving} kind="jev" />
           {saved.storedJevApiKey && (
-            <label className="flex gap-2 text-[14px]">
-              <input
-                type="checkbox"
-                checked={clearKey}
-                onChange={(e) => setClearKey(e.target.checked)}
-              />
-              清除已存 Jev 密钥
-            </label>
+            <details className="settings-details">
+              <summary>高级设置</summary>
+              <DeleteModelApiKey editor={editor} busy={editor.saving} kind="jev" />
+            </details>
           )}
           <p className="text-[14px] text-muted-foreground">
             {saved.directionSource !== 'smart' || !saved.jev.consent
               ? '智能挑选未启用，不会发送判断请求。'
               : saved.jevKeyConfigured
-                ? '凭据已配置，实际连接由上方「测试连接」验证。'
+                ? '凭据已配置，可在「模型与生成」中测试连接。'
                 : '尚未连接：可保存密钥，或在后台环境设置 TYPESAFE_API_KEY。'}
           </p>
         </div>

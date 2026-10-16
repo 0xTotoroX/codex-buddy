@@ -142,6 +142,13 @@ test(
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'ask');
       await policy.selectOption('force');
+      const policyDialog = page.getByRole('dialog', { name: '允许直接强制重开？' });
+      assert.equal(await policy.inputValue(), 'ask');
+      assert.equal(saves.length, 0);
+      await policyDialog.getByRole('button', { name: '取消', exact: true }).click();
+      assert.equal(saves.length, 0);
+      await policy.selectOption('force');
+      await policyDialog.getByRole('button', { name: '确认启用', exact: true }).click();
       await page.waitForFunction(
         () =>
           document.querySelector('[data-save-state]')?.getAttribute('data-save-state') === 'saved',
@@ -152,13 +159,13 @@ test(
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'force');
       await page.getByRole('link', { name: '模型与生成', exact: true }).click();
-      await page.getByText('高级生成设置', { exact: true }).click();
+      await page.getByText('高级设置', { exact: true }).click();
       const context = page.getByLabel('输入上下文', { exact: true });
       await context.selectOption('latest');
       await until(() => settings.maxInputChars === 0);
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).count(), 0);
       await page.reload();
-      await page.getByText('高级生成设置', { exact: true }).click();
+      await page.getByText('高级设置', { exact: true }).click();
       await context.waitFor();
       assert.equal(await context.inputValue(), 'latest');
       await context.selectOption('limited');
@@ -239,8 +246,16 @@ test(
         await page.getByRole('button', { name: '保存设置', exact: true }).isDisabled(),
         true,
       );
+      await page.getByRole('button', { name: '重新载入设置', exact: true }).click();
+      const reloadDialog = page.getByRole('dialog', { name: '放弃当前草稿并重新载入？' });
+      await reloadDialog.getByRole('button', { name: '取消', exact: true }).click();
+      assert.equal(await input.inputValue(), '14000');
+      await page.getByRole('button', { name: '重新载入设置', exact: true }).click();
+      await reloadDialog.getByRole('button', { name: '确认重新载入', exact: true }).click();
+      await reloadDialog.waitFor({ state: 'hidden' });
+      assert.equal(await input.inputValue(), '13000');
       await page.reload();
-      await page.getByText('高级生成设置', { exact: true }).click();
+      await page.getByText('高级设置', { exact: true }).click();
       await input.waitFor();
       assert.equal(await input.inputValue(), '13000');
       await page.getByRole('link', { name: '功能与交互', exact: true }).click();
@@ -267,7 +282,7 @@ test(
       await until(() => settings.selectedDirections.length === 2);
       await page.getByRole('button', { name: '上移方向 2', exact: true }).click();
       await until(() => settings.selectedDirections[0] === 'advance');
-      await page.getByText('自定义方向库', { exact: true }).click();
+
       await page.getByRole('button', { name: '添加自定义方向', exact: true }).click();
       await page.getByLabel('方向名称 4', { exact: true }).fill('长期维护');
       await page.getByLabel('倾向说明 4', { exact: true }).fill('关注维护成本与依赖负担');
@@ -300,6 +315,7 @@ test(
       assert.equal(settings.directionLibrary.length, 4);
       assert.equal(await page.getByLabel('方向名称 5', { exact: true }).inputValue(), '');
       await page.getByRole('button', { name: '删除方向', exact: true }).click();
+      await page.getByRole('dialog').getByRole('button', { name: '确认删除', exact: true }).click();
       await page.getByLabel('我同意将最近一问一答', { exact: false }).check();
       await until(() => settings.jev.consent);
       await page.waitForFunction(

@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { request } from './api';
 import { Toggle, Feedback } from './settings-controls';
+import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import type { CodexHostStatus } from '../shared/codex-host';
 const labels: Record<CodexHostStatus['state'], string> = {
@@ -51,7 +52,7 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
     };
   }, [live, active]);
   async function command(op: string, data: Record<string, unknown> = {}) {
-    if (writing.current || restarting || !state) return;
+    if (writing.current || restarting || !state) return false;
     writing.current = true;
     generation.current++;
     setBusy(true);
@@ -69,8 +70,11 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
             ...data,
           }),
         );
+      return true;
     } catch (e) {
       setError(String(e));
+      if (op === 'restore' || op === 'restart-disabled') throw e;
+      return false;
     } finally {
       writing.current = false;
       setBusy(false);
@@ -147,9 +151,16 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
           )}
           <div className="flex flex-wrap gap-3">
             {state.state === 'pendingDisable' && (
-              <Button disabled={disabled} onClick={() => void command('restart-disabled')}>
+              <ConfirmationButton
+                disabled={disabled}
+                revision={state.revision}
+                title="重启 Codex 并停用 CodexHost？"
+                description="Codex 将退出并重新打开，正在运行的任务可能中断。请先保存内容并结束任务。"
+                confirmLabel="确认重启"
+                onConfirm={() => command('restart-disabled')}
+              >
                 {restarting ? '正在重启…' : '重启 Codex 并停用'}
-              </Button>
+              </ConfirmationButton>
             )}
             <Button
               variant="outline"
@@ -172,9 +183,17 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
               </Button>
             )}
             {state.canRestore && (
-              <Button variant="ghost" disabled={disabled} onClick={() => void command('restore')}>
+              <ConfirmationButton
+                variant="ghost"
+                disabled={disabled}
+                revision={state.revision}
+                title="恢复 CodexHost 上一版本？"
+                description="将切换回先前安装的版本，当前会话可能需要重新启动才能使用。已有配置保持不变。"
+                confirmLabel="确认恢复"
+                onConfirm={() => command('restore')}
+              >
                 恢复上一版本
-              </Button>
+              </ConfirmationButton>
             )}
           </div>
           {latest === state.version && <p role="status">已是最新版本</p>}

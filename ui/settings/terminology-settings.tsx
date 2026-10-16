@@ -1,8 +1,9 @@
 /* [INPUT]: 认证术语 API、可唤起状态、共用卡片/动作图标与用户导入/输入。
- * [OUTPUT]: 直接显示识别、预览、检索和掌握列表，自定义入库与导入导出保留折叠。
+ * [OUTPUT]: 直接显示识别、预览、检索和掌握列表；统一词库管理入口，导入先确认覆盖影响。
  * [POS]: 详细设置的功能区，不访问主聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useRef, useState } from 'react';
+import { useConfirmation } from './settings-confirmation';
 import { request } from './api';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import { NativeSelect } from './components/ui/native-select';
@@ -123,6 +124,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
     }
   }
   const prefs = data?.preferences;
+  const { confirm, confirmation } = useConfirmation(prefs?.revision, busy);
   const results = (data?.entries || []).filter(
     (t) =>
       (!masteredOnly || prefs?.mastered.includes(t.id)) &&
@@ -133,6 +135,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
   );
   return (
     <section className="settings-section" id="settings-terminology">
+      {confirmation}
       <style>
         {cardStyles +
           `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{max-width:100%}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
@@ -337,7 +340,8 @@ export function TerminologySettings({ active }: { active: boolean }) {
             )}
           </section>
           <details>
-            <summary>添加自定义术语</summary>
+            <summary>词库管理</summary>
+            <h3 className="mt-4">添加自定义术语</h3>
             <div className="term-entry">
               <input
                 aria-label="中文术语名"
@@ -389,9 +393,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
               </button>
             </div>
             <p className="settings-hint">使用已配置模型分类。</p>
-          </details>
-          <details>
-            <summary>导入与导出</summary>
+            <h3 className="mt-5">导入与导出</h3>
             <div className="term-actions">
               <button type="button" onClick={() => void exportFile()}>
                 导出术语文档
@@ -411,23 +413,41 @@ export function TerminologySettings({ active }: { active: boolean }) {
                   onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    setBusy(true);
+                    const input = e.target;
+                    input.value = '';
                     setError('');
                     try {
                       if (file.size > 8_000_000) throw Error('文件过大');
                       const entries = JSON.parse(await file.text());
-                      if (!Array.isArray(entries)) throw Error('请选择词条数组格式的 JSON 文件');
-                      for (let i = 0; i < entries.length; i += 20)
-                        await request('terminology', {
-                          action: 'import',
-                          entries: entries.slice(i, i + 20),
-                        });
-                      await load();
+                      if (!Array.isArray(entries) || !entries.length)
+                        throw Error('请选择包含词条的 JSON 数组');
+                      confirm({
+                        title: `导入 ${entries.length} 条术语？`,
+                        description: `将从“${file.name}”合并词条，相同编号的已有释义会被替换；其他词条与掌握记录保留。建议先导出备份。`,
+                        confirmLabel: '确认导入',
+                        action: async () => {
+                          setBusy(true);
+                          let imported = 0;
+                          try {
+                            for (let i = 0; i < entries.length; i += 20) {
+                              await request('terminology', {
+                                action: 'import',
+                                entries: entries.slice(i, i + 20),
+                              });
+                              imported += Math.min(20, entries.length - i);
+                            }
+                          } catch (error) {
+                            throw Error(
+                              `已导入 ${imported} 条，其余未完成：${(error as Error).message}`,
+                            );
+                          } finally {
+                            await load();
+                            setBusy(false);
+                          }
+                        },
+                      });
                     } catch (err) {
                       setError((err as Error).message);
-                    } finally {
-                      setBusy(false);
-                      e.target.value = '';
                     }
                   }}
                 />

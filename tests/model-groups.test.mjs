@@ -279,10 +279,21 @@ test(
       await settings.getByRole('region', { name: '分组：工作' }).waitFor();
       const beforeDelete = writes;
       await settings.getByRole('button', { name: '删除分组' }).click();
+      await settings.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+      assert.equal(writes, beforeDelete, 'cancelled deletion does not write preferences');
+      await settings.getByRole('button', { name: '删除分组' }).click();
+      await settings
+        .getByRole('dialog')
+        .getByRole('button', { name: '确认删除', exact: true })
+        .click();
       await settings.getByRole('region', { name: '分组：私人厂家' }).waitFor();
       assert.equal(writes, beforeDelete + 1, 'deleting does not submit the rename form');
       assert.equal(state.preferences.modelOverrides.custom.groupId, undefined);
       await settings.getByRole('button', { name: '恢复自动分类' }).click();
+      await settings
+        .getByRole('dialog')
+        .getByRole('button', { name: '确认恢复', exact: true })
+        .click();
       await settings
         .getByRole('region', { name: '分组：未分类' })
         .getByLabel('选择 私有别名')

@@ -1,8 +1,9 @@
 /* [INPUT]: 模型状态、带修订校验的保存与刷新操作、共用自由输入候选控件与操作图标。
- * [OUTPUT]: 可折叠的自定义模型分组，包含厂家纠正、批量归属与稳定排序。
+ * [OUTPUT]: 自定义模型分组、厂家纠正与稳定排序；删除和恢复分类统一确认并校验修订。
  * [POS]: 只管理模型展示偏好，不切换模型或修改预设。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useState } from 'react';
+import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
@@ -67,7 +68,7 @@ export function ModelOrganization({
       if (value.manufacturer || value.groupId) overrides[id] = value;
       else delete overrides[id];
     }
-    await save({ modelOverrides: overrides });
+    return save({ modelOverrides: overrides });
   }
   async function deleteGroup(id: string) {
     const overrides = Object.fromEntries(
@@ -77,16 +78,14 @@ export function ModelOrganization({
         return [key, next];
       }),
     );
-    if (
-      await save({
-        groups: (prefs.groups || []).filter((g) => g.id !== id),
-        modelOverrides: overrides,
-        groupOrder: groupOrder.filter((key) => key !== `custom:${id}`),
-        expandedGroups: prefs.expandedGroups?.filter((key) => key !== `custom:${id}`),
-      })
-    ) {
-      if (destination === id) setDestination('');
-    }
+    const ok = await save({
+      groups: (prefs.groups || []).filter((g) => g.id !== id),
+      modelOverrides: overrides,
+      groupOrder: groupOrder.filter((key) => key !== `custom:${id}`),
+      expandedGroups: prefs.expandedGroups?.filter((key) => key !== `custom:${id}`),
+    });
+    if (ok && destination === id) setDestination('');
+    return ok;
   }
   return (
     <details id="model-organization" className="settings-details mt-3">
@@ -164,14 +163,18 @@ export function ModelOrganization({
             >
               取消选择
             </Button>
-            <Button
+            <ConfirmationButton
               type="button"
               variant="ghost"
               disabled={blocked}
-              onClick={() => void updateSelected(() => ({}))}
+              revision={state.revision}
+              title={`恢复 ${selected.length} 个模型的自动分类？`}
+              description="会移除所选模型的手动厂家与分组归属，保留常用、预设和排序。"
+              confirmLabel="确认恢复"
+              onConfirm={() => updateSelected(() => ({}))}
             >
               恢复自动分类
-            </Button>
+            </ConfirmationButton>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <label className="min-w-0 flex-1 basis-40 space-y-1">
@@ -309,16 +312,20 @@ export function ModelOrganization({
                   >
                     <Icon name="check" />
                   </Button>
-                  <Button
+                  <ConfirmationButton
                     type="button"
                     variant="ghost"
                     disabled={busy}
-                    onClick={() => void deleteGroup(custom.id)}
+                    revision={state.revision}
+                    title={`删除分组“${custom.name}”？`}
+                    description="组内模型会回到厂家分类，常用、预设和模型本身保持不变。"
+                    confirmLabel="确认删除"
+                    onConfirm={() => deleteGroup(custom.id)}
                     size="icon"
                     aria-label={`删除分组 ${custom.name}`}
                   >
                     <Icon name="trash" />
-                  </Button>
+                  </ConfirmationButton>
                 </form>
               )}
               {group.models.map((model, i) => {
@@ -401,18 +408,22 @@ export function ModelOrganization({
                         <div>{model.id}</div>
                         <div>自动识别：{automaticManufacturer(model) || '未分类'}</div>
                         {(manual?.manufacturer || manual?.groupId) && (
-                          <Button
+                          <ConfirmationButton
                             type="button"
                             variant="ghost"
                             disabled={busy}
-                            onClick={() => {
+                            revision={state.revision}
+                            title={`恢复“${model.label}”的自动分类？`}
+                            description="会移除这个模型的手动厂家与分组归属，保留常用和预设。"
+                            confirmLabel="确认恢复"
+                            onConfirm={() => {
                               const overrides = { ...prefs.modelOverrides };
                               delete overrides[model.id];
-                              void save({ modelOverrides: overrides });
+                              return save({ modelOverrides: overrides });
                             }}
                           >
                             恢复自动
-                          </Button>
+                          </ConfirmationButton>
                         )}
                       </div>
                     )}

@@ -255,28 +255,28 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
                 {busy && <span aria-hidden="true"> 已等待 {elapsed} 秒</span>}
               </p>
             )}
-            <details className="settings-section mt-5" hidden={simple || form.provider !== 'api'}>
-              <summary>高级连接设置</summary>
-              <Field
-                id="api-key-env"
-                label="密钥环境变量名（可选）"
-                hint="填变量名，不是密钥。后台读到非空值时优先使用；直接填写 API 密钥可留空。"
-              >
-                <Input
-                  id="api-key-env"
-                  value={form.apiKeyEnv}
-                  onChange={(e) => change('apiKeyEnv', e.target.value)}
-                  placeholder="CODEX_BUDDY_API_KEY"
-                  spellCheck={false}
-                />
-              </Field>
-              <DeleteModelApiKey editor={editor} busy={!!busy} />
-            </details>
           </div>
         </div>
       </Card>
       <details id="settings-limits" className="settings-section" hidden={simple}>
-        <summary>高级生成设置</summary>
+        <summary>高级设置</summary>
+        <section hidden={form.provider !== 'api'}>
+          <h3>连接与密钥</h3>
+          <Field
+            id="api-key-env"
+            label="密钥环境变量名（可选）"
+            hint="填变量名，不是密钥。后台读到非空值时优先使用；直接填写 API 密钥可留空。"
+          >
+            <Input
+              id="api-key-env"
+              value={form.apiKeyEnv}
+              onChange={(e) => change('apiKeyEnv', e.target.value)}
+              placeholder="CODEX_BUDDY_API_KEY"
+              spellCheck={false}
+            />
+          </Field>
+          <DeleteModelApiKey editor={editor} busy={!!busy} />
+        </section>
         <div className="space-y-5">
           <Field id="context-scope" label="输入上下文" hint="最近一次提问与回答，不包含更早历史。">
             <NativeSelect
