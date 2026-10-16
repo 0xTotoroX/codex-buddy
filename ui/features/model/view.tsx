@@ -6,7 +6,14 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { ModelPresetDraft, Reading } from '../../shared/features';
-import { groupedModels, orderedModelIds, type ModelState, type Selection } from './catalog';
+import {
+  groupedModels,
+  orderedModelIds,
+  uniquePresetName,
+  uniquePresetNames,
+  type ModelState,
+  type Selection,
+} from './catalog';
 export type { ModelState } from './catalog';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const icon = (name: string) => <span dangerouslySetInnerHTML={{ __html: iconSvg(name) }} />;
@@ -27,6 +34,7 @@ export function ModelView({
     [others, setOthers] = useState(false),
     [browserHeight, setBrowserHeight] = useState(0),
     [drop, setDrop] = useState(''),
+    [dragging, setDragging] = useState(false),
     [columnWidth, setColumnWidth] = useState<number | null>(null),
     [metrics, setMetrics] = useState({ available: 0, widths: [] as number[] }),
     [presetDraft, renderPresetDraft] = useState<ModelPresetDraft | null>(() =>
@@ -90,16 +98,20 @@ export function ModelView({
   const apply = (selection: Selection, preserveSpeed = false) =>
     action({ target: s.target, expectedRevision: s.revision, selection, preserveSpeed }, 'apply');
   const save = (patch: object) => action({ revision: state.revision, patch }, 'preferences');
-  const beginPreset = () => {
+  const addPreset = async () => {
     if (busy || !allowed || !s.current) return;
     closeTools();
     setOthers(false);
-    setPresetDraft({
+    const preset = {
       id: crypto.randomUUID(),
-      name: s.models.find((m) => m.id === s.current?.model)?.label || s.current.model,
+      name: uniquePresetName(
+        s.models.find((m) => m.id === s.current?.model)?.label || s.current.model,
+        prefs.presets,
+      ),
       selection: { ...s.current },
-      creating: true,
-    });
+    };
+    const result = await save({ presets: uniquePresetNames([...prefs.presets, preset]) });
+    if (result !== null) setPresetDraft(null);
   };
   const saveWidth = async (width: number) => {
     try {
@@ -243,13 +255,19 @@ export function ModelView({
       aria-label={presetDraft.creating ? '保存模型预设' : '重命名模型预设'}
       onSubmit={async (event) => {
         event.preventDefault();
-        const name = presetDraft.name.trim();
-        if (busy || !prefs.enabled || !name) return;
+        const requestedName = presetDraft.name.trim();
+        if (busy || !prefs.enabled || !requestedName) return;
+        const name = uniquePresetName(
+          requestedName,
+          prefs.presets.filter((p) => p.id !== presetDraft.id),
+        );
         const preset = { id: presetDraft.id, name, selection: presetDraft.selection };
         const result = await save({
-          presets: presetDraft.creating
-            ? [...prefs.presets, preset]
-            : prefs.presets.map((item) => (item.id === preset.id ? { ...item, name } : item)),
+          presets: uniquePresetNames(
+            presetDraft.creating
+              ? [...prefs.presets, preset]
+              : prefs.presets.map((item) => (item.id === preset.id ? { ...item, name } : item)),
+          ),
         });
         if (result !== null) setPresetDraft(null);
       }}
@@ -356,6 +374,7 @@ export function ModelView({
                   aria-disabled={busy}
                   tabIndex={busy ? -1 : 0}
                   data-resizing={!!resize.current}
+                  data-dragging={dragging}
                   onClick={(event) => {
                     if (event.detail > 0 && suppressFastClick.current) {
                       suppressFastClick.current = false;
@@ -379,6 +398,7 @@ export function ModelView({
                     event.stopPropagation();
                     event.currentTarget.focus({ preventScroll: true });
                     suppressFastClick.current = false;
+                    setDragging(false);
                     resize.current = {
                       pointer: event.pointerId,
                       x: event.clientX,
@@ -396,11 +416,11 @@ export function ModelView({
                   onPointerMove={(event) => {
                     const drag = resize.current;
                     if (!drag || drag.pointer !== event.pointerId) return;
-                    if (
-                      !drag.moved &&
-                      Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 5
-                    )
-                      return;
+                    const dx = event.clientX - drag.x;
+                    const dy = event.clientY - drag.y;
+                    if (Math.hypot(dx, dy) >= 8) suppressFastClick.current = true;
+                    if (!drag.moved && (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy))) return;
+                    if (!drag.moved) setDragging(true);
                     drag.moved = true;
                     drag.value = clampWidth(drag.width + (event.clientX - drag.x) / drag.scale);
                     setColumnWidth(drag.value);
@@ -408,7 +428,8 @@ export function ModelView({
                   onPointerUp={(event) => {
                     const drag = resize.current;
                     if (!drag || drag.pointer !== event.pointerId) return;
-                    suppressFastClick.current = drag.moved;
+                    suppressFastClick.current ||= drag.moved;
+                    setDragging(false);
                     resize.current = null;
                     event.currentTarget.releasePointerCapture(event.pointerId);
                     if (drag.value !== drag.width) void saveWidth(drag.value);
@@ -417,6 +438,7 @@ export function ModelView({
                   onLostPointerCapture={() => {
                     if (!resize.current) return;
                     suppressFastClick.current = true;
+                    setDragging(false);
                     resize.current = null;
                     setColumnWidth(null);
                   }}
@@ -424,6 +446,7 @@ export function ModelView({
                     if (event.key === 'Escape' && resize.current) {
                       event.stopPropagation();
                       suppressFastClick.current = true;
+                      setDragging(false);
                       event.currentTarget.releasePointerCapture(resize.current.pointer);
                       resize.current = null;
                       setColumnWidth(null);
@@ -533,7 +556,7 @@ export function ModelView({
                   className="model-preset-add"
                   aria-label="添加预设"
                   disabled={busy || !allowed || !s.current}
-                  onClick={beginPreset}
+                  onClick={addPreset}
                 >
                   {icon('plus')}
                 </button>

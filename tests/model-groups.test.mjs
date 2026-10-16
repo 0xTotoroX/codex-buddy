@@ -12,9 +12,10 @@ const catalog = await build({
   write: false,
   format: 'esm',
 });
-const { automaticManufacturer, modelGroup, groupedModels } = await import(
-  `data:text/javascript;base64,${Buffer.from(catalog.outputFiles[0].text).toString('base64')}`
-);
+const { automaticManufacturer, modelGroup, groupedModels, uniquePresetName, uniquePresetNames } =
+  await import(
+    `data:text/javascript;base64,${Buffer.from(catalog.outputFiles[0].text).toString('base64')}`
+  );
 const model = (id, label = id) => ({ id, label, reasoning: ['low', 'high'], fast: false });
 test('manufacturer ignores routing prefixes, handles conflicts and manual groups without merging routes', () => {
   assert.equal(
@@ -517,3 +518,34 @@ test(
     }
   },
 );
+
+test('preset names stay unique without merging repeated model selections', () => {
+  const selection = { model: 'gpt', reasoning: 'high', speed: 'standard' };
+  const presets = ['GPT', 'GPT', 'GPT 2', 'gpt'].map((name, id) => ({
+    id: String(id),
+    name,
+    selection,
+  }));
+  const normalized = uniquePresetNames(presets);
+  assert.deepEqual(
+    normalized.map((p) => p.name),
+    ['GPT', 'GPT 3', 'GPT 2', 'gpt 4'],
+  );
+  assert.deepEqual(
+    normalized.map((p) => [p.id, p.selection]),
+    presets.map((p) => [p.id, p.selection]),
+  );
+  assert.deepEqual(uniquePresetNames(normalized), normalized);
+  assert.equal(uniquePresetName(' GPT ', normalized), 'GPT 5');
+  assert.equal(
+    uniquePresetName(
+      'GPT 2',
+      normalized.filter((p) => p.id !== '2'),
+    ),
+    'GPT 2',
+  );
+  const longName = '模型'.repeat(42);
+  const suffixed = uniquePresetName(longName, [{ name: longName }]);
+  assert.ok(new TextEncoder().encode(suffixed).length <= 256);
+  assert.ok(suffixed.endsWith(' 2'));
+});

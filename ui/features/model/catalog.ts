@@ -1,5 +1,5 @@
 /* [INPUT]: 宿主模型能力与独立模型偏好；不读取接入凭据或聊天。
- * [OUTPUT]: 共用模型类型、保守厂家识别、稳定分组及顺序。
+ * [OUTPUT]: 共用模型类型、保守厂家识别、稳定分组及顺序，以及不合并预设身份的名称消歧。
  * [POS]: 快切与设置共用的纯分类逻辑，不执行切换或保存。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 export type Selection = { model: string; reasoning: string; speed: string };
@@ -28,6 +28,36 @@ export type ModelState = {
   };
   preferences: ModelPreferences;
 };
+// 预设身份和选择独立；只对名称消歧，不合并同模型或同配置的收藏。
+const presetNameKey = (name: string) => name.trim().normalize('NFC').toLowerCase();
+const presetNameLimit = (name: string, suffix = '') => {
+  const chars = [...name.trim()];
+  const encoder = new TextEncoder();
+  while (encoder.encode(chars.join('') + suffix).length > 256) chars.pop();
+  return chars.join('').trimEnd() + suffix;
+};
+export function uniquePresetName(name: string, existing: readonly { name: string }[]): string {
+  const used = new Set(existing.map((p) => presetNameKey(p.name)));
+  const base = presetNameLimit(name);
+  let candidate = base;
+  for (let n = 2; used.has(presetNameKey(candidate)); n++)
+    candidate = presetNameLimit(base, ` ${n}`);
+  return candidate;
+}
+export function uniquePresetNames(
+  presets: ModelPreferences['presets'],
+): ModelPreferences['presets'] {
+  const seen = new Set<string>();
+  const result: ModelPreferences['presets'] = [];
+  for (const preset of presets) {
+    const name = seen.has(presetNameKey(preset.name))
+      ? uniquePresetName(preset.name, [...presets, ...result])
+      : preset.name;
+    seen.add(presetNameKey(name));
+    result.push(name === preset.name ? preset : { ...preset, name });
+  }
+  return result;
+}
 const manufacturers = [
   ['OpenAI', /^(?:gpt(?:[-\s]|\d)|chatgpt(?:[-\s]|$)|o[134](?:[-\s]|$))/i],
   ['Anthropic', /^claude(?:[-\s]|$)/i],

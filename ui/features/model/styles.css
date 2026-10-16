@@ -75,15 +75,20 @@
 .feature-model .model-column-resize {
   position: absolute;
   z-index: 1;
-  left: calc(var(--name-width) - 28px);
+  left: calc(var(--name-width) - 36px);
   top: 0;
-  width: 28px;
-  height: 28px;
-  padding: 5px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 32px;
+  padding: 7px 9px;
   color: var(--muted);
-  cursor: col-resize;
+  cursor: pointer;
   touch-action: none;
   user-select: none;
+}
+.feature-model .model-column-resize[data-dragging='true'] {
+  cursor: col-resize;
 }
 .feature-model .model-column-resize:focus-visible {
   outline: none;
@@ -99,7 +104,7 @@
   min-width: calc(var(--name-width) + 16px + var(--reasoning-min-width));
 }
 .model-matrix-head {
-  min-height: 28px;
+  min-height: 32px;
   color: var(--muted);
   font-size: inherit;
 }
