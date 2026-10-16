@@ -78,7 +78,7 @@ input:focus-visible {
   padding: 12px;
 }
 .feature-view[data-feature='model'] > .feature-body {
-  padding-top: 12px;
+  padding-top: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;

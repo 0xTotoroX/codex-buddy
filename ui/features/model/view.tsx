@@ -35,6 +35,7 @@ export function ModelView({
 }) {
   const [tools, setTools] = useState(reading.modelTools || false),
     [others, setOthers] = useState(false),
+    [catalogGroup, setCatalogGroup] = useState(''),
     [browserHeight, setBrowserHeight] = useState(0),
     [drop, setDrop] = useState(''),
     [dragging, setDragging] = useState(false),
@@ -336,7 +337,10 @@ export function ModelView({
       aria-label="所有模型"
       aria-expanded={others}
       onClick={() => {
-        if (!others) setBrowserHeight(main.current?.offsetHeight || 0);
+        if (!others) {
+          setBrowserHeight(main.current?.offsetHeight || 0);
+          setCatalogGroup('');
+        }
         setPresetDraft(null);
         setOthers(!others);
       }}
@@ -346,6 +350,11 @@ export function ModelView({
   );
   const catalogControls = (
     <div className="model-picker-actions" ref={pickerActions}>
+      {headerActions && (
+        <h3 className="model-catalog-title">
+          {(groups.find((group) => group.id === catalogGroup) || groups[0])?.name}
+        </h3>
+      )}
       <button
         className="model-icon-button"
         data-refresh="model"
@@ -641,7 +650,7 @@ export function ModelView({
                   disabled={busy || !allowed || !s.current}
                   onClick={addPreset}
                 >
-                  {icon('plus-large')}
+                  {icon('bookmark')}
                 </button>
                 {allButton}
               </div>
@@ -651,15 +660,27 @@ export function ModelView({
         {others && (
           <div className="model-picker" ref={picker} role="region" aria-label="所有模型">
             {!headerActions && catalogControls}
-            <div className="model-other-list">
-              {groups.map((group) => (
+            <div
+              className="model-other-list"
+              onScroll={(event) => {
+                if (!headerActions) return;
+                const list = event.currentTarget;
+                const top = list.getBoundingClientRect().top;
+                const sections = [...list.querySelectorAll<HTMLElement>('.model-group')];
+                const current = sections
+                  .reverse()
+                  .find((section) => section.getBoundingClientRect().top <= top + 1);
+                setCatalogGroup(current?.dataset.modelGroup || '');
+              }}
+            >
+              {groups.map((group, index) => (
                 <section
                   className="model-group"
                   data-model-group={group.id}
                   key={group.id}
                   aria-label={group.name}
                 >
-                  <h3>{group.name}</h3>
+                  <h3 hidden={!!headerActions && index === 0}>{group.name}</h3>
                   <div className="model-tiles">
                     {group.models.map((m) => (
                       <button

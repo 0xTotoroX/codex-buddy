@@ -1,5 +1,5 @@
-/* [INPUT]: Surface header slot, matrix geometry, reasoning columns and catalog controls.
- * [OUTPUT]: Title-aligned Fast/reasoning headings or catalog controls, including scroll alignment.
+/* [INPUT]: Surface header slot, matrix geometry, reasoning columns and catalog group/controls.
+ * [OUTPUT]: Title-aligned Fast/reasoning headings or current catalog group/controls, including scroll alignment.
  * [POS]: Model-only presentation adapter for the existing surface header slot.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 import { useLayoutEffect, useRef, type ReactNode, type RefObject } from 'react';
@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 
 const styles = `
 .model-heading-host { position: relative; }
-.model-heading-host:has([data-model-heading-slot]:not([hidden])) { box-sizing: content-box; padding-top: 8px; }
+.model-heading-host:has([data-model-heading-slot]:not([hidden])) { box-sizing: content-box; padding-top: 12px; }
 .model-heading-host:has([data-model-heading-slot]:not([hidden]) .model-catalog-heading) > nav > button:is([aria-pressed='true'], [data-pane-tab='model']) { visibility: hidden; pointer-events: none; }
 .model-heading-host:has([data-model-heading-slot]:not([hidden]) .model-inline-heading:not([hidden])) > nav, .model-heading-host:has([data-model-heading-slot]:not([hidden]) .model-inline-heading:not([hidden])) > .csw-workbench-tabs {
   max-width: var(--model-title-space); min-width: 0; overflow: auto; scrollbar-width: none;
@@ -15,7 +15,7 @@ const styles = `
 .model-heading-host > nav button { white-space: nowrap; }
 .model-inline-heading { position: relative; display: grid; align-items: center; min-height: 28px; pointer-events: none; }
 .model-inline-heading[hidden] { display: none; }
-.model-heading-portal { position: absolute; inset: 8px 0 0; overflow: hidden; pointer-events: none; }
+.model-heading-portal { position: absolute; inset: 12px 0 0; overflow: hidden; pointer-events: none; }
 .model-heading-portal .model-inline-heading { position: absolute; top: 0; height: 100%; }
 .model-inline-heading .model-choices { display: grid; gap: 4px; align-items: center; text-align: center; grid-column: 2; opacity: .65; }
 .model-inline-heading [data-reasoning-label] { white-space: nowrap; }
@@ -26,9 +26,10 @@ const styles = `
 .model-inline-heading .model-fast:focus-visible { outline: 1px solid currentColor; outline-offset: 1px; }
 .model-inline-heading .model-fast > span { grid-area: 1 / 1; display: block; width: 18px; height: 18px; }
 .model-inline-heading .model-fast svg { display: block; width: 18px; height: 18px; }
-.model-catalog-heading { position: absolute; top: 0; height: 100%; display: flex; align-items: center; pointer-events: auto; }
-.model-catalog-heading .model-picker-actions { display: flex; align-items: center; gap: 4px; margin: 0; }
-.model-catalog-heading .model-icon-button { display: grid; place-items: center; width: 28px; height: 28px; padding: 5px; border: 0; border-radius: 6px; color: inherit; opacity: 1; background: transparent; cursor: pointer; }
+.model-catalog-heading { position: absolute; top: 0; height: 100%; display: flex; align-items: center; pointer-events: none; }
+.model-catalog-heading .model-picker-actions { display: flex; align-items: center; gap: 4px; margin: 0; width: 100%; }
+.model-catalog-title { pointer-events: auto; flex: 1; min-width: 0; margin: 0 auto 0 var(--model-catalog-label-left, 0px); max-width: var(--model-catalog-label-width, none); font: inherit; opacity: .65; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-catalog-heading .model-icon-button { display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0; padding: 5px; border: 0; border-radius: 6px; color: inherit; opacity: 1; background: transparent; cursor: pointer; pointer-events: auto; }
 .model-catalog-heading .model-icon-button svg { display: block; width: 18px; height: 18px; }
 .model-catalog-heading .model-icon-button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
 .model-catalog-heading .model-icon-button:disabled { opacity: .45; cursor: default; }
@@ -88,8 +89,23 @@ export function ModelHeading({
       row.style.font = computed.font;
       row.style.color = computed.color;
       if (catalog.current) {
+        catalog.current.style.left = `${(rect.left - head.left) / scale}px`;
         catalog.current.style.right = `${Math.max(0, (head.right - rect.right) / scale)}px`;
+        catalog.current.style.font = computed.font;
         catalog.current.style.color = computed.color;
+        const tabs = host.querySelectorAll<HTMLElement>('nav > button');
+        const modelTab = host.querySelector<HTMLElement>(
+          'nav > button:is([aria-pressed="true"], [data-pane-tab="model"])',
+        );
+        const tab = tabs.length > 1 ? modelTab?.getBoundingClientRect() : null;
+        catalog.current.style.setProperty(
+          '--model-catalog-label-left',
+          `${tab ? Math.max(0, (tab.left - rect.left) / scale) : 0}px`,
+        );
+        catalog.current.style.setProperty(
+          '--model-catalog-label-width',
+          tab ? `${tab.width / scale}px` : 'none',
+        );
       }
       host.style.setProperty('--model-title-space', `${Math.max(0, left + nameWidth - 20)}px`);
     };

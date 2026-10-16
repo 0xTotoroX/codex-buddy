@@ -605,12 +605,11 @@ test(
         await page.getByRole('button', { name: '旧预设', exact: true }).locator('svg').count(),
         0,
       );
-      const plus = await page.locator('.model-preset-add').evaluate((n) => ({
-        button: n.getBoundingClientRect().width,
-        glyph: n.querySelector('path').getBoundingClientRect().width,
-      }));
-      assert.equal(plus.button, 28);
-      assert.ok(plus.glyph >= 15.5, 'larger visible plus, same button hit area');
+      assert.equal(
+        await page.locator('.model-preset-add [data-icon="bookmark"]').count(),
+        1,
+        'preset creation uses the shared bookmark icon',
+      );
       assert.deepEqual(
         await page
           .locator('.model-preset-actions button')
@@ -790,17 +789,81 @@ test(
         await page.getByRole('button', { name: '模型快切', exact: true }).isVisible(),
         false,
       );
-      const catalogTop = await page.locator('.model-group h3').first().boundingBox();
+      const catalogTop = await page.locator('.model-catalog-title').boundingBox();
       const closeTop = await page.getByRole('button', { name: '关闭所有模型' }).boundingBox();
       assert.ok(
-        Math.abs(catalogTop.y - firstRow.y) < 1,
-        'catalog does not reserve an extra toolbar row',
+        Math.abs(catalogTop.y + catalogTop.height / 2 - title.y - title.height / 2) < 1,
+        'first group occupies the former title row',
       );
       assert.ok(
         Math.abs(closeTop.y + closeTop.height / 2 - title.y - title.height / 2) < 1,
         'catalog actions share the title row',
       );
       assert.ok(Math.abs(catalogTop.x - title.x) < 1, 'catalog aligns with the title');
+      const firstTile = await page.locator('.model-tile').first().boundingBox();
+      assert.ok(Math.abs(firstTile.y - firstRow.y) < 1, 'tiles start immediately below the header');
+      assert.equal(await page.locator('.model-group h3').first().isVisible(), false);
+      assert.equal(await page.locator('.model-catalog-title').textContent(), 'OpenAI');
+      await page.locator('.model-catalog-title').click();
+      assert.equal(await page.getByRole('button', { name: '关闭所有模型' }).isVisible(), true);
+      await page.evaluate(() => {
+        window.state.snapshot.models.push(
+          ...Array.from({ length: 16 }, (_, i) => ({
+            id: `claude-scroll-${i}`,
+            label: `Claude scrolling model ${i}`,
+            reasoning: ['high'],
+            fast: false,
+          })),
+          ...Array.from({ length: 16 }, (_, i) => ({
+            id: `gpt-scroll-${i}`,
+            label: `GPT scrolling model ${i}`,
+            reasoning: ['high'],
+            fast: false,
+          })),
+        );
+        window.render();
+      });
+      await page.waitForFunction(
+        () => document.querySelector('.model-catalog-title').textContent === 'Anthropic',
+      );
+      await page.locator('.model-other-list').evaluate((list) => {
+        const next = list.querySelectorAll('.model-group')[1];
+        list.scrollTop += next.getBoundingClientRect().top - list.getBoundingClientRect().top + 2;
+      });
+      await page.waitForFunction(
+        () => document.querySelector('.model-catalog-title').textContent === 'OpenAI',
+      );
+      await page.locator('.model-other-list').evaluate((list) => {
+        list.scrollTop = 0;
+      });
+      await page.waitForFunction(
+        () => document.querySelector('.model-catalog-title').textContent === 'Anthropic',
+      );
+      await page.evaluate(() => {
+        window.state.snapshot.models.splice(1);
+        const board = document.createElement('button');
+        board.textContent = '看板';
+        board.onclick = () => {
+          window.boardClicked = true;
+        };
+        document.querySelector('header nav').append(board);
+        window.render();
+      });
+      await page.getByRole('button', { name: '关闭所有模型' }).click();
+      await page.getByRole('button', { name: '所有模型', exact: true }).click();
+      const groupLabel = await page.locator('.model-catalog-title').boundingBox();
+      const boardTab = await page.getByRole('button', { name: '看板', exact: true }).boundingBox();
+      assert.ok(
+        groupLabel.x + groupLabel.width <= boardTab.x + 1,
+        'catalog title preserves other feature tabs',
+      );
+      await page.getByRole('button', { name: '看板', exact: true }).click();
+      assert.equal(
+        await page.evaluate(() => window.boardClicked),
+        true,
+        'catalog header does not cover other tabs',
+      );
+      await page.getByRole('button', { name: '所有模型', exact: true }).click();
       await page.getByRole('button', { name: '关闭所有模型' }).click();
       assert.equal(await fast.isVisible(), true);
       assert.equal(
