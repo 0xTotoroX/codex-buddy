@@ -1,5 +1,5 @@
 /* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
- * [OUTPUT]: Content-sized matrix, header controls and inset presets and a single-surface model catalog.
+ * [OUTPUT]: Content-sized matrix, combined Fast/resize control and recessed preset tags and a single-surface model catalog.
  * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 .feature-model {
@@ -103,11 +103,6 @@
   color: var(--muted);
   font-size: inherit;
 }
-.model-quick-actions {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
 .feature-model .model-fast {
   padding: 5px;
   color: var(--muted);
@@ -186,83 +181,94 @@
   margin: 8px 0;
 }
 .model-collections {
-  margin-top: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--paper) 90%, var(--ink));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
+  margin-top: 16px;
+  padding: 2px 6px 4px;
 }
-.model-collections-row {
+.model-presets {
   display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--muted);
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
 }
-.feature-model .model-quick-actions button,
-.feature-model .model-preset-add {
+.model-preset-tag {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+.feature-model .model-preset-choice,
+.model-preset-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: var(--model-preset-height);
+  padding: 6px 14px;
+  border-radius: 18px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 92%, var(--ink));
+  box-shadow:
+    inset 2px 2px 5px color-mix(in srgb, var(--paper) 60%, black),
+    inset -1px -1px 2px color-mix(in srgb, var(--paper) 80%, white);
+}
+.feature-model .model-preset-choice[aria-pressed='true'] {
+  background: color-mix(in srgb, var(--paper) 84%, var(--ink));
+}
+.model-preset-choice > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.model-preset-choice > span:has(svg) {
+  flex: none;
+}
+.feature-model .model-preset-choice[aria-disabled='true'] {
+  opacity: 0.45;
+}
+.model-presets[data-editing='true'] .model-preset-tag {
+  padding-top: 10px;
+}
+.model-presets[data-editing='true'] .model-preset-choice,
+.model-presets[data-editing='true'] .model-preset-editor {
+  padding-left: 26px;
+}
+.feature-model .model-preset-delete {
+  position: absolute;
+  top: 0;
+  left: -6px;
   display: grid;
   place-items: center;
   width: 28px;
   height: 28px;
   padding: 5px;
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--muted);
 }
-.model-presets {
-  flex: 1;
-  min-width: 0;
+.model-preset-actions {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.model-preset-add {
   flex: none;
+  align-self: flex-end;
+  margin-left: auto;
+  gap: 0;
 }
-.feature-model .model-presets > button[aria-disabled='true'] {
-  opacity: 0.45;
-}
-.feature-model .model-presets > button {
-  flex: none;
-  max-width: 100%;
-  height: var(--model-preset-height);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 4px 10px;
-  background: color-mix(in srgb, var(--paper) 82%, var(--ink));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
-}
-.feature-model .model-presets > button[aria-pressed='true'] {
-  background: var(--model-tile-on);
-}
-.model-preset {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.model-preset > span {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.model-tools {
+.feature-model .model-preset-actions button {
   display: grid;
-  gap: 8px;
-  max-height: 10em;
-  overflow: auto;
-  padding: 8px 0;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  color: var(--muted);
+}
+.feature-model .model-preset-edit[aria-pressed='true'] {
+  color: var(--ink);
+  background: var(--hover);
 }
 .model-preset-editor {
-  display: flex;
-  flex: 0 1 250px;
-  max-width: 100%;
+  width: 280px;
   min-width: 0;
-  align-items: center;
   gap: 2px;
-  padding: 3px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--paper) 82%, var(--ink));
-  box-shadow: inset 0 0 0 1px var(--line);
+  padding: 3px 8px;
 }
 .model-preset-editor input {
   flex: 1 1 80px;
@@ -272,6 +278,9 @@
   border: 0;
   border-radius: 5px;
   background: transparent;
+}
+.model-preset-editor button {
+  flex: none;
 }
 .model-picker {
   position: absolute;

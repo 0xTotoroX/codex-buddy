@@ -25,3 +25,5 @@ bookmark / bookmark-filled / check 分别摘取同一固定提交的 SavedXs / S
 grip 使用同一固定提交的 DotsVertical.tsx 路径，分别平移 −4 / +4 组成双列握柄，保持24px画布和18px显示，用于模型列宽拖动。
 
 catalog 摘取同一固定公开提交的 Grid.tsx，四个空心圆表示模型目录，使用原路径及24px画布，以18px显示。
+
+pencil 摘取同一固定公开提交的 Pencil.tsx，原路径和24px画布，用于模型预设统一编辑模式。

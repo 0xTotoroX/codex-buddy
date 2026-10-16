@@ -335,13 +335,10 @@ try {
   assert.equal(await view.locator('[data-model-group], .model-visibility').count(), 0);
   assert.equal(await view.locator('.model-row, [data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
-  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
-  assert.equal(await view.locator('.model-quick-actions .model-fast').count(), 1);
-  assert.equal(await view.locator('.model-quick-actions .model-add-preset').count(), 1);
-  assert.equal(
-    await view.locator('.model-matrix-head .model-add-preset [data-icon="bookmark"]').count(),
-    1,
-  );
+  assert.equal(await view.locator('.model-column-resize.model-fast').count(), 1);
+  assert.equal(await view.locator('.model-quick-actions').count(), 0);
+  assert.equal(await view.locator('.model-add-preset').count(), 0);
+  assert.equal(await view.locator('.model-preset-actions [data-icon="pencil"]').count(), 1);
   await showOthers();
   assert.equal(await view.locator('.model-tile').count(), 2);
   assert.equal(await view.locator('.model-tile svg').count(), 0);
@@ -364,7 +361,7 @@ try {
       .evaluate((n) => getComputedStyle(n).fontSize),
     '16.3px',
   );
-  const resizeBox = await view.getByRole('separator', { name: '模型名称列宽' }).boundingBox();
+  const resizeBox = await view.getByRole('button', { name: 'Fast', exact: true }).boundingBox();
   const headerBox = await view.locator('.model-matrix-head').boundingBox();
   assert.ok(
     resizeBox.y + resizeBox.height <= headerBox.y + headerBox.height + 1,
@@ -430,21 +427,26 @@ try {
   await refresh.waitFor();
   await closeOthers();
   assert.equal(await page.locator('#edge-panel > header [data-refresh="model"]').count(), 0);
-  assert.equal(await view.getByRole('button', { name: '保存预设', exact: true }).innerText(), '');
+  assert.equal(await view.getByRole('button', { name: '添加预设', exact: true }).innerText(), '');
   const compactModelHeight = await page
     .locator('#edge-panel')
     .evaluate((n) => n.getBoundingClientRect().height);
   assert.ok(compactModelHeight < 350, 'few model rows keep the edge panel compact');
   record(
-    'refresh lives beside the picker close button and presets wrap in an inset box with an icon-only save button in the matrix header',
+    'refresh lives beside the picker close button and presets wrap in an inset box with an combined Fast/resize control and trailing preset actions',
   );
   const savedSelection = structuredClone(model.snapshot.current);
-  const presetButton = view.getByRole('button', { name: '保存预设', exact: true });
+  const presetButton = view.getByRole('button', { name: '添加预设', exact: true });
   const editor = view.getByRole('form', { name: '保存模型预设' });
   await presetButton.click();
   const nameInput = editor.getByRole('textbox', { name: '预设名称' });
   await nameInput.waitFor();
   assert.equal(await nameInput.evaluate((node) => node.getRootNode().activeElement === node), true);
+  assert.equal(
+    await nameInput.inputValue(),
+    model.snapshot.models.find((m) => m.id === savedSelection.model).label,
+  );
+  await nameInput.fill('');
   assert.equal(await editor.getByRole('button', { name: '保存', exact: true }).isDisabled(), true);
   await nameInput.fill('取消的预设');
   await editor.getByRole('button', { name: '取消', exact: true }).click();
@@ -485,8 +487,15 @@ try {
     )
     .waitFor();
   assert.deepEqual(model.snapshot.current, savedSelection);
-  await view.getByRole('button', { name: '日常', exact: true }).click({ button: 'right' });
-  await view.getByRole('button', { name: '重命名预设 日常', exact: true }).click();
+  await view.getByRole('button', { name: '编辑预设', exact: true }).click();
+  assert.equal(await view.locator('.model-preset-delete').count(), 1);
+  const applyBeforeRename = actions.filter((item) => item.action === 'apply').length;
+  await view.getByRole('button', { name: '日常', exact: true }).click();
+  assert.equal(
+    actions.filter((item) => item.action === 'apply').length,
+    applyBeforeRename,
+    'editing does not apply the preset',
+  );
   const rename = view.getByRole('form', { name: '重命名模型预设' });
   assert.equal(await rename.getByRole('textbox').inputValue(), '日常');
   await rename.getByRole('textbox').fill('工作');
@@ -498,15 +507,17 @@ try {
     () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
   assert.deepEqual(model.preferences.presets[0].selection, savedSelection);
+  await view.getByRole('button', { name: '编辑预设', exact: true }).click();
   record(
     'preset create/rename/cancel work without native prompt; failed save keeps draft and captured model/effort/speed',
   );
   assert.equal(await view.getByRole('searchbox').count(), 0);
   assert.equal(await view.getByRole('slider').count(), 0);
-  const columnHandle = view.getByRole('separator', { name: '模型名称列宽' });
+  const columnHandle = view.getByRole('button', { name: 'Fast', exact: true });
   const handleBox = await columnHandle.boundingBox();
   const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
   const beforeResize = preferenceCount();
+  const applyBeforeResize = actions.filter((item) => item.action === 'apply').length;
   const columnFrame = await page.locator('#edge-panel').boundingBox();
   const fixedFast = await view.locator('.model-fast').boundingBox();
   const sizeMessages = () =>
@@ -520,12 +531,12 @@ try {
     'pointer resize has no focus rectangle',
   );
   await page.mouse.move(handleBox.x + handleBox.width / 2 + 50, handleBox.y + 10, { steps: 5 });
-  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(await columnHandle.getAttribute('data-column-width'), '190');
   assert.equal(preferenceCount(), beforeResize, 'drag previews without writing preferences');
   assert.deepEqual(
     await view.locator('.model-fast').boundingBox(),
-    fixedFast,
-    'Fast stays fixed while dragging',
+    { ...fixedFast, x: fixedFast.x + 50 },
+    'combined Fast handle follows the column boundary',
   );
   assert.deepEqual(
     await page.locator('#edge-panel').boundingBox(),
@@ -541,11 +552,16 @@ try {
   await page.waitForFunction(() => {
     const host = document.querySelector('.edge-view:not([hidden])');
     return (
-      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      host?.shadowRoot?.querySelector('.model-column-resize')?.getAttribute('aria-disabled') ===
       'false'
     );
   });
   assert.equal(model.preferences.modelColumnWidth, 190);
+  assert.equal(
+    actions.filter((item) => item.action === 'apply').length,
+    applyBeforeResize,
+    'resizing does not toggle Fast',
+  );
   assert.equal(preferenceCount(), beforeResize + 1);
   assert.deepEqual(
     await page.locator('#edge-panel').boundingBox(),
@@ -558,13 +574,13 @@ try {
   await page.mouse.move(cancelBox.x + 40, cancelBox.y + 10);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  assert.equal(await columnHandle.getAttribute('aria-valuenow'), '190');
+  assert.equal(await columnHandle.getAttribute('data-column-width'), '190');
   assert.equal(preferenceCount(), beforeResize + 1, 'Escape cancels without saving');
   await columnHandle.press('ArrowLeft');
   await page.waitForFunction(() => {
     const host = document.querySelector('.edge-view:not([hidden])');
     return (
-      host?.shadowRoot?.querySelector('[role="separator"]')?.getAttribute('aria-disabled') ===
+      host?.shadowRoot?.querySelector('.model-column-resize')?.getAttribute('aria-disabled') ===
       'false'
     );
   });
@@ -574,11 +590,11 @@ try {
   );
   const limitBox = await columnHandle.boundingBox();
   const limitFrame = await page.locator('#edge-panel').boundingBox();
-  const limitValue = Number(await columnHandle.getAttribute('aria-valuemax'));
+  const limitValue = Number(await columnHandle.getAttribute('data-column-max'));
   await page.mouse.move(limitBox.x + 4, limitBox.y + 10);
   await page.mouse.down();
   await page.mouse.move(limitBox.x + 650, limitBox.y + 10, { steps: 10 });
-  assert.equal(Number(await columnHandle.getAttribute('aria-valuenow')), limitValue);
+  assert.equal(Number(await columnHandle.getAttribute('data-column-width')), limitValue);
   assert.deepEqual(await page.locator('#edge-panel').boundingBox(), limitFrame);
   const clearColumns = await view.locator('.model-matrix-head').evaluate((node) => {
     const name = node.children[0].getBoundingClientRect();
@@ -601,7 +617,7 @@ try {
     (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
     compactModelHeight,
   );
-  await view.getByRole('button', { name: '工作', exact: true }).click({ button: 'right' });
+  await view.getByRole('button', { name: '编辑预设', exact: true }).click();
   await view.getByLabel('删除预设 工作').click();
   await view.getByRole('button', { name: '工作', exact: true }).waitFor({ state: 'detached' });
   record(
@@ -654,7 +670,7 @@ try {
     'http://127.0.0.1:47991/feature.html?feature=main&lease=main-owner#token=fixture',
   );
   await page.locator('[data-feature="model"] [data-model="a"]').first().waitFor();
-  await view.getByRole('separator', { name: '模型名称列宽' }).waitFor();
+  await view.getByRole('button', { name: 'Fast', exact: true }).waitFor();
   assert.equal(await view.locator('[data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('.model-row').first().getAttribute('data-model-row'), 'b');
   assert.equal(
@@ -698,9 +714,11 @@ try {
     'narrow rendering preserves the wider saved preference',
   );
   await page.setViewportSize({ width: 1100, height: 700 });
-  await view.locator('[role="separator"][aria-valuenow="280"]').waitFor();
-  await view.getByRole('separator', { name: '模型名称列宽' }).press('ArrowRight');
-  await view.locator('[role="separator"][aria-valuenow="296"][aria-disabled="false"]').waitFor();
+  await view.locator('.model-column-resize[data-column-width="280"]').waitFor();
+  await view.getByRole('button', { name: 'Fast', exact: true }).press('ArrowRight');
+  await view
+    .locator('.model-column-resize[data-column-width="296"][aria-disabled="false"]')
+    .waitFor();
   assert.equal(model.preferences.modelColumnWidth, 296);
   record(
     'desktop long model names wrap without clipping; viewport limits preserve saved widths and wide windows can save beyond 280px',
@@ -739,7 +757,8 @@ try {
   await separator.focus();
   await separator.press('ArrowDown');
   await page.waitForFunction(
-    () => Number(document.querySelector('.csw-workbench-split').getAttribute('aria-valuenow')) > 50,
+    () =>
+      Number(document.querySelector('.csw-workbench-split').getAttribute('data-column-width')) > 50,
   );
   await tab.dblclick();
   assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 1);
@@ -1098,11 +1117,11 @@ try {
   assert.equal(await inner.getAttribute('aria-orientation'), 'vertical');
   await inner.focus();
   await inner.press('ArrowRight');
-  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
-  assert.equal(await outer.getAttribute('aria-valuenow'), '50');
+  assert.ok(Number(await inner.getAttribute('data-column-width')) > 50);
+  assert.equal(await outer.getAttribute('data-column-width'), '50');
   await outer.focus();
   await outer.press('ArrowDown');
-  assert.ok(Number(await outer.getAttribute('aria-valuenow')) > 50);
+  assert.ok(Number(await outer.getAttribute('data-column-width')) > 50);
   await page.getByRole('tab', { name: '下一步', exact: true }).dblclick();
   assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 1);
   assert.equal(await page.getByRole('separator', { name: '调整分栏比例' }).count(), 0);
@@ -1117,7 +1136,7 @@ try {
   await page.reload();
   await inner.waitFor();
   assert.deepEqual(layouts.desktop, savedNested);
-  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  assert.ok(Number(await inner.getAttribute('data-column-width')) > 50);
   await page.setViewportSize({ width: 360, height: 900 });
   await page.waitForFunction(
     () => document.querySelector('.csw-feature-split')?.dataset.axis === 'vertical',

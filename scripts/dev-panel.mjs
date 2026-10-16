@@ -228,8 +228,8 @@ export async function buildDevPanel(root, output) {
           model: favorites && presets ? [
             [rows.length,favorites.scrollHeight,favorites.clientHeight,rows.at(-1)?.getBoundingClientRect().bottom || 0],
             rect(favorites),
-            rect(model.querySelector('.model-quick-actions > :first-child')),
-            rect(model.querySelector('.model-quick-actions > :last-child')),
+            rect(model.querySelector('.model-column-resize')),
+            rect(model.querySelector('.model-preset-actions')),
             [presets.children.length,new Set([...presets.children].map(node => node.offsetTop)).size,presets.scrollWidth,presets.clientWidth],
             rect(presets)
           ] : [],
