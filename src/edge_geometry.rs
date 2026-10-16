@@ -1,4 +1,4 @@
-// [INPUT]: NSScreen 的逻辑点快照、边缘、归一化位置与开合状态。
+// [INPUT]: NSScreen 的逻辑点快照、CDP 宿主窗口坐标、边缘、归一化位置与开合状态。
 // [OUTPUT]: 稳定承载窗口的整点包围盒、贴合物理边缘的内容高度布局、精确点击/稳定悬停命中、多屏选择与可反向连续开合进度。
 // [POS]: edge_window 私有几何模块，不依赖 AppKit 或工作台。
 // [PROTOCOL]: 接口变化时由集成任务同步 src/AGENTS.md。
@@ -337,6 +337,34 @@ pub fn content_offset(screen: &Screen, edge: Edge, expanded: bool) -> f64 {
     }
 }
 
+// CDP uses a top-left origin on the primary display; AppKit uses bottom-left.
+pub fn host_screen(screens: &[Screen], bounds: Rect) -> Option<&Screen> {
+    let primary = screens.first()?;
+    if ![bounds.x, bounds.y, bounds.width, bounds.height]
+        .iter()
+        .all(|v| v.is_finite())
+        || bounds.width <= 0.
+        || bounds.height <= 0.
+    {
+        return None;
+    }
+    let host = Rect {
+        y: primary.frame.y + primary.frame.height - bounds.y - bounds.height,
+        ..bounds
+    };
+    screens
+        .iter()
+        .filter_map(|screen| {
+            let frame = screen.frame;
+            let width = (host.x + host.width).min(frame.x + frame.width) - host.x.max(frame.x);
+            let height = (host.y + host.height).min(frame.y + frame.height) - host.y.max(frame.y);
+            let area = width.max(0.) * height.max(0.);
+            (area > 0.).then_some((screen, area))
+        })
+        .max_by(|a, b| a.1.total_cmp(&b.1))
+        .map(|(screen, _)| screen)
+}
+
 // 回退只决定当前显示位置；调用者不能把结果当作用户保存的显示器意图。
 pub fn select_screen<'a>(
     screens: &'a [Screen],
@@ -631,6 +659,32 @@ mod tests {
         assert_eq!(fraction(f64::NAN), 0.5);
         assert_eq!(fraction(-1.), 0.);
         assert_eq!(fraction(2.), 1.);
+    }
+
+    #[test]
+    fn follows_host_across_vertical_negative_and_straddled_displays() {
+        let screens = [
+            screen("primary", 0., 0., 2304., 1296.),
+            screen("below", 260., -1155., 1539., 1155.),
+            screen("left", -1440., 0., 1440., 900.),
+        ];
+        let bounds = |x, y, width, height| Rect {
+            x,
+            y,
+            width,
+            height,
+        };
+        for (rect, expected) in [
+            (bounds(260., 1326., 1539., 1034.), "below"),
+            (bounds(-1400., 420., 1200., 800.), "left"),
+            (bounds(-200., 100., 1000., 800.), "primary"),
+        ] {
+            assert_eq!(host_screen(&screens, rect).unwrap().id, expected);
+        }
+        assert!(host_screen(&screens, bounds(9999., 9999., 800., 600.)).is_none());
+        assert!(host_screen(&screens, bounds(0., 0., 0., 600.)).is_none());
+        assert!(host_screen(&screens, bounds(f64::NAN, 0., 800., 600.)).is_none());
+        assert!(host_screen(&[], bounds(0., 0., 800., 600.)).is_none());
     }
 
     #[test]

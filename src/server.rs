@@ -368,6 +368,8 @@ async fn development_report(State(service): State<Service>, Json(value): Json<Va
     let report = json!({
         "updatedAt":std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         "board":value["board"].as_array().map(|rows| rows.iter().take(4).map(|row| row.as_array().map(|values| values.iter().take(4).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
+        "model":value["model"].as_array().map(|rows| rows.iter().take(6).map(|row| row.as_array().map(|values| values.iter().take(4).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
+        "displayGeometry":value["displayGeometry"].as_array().map(|rows| rows.iter().take(3).map(|row| row.as_array().map(|values| values.iter().take(4).map(|v| v.as_f64()).collect::<Vec<_>>())).collect::<Vec<_>>()),
         "revision": value["revision"].as_str().unwrap_or("").chars().take(64).collect::<String>(),
         "instance": value["instance"].as_str().unwrap_or("").chars().take(128).collect::<String>(),
         "roots": value["roots"].as_u64(), "styles": value["styles"].as_u64(),

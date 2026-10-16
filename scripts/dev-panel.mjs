@@ -205,6 +205,8 @@ export async function buildDevPanel(root, output) {
 ;(() => {
     window.__buddyFeatureRevision = ${JSON.stringify(featureRevision)};
     let updating = false;
+    let displayGeometry = [];
+    window.addEventListener('edge-native', event => { displayGeometry = event.detail.displayGeometry || []; });
     setInterval(async () => {
       if (updating) return;
       updating = true;
@@ -214,9 +216,24 @@ export async function buildDevPanel(root, output) {
         const tools = board?.querySelector('.board-tools')?.getBoundingClientRect();
         const heading = [...(board?.querySelectorAll('.stage-tabs,.column-heading') || [])]
         .map(node => node.getBoundingClientRect()).find(rect => rect.width && rect.height);
+        const modelHost = [...document.querySelectorAll('.csw-feature-content > div,.edge-view')].find(node => node.shadowRoot?.querySelector('.feature-model'));
+        const model = modelHost?.shadowRoot.querySelector('.feature-model');
+        const favorites = model?.querySelector('.model-favorites');
+        const rows = [...(model?.querySelectorAll('.model-row') || [])];
+        const presets = model?.querySelector('.model-presets');
+        const rect = node => { const r = node?.getBoundingClientRect(); return r ? [r.x,r.y,r.width,r.height] : []; };
         await fetch('/api/development', {method:'POST', headers:{'Content-Type':'application/json',Authorization:'Bearer '+sessionStorage.getItem('companion-token')},body:JSON.stringify({
           surface: document.getElementById('edge-panel') ? 'edge' : 'desktop',
           native:true, revision:window.__buddyFeatureRevision, roots:1,
+          displayGeometry,
+          model: favorites && presets ? [
+            [rows.length,favorites.scrollHeight,favorites.clientHeight,rows.at(-1)?.getBoundingClientRect().bottom || 0],
+            rect(favorites),
+            rect(model.querySelector('.model-quick-actions > :first-child')),
+            rect(model.querySelector('.model-quick-actions > :last-child')),
+            [presets.children.length,new Set([...presets.children].map(node => node.offsetTop)).size,presets.scrollWidth,presets.clientWidth],
+            rect(presets)
+          ] : [],
           board:board && tools && heading ? [[board.getBoundingClientRect().width,tools.y+tools.height/2,heading.y+heading.height/2,board.querySelectorAll('.board-toolbar').length]] : []
         })});
         const next = await (await fetch('/dev-state.json', {cache:'no-store'})).json();

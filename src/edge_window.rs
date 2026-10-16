@@ -1,5 +1,5 @@
 // [INPUT]: Paths/Runtime、独立 edge HTTP/IPC、AppKit/Wry/Tao。
-// [OUTPUT]: macOS 14+ 稳定视口与原生整树轮廓、首帧就绪门控的非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、所选显示器跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
+// [OUTPUT]: macOS 14+ 稳定视口与原生整树轮廓、首帧就绪门控的非激活 NSPanel、精确点击与稳定悬停事件、内容高度与凹角命中、固定或跟随 Codex 显示器的跨桌面显示、统一开合进度与独立四主题、显示器枚举与租约退出。
 // [POS]: 独立窗口子进程；不依赖 panel/workbench，不启动或终止官方宿主。
 // [PROTOCOL]: 集成需在 main 声明模块，并启用 AppKit NSPanel/NSColor/NSResponder features。
 
@@ -301,6 +301,7 @@ struct Surface {
     prefs: Preferences,
     appearance: Appearance,
     screen: Option<Screen>,
+    host_bounds: Option<Rect>,
     expanded: bool,
     unfold: geometry::Unfold,
     motion_tick: Instant,
@@ -398,6 +399,7 @@ impl Surface {
             "allSpaces": self.panel.collectionBehavior().contains(NSWindowCollectionBehavior::CanJoinAllSpaces),
             "fullScreenAuxiliary": self.panel.collectionBehavior().contains(NSWindowCollectionBehavior::FullScreenAuxiliary),
             "preferredScreen": self.prefs.screen, "keepOpen": self.prefs.keep_open, "hidden": self.hidden,
+            "displayGeometry": [screen.map(|s| [s.frame.x,s.frame.y,s.frame.width,s.frame.height]), self.host_bounds.map(|b| [b.x,b.y,b.width,b.height]), Some([host.x,host.y,host.width,host.height])],
             "notchWidth": screen.map_or(0., |s| s.notch_width), "notchHeight": screen.map_or(0., |s| s.notch_height),
             "width": size.width, "height": size.height,
             "compactWidth": compact.width, "compactHeight": compact.height,
@@ -430,20 +432,29 @@ impl Surface {
     }
 
     fn reflow(&mut self, mtm: MainThreadMarker) -> Result<()> {
-        // The selected display owns placement; Spaces and host focus do not.
+        // Follow the connected Codex window only when explicitly selected.
         let refresh_screen = self.screen.is_none() || Instant::now() >= self.screen_check;
         if refresh_screen {
             self.screen_check = Instant::now() + Duration::from_secs(1);
             let screens = screen_snapshots(mtm);
             let pointer = NSEvent::mouseLocation();
             let current = self.screen.as_ref().map_or("", |s| s.id.as_str());
-            let selected = geometry::select_screen(
-                &screens,
-                &self.prefs.screen,
-                current,
-                (pointer.x, pointer.y),
-            )
-            .cloned();
+            let host_screen = (self.prefs.screen == "codex")
+                .then(|| {
+                    self.host_bounds
+                        .and_then(|bounds| geometry::host_screen(&screens, bounds))
+                })
+                .flatten();
+            let selected = host_screen
+                .or_else(|| {
+                    geometry::select_screen(
+                        &screens,
+                        &self.prefs.screen,
+                        current,
+                        (pointer.x, pointer.y),
+                    )
+                })
+                .cloned();
             self.screen = selected;
         }
         let Some(screen) = self.screen.as_ref() else {
@@ -717,6 +728,7 @@ impl Surface {
                     // 只有用户的显式拖动才采纳当前回退屏幕；轮询/reflow 从不写屏幕身份。
                     if let Some(screen) = &self.screen
                         && !screen.id.is_empty()
+                        && self.prefs.screen != "codex"
                     {
                         self.prefs.screen = screen.id.clone();
                         patch["screen"] = json!(screen.id);
@@ -755,12 +767,33 @@ impl Surface {
         self.reveal = Some(reveal);
         if revision >= self.revision {
             let prefs = Preferences::read(&value["preferences"]);
+            if prefs.screen != self.prefs.screen {
+                self.screen_check = Instant::now();
+            }
             if prefs.keep_open {
                 self.expanded = true;
             } else if self.prefs.keep_open && !self.keyboard {
                 self.expanded = false;
             }
             self.prefs = prefs;
+        }
+        let bounds = &value["hostBounds"];
+        if let (Some(x), Some(y), Some(width), Some(height)) = (
+            bounds["left"].as_f64(),
+            bounds["top"].as_f64(),
+            bounds["width"].as_f64(),
+            bounds["height"].as_f64(),
+        ) {
+            let next = Rect {
+                x,
+                y,
+                width,
+                height,
+            };
+            if self.host_bounds != Some(next) {
+                self.host_bounds = Some(next);
+                self.screen_check = Instant::now();
+            }
         }
         // Native polling also recovers from changed resolution, scaling, Dock or display topology.
         self.reflow(mtm)?;
@@ -842,6 +875,7 @@ pub fn run(paths: &Paths, lease: &str) -> Result<()> {
         prefs: Preferences::default(),
         appearance: Appearance::read(&Value::Null),
         screen: None,
+        host_bounds: None,
         expanded: false,
         unfold: geometry::Unfold::default(),
         motion_tick: Instant::now(),

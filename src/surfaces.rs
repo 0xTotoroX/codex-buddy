@@ -1,5 +1,5 @@
 // [INPUT]: Presentation preferences, native window leases and existing host appearance.
-// [OUTPUT]: Independent per-surface themes, current feature fonts and one shared edge/notch container.
+// [OUTPUT]: Independent per-surface themes, current feature fonts, optional host window bounds and one shared edge/notch container.
 // [POS]: Presentation only; owns no task, model or outline business state.
 // [PROTOCOL]: Keep src/AGENTS.md in sync.
 use crate::{
@@ -246,6 +246,16 @@ impl App {
         if op == "window" {
             let active = self.edge_features_active().await;
             let appearance = self.surface_appearance("edge").await;
+            let follows_host = self.surfaces.lock().await.preferences.edge.screen == "codex";
+            let host_bounds = if follows_host {
+                if let Some(client) = self.desktop_client().await {
+                    client.window_bounds().await.unwrap_or(Value::Null)
+                } else {
+                    Value::Null
+                }
+            } else {
+                Value::Null
+            };
             let s = self.surfaces.lock().await;
             let mut preferences = serde_json::to_value(&s.preferences.edge)?;
             preferences.as_object_mut().unwrap().extend(
@@ -255,7 +265,7 @@ impl App {
                     .clone(),
             );
             return Ok(
-                json!({"valid":active && !s.lease.is_empty() && input["lease"]==s.lease,"preferences":preferences,"reveal":s.reveal,"pid":s.child.as_ref().map(|c|c.id()),"appearance":{"hostTheme":{"theme":appearance["theme"],"colors":appearance["colors"]},"fontOffset":appearance["fontSize"].as_f64().unwrap_or(13.)-13.}}),
+                json!({"valid":active && !s.lease.is_empty() && input["lease"]==s.lease,"preferences":preferences,"hostBounds":host_bounds,"reveal":s.reveal,"pid":s.child.as_ref().map(|c|c.id()),"appearance":{"hostTheme":{"theme":appearance["theme"],"colors":appearance["colors"]},"fontOffset":appearance["fontSize"].as_f64().unwrap_or(13.)-13.}}),
             );
         }
         let mut s = self.surfaces.lock().await;

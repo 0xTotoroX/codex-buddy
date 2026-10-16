@@ -1,5 +1,5 @@
 // [INPUT]: 本机 CDP 端点、WebSocket、assets 胶囊脚本与受限 binding。
-// [OUTPUT]: 目标发现、Client 请求/事件/注入及开发实例归属检查；独立模型适配器的文档生命周期与有界执行。
+// [OUTPUT]: 目标发现、Client 请求/事件/注入及开发实例归属检查及宿主窗口只读逻辑坐标；独立模型适配器的文档生命周期与有界执行。
 // [POS]: 宿主连接基础层，被 state.rs 和 requests.rs 使用。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -194,6 +194,17 @@ impl Client {
     pub async fn evaluate(&self, expression: String) -> Result<Value> {
         self.evaluate_with_timeout(expression, Duration::from_secs(5))
             .await
+    }
+
+    // The connected page owns this window; do not follow unrelated foreground apps.
+    pub async fn window_bounds(&self) -> Result<Value> {
+        // Electron's hosted chat renderer has no Browser-domain window identity.
+        // Use the same global logical coordinates as the existing panel handoff.
+        self.evaluate_with_timeout(
+            "({left:screenX,top:screenY,width:outerWidth,height:outerHeight})".into(),
+            Duration::from_millis(500),
+        )
+        .await
     }
 
     pub async fn evaluate_with_timeout(

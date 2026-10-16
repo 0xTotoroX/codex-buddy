@@ -12,7 +12,7 @@ ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模�
 
 模型快切由 model_control 管理能力、串行切换、实际回读、置顶与预设；与生成建议的 model.rs 分离。模型指令绑定宿主当前唯一输入目标和版本，经官方菜单执行后核验完整配置；preserveSpeed 用于模型格在同一事务内保留实际可用 Fast，预设指定完整配置。私有 model-control.json 只保存业务开关、置顶、预设和兼容列宽，不保存聊天正文；旧视觉偏好由 surfaces 一次迁移到 surfaces.json。model-control-diagnostic.json 只保留最近一次显式刷新/切换的阶段与失败计数，0600 写入，不含聊天身份、正文或凭据，被动轮询不覆盖。
 
-四功能共用 features 的位置、owner 和阅读状态交接；surfaces 管理每种形式的主题以及唯一贴边窗口。edge_window 不依赖模型服务，固定在所选显示器并加入所有 Spaces/全屏辅助空间；收起与换标签保留功能挂载，场景修订确认控制首帧与键盘交接，原生根遮罩统一裁切背景与网页。模型关闭只关闭自己的功能条目，最后一个贴边功能关闭后才回收共享窗口。
+四功能共用 features 的位置、owner 和阅读状态交接；surfaces 管理每种形式的主题以及唯一贴边窗口。edge_window 不依赖模型服务，支持固定显示器或跟随当前连接的 Codex 窗口所在屏幕，并加入所有 Spaces/全屏辅助空间；收起与换标签保留功能挂载，场景修订确认控制首帧与键盘交接，原生根遮罩统一裁切背景与网页。模型关闭只关闭自己的功能条目，最后一个贴边功能关闭后才回收共享窗口。
 
 成员清单：
 
@@ -25,7 +25,7 @@ ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模�
 
 - [model_control.rs](model_control.rs)：模型能力、串行切换、实际回读、开关/常用/模型排序/预设及末次私有诊断；旧打开入口转到 features，不管理窗口。
 - [edge_window.rs](edge_window.rs)：非激活 NSPanel/WebView，显式键盘焦点、原生鼠标精确点击边界、稳定悬停区域及8pt退出容错与冻结区域、按活动内容调整宽高，保留收放期间稳定视口、整点承载包围盒与原生轮廓、scene-ready 首帧/键盘交接、边缘/刘海几何、屏幕恢复、线程安全显示器枚举、独立材质、统一原生开合进度（0.42s响应、掉帧按实际时间推进、减少动态效果时立即完成；16ms更新间隔与屏幕检查解耦）、快捷键和租约退出。
-- [edge_geometry.rs](edge_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、显示器选择及可反向连续阻尼开合的纯计算及测试。
+- [edge_geometry.rs](edge_geometry.rs)：逻辑点布局、精确凹角点击与稳定悬停区域、安全区、固定屏幕选择与 CDP 顶部坐标转换后的宿主最大相交屏幕选择及可反向连续阻尼开合的纯计算及测试。
 
 
 - [assets.rs](assets.rs)：正式内嵌与开发快照的资源边界；只有 debug 程序接受显式 CODEX_BUDDY_DEV_ASSETS，release 始终使用内嵌资源；debug 通过 CODEX_BUDDY_DEV_SETTINGS 接收经验证的本机统一设置地址。
@@ -95,3 +95,7 @@ settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修�
 terminology 的 seen 文件只保存聊天身份、术语编号和分析状态；verifiedSessions 单独保留经语境确认的编号，旧字面 sessions 保留但不作为语义模式当前聊天结果；收藏与已掌握独立保存。features 增加 terms 业务分发与已有主界面缺失成员补登记，不覆盖关闭状态和布局。
 
 panel.Preferences 顶层 typography 单独持久化并验证 follow/custom、body/session/composer、75–150%及10–32px，沿用外观修订。state.panel_typography 仅保存末次有效只读样式，CDP缺失/断连不清除；server 的认证状态/SSE 和 surfaces/features 外观投影传给所有承载，不含聊天文本，不写入模型配置。
+
+贴边 screen="codex" 显式跟随当前 CDP 连接窗口，surfaces/window 仅此模式读取临时 hostBounds（500ms 超时），edge_geometry 将顶部逻辑坐标转换为 AppKit 后取最大相交屏幕；缺失或无交集时沿原回退保留屏幕。拖动贴边位置不取消跟随，轮询不写回显示器偏好。原空值自动选择与固定 UUID 保留。
+
+开发回读新增 model（最多六行四个数字：常用行数/滚动高度/可用高度/末行底部、常用区矩形、Fast 矩形、加号矩形、预设数/行数/滚动宽度/可用宽度、预设区矩形）和 displayGeometry（三个矩形：AppKit 屏幕、CDP 宿主、AppKit 面板），不记录模型名称、预设内容或聊天。

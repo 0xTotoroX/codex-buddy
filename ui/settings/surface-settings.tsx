@@ -191,14 +191,17 @@ export function SurfaceSettings({
               onChange={(event) => void save({ edge: { screen: event.target.value } })}
             >
               <option value="">自动选择</option>
+              <option value="codex">跟随 Codex</option>
               {displays.screens.map((screen) => (
                 <option key={screen.id} value={screen.id}>
                   {screen.label}
                 </option>
               ))}
-              {edge?.screen && !displays.screens.some((screen) => screen.id === edge.screen) && (
-                <option value={edge.screen}>已断开的屏幕（保留选择）</option>
-              )}
+              {edge?.screen &&
+                edge.screen !== 'codex' &&
+                !displays.screens.some((screen) => screen.id === edge.screen) && (
+                  <option value={edge.screen}>已断开的屏幕（保留选择）</option>
+                )}
             </NativeSelect>
           </label>
           <label className="settings-field text-sm">
