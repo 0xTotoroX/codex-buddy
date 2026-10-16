@@ -1,0 +1,120 @@
+/* [INPUT]: Settings markup, theme variables and pointer/keyboard modality.
+ * [OUTPUT]: Consistent theme, mode, control, menu and disclosure transitions.
+ * [POS]: Visual feedback only; native actions and form mounting stay unchanged.
+ * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
+html:root,
+body,
+.settings-header,
+.preview-frame {
+  transition:
+    background-color 180ms ease,
+    color 180ms ease,
+    border-color 180ms ease;
+}
+.settings-app :is(button, a, input, select, textarea, .settings-search-input) {
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease,
+    transform 140ms var(--settings-ease);
+}
+.settings-app button:active:not(:disabled):not([role='switch']) {
+  transform: scale(0.97);
+}
+.settings-mode::before {
+  transition:
+    transform 200ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 180ms ease;
+}
+.settings-search ul,
+.settings-suggestion-list {
+  transform-origin: top center;
+  transition:
+    opacity 140ms ease,
+    transform 180ms var(--settings-ease);
+}
+.settings-suggestion-list[data-above='true'] {
+  transform-origin: bottom center;
+}
+@starting-style {
+  .settings-search ul,
+  .settings-suggestion-list {
+    opacity: 0;
+    transform: translateY(-3px) scale(0.985);
+  }
+}
+@supports (appearance: base-select) {
+  .settings-app select[data-slot='native-select']::picker(select) {
+    transform-origin: top center;
+    transition:
+      opacity 140ms ease,
+      transform 180ms var(--settings-ease),
+      display 180ms allow-discrete,
+      overlay 180ms allow-discrete;
+  }
+  @starting-style {
+    .settings-app select[data-slot='native-select']:open::picker(select) {
+      opacity: 0;
+      transform: translateY(-3px) scale(0.985);
+    }
+  }
+}
+@supports (interpolate-size: allow-keywords) and selector(details::details-content) {
+  .settings-app details {
+    interpolate-size: allow-keywords;
+  }
+  .settings-app details::details-content {
+    block-size: 0;
+    opacity: 0;
+    overflow: clip;
+    transition:
+      block-size 220ms var(--settings-ease),
+      opacity 160ms ease,
+      content-visibility 220ms allow-discrete;
+  }
+  .settings-app details[open]::details-content {
+    block-size: auto;
+    opacity: 1;
+  }
+  /* Free-text candidates must be able to extend beyond an expanded section. */
+  .settings-app details:has(.settings-suggestion-list)::details-content {
+    overflow: visible;
+  }
+}
+@keyframes settings-feedback {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+html[data-settings-input='keyboard'],
+html[data-settings-input='keyboard'] :is(body, .settings-header, .preview-frame),
+html[data-settings-input='keyboard'] .settings-app :is(button, a, input, select, textarea),
+html[data-settings-input='keyboard'] .settings-mode::before,
+html[data-settings-input='keyboard'] .settings-search ul,
+html[data-settings-input='keyboard'] .settings-suggestion-list,
+html[data-settings-input='keyboard'] .settings-app details::details-content,
+html[data-settings-input='keyboard'] .settings-app select::picker(select) {
+  transition: none;
+}
+html[data-settings-input='keyboard'] .settings-app button:active {
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:root,
+  body,
+  .settings-app *,
+  .settings-app *::before,
+  .settings-app *::after,
+  .settings-app details::details-content,
+  .settings-app select::picker(select) {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

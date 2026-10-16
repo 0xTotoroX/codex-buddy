@@ -1,8 +1,9 @@
-/* [INPUT]: Authenticated Codex theme snapshot and this origin's display preference.
- * [OUTPUT]: Light/dark settings theme and an accessible three-way selector.
+/* [INPUT]: Authenticated Codex theme snapshot, shared sun/moon icons and this origin's display preference.
+ * [OUTPUT]: Light/dark settings theme and a three-way selector with explicit Codex-follow text and light/dark icons.
  * [POS]: Presentation only; never writes Codex appearance or business configuration.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Icon } from '../shared/icons/react';
 
 type Theme = 'light' | 'dark';
 type Preference = Theme | 'codex';
@@ -72,10 +73,11 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
         <button
           key={value}
           type="button"
+          aria-label={label}
           aria-pressed={preference === value}
           onClick={() => select(value)}
         >
-          {label}
+          {value === 'codex' ? label : <Icon name={value === 'light' ? 'sun' : 'moon'} />}
         </button>
       ))}
     </div>

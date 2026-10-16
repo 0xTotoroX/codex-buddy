@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、功能打开图标、主题/字体及联动预览，保留保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、功能打开动作、紧凑工具栏、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -11,6 +11,7 @@ import './styles.css';
 import './settings-layout.css';
 import './settings-preview.css';
 import './settings-controls.css';
+import './settings-motion.css';
 import icon from '../icon.png';
 import { request, useCompanion, type Settings, type EditableSettings } from './api';
 import { useSettingsForm } from './use-settings-form';
@@ -117,33 +118,40 @@ function App() {
             CodexBuddy{' '}
             <span className="settings-edition">{import.meta.env.DEV ? '开发版' : '设置'}</span>
           </a>
+          <SettingsSearch navigate={navigate} />
           <div className="settings-header-actions">
             <SettingsTheme codexTheme={view?.panelTheme} />
-            <span className="settings-connection-status" data-connected={connected}>
-              {view?.connection.status === 'unresponsive'
-                ? '页面暂未响应'
-                : connected
-                  ? '已连接'
+            <div
+              className="settings-mode"
+              role="group"
+              aria-label="设置显示模式"
+              data-settings-navigation
+            >
+              <button type="button" aria-pressed={simple} onClick={() => switchMode('simple')}>
+                简易
+              </button>
+              <button
+                type="button"
+                aria-label="详细设置"
+                aria-pressed={!simple}
+                onClick={() => switchMode('detail')}
+              >
+                详细
+              </button>
+            </div>
+            <span
+              className="settings-connection-status"
+              data-connected={connected}
+              role="status"
+              aria-label={connected ? '已连接' : undefined}
+            >
+              {!connected &&
+                (view?.connection.status === 'unresponsive'
+                  ? '页面暂未响应'
                   : live
                     ? '等待连接'
-                    : '未连接'}
+                    : '未连接')}
             </span>
-          </div>
-        </div>
-        <div className="settings-toolbar">
-          <SettingsSearch navigate={navigate} />
-          <div
-            className="settings-mode"
-            role="group"
-            aria-label="设置显示模式"
-            data-settings-navigation
-          >
-            <button type="button" aria-pressed={simple} onClick={() => switchMode('simple')}>
-              简易
-            </button>
-            <button type="button" aria-pressed={!simple} onClick={() => switchMode('detail')}>
-              详细设置
-            </button>
           </div>
         </div>
       </header>
@@ -168,7 +176,7 @@ function App() {
                 <div id="settings-outline">
                   <FeatureSwitch
                     name="大纲"
-                    onOpen={simple ? undefined : () => openFeature('outline')}
+                    onOpen={simple || !connected ? undefined : () => openFeature('outline')}
                     checked={editor.form?.answerOutlineEnabled ?? false}
                     disabled={!live || !editor.form}
                     onChange={(v) => editor.change('answerOutlineEnabled', v)}
@@ -176,14 +184,14 @@ function App() {
                 </div>
                 <FeatureSwitch
                   name="下一步"
-                  onOpen={simple ? undefined : () => openFeature('next')}
+                  onOpen={simple || !connected ? undefined : () => openFeature('next')}
                   checked={editor.form?.enabled ?? false}
                   disabled={!live || !editor.form}
                   onChange={(v) => editor.change('enabled', v)}
                 />
                 <FeatureSwitch
                   name="看板"
-                  onOpen={simple ? undefined : () => openFeature('board')}
+                  onOpen={simple || !connected ? undefined : () => openFeature('board')}
                   checked={tasks.state?.store.boardEnabled ?? false}
                   disabled={tasks.busy || !tasks.state || !!tasks.state.error}
                   onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
@@ -192,7 +200,7 @@ function App() {
                   live={live}
                   detailed={!simple}
                   onSnapshot={setModel}
-                  onOpen={simple ? undefined : () => openFeature('model')}
+                  onOpen={simple || !connected ? undefined : () => openFeature('model')}
                 />
                 <div id="settings-prompt-enhancement">
                   <FeatureSwitch
@@ -239,7 +247,10 @@ function App() {
                 />
               </section>
               <div data-settings-page="features" hidden={simple || page !== 'features'}>
-                <TerminologySettings active={!simple && page === 'features'} />
+                <TerminologySettings
+                  active={!simple && page === 'features'}
+                  canOpen={!!connected}
+                />
               </div>
               <SettingsForm
                 editor={editor}

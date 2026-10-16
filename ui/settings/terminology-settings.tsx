@@ -1,4 +1,4 @@
-/* [INPUT]: 认证术语 API、共用卡片/动作图标与用户导入/输入。
+/* [INPUT]: 认证术语 API、可唤起状态、共用卡片/动作图标与用户导入/输入。
  * [OUTPUT]: 直接显示识别、预览、检索和掌握列表，自定义入库与导入导出保留折叠。
  * [POS]: 详细设置的功能区，不访问主聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -74,7 +74,13 @@ function download(text: string, name: string, type = 'text/markdown;charset=utf-
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-export function TerminologySettings({ active }: { active: boolean }) {
+export function TerminologySettings({
+  active,
+  canOpen = true,
+}: {
+  active: boolean;
+  canOpen?: boolean;
+}) {
   const [data, setData] = useState<Library | null>(null),
     [error, setError] = useState(''),
     [busy, setBusy] = useState(false);
@@ -139,19 +145,21 @@ export function TerminologySettings({ active }: { active: boolean }) {
       </style>
       <div className="settings-section-heading">
         <h2>术语释义</h2>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="打开术语模块"
-          onClick={() =>
-            void request('features', { op: 'reveal', id: 'terms' }).catch((e) =>
-              setError(e.message),
-            )
-          }
-        >
-          <Icon name="detach" />
-        </Button>
+        {canOpen && prefs && !busy && !error && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="打开术语模块"
+            onClick={() =>
+              void request('features', { op: 'reveal', id: 'terms' }).catch((e) =>
+                setError(e.message),
+              )
+            }
+          >
+            打开
+          </Button>
+        )}
       </div>
       {error && (
         <p role="alert" className="text-destructive">

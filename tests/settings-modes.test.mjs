@@ -350,8 +350,8 @@ test(
       const openOutline = page.getByRole('button', { name: '打开大纲', exact: true });
       assert.equal(
         (await openOutline.innerText()).trim(),
-        '',
-        'open action uses an accessible icon',
+        '打开',
+        'feature reveal has a clear visible action label',
       );
       const [revealed] = await Promise.all([
         page.waitForResponse(
@@ -370,6 +370,16 @@ test(
             entry.body.id === 'outline',
         ),
       );
+      publishTheme('light', 'disconnected');
+      await openOutline.waitFor({ state: 'hidden' });
+      assert.equal(
+        await page
+          .getByRole('button', { name: /^打开(大纲|下一步|看板|模型快切|术语模块)$/ })
+          .count(),
+        0,
+      );
+      publishTheme('light');
+      await openOutline.waitFor();
       writes.length = 0;
       await simple();
       await page.goBack();
@@ -657,8 +667,50 @@ test(
           colorScheme === 'light' ? 'rgb(250, 250, 250)' : 'rgb(25, 25, 27)',
           'production CSS chunk ordering must not overwrite the approved settings palette',
         );
-        for (const width of [360, 900, 1360]) {
+        for (const width of [360, 600, 900, 1360]) {
           await page.setViewportSize({ width, height: 900 });
+          const header = await page.locator('.settings-header').evaluate((node) => {
+            const rect = (selector) => node.querySelector(selector).getBoundingClientRect();
+            const search = rect('.settings-search'),
+              brand = rect('.settings-brand'),
+              actions = rect('.settings-header-actions');
+            return {
+              search: search.toJSON(),
+              brand: brand.toJSON(),
+              actions: actions.toJSON(),
+              header: node.getBoundingClientRect().toJSON(),
+            };
+          });
+          if (width > 1100) {
+            assert.ok(
+              Math.abs(
+                header.search.y +
+                  header.search.height / 2 -
+                  (header.brand.y + header.brand.height / 2),
+              ) < 2,
+              'wide search shares the brand row',
+            );
+            assert.ok(
+              header.search.x >= header.brand.right && header.search.right <= header.actions.x,
+            );
+          } else {
+            assert.ok(
+              Math.abs(header.search.x - header.header.x) < 1 &&
+                Math.abs(header.search.right - header.header.right) < 1,
+              'wrapped search has equal left/right edges',
+            );
+          }
+          assert.ok(header.actions.right <= header.header.right + 1, 'header controls fit');
+          publishTheme(colorScheme, 'unresponsive');
+          await page.getByText('页面暂未响应', { exact: true }).waitFor();
+          assert.equal(
+            await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+            false,
+            'connection status text fits the narrow header',
+          );
+          publishTheme(colorScheme);
+          await page.getByRole('status', { name: '已连接', exact: true }).waitFor();
+
           for (const id of ['surfaces', 'features', 'model', 'connection']) {
             if (width <= 760) await category(id);
             else
@@ -760,6 +812,89 @@ test(
         await preview.locator('.preview-workspace').evaluate((n) => n.getAnimations().length > 0),
         'placement changes animate only the illustration',
       );
+      const beforeMotion = writes.length;
+      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      if (await limits.evaluate((node) => node.open)) await limits.locator('summary').click();
+      await limits.evaluate(async (node) => {
+        await Promise.allSettled(node.getAnimations({ subtree: true }).map((a) => a.finished));
+      });
+      await limits.locator('summary').click();
+      // Native details pseudo-element transitions are not exposed by Element.getAnimations in every Chromium.
+      const opening = await limits.evaluate(async (node) => {
+        const heights = [];
+        for (let frame = 0; frame < 20; frame++) {
+          await new Promise(requestAnimationFrame);
+          heights.push(node.getBoundingClientRect().height);
+        }
+        return {
+          first: Math.min(...heights),
+          last: heights.at(-1),
+          intermediate: new Set(heights.map((height) => Math.round(height))).size,
+        };
+      });
+      assert.ok(
+        opening.last > opening.first + 8 && opening.intermediate > 2,
+        `disclosure grows smoothly: ${JSON.stringify(opening)}`,
+      );
+      await limits.locator('summary').click();
+      await limits.locator('summary').click();
+      await limits.evaluate(async (node) => {
+        await Promise.allSettled(node.getAnimations({ subtree: true }).map((a) => a.finished));
+      });
+      assert.equal(
+        await limits.evaluate((node) => node.open),
+        true,
+        'rapid reversal keeps intended state',
+      );
+      await page.waitForFunction(
+        (height) =>
+          Math.abs(
+            document.querySelector('#settings-limits').getBoundingClientRect().height - height,
+          ) < 1,
+        opening.last,
+      );
+
+      await limits.locator('summary').press('Enter');
+      assert.equal(await limits.evaluate((node) => node.open), false);
+      assert.equal(
+        await limits.evaluate(
+          (node) => getComputedStyle(node, '::details-content').transitionDuration,
+        ),
+        '0s',
+      );
+      assert.equal(
+        await limits.evaluate((node) => node.getAnimations({ subtree: true }).length),
+        0,
+        'keyboard disclosure is immediate',
+      );
+      const nav = page.getByRole('link', { name: '外观与布局', exact: true });
+      await nav.press('Enter');
+      assert.equal(
+        await page.locator('.settings-content').evaluate((node) => node.getAnimations().length),
+        0,
+        'keyboard navigation has no entry animation',
+      );
+      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await limits.locator('summary').click();
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(
+        await limits.evaluate((node) => node.getAnimations({ subtree: true }).length),
+        0,
+        'enabling reduced motion cancels disclosure motion',
+      );
+      assert.equal(
+        await limits.evaluate(
+          (node) => getComputedStyle(node, '::details-content').transitionDuration,
+        ),
+        '0s',
+      );
+      assert.ok(
+        Math.abs(
+          (await limits.evaluate((node) => node.getBoundingClientRect().height)) - opening.last,
+        ) < 1,
+        'reduced motion resolves the full expanded height immediately',
+      );
+      assert.equal(writes.length, beforeMotion, 'motion and disclosures never save configuration');
       await page.getByRole('link', { name: '启动与开发', exact: true }).click();
       await page.addScriptTag({ content: await readFile('ui/settings/dev-sources.js', 'utf8') });
       await page.getByText('开发来源 · main · 1234567', { exact: true }).waitFor();

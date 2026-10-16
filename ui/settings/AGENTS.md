@@ -6,11 +6,11 @@
 
 成员清单：
 
-- [main.tsx](main.tsx)：Tom Modern 双模式入口、共享功能开关、唯一任务状态与分类容器；组合现有模块及其只读预览快照，表单保持单份挂载；常规配置直接显示，详细模式的打开图标位于对应功能开关旁；版本位于页面末尾，不覆盖内容，不持有任务或模型业务。
+- [main.tsx](main.tsx)：Tom Modern 双模式入口、共享功能开关、唯一任务状态与分类容器；组合现有模块及其只读预览快照，表单保持单份挂载；常规配置直接显示，顶栏宽屏同行、窄屏搜索完整换行；详细模式的“打开”文字按钮仅在已连接且功能可用时显示；版本位于页面末尾，不覆盖内容，不持有任务或模型业务。
 - [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
 - [settings-outline.tsx](settings-outline.tsx)：默认简易模式，模式/四分类导航、浏览器历史、旧锚点按字段分流、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
 - [settings-disclosure.tsx](settings-disclosure.tsx)：保留的原生details展示兼容组件，当前常规配置已改为直接显示；支持强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
-- [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关及可选 onOpen 图标回调、反馈及自动/手动保存表单；图标带无障碍名称，开启状态和禁用态与开关一致，不新增保存服务。
+- [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关及可选 onOpen 回调、反馈及自动/手动保存表单；功能可用时显示“打开”文字按钮，关闭/忙碌时隐藏，不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步的方向、常用提示词和点击/显示行为；共享模型配置移入model-settings，不复制表单。
 - [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，两种模式均直接显示；详细模式增加协议/环境变量，高级生成参数保留折叠；局部模型列表、密钥显示与草稿保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，保留自由输入与原失焦保存。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
@@ -29,8 +29,9 @@
 - [settings-controls.css](settings-controls.css)：按钮、输入框、选择器、开关的统一高度、微圆角、中性焦点与禁用态；支持 base-select 时定制原生菜单和选项，原生键盘、点击、取消、禁用及 change 事件不变，不支持时保留系统菜单。自由输入候选和搜索弹层沿用同一菜单样式。Dev 来源因 Shadow DOM 隔离，在 dev-sources.js 内以同一语义变量适配，不依赖新版源码文件。
 - [settings-preview.tsx](settings-preview.tsx)：只读联动预览。复用既有模块回读的功能、材质、模型和看板快照；嵌套布局复用 resolveFeatureLayout，过滤关闭功能。生成参数显示当前草稿并标识未保存；主形式与材质只显示成功保存的值。示例操作只改变本组件状态，不请求 API、不读任务正文或凭据。
 - [settings-preview.css](settings-preview.css)：预览画布、功能示例、生成路径和连接示意的样式，材质为近似效果，不用于实际业务视图。
-- [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，尊重运行期间的减少动态效果偏好；不重新挂载控件、不存储配置。
-- [settings-theme.tsx](settings-theme.tsx)：页头“跟随 Codex / 浅色 / 深色”选择；默认跟随认证 SSE 的 panelTheme，无有效快照时保留本页末次主题，尚未收到时回退系统。选择在同源 localStorage 记忆并跨标签页同步，受限存储仍允许当前页切换；不写宿主或业务配置、不触发表单失焦保存。settings-layout.css 统一语义色，品牌图标保持原图，动作图标沿用 currentColor。
+- [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，读取输入方式以保持键盘即时响应，尊重动态减少效果偏好；ResizeObserver 同步顶栏真实高度至目录/预览粘性偏移，不重新挂载控件、不存储配置。
+- [settings-motion.css](settings-motion.css)：主题颜色、模式滑块、按钮反馈、搜索/候选/原生菜单入场和原生 details 展开/收起；不支持插值的浏览器保留原生即时行为。键盘和减少动态效果不等待装饰动画，候选菜单不受折叠裁切。
+- [settings-theme.tsx](settings-theme.tsx)：页头“跟随 Codex”文字加太阳/月亮图标选择；默认跟随认证 SSE 的 panelTheme，无有效快照时保留本页末次主题，尚未收到时回退系统。选择在同源 localStorage 记忆并跨标签页同步，受限存储仍允许当前页切换；不写宿主或业务配置、不触发表单失焦保存。settings-layout.css 统一语义色，品牌图标保持原图，动作图标沿用 currentColor。
 - [index.html](index.html)：设置网页入口，图标复用 ../icon.png。
 - [board.html](board.html)：旧独立看板 HTML 入口，仍挂载 ../surfaces/desktop/legacy-board.tsx 及共用看板内容。
 - [feature.html](feature.html)：桌面和贴边通用 HTML 入口。
@@ -66,7 +67,7 @@ settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/
 
 设置搜索的 Enter 操作根据当前输入与已挂载控件即时重新匹配，避免快速输入早于异步索引时失效；输入法组合期间不提交，仍只索引标签而不读取配置值。
 
-术语设置增加打开模块与收藏筛选；移除阅读批注候选，旧 note 偏好读取为 plain。
+术语设置按 canOpen 和数据可用性显示“打开”动作，并提供收藏筛选；移除阅读批注候选，旧 note 偏好读取为 plain。
 
 `typography-settings.tsx` 是字体唯一设置入口，复用 PanelSettings 外观 revision 保存，数字草稿跨模式/分类保留；`use-typography.ts` 通过认证 SSE 接收字体快照，更新自有文档字体和 rem 基准。设置文字层级按同一基准缩放，颜色由 settings-theme 独立管理。旧分功能字号表单由统一跟随/自定义控件替换，旧值不删除。
 

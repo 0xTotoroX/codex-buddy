@@ -1,5 +1,5 @@
 /* [INPUT]: Tom Modern visual direction, shared typography and resolved settings theme.
- * [OUTPUT]: Settings-only tokens, responsive shell, form rhythm and motion.
+ * [OUTPUT]: Settings-only tokens, responsive single-row/wrapped header and form rhythm.
  * [POS]: Does not alter the workspace or host theme tokens.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 /* Shared tokens may be emitted after the entry CSS by Vite; specificity keeps both builds aligned. */
@@ -112,11 +112,11 @@ html:root
   border-top: var(--settings-top-rule-width) solid var(--settings-rule);
 }
 .settings-topline {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 72px;
+  gap: 24px;
+  min-height: 76px;
   border-bottom: 1px solid var(--settings-rule);
 }
 .settings-brand {
@@ -136,8 +136,11 @@ html:root
 }
 .settings-header-actions {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
-  gap: 20px;
+  justify-content: flex-end;
+  gap: 12px;
 }
 .settings-theme {
   display: flex;
@@ -146,8 +149,11 @@ html:root
   border: 1px solid var(--buddy-border);
 }
 .settings-theme button {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
   min-height: 32px;
-  padding: 4px 10px;
+  padding: 4px 7px;
   color: var(--buddy-muted);
   font-size: 0.75em;
   cursor: pointer;
@@ -186,17 +192,10 @@ html:root
 .settings-connection-status[data-connected='true']::before {
   background: var(--settings-orange);
 }
-.settings-toolbar {
-  display: flex;
-  gap: 20px;
-  align-items: center;
-  padding-block: 14px;
-  border-bottom: 1px solid var(--buddy-border);
-}
-.settings-toolbar .settings-search {
-  flex: 1;
+.settings-topline > .settings-search {
+  min-width: 0;
+  width: 100%;
   margin: 0;
-  max-width: 420px;
 }
 .settings-search-input {
   border-radius: var(--settings-control-radius);
@@ -211,21 +210,35 @@ html:root
   border-radius: var(--settings-control-radius);
 }
 .settings-mode {
-  margin-left: auto;
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-shrink: 0;
   border: 1px solid var(--buddy-border);
   padding: 3px;
 }
 .settings-mode button {
+  position: relative;
+  min-width: 50px;
   min-height: 32px;
-  padding: 4px 14px;
+  padding: 4px 10px;
   font-size: 0.8125em;
   cursor: pointer;
   color: var(--buddy-muted);
 }
-.settings-mode button[aria-pressed='true'] {
+.settings-mode::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 3px auto 3px 3px;
+  width: calc((100% - 6px) / 2);
+  border-radius: var(--settings-control-radius);
   background: var(--settings-selected);
+}
+.settings-app[data-settings-mode='detail'] .settings-mode::before {
+  transform: translateX(100%);
+}
+.settings-mode button[aria-pressed='true'] {
   color: var(--settings-selected-text);
   box-shadow: inset 0 0 0 1px var(--settings-selected-border);
 }
@@ -239,7 +252,7 @@ html:root
 }
 .settings-nav {
   position: sticky;
-  top: 164px;
+  top: var(--settings-sticky-offset, 100px);
   min-width: 0;
   margin-top: 30px;
   padding-right: 22px;
@@ -498,40 +511,6 @@ html:root
   font-size: 0.6875em;
   color: var(--buddy-muted);
 }
-.settings-app button,
-.settings-app a {
-  transition:
-    color 150ms,
-    background-color 150ms,
-    border-color 150ms,
-    transform 150ms var(--settings-ease);
-}
-.settings-app button:active:not(:disabled):not([role='switch']) {
-  transform: translateY(1px);
-}
-.settings-app details[open] > :not(summary) {
-  animation: settings-reveal 180ms var(--settings-ease);
-}
-@keyframes settings-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-@keyframes settings-feedback {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 @media (max-width: 1190px) {
   .settings-app {
     padding-inline: 24px;
@@ -560,32 +539,28 @@ html:root
     grid-template-columns: minmax(0, 1fr) minmax(290px, 0.95fr);
   }
 }
+@media (max-width: 1100px) {
+  .settings-topline {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 14px 20px;
+    padding-block: 14px;
+  }
+  .settings-topline > .settings-search {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
 @media (max-width: 760px) {
   .settings-app {
     padding: 16px 20px 24px;
   }
   .settings-topline {
     min-height: 64px;
-    flex-wrap: wrap;
     gap: 12px;
-    padding-block: 14px;
-  }
-  .settings-header-actions {
-    display: contents;
-  }
-  .settings-theme {
-    order: 3;
-    width: 100%;
-  }
-  .settings-theme button {
-    flex: 1;
   }
   .settings-brand {
     font-size: 1.125em;
     gap: 8px;
-  }
-  .settings-toolbar {
-    gap: 12px;
   }
   .settings-mode button {
     padding-inline: 10px;
@@ -622,27 +597,24 @@ html:root
     gap: 24px;
   }
 }
+@media (max-width: 640px) {
+  .settings-topline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settings-topline > .settings-search {
+    grid-row: 3;
+  }
+  .settings-header-actions {
+    justify-content: space-between;
+    gap: 8px;
+  }
+}
 @media (max-width: 440px) {
   .settings-app {
     padding-inline: 16px;
   }
   .settings-edition {
     display: none;
-  }
-  .settings-toolbar {
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .settings-toolbar .settings-search {
-    flex-basis: 100%;
-    max-width: none;
-  }
-  .settings-mode {
-    margin: 0;
-    width: 100%;
-  }
-  .settings-mode button {
-    flex: 1;
   }
   .settings-field {
     grid-template-columns: 1fr;
@@ -654,14 +626,5 @@ html:root
   .settings-app[data-settings-mode='simple'] .settings-placement-row {
     grid-template-columns: 1fr;
     gap: 8px;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .settings-app *,
-  .settings-app *::before,
-  .settings-app *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
   }
 }

@@ -1,5 +1,5 @@
-/* [INPUT]: Presentation identity and mounted preview geometry.
- * [OUTPUT]: Interruptible entry and layout transitions; respects reduced motion live.
+/* [INPUT]: Presentation identity, header/preview geometry and input modality.
+ * [OUTPUT]: Sticky offsets and interruptible navigation/layout transitions; keyboard and reduced motion stay immediate.
  * [POS]: Settings-only motion, never remounts controls or changes configuration.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useLayoutEffect, useRef } from 'react';
@@ -7,16 +7,41 @@ import { useLayoutEffect, useRef } from 'react';
 export function useSettingsMotion(identity: string) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
+    const root = document.documentElement;
+    const header = document.querySelector<HTMLElement>('.settings-header');
+    const pointer = () => (root.dataset.settingsInput = 'pointer');
+    const keyboard = () => {
+      root.dataset.settingsInput = 'keyboard';
+      ref.current?.getAnimations().forEach((animation) => animation.cancel());
+    };
+    const measure = () => {
+      if (header)
+        root.style.setProperty('--settings-sticky-offset', `${header.offsetHeight + 18}px`);
+    };
+    const observer = new ResizeObserver(measure);
+    if (header) observer.observe(header);
+    measure();
+    window.addEventListener('pointerdown', pointer, true);
+    window.addEventListener('keydown', keyboard, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('pointerdown', pointer, true);
+      window.removeEventListener('keydown', keyboard, true);
+      delete root.dataset.settingsInput;
+      root.style.removeProperty('--settings-sticky-offset');
+    };
+  }, []);
+  useLayoutEffect(() => {
     const element = ref.current;
     if (!element) return;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)');
-    if (reduce.matches) return;
+    if (reduce.matches || document.documentElement.dataset.settingsInput === 'keyboard') return;
     const animation = element.animate(
       [
         { opacity: 0.65, transform: 'translateY(5px)' },
         { opacity: 1, transform: 'none' },
       ],
-      { duration: 180, easing: 'cubic-bezier(.2,.7,.2,1)' },
+      { duration: 220, easing: 'cubic-bezier(.23,1,.32,1)' },
     );
     const cancel = () => animation.cancel();
     reduce.addEventListener('change', cancel);
@@ -54,7 +79,15 @@ export function usePreviewMotion(identity: string) {
       const key = node.dataset.previewPart!;
       const before = previous.current.get(key);
       next.set(key, rect);
-      if (reduce.matches || resized || !before || !rect.width || !rect.height) return;
+      if (
+        reduce.matches ||
+        document.documentElement.dataset.settingsInput === 'keyboard' ||
+        resized ||
+        !before ||
+        !rect.width ||
+        !rect.height
+      )
+        return;
       const dx = before.x - rect.x,
         dy = before.y - rect.y;
       if (Math.abs(dx) + Math.abs(dy) < 1) return;

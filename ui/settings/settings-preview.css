@@ -4,7 +4,7 @@
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 .settings-preview {
   position: sticky;
-  top: 170px;
+  top: var(--settings-sticky-offset, 100px);
   min-width: 0;
   padding-right: 6px;
   font-size: 0.8125em;
