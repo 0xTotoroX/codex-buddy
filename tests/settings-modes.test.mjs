@@ -1,5 +1,5 @@
 /* [INPUT]: Built settings page, synthetic authenticated services and isolated Chromium.
- * [OUTPUT]: Shared drafts/DOM, no mode-only writes, retained details/scroll and responsive dual navigation.
+ * [OUTPUT]: Shared drafts/DOM, Codex/manual themes without writes, retained details/scroll and responsive navigation.
  * [POS]: No real user data, model requests or host restarts.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import test from 'node:test';
@@ -18,6 +18,9 @@ test(
       rejectNext = false,
       rejectSurface = false;
     const writes = [];
+    let panelTheme = null;
+    let connectionStatus = 'connected';
+    const streams = new Set();
     let appearance = {
       revision: 1,
       webRevision: 1,
@@ -84,13 +87,23 @@ test(
     const view = () => ({
       version: 'fixture',
       configurationRevision: settings.configurationRevision,
-      connection: { status: 'connected', targets: [], endpoint: 'fixture', targetId: 'fixture' },
+      connection: {
+        status: connectionStatus,
+        targets: [],
+        endpoint: 'fixture',
+        targetId: 'fixture',
+      },
       desktop: { hasAnswer: false, headings: 0 },
       model: { provider: 'api', model: settings.model, available: true },
       panelPreferences: appearance,
-      panelTheme: 'light',
+      panelTheme,
       panelFontBase: 13,
     });
+    const publishTheme = (theme, status = 'connected') => {
+      panelTheme = theme;
+      connectionStatus = status;
+      for (const stream of streams) stream.write('data: ' + JSON.stringify(view()) + '\n\n');
+    };
     const server = createServer(async (req, res) => {
       const path = req.url.split('?')[0];
       if (path.startsWith('/api/')) {
@@ -103,6 +116,8 @@ test(
         if (path === '/api/events') {
           res.writeHead(200, { 'Content-Type': 'text/event-stream' });
           res.write('data: ' + JSON.stringify(view()) + '\n\n');
+          streams.add(res);
+          res.on('close', () => streams.delete(res));
           return;
         }
         let raw = '';
@@ -195,6 +210,7 @@ test(
     const context = await browser.newContext({
       viewport: { width: 420, height: 800 },
       reducedMotion: 'reduce',
+      colorScheme: 'dark',
     });
     const page = await context.newPage();
     const errors = [];
@@ -202,9 +218,44 @@ test(
     const simple = () => page.getByRole('button', { name: '简易', exact: true }).click();
     const detail = () => page.getByRole('button', { name: '详细设置', exact: true }).click();
     const category = (id) => page.getByLabel('详细设置分类').selectOption(id);
+    const themeButton = (name) =>
+      page.getByRole('group', { name: '设置页主题' }).getByRole('button', { name, exact: true });
+    const expectTheme = async (theme) => {
+      await page.waitForFunction(
+        (expected) =>
+          document.documentElement.dataset.settingsTheme === expected &&
+          getComputedStyle(document.documentElement).colorScheme === expected &&
+          getComputedStyle(document.documentElement).backgroundColor ===
+            (expected === 'light' ? 'rgb(250, 250, 250)' : 'rgb(25, 25, 27)'),
+        theme,
+      );
+      assert.equal(
+        await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor),
+        theme === 'light' ? 'rgb(250, 250, 250)' : 'rgb(25, 25, 27)',
+      );
+      assert.equal(
+        await page.locator('.settings-brand img').evaluate((n) => getComputedStyle(n).filter),
+        'none',
+        'the original brand icon stays unchanged in both themes',
+      );
+    };
     try {
       await page.goto(origin + '/#token=fixture');
       await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
+      assert.equal(await themeButton('跟随 Codex').getAttribute('aria-pressed'), 'true');
+      await expectTheme('dark'); // Before Codex is known, the browser supplies the fallback.
+      await page.emulateMedia({ colorScheme: 'light' });
+      await expectTheme('light');
+      publishTheme('dark');
+      await expectTheme('dark'); // The host wins even when the browser prefers light.
+      publishTheme(null, 'unresponsive');
+      await page.getByText('页面暂未响应', { exact: true }).waitFor();
+      await expectTheme('dark'); // A missing host theme retains the last valid snapshot.
+      publishTheme('light');
+      await expectTheme('light');
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await expectTheme('light');
+      assert.equal(writes.length, 0, 'theme subscription never writes business preferences');
       assert.equal(
         await page.locator('.settings-app').getAttribute('data-settings-mode'),
         'simple',
@@ -248,6 +299,16 @@ test(
       await page.locator('.settings-save[data-save-state="dirty"]').waitFor({ state: 'attached' });
       writes.length = 0;
       await key.fill('fixture-unsaved-key');
+      await themeButton('深色').click();
+      await expectTheme('dark');
+      publishTheme('light');
+      await expectTheme('dark');
+      await themeButton('浅色').click();
+      await expectTheme('light');
+      await themeButton('跟随 Codex').click();
+      assert.equal(await key.inputValue(), 'fixture-unsaved-key');
+      assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
+      assert.equal(writes.length, 0, 'theme buttons preserve focused drafts without auto-saving');
       await detail();
       await category('model');
       assert.equal(await model.inputValue(), '未保存模型草稿');
@@ -464,7 +525,12 @@ test(
       assert.equal((await preview.textContent()).includes('fixture-unsaved-key'), false);
 
       for (const colorScheme of ['light', 'dark']) {
-        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        await page.emulateMedia({
+          colorScheme: colorScheme === 'light' ? 'dark' : 'light',
+          reducedMotion: 'reduce',
+        });
+        await themeButton(colorScheme === 'light' ? '浅色' : '深色').click();
+        await expectTheme(colorScheme);
         // Chromium applies a changed media preference on its next rendering update.
         await page.waitForFunction(
           (expected) => getComputedStyle(document.documentElement).backgroundColor === expected,
@@ -514,6 +580,38 @@ test(
           );
         }
       }
+      const themeWrites = writes.length;
+      const peer = await context.newPage();
+      await peer.goto(origin);
+      await peer.locator('html[data-settings-theme="dark"]').waitFor();
+      await peer
+        .getByRole('group', { name: '设置页主题' })
+        .getByRole('button', { name: '浅色', exact: true })
+        .click();
+      await expectTheme('light');
+      assert.equal(
+        await model.inputValue(),
+        '新的预览模型草稿',
+        'other tabs do not replace form drafts',
+      );
+      await page.reload();
+      await themeButton('浅色').waitFor();
+      assert.equal(await themeButton('浅色').getAttribute('aria-pressed'), 'true');
+      await expectTheme('light');
+      await peer.evaluate(() => localStorage.setItem('codex-buddy-settings-theme', 'unknown'));
+      await page.waitForFunction(
+        () => document.documentElement.dataset.settingsThemeMode === 'codex',
+      );
+      publishTheme('dark');
+      await expectTheme('dark');
+      await peer.evaluate(() => localStorage.removeItem('codex-buddy-settings-theme'));
+      await themeButton('跟随 Codex').click();
+      await peer.close();
+      assert.equal(
+        writes.length,
+        themeWrites,
+        'theme persistence and cross-tab changes never submit configuration',
+      );
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
       await page.getByRole('button', { name: '桌面窗口', exact: true }).click();
       await preview.locator('.preview-host[data-placement="desktop"]').waitFor();
@@ -521,6 +619,30 @@ test(
         await preview.locator('.preview-workspace').evaluate((n) => n.getAnimations().length > 0),
         'placement changes animate only the illustration',
       );
+      const restricted = await browser.newContext({ colorScheme: 'dark', reducedMotion: 'reduce' });
+      await restricted.addInitScript(() => {
+        const get = Storage.prototype.getItem,
+          set = Storage.prototype.setItem;
+        Storage.prototype.getItem = function (key) {
+          if (key === 'codex-buddy-settings-theme')
+            throw new DOMException('Storage unavailable', 'SecurityError');
+          return get.call(this, key);
+        };
+        Storage.prototype.setItem = function (key, value) {
+          if (key === 'codex-buddy-settings-theme')
+            throw new DOMException('Storage unavailable', 'SecurityError');
+          return set.call(this, key, value);
+        };
+      });
+      const restrictedPage = await restricted.newPage();
+      restrictedPage.on('pageerror', (e) => errors.push(e.message));
+      await restrictedPage.goto(origin + '/#token=fixture');
+      await restrictedPage
+        .getByRole('group', { name: '设置页主题' })
+        .getByRole('button', { name: '浅色', exact: true })
+        .click();
+      await restrictedPage.locator('html[data-settings-theme="light"]').waitFor();
+      await restricted.close();
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();

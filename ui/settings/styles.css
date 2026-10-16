@@ -1,5 +1,5 @@
 /*
- * [INPUT]: 共享 tokens、Tailwind 与系统外观/动效偏好。
+ * [INPUT]: 共享 tokens、设置主题、Tailwind 与系统动效偏好。
  * [OUTPUT]: 设置页工具类、语义主题与必要的全局可访问性规则。
  * [POS]: 设置公共规则、搜索与保留的总览；主布局由 settings-layout.css 管理，不注入宿主。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
@@ -48,26 +48,6 @@
     font-synthesis: none;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
-    color-scheme: light;
-    --switch-track: #d7d7dd;
-    --notice: #faf6ed;
-    --notice-border: #ded5c4;
-    --notice-foreground: #807153;
-    --error: #fcf4f4;
-    --error-border: #e6cccc;
-    --error-foreground: #9d5353;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --switch-track: #46464e;
-      --notice: #2b281f;
-      --notice-border: #49412f;
-      --notice-foreground: #c0b18d;
-      --error: #302324;
-      --error-border: #533536;
-      --error-foreground: #ce9191;
-    }
   }
   button,
   a {

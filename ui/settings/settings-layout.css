@@ -1,9 +1,10 @@
-/* [INPUT]: Tom Modern visual direction, shared typography and system preferences.
+/* [INPUT]: Tom Modern visual direction, shared typography and resolved settings theme.
  * [OUTPUT]: Settings-only tokens, responsive shell, form rhythm and motion.
  * [POS]: Does not alter the workspace or host theme tokens.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 /* Shared tokens may be emitted after the entry CSS by Vite; specificity keeps both builds aligned. */
 html:root {
+  color-scheme: light;
   --buddy-page: #fafafa;
   --buddy-surface: #fff;
   --buddy-text: #27272a;
@@ -14,25 +15,54 @@ html:root {
   --buddy-focus: #c94300;
   --buddy-subtle: #f1f1f2;
   --buddy-radius-small: 0px;
+  --switch-track: #d7d7dd;
+  --notice: #faf6ed;
+  --notice-border: #ded5c4;
+  --notice-foreground: #807153;
+  --error: #fcf4f4;
+  --error-border: #e6cccc;
+  --error-foreground: #9d5353;
   --settings-orange: #ff5a00;
   --settings-grid: #9696960b;
   --settings-shadow: 6px 6px 0 #9696961f;
+  --settings-rule: var(--buddy-text);
+  --settings-top-rule-width: 3px;
+  --settings-selected: var(--buddy-text);
+  --settings-selected-text: var(--buddy-page);
+  --settings-selected-border: transparent;
+  --settings-switch-on: var(--buddy-text);
+  --settings-switch-thumb: var(--buddy-page);
+  --settings-glass-highlight: #ffffff65;
   --settings-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-@media (prefers-color-scheme: dark) {
-  html:root {
-    --buddy-page: #19191b;
-    --buddy-surface: #212124;
-    --buddy-text: #eeeeef;
-    --buddy-muted: #adadb6;
-    --buddy-border: #44444b;
-    --buddy-input: #252528;
-    --buddy-accent: #c94300;
-    --buddy-focus: #ff8a4a;
-    --buddy-subtle: #2c2c30;
-    --settings-grid: #aaaaaa08;
-    --settings-shadow: 6px 6px 0 #0004;
-  }
+html:root[data-settings-theme='dark'] {
+  color-scheme: dark;
+  --buddy-page: #19191b;
+  --buddy-surface: #212124;
+  --buddy-text: #eeeeef;
+  --buddy-muted: #adadb6;
+  --buddy-border: #36363c;
+  --buddy-input: #252528;
+  --buddy-accent: #c94300;
+  --buddy-focus: #ff8a4a;
+  --buddy-subtle: #2c2c30;
+  --switch-track: #3c3c43;
+  --notice: #2b281f;
+  --notice-border: #49412f;
+  --notice-foreground: #c0b18d;
+  --error: #302324;
+  --error-border: #533536;
+  --error-foreground: #ce9191;
+  --settings-grid: #aaaaaa08;
+  --settings-shadow: 0 6px 20px #00000018;
+  --settings-rule: #3c3c43;
+  --settings-top-rule-width: 1px;
+  --settings-selected: #34343b;
+  --settings-selected-text: #eeeeef;
+  --settings-selected-border: #55555f;
+  --settings-switch-on: #62626c;
+  --settings-switch-thumb: #dedee3;
+  --settings-glass-highlight: #ffffff1c;
 }
 body {
   background-image:
@@ -55,7 +85,7 @@ body {
   top: 0;
   z-index: 10;
   background: var(--buddy-page);
-  border-top: 3px solid var(--buddy-text);
+  border-top: var(--settings-top-rule-width) solid var(--settings-rule);
 }
 .settings-topline {
   display: flex;
@@ -63,7 +93,7 @@ body {
   justify-content: space-between;
   gap: 16px;
   min-height: 72px;
-  border-bottom: 1px solid var(--buddy-text);
+  border-bottom: 1px solid var(--settings-rule);
 }
 .settings-brand {
   display: inline-flex;
@@ -79,6 +109,37 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 8px;
+}
+.settings-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.settings-theme {
+  display: flex;
+  flex-shrink: 0;
+  padding: 3px;
+  border: 1px solid var(--buddy-border);
+}
+.settings-theme button {
+  min-height: 32px;
+  padding: 4px 10px;
+  color: var(--buddy-muted);
+  font-size: 0.75em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.settings-theme button:hover {
+  color: var(--buddy-text);
+}
+.settings-theme button[aria-pressed='true'] {
+  color: var(--settings-selected-text);
+  background: var(--settings-selected);
+  box-shadow: inset 0 0 0 1px var(--settings-selected-border);
+}
+.settings-theme button:focus-visible {
+  outline: 2px solid var(--buddy-focus);
+  outline-offset: 2px;
 }
 .settings-edition {
   font-size: 0.6em;
@@ -123,7 +184,7 @@ body {
 }
 .settings-search ul {
   border-radius: 0;
-  border-color: var(--buddy-text);
+  border-color: var(--settings-rule);
   box-shadow: var(--settings-shadow);
 }
 .settings-search li button {
@@ -144,8 +205,9 @@ body {
   color: var(--buddy-muted);
 }
 .settings-mode button[aria-pressed='true'] {
-  background: var(--buddy-text);
-  color: var(--buddy-page);
+  background: var(--settings-selected);
+  color: var(--settings-selected-text);
+  box-shadow: inset 0 0 0 1px var(--settings-selected-border);
 }
 .settings-layout {
   flex: 1;
@@ -378,9 +440,9 @@ body {
   cursor: pointer;
 }
 .settings-choice button[aria-pressed='true'] {
-  background: var(--buddy-text);
-  color: var(--buddy-page);
-  border-color: var(--buddy-text);
+  background: var(--settings-selected);
+  color: var(--settings-selected-text);
+  border-color: var(--settings-selected-border);
 }
 .settings-app button:disabled {
   cursor: not-allowed;
@@ -413,10 +475,10 @@ body {
   translate: 3px 0;
 }
 .settings-app [data-slot='switch'][data-state='checked'] {
-  background: var(--buddy-text);
+  background: var(--settings-switch-on);
 }
 .settings-app [data-slot='switch-thumb'] {
-  background: var(--buddy-page);
+  background: var(--settings-switch-thumb);
 }
 .settings-feature-actions {
   margin-top: 16px;
@@ -485,7 +547,7 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  border-top: 1px solid var(--buddy-text);
+  border-top: 1px solid var(--settings-rule);
   padding-top: 18px;
   margin-top: 36px;
   font-size: 0.6875em;
@@ -559,6 +621,19 @@ body {
   }
   .settings-topline {
     min-height: 64px;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-block: 14px;
+  }
+  .settings-header-actions {
+    display: contents;
+  }
+  .settings-theme {
+    order: 3;
+    width: 100%;
+  }
+  .settings-theme button {
+    flex: 1;
   }
   .settings-brand {
     font-size: 1.125em;

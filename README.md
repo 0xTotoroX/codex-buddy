@@ -71,7 +71,7 @@ Write a draft in the chat composer and click the pencil-and-sparkle icon. The re
 
 Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Narrow panels use a category selector. Both modes use the same forms and save queue; switching retains unfinished edits, disclosure state and reading position without changing advanced values. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
 
-The Tom Modern settings design includes linked workspace, feature, generation and connection previews. Saved placement, nested layout and materials update the workspace diagram; generation previews identify unsaved edits. Sample interactions stay inside the preview. Light/dark appearance and reduced-motion preferences are respected, while the existing shared font settings remain in effect.
+The Tom Modern settings design includes linked workspace, feature, generation and connection previews. Saved placement, nested layout and materials update the workspace diagram; generation previews identify unsaved edits. Sample interactions stay inside the preview. Settings follow Codex's light/dark appearance by default; the page header also offers a saved light or dark override, while the brand icon retains its original appearance. Reduced-motion preferences and existing shared font settings remain in effect.
 
 ## Task board
 

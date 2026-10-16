@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: Tom Modern 双模式设置、共享字体及只读联动预览，保留自动保存与错误反馈。
+ * [OUTPUT]: Tom Modern 双模式设置、Codex/手动主题、共享字体及只读联动预览，保留自动保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -29,6 +29,7 @@ import { CodexHostSettings } from './codex-host-settings';
 import { SettingsSearch } from './settings-search';
 import { SettingsPreview } from './settings-preview';
 import { useSettingsMotion } from './settings-motion';
+import { SettingsTheme } from './settings-theme';
 import type { FeatureState } from '../shared/features';
 import type { SurfaceState } from './surface-settings';
 import type { ModelState } from '../features/model/catalog';
@@ -105,15 +106,18 @@ function App() {
             CodexBuddy{' '}
             <span className="settings-edition">{import.meta.env.DEV ? '开发版' : '设置'}</span>
           </a>
-          <span className="settings-connection-status" data-connected={connected}>
-            {view?.connection.status === 'unresponsive'
-              ? '页面暂未响应'
-              : connected
-                ? '已连接'
-                : live
-                  ? '等待连接'
-                  : '未连接'}
-          </span>
+          <div className="settings-header-actions">
+            <SettingsTheme codexTheme={view?.panelTheme} />
+            <span className="settings-connection-status" data-connected={connected}>
+              {view?.connection.status === 'unresponsive'
+                ? '页面暂未响应'
+                : connected
+                  ? '已连接'
+                  : live
+                    ? '等待连接'
+                    : '未连接'}
+            </span>
+          </div>
         </div>
         <div className="settings-toolbar">
           <SettingsSearch navigate={navigate} />

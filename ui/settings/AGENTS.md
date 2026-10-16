@@ -25,10 +25,11 @@
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
 - [styles.css](styles.css)：Tailwind v4、语义主题映射、搜索和保留的旧总览样式；只扫描本目录，不注入宿主。
-- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。
+- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。深色使用低对比灰线与深灰选中底，不将正文白色复用作结构线或大面积选中底。
 - [settings-preview.tsx](settings-preview.tsx)：只读联动预览。复用既有模块回读的功能、材质、模型和看板快照；嵌套布局复用 resolveFeatureLayout，过滤关闭功能。生成参数显示当前草稿并标识未保存；主形式与材质只显示成功保存的值。示例操作只改变本组件状态，不请求 API、不读任务正文或凭据。
 - [settings-preview.css](settings-preview.css)：预览画布、功能示例、生成路径和连接示意的样式，材质为近似效果，不用于实际业务视图。
 - [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，尊重运行期间的减少动态效果偏好；不重新挂载控件、不存储配置。
+- [settings-theme.tsx](settings-theme.tsx)：页头“跟随 Codex / 浅色 / 深色”选择；默认跟随认证 SSE 的 panelTheme，无有效快照时保留本页末次主题，尚未收到时回退系统。选择在同源 localStorage 记忆并跨标签页同步，受限存储仍允许当前页切换；不写宿主或业务配置、不触发表单失焦保存。settings-layout.css 统一语义色，品牌图标保持原图，动作图标沿用 currentColor。
 - [index.html](index.html)：设置网页入口，图标复用 ../icon.png。
 - [board.html](board.html)：旧独立看板 HTML 入口，仍挂载 ../surfaces/desktop/legacy-board.tsx 及共用看板内容。
 - [feature.html](feature.html)：桌面和贴边通用 HTML 入口。
@@ -66,4 +67,4 @@ settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/
 
 术语设置增加打开模块与收藏筛选；移除阅读批注候选，旧 note 偏好读取为 plain。
 
-`typography-settings.tsx` 是字体唯一设置入口，复用 PanelSettings 外观 revision 保存，数字草稿跨模式/分类保留；`use-typography.ts` 通过认证 SSE 接收字体快照，更新自有文档字体和 rem 基准。设置文字层级按同一基准缩放，颜色继续跟随系统。旧分功能字号表单由统一跟随/自定义控件替换，旧值不删除。
+`typography-settings.tsx` 是字体唯一设置入口，复用 PanelSettings 外观 revision 保存，数字草稿跨模式/分类保留；`use-typography.ts` 通过认证 SSE 接收字体快照，更新自有文档字体和 rem 基准。设置文字层级按同一基准缩放，颜色由 settings-theme 独立管理。旧分功能字号表单由统一跟随/自定义控件替换，旧值不删除。
