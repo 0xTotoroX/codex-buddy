@@ -321,7 +321,7 @@ try {
     .getByRole('button', { name: '模型快切' })
     .click();
   const view = page.locator('[data-feature="model"]');
-  const picker = () => page.locator('[data-model-picker]:visible');
+  const picker = () => view.locator('[data-model-picker]');
   const tile = (id) => view.locator(`[data-model-tile="${id}"]`);
   const showOthers = async () => {
     if ((await picker().getAttribute('aria-expanded')) === 'false') await picker().click();
@@ -335,7 +335,8 @@ try {
   assert.equal(await view.locator('[data-model-group], .model-visibility').count(), 0);
   assert.equal(await view.locator('.model-row, [data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
-  assert.equal(await view.locator('.model-column-resize.model-fast').count(), 1);
+  assert.equal(await view.locator('.model-column-resize.model-fast').count(), 0);
+  assert.equal(await view.locator('.model-preset-actions [data-model-picker]').count(), 1);
   assert.equal(await view.locator('.model-quick-actions').count(), 0);
   assert.equal(await view.locator('.model-add-preset').count(), 0);
   assert.equal(await view.locator('.model-preset-actions [data-icon="pencil"]').count(), 1);
@@ -433,7 +434,7 @@ try {
     .evaluate((n) => n.getBoundingClientRect().height);
   assert.ok(compactModelHeight < 350, 'few model rows keep the edge panel compact');
   record(
-    'refresh lives beside the picker close button and presets wrap in an inset box with an combined Fast/resize control and trailing preset actions',
+    'refresh lives beside picker close; independent Fast/divider controls and trailing edit/add/catalog actions',
   );
   const savedSelection = structuredClone(model.snapshot.current);
   const presetButton = view.getByRole('button', { name: '添加预设', exact: true });
@@ -522,7 +523,7 @@ try {
   );
   assert.equal(await view.getByRole('searchbox').count(), 0);
   assert.equal(await view.getByRole('slider').count(), 0);
-  const columnHandle = view.getByRole('button', { name: 'Fast', exact: true });
+  const columnHandle = view.getByRole('button', { name: '调整模型名称宽度', exact: true });
   const handleBox = await columnHandle.boundingBox();
   const preferenceCount = () => actions.filter((item) => item.action === 'preferences').length;
   const beforeResize = preferenceCount();
@@ -545,7 +546,7 @@ try {
   assert.deepEqual(
     await view.locator('.model-fast').boundingBox(),
     { ...fixedFast, x: fixedFast.x + 50 },
-    'combined Fast handle follows the column boundary',
+    'Fast remains aligned above the independent divider',
   );
   assert.deepEqual(
     await page.locator('#edge-panel').boundingBox(),
@@ -724,7 +725,7 @@ try {
   );
   await page.setViewportSize({ width: 1100, height: 700 });
   await view.locator('.model-column-resize[data-column-width="280"]').waitFor();
-  await view.getByRole('button', { name: 'Fast', exact: true }).press('ArrowRight');
+  await view.getByRole('button', { name: '调整模型名称宽度', exact: true }).press('ArrowRight');
   await view
     .locator('.model-column-resize[data-column-width="296"][aria-disabled="false"]')
     .waitFor();

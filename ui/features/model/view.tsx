@@ -1,9 +1,8 @@
-/* [INPUT]: Existing model control envelope, serialized actions and optional surface header slot.
- * [OUTPUT]: Content-sized favorites matrix, combined Fast/resize control, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
+/* [INPUT]: Existing model control envelope and serialized actions.
+ * [OUTPUT]: Content-sized favorites matrix, independent Fast/animated divider controls, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { createPortal } from 'react-dom';
 import { iconSvg } from '../../shared/icons/index.js';
 import type { ModelPresetDraft, Reading } from '../../shared/features';
 import {
@@ -15,6 +14,8 @@ import {
   type Selection,
 } from './catalog';
 export type { ModelState } from './catalog';
+const dischargeShape =
+  'M24 0 L23 43 L27 86 L20 122 L26 166 L23 209 L28 256 L21 295 L25 328 L24 360';
 const label = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 const icon = (name: string) => <span dangerouslySetInnerHTML={{ __html: iconSvg(name) }} />;
 export function ModelView({
@@ -22,7 +23,6 @@ export function ModelView({
   action,
   busy,
   reading,
-  headerActions,
 }: {
   headerActions?: HTMLElement;
   reading: Reading;
@@ -57,6 +57,62 @@ export function ModelView({
   const root = useRef<HTMLElement>(null);
   const picker = useRef<HTMLDivElement>(null);
   const pickerToggle = useRef<HTMLButtonElement>(null);
+  const restorePickerFocus = useRef(false);
+  useLayoutEffect(() => {
+    if (!others && restorePickerFocus.current) {
+      restorePickerFocus.current = false;
+      pickerToggle.current?.focus({ preventScroll: true });
+    }
+  }, [others]);
+  const fastButton = useRef<HTMLButtonElement>(null);
+  const discharge = useRef<HTMLDivElement>(null);
+  const dischargePath = useRef<SVGGElement>(null);
+  const dischargeAnimations = useRef<Animation[]>([]);
+  function stopDischarge() {
+    dischargeAnimations.current.forEach((animation) => animation.cancel());
+    dischargeAnimations.current = [];
+  }
+  function playDischarge() {
+    stopDischarge();
+    const button = fastButton.current;
+    const beam = discharge.current;
+    const path = dischargePath.current;
+    if (!button || !beam || !path) return;
+    const reduced = button.ownerDocument.defaultView?.matchMedia(
+      '(prefers-reduced-motion: reduce)',
+    ).matches;
+    const pulse = button.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 130 });
+    const animations = reduced
+      ? [pulse]
+      : [
+          pulse,
+          path.animate([{ clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)' }], {
+            duration: 145,
+            easing: 'cubic-bezier(.18,.7,.28,1)',
+            fill: 'forwards',
+          }),
+          beam.animate(
+            [
+              { opacity: 0, offset: 0 },
+              { opacity: 1, offset: 0.1 },
+              { opacity: 0.95, offset: 0.44 },
+              { opacity: 0, offset: 1 },
+            ],
+            { duration: 340, easing: 'linear' },
+          ),
+        ];
+    dischargeAnimations.current = animations;
+    void animations
+      .at(-1)!
+      .finished.then(() => {
+        if (dischargeAnimations.current === animations) stopDischarge();
+      })
+      .catch(() => {});
+  }
+  useEffect(() => stopDischarge, []);
+  useEffect(() => {
+    if (others) stopDischarge();
+  }, [others]);
   useEffect(() => {
     if (!others) return;
     const document = root.current!.ownerDocument;
@@ -68,8 +124,8 @@ export function ModelView({
     const escape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.isComposing) return;
       event.stopPropagation();
+      restorePickerFocus.current = true;
       setOthers(false);
-      pickerToggle.current?.focus({ preventScroll: true });
     };
     document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', escape, true);
@@ -88,7 +144,6 @@ export function ModelView({
     value: number;
     scale: number;
   } | null>(null);
-  const suppressFastClick = useRef(false);
   useLayoutEffect(() => {
     if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
   }, []);
@@ -304,23 +359,10 @@ export function ModelView({
   const allButton = (
     <button
       ref={pickerToggle}
-      className="model-picker-toggle"
+      className="model-icon-button model-picker-toggle"
       data-model-picker
       aria-label="所有模型"
       aria-expanded={others}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 28,
-        height: 28,
-        padding: 5,
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-        opacity: 1,
-        border: 0,
-        background: 'transparent',
-      }}
       onClick={() => {
         if (!others) setBrowserHeight(main.current?.offsetHeight || 0);
         setPresetDraft(null);
@@ -344,11 +386,6 @@ export function ModelView({
         } as CSSProperties
       }
     >
-      {headerActions ? (
-        createPortal(allButton, headerActions)
-      ) : (
-        <header className="model-toolbar">{allButton}</header>
-      )}
       <div className="model-main" ref={main} data-view={others ? 'all' : 'favorites'}>
         <div className="model-favorites" aria-hidden={others} inert={others}>
           <div
@@ -364,10 +401,33 @@ export function ModelView({
               <div className="model-primary">
                 <button
                   type="button"
-                  className="model-column-resize model-fast"
+                  ref={fastButton}
+                  className="model-icon-button model-fast"
                   aria-label="Fast"
-                  aria-description={`单击切换 Fast，左右拖动或方向键调整模型名称宽度，当前 ${nameWidth}px`}
                   aria-pressed={s.current?.speed === 'fast'}
+                  disabled={
+                    busy ||
+                    !allowed ||
+                    !s.current ||
+                    !s.models.find((m) => m.id === s.current?.model)?.fast
+                  }
+                  onClick={async () => {
+                    if (!s.current) return;
+                    playDischarge();
+                    const result = await apply({
+                      ...s.current,
+                      speed: s.current.speed === 'fast' ? 'standard' : 'fast',
+                    });
+                    if (result === null) stopDischarge();
+                  }}
+                >
+                  {icon('bolt')}
+                </button>
+                <button
+                  type="button"
+                  className="model-column-resize"
+                  aria-label="调整模型名称宽度"
+                  aria-description={`左右拖动或方向键调整，当前 ${nameWidth}px`}
                   data-column-min={100}
                   data-column-max={maxNameWidth}
                   data-column-width={nameWidth}
@@ -375,29 +435,12 @@ export function ModelView({
                   tabIndex={busy ? -1 : 0}
                   data-resizing={!!resize.current}
                   data-dragging={dragging}
-                  onClick={(event) => {
-                    if (event.detail > 0 && suppressFastClick.current) {
-                      suppressFastClick.current = false;
-                      return;
-                    }
-                    if (
-                      busy ||
-                      !allowed ||
-                      !s.current ||
-                      !s.models.find((m) => m.id === s.current?.model)?.fast
-                    )
-                      return;
-                    void apply({
-                      ...s.current,
-                      speed: s.current.speed === 'fast' ? 'standard' : 'fast',
-                    });
-                  }}
                   onPointerDown={(event) => {
-                    if (event.button !== 0 || busy) return;
+                    if (event.button !== 0 || busy || resize.current) return;
                     event.preventDefault();
                     event.stopPropagation();
                     event.currentTarget.focus({ preventScroll: true });
-                    suppressFastClick.current = false;
+                    stopDischarge();
                     setDragging(false);
                     resize.current = {
                       pointer: event.pointerId,
@@ -418,8 +461,7 @@ export function ModelView({
                     if (!drag || drag.pointer !== event.pointerId) return;
                     const dx = event.clientX - drag.x;
                     const dy = event.clientY - drag.y;
-                    if (Math.hypot(dx, dy) >= 8) suppressFastClick.current = true;
-                    if (!drag.moved && (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy))) return;
+                    if (!drag.moved && (Math.abs(dx) < 2 || Math.abs(dx) < Math.abs(dy))) return;
                     if (!drag.moved) setDragging(true);
                     drag.moved = true;
                     drag.value = clampWidth(drag.width + (event.clientX - drag.x) / drag.scale);
@@ -428,7 +470,6 @@ export function ModelView({
                   onPointerUp={(event) => {
                     const drag = resize.current;
                     if (!drag || drag.pointer !== event.pointerId) return;
-                    suppressFastClick.current ||= drag.moved;
                     setDragging(false);
                     resize.current = null;
                     event.currentTarget.releasePointerCapture(event.pointerId);
@@ -437,7 +478,6 @@ export function ModelView({
                   }}
                   onLostPointerCapture={() => {
                     if (!resize.current) return;
-                    suppressFastClick.current = true;
                     setDragging(false);
                     resize.current = null;
                     setColumnWidth(null);
@@ -445,7 +485,6 @@ export function ModelView({
                   onKeyDown={(event) => {
                     if (event.key === 'Escape' && resize.current) {
                       event.stopPropagation();
-                      suppressFastClick.current = true;
                       setDragging(false);
                       event.currentTarget.releasePointerCapture(resize.current.pointer);
                       resize.current = null;
@@ -462,8 +501,29 @@ export function ModelView({
                     void saveWidth(width);
                   }}
                 >
-                  {icon('bolt')}
+                  <span className="model-divider-line" />
                 </button>
+                <div className="model-discharge" ref={discharge} aria-hidden="true">
+                  <svg viewBox="0 0 48 360" preserveAspectRatio="none">
+                    <g ref={dischargePath}>
+                      <path
+                        className="model-discharge-glow"
+                        d={dischargeShape}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <path
+                        className="model-discharge-core"
+                        d={dischargeShape}
+                        vectorEffect="non-scaling-stroke"
+                      />
+                      <path
+                        className="model-discharge-branches"
+                        d="M20 122 L12 144 L15 158 M28 256 L35 270 L32 284"
+                        vectorEffect="non-scaling-stroke"
+                      />
+                    </g>
+                  </svg>
+                </div>
                 <div className="model-matrix-head">
                   <div aria-hidden="true" />
                   <div className="model-choices">
@@ -541,7 +601,7 @@ export function ModelView({
               {presetDraft?.creating && presetEditor}
               <div className="model-preset-actions">
                 <button
-                  className="model-preset-edit"
+                  className="model-icon-button model-preset-edit"
                   aria-label="编辑预设"
                   aria-pressed={tools}
                   disabled={busy || !prefs.presets.length}
@@ -553,13 +613,14 @@ export function ModelView({
                   {icon('pencil')}
                 </button>
                 <button
-                  className="model-preset-add"
+                  className="model-icon-button model-preset-add"
                   aria-label="添加预设"
                   disabled={busy || !allowed || !s.current}
                   onClick={addPreset}
                 >
                   {icon('plus')}
                 </button>
+                {allButton}
               </div>
             </div>
           </section>
@@ -578,8 +639,8 @@ export function ModelView({
               <button
                 aria-label="关闭所有模型"
                 onClick={() => {
+                  restorePickerFocus.current = true;
                   setOthers(false);
-                  pickerToggle.current?.focus({ preventScroll: true });
                 }}
               >
                 {icon('close')}

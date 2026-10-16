@@ -227,7 +227,7 @@ function probePage() {
             const divider = root?.querySelector('.model-section-divider');
             return {
               outline: handle ? getComputedStyle(handle).outlineStyle : null,
-              picker: document.querySelector('[data-model-picker]')?.getAttribute('aria-expanded'),
+              picker: root?.querySelector('[data-model-picker]')?.getAttribute('aria-expanded'),
               groups: root?.querySelectorAll('[data-model-group]').length,
               rows: root?.querySelectorAll('.model-row').length,
               divider: divider ? getComputedStyle(divider).borderTopWidth : null,
@@ -236,11 +236,11 @@ function probePage() {
           columnWidth: document
             .querySelector('.edge-view')
             ?.shadowRoot?.querySelector('.model-column-resize')
-            ?.getAttribute('aria-valuenow'),
+            ?.getAttribute('data-column-width'),
           columnMax: document
             .querySelector('.edge-view')
             ?.shadowRoot?.querySelector('.model-column-resize')
-            ?.getAttribute('aria-valuemax'),
+            ?.getAttribute('data-column-max'),
           featureVisible: !!document
             .querySelector('.edge-view')
             ?.shadowRoot?.querySelector('[data-feature="model"]'),
@@ -533,7 +533,9 @@ try {
   assert.equal(telemetry.modelView.divider, null);
   check('native model view defaults to favorites with a borderless collapsed picker');
   const favoriteHeight = telemetry.native.layoutHeight;
-  await command("document.querySelector('[data-model-picker]').click()");
+  await command(
+    "document.querySelector('.edge-view').shadowRoot.querySelector('[data-model-picker]').click()",
+  );
   await until(
     () => telemetry.modelView.picker === 'true' && telemetry.modelView.groups === 1,
     'native chooser opens',
@@ -595,9 +597,6 @@ try {
     'hold column-resize fixture open',
   );
   const columnBounds = windowInfo().kCGWindowBounds;
-  const fastBounds = await command(
-    "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
-  );
   const originalColumn = prefs.modelColumnWidth;
   for (const width of [100, 200, 560, originalColumn]) {
     prefs.modelColumnWidth = width;
@@ -611,12 +610,15 @@ try {
       columnBounds,
       'column width must not move or resize the native frame',
     );
-    assert.deepEqual(
-      await command(
-        "document.querySelector('.edge-view').shadowRoot.querySelector('.model-fast').getBoundingClientRect().toJSON()",
-      ),
-      fastBounds,
-      'native Fast control does not follow the column divider',
+    assert.equal(
+      await command(`(() => {
+      const root = document.querySelector('.edge-view').shadowRoot;
+      const fast = root.querySelector('.model-fast').getBoundingClientRect();
+      const line = root.querySelector('.model-column-resize').getBoundingClientRect();
+      return Math.abs(fast.x + fast.width / 2 - line.x - line.width / 2) < 1 && fast.bottom <= line.y;
+    })()`),
+      true,
+      'native Fast is aligned above the independent divider',
     );
     assert.equal(telemetry.native.layoutWidth, preparedWidth);
     assert.ok(
@@ -632,7 +634,7 @@ try {
     const handle = await command(`(() => {
       const node = document.querySelector('.edge-view').shadowRoot.querySelector('.model-column-resize');
       const rect = node.getBoundingClientRect();
-      return { x: rect.x + rect.width / 2, y: rect.y + 12, value: Number(node.getAttribute('aria-valuenow')), max: Number(node.getAttribute('aria-valuemax')) };
+      return { x: rect.x + rect.width / 2, y: rect.y + 12, value: Number(node.getAttribute('data-column-width')), max: Number(node.getAttribute('data-column-max')) };
     })()`);
     const amount = Math.min(24, handle.max - handle.value);
     assert.ok(amount > 0, 'fixture has room for an internal resize');

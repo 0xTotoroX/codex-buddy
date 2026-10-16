@@ -1,5 +1,5 @@
 /* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
- * [OUTPUT]: Content-sized matrix, combined Fast/resize control and recessed preset tags and a single-surface model catalog.
+ * [OUTPUT]: Content-sized matrix, separate Fast and electric divider controls and recessed preset tags and a single-surface model catalog.
  * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 .feature-model {
@@ -49,17 +49,6 @@
   height: var(--model-browser-height);
   flex: none;
 }
-.model-toolbar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
-}
-.model-picker-toggle {
-  color: var(--muted);
-}
-.model-picker-toggle[aria-expanded='true'] {
-  color: var(--ink);
-}
 .model-scroll {
   min-height: 0;
   overflow-x: auto;
@@ -72,28 +61,96 @@
 .model-primary {
   position: relative;
 }
+.feature-model .model-icon-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  color: var(--muted);
+  background: transparent;
+}
+.feature-model .model-icon-button[aria-pressed='true'],
+.feature-model .model-icon-button[aria-expanded='true'] {
+  color: var(--ink);
+}
 .feature-model .model-column-resize {
   position: absolute;
   z-index: 1;
-  left: calc(var(--name-width) - 36px);
-  top: 0;
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 32px;
-  padding: 7px 9px;
-  color: var(--muted);
-  cursor: pointer;
+  left: var(--name-width);
+  top: 32px;
+  bottom: 4px;
+  width: 16px;
+  min-width: 16px;
+  min-height: 0;
+  padding: 0;
+  cursor: col-resize;
   touch-action: none;
   user-select: none;
 }
-.feature-model .model-column-resize[data-dragging='true'] {
-  cursor: col-resize;
-}
+.feature-model .model-column-resize:hover:not(:disabled),
 .feature-model .model-column-resize:focus-visible {
+  background: transparent;
   outline: none;
+}
+.model-divider-line {
+  position: absolute;
+  inset: 0 auto 0 7.5px;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--ink) 25%, transparent),
+    color-mix(in srgb, var(--ink) 12%, transparent) 85%,
+    transparent
+  );
+}
+.model-column-resize:is(:hover, :focus-visible, [data-dragging='true']) .model-divider-line {
+  background: linear-gradient(
+    to bottom,
+    var(--muted),
+    color-mix(in srgb, var(--ink) 40%, transparent) 85%,
+    transparent
+  );
+}
+.model-discharge {
+  position: absolute;
+  left: calc(var(--name-width) - 8px);
+  top: 26px;
+  bottom: 4px;
+  width: 32px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
   color: var(--ink);
-  background: var(--hover);
+}
+.feature-model .model-discharge svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.model-discharge path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.model-discharge-core {
+  stroke-width: 1.4;
+}
+.model-discharge-glow {
+  stroke-width: 4;
+  opacity: 0.48;
+  filter: blur(2px);
+}
+.model-discharge-branches {
+  stroke-width: 0.8;
+  opacity: 0.48;
+}
+@media (prefers-reduced-motion: reduce) {
+  .model-discharge {
+    display: none;
+  }
 }
 .model-matrix-head,
 .model-row {
@@ -104,18 +161,15 @@
   min-width: calc(var(--name-width) + 16px + var(--reasoning-min-width));
 }
 .model-matrix-head {
-  min-height: 32px;
+  min-height: 28px;
   color: var(--muted);
   font-size: inherit;
 }
 .feature-model .model-fast {
-  padding: 5px;
-  color: var(--muted);
-  background: transparent;
-}
-.feature-model .model-fast[aria-pressed='true'] {
-  color: var(--ink);
-  background: transparent;
+  position: absolute;
+  left: calc(var(--name-width) - 6px);
+  top: 0;
+  z-index: 3;
 }
 .model-choices {
   display: grid;
@@ -256,14 +310,6 @@
   align-self: flex-end;
   margin-left: auto;
   gap: 0;
-}
-.feature-model .model-preset-actions button {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 5px;
-  color: var(--muted);
 }
 .feature-model .model-preset-edit[aria-pressed='true'] {
   color: var(--ink);

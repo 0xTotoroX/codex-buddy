@@ -385,14 +385,15 @@ test(
       });
       await page.evaluate((state) => window.render(state), state);
       const chooser = view.locator('.model-picker-toggle');
-      if ((await chooser.getAttribute('aria-expanded')) === 'true') await chooser.click();
+      if ((await chooser.getAttribute('aria-expanded')) === 'true')
+        await view.getByRole('button', { name: '关闭所有模型' }).click();
       await view.locator('[data-model-row="favorite-4"] .model-route').waitFor();
       await page.mouse.move(850, 950);
       assert.equal(await view.locator('.model-visibility, hr, .model-group-label').count(), 0);
-      assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
+      assert.equal(await view.locator('.model-primary > .model-fast').count(), 1);
       const line = await view.locator('.model-column-resize').boundingBox();
       const head = await view.locator('.model-matrix-head').boundingBox();
-      assert.ok(line.y + line.height <= head.y + head.height + 1, 'resize grip ends in the header');
+      assert.ok(line.y >= head.y + head.height, 'divider starts below the Fast button');
       await view.screenshot({ path: 'target/reports/model-groups/model-compact.png' });
       await chooser.click();
       const list = view.locator('.model-other-list');
@@ -428,31 +429,25 @@ test(
       await page.mouse.move(850, 950);
       await view.screenshot({ path: 'target/reports/model-groups/model-expanded.png' });
 
-      await chooser.click();
+      await view.getByRole('button', { name: '关闭所有模型' }).click();
       const fixedFrame = await view.boundingBox();
       await view.evaluate((node, height) => (node.style.height = `${height}px`), fixedFrame.height);
-      const fixedButton = await chooser.boundingBox();
       const fixedFast = await view.locator('.model-fast').boundingBox();
-      const separator = view.getByRole('separator', { name: '模型名称列宽' });
+      const separator = view.getByRole('button', { name: '调整模型名称宽度' });
       const start = await separator.boundingBox();
       await page.mouse.move(start.x + start.width / 2, start.y + 12);
       await page.mouse.down();
       await page.mouse.move(start.x - 180, start.y + 12, { steps: 12 });
-      assert.equal(await separator.getAttribute('aria-valuenow'), '100');
+      assert.equal(await separator.getAttribute('data-column-width'), '100');
       assert.deepEqual(
         await view.locator('.model-fast').boundingBox(),
-        fixedFast,
-        'Fast never follows column width',
+        { ...fixedFast, x: fixedFast.x - 145 },
+        'Fast stays aligned above the divider',
       );
       const scroller = view.locator('.model-favorites');
       assert.ok(
         await scroller.evaluate((n) => n.scrollHeight > n.clientHeight),
         'wrapped names scroll inside the fixed table',
-      );
-      const narrowedButton = await chooser.boundingBox();
-      assert.ok(
-        Math.abs(narrowedButton.y - fixedButton.y) < 1,
-        `chooser button stays visible while rows grow: ${JSON.stringify({ fixedButton, narrowedButton, geometry: await view.evaluate((n) => [...n.querySelectorAll('.feature-body,.feature-model,.model-scroll,.model-picker,.model-picker-toggle')].map((el) => ({ class: el.className, height: el.clientHeight, scroll: el.scrollHeight, flex: getComputedStyle(el).flex, y: el.getBoundingClientRect().y }))) })}`,
       );
       assert.deepEqual(
         await view.boundingBox(),
@@ -462,7 +457,8 @@ test(
       await page.mouse.up();
       await page.waitForFunction(
         () =>
-          document.querySelector('.model-column-resize').getAttribute('aria-valuenow') === '100',
+          document.querySelector('.model-column-resize').getAttribute('data-column-width') ===
+          '100',
       );
       await scroller.evaluate((n) => (n.scrollTop = n.scrollHeight));
       const lastChoice = view.locator('[data-model="favorite-4"][data-reasoning="high"]');
@@ -495,7 +491,7 @@ test(
       const wrapped = await view.locator('.model-presets').evaluate((node) => {
         const buttons = [...node.querySelectorAll('button')];
         return {
-          rows: new Set(buttons.map((button) => button.offsetTop)).size,
+          rows: new Set(buttons.map((button) => button.getBoundingClientRect().top)).size,
           height: node.clientHeight,
           scroll: node.scrollHeight,
         };
@@ -549,3 +545,129 @@ test('preset names stay unique without merging repeated model selections', () =>
   assert.ok(new TextEncoder().encode(suffixed).length <= 256);
   assert.ok(suffixed.endsWith(' 2'));
 });
+
+test(
+  'Fast click animates independently of divider drag and preserves model preferences',
+  { timeout: 30000 },
+  async () => {
+    const bundle = await build({
+      stdin: {
+        contents: `import React from 'react'; import {createRoot} from 'react-dom/client'; import {ModelView} from './ui/features/model/view';
+      const root = createRoot(document.getElementById('view')); const reading = {};
+      window.calls = []; window.state = {revision: 1, preferences: {enabled: true, pinned: ['gpt-test'], modelColumnWidth: 220, presets: [{id:'kept',name:'旧预设',selection:{model:'gpt-test',reasoning:'high',speed:'standard'}}]}, snapshot: {target:{id:'fixture'},revision:'v1',status:'ready',models:[{id:'gpt-test',label:'GPT test',reasoning:['low','high'],fast:true}],current:{model:'gpt-test',reasoning:'high',speed:'standard'}}};
+      window.render = () => root.render(<ModelView state={window.state} reading={reading} busy={false} action={async(data,action)=>{window.calls.push({data,action}); if(window.fail) return null; if(action==='apply')window.state.snapshot.current={...data.selection};else Object.assign(window.state.preferences,data.patch);window.render();return window.state;}}/>); window.render();`,
+        resolveDir: process.cwd(),
+        loader: 'tsx',
+      },
+      bundle: true,
+      write: false,
+    });
+    const browser = await chromium.launch({ headless: true });
+    try {
+      const page = await browser.newPage({ viewport: { width: 760, height: 650 } });
+      const errors = [];
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.setContent(
+        '<div id="view" style="width:700px;--paper:#000;--ink:#eee;--muted:#999;--hover:#222"></div>',
+      );
+      await page.addStyleTag({
+        content:
+          readFileSync('ui/surfaces/workspace/content.css', 'utf8') +
+          readFileSync('ui/features/model/styles.css', 'utf8'),
+      });
+      await page.addScriptTag({ content: bundle.outputFiles[0].text });
+      const fast = page.getByRole('button', { name: 'Fast', exact: true });
+      const line = page.getByRole('button', { name: '调整模型名称宽度' });
+      await fast.waitFor();
+      assert.deepEqual(
+        await page
+          .locator('.model-preset-actions button')
+          .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('aria-label'))),
+        ['编辑预设', '添加预设', '所有模型'],
+      );
+      assert.equal(
+        await page.locator('.model-icon-button').evaluateAll((nodes) =>
+          nodes.every((n) => {
+            const b = n.getBoundingClientRect(),
+              s = n.querySelector('svg').getBoundingClientRect();
+            return b.width === 28 && b.height === 28 && s.width === 18 && s.height === 18;
+          }),
+        ),
+        true,
+      );
+      const animations = await fast.evaluate((n) => {
+        n.click();
+        return n.closest('.feature-model').querySelector('.model-discharge').getAnimations().length;
+      });
+      assert.equal(animations, 1);
+      await page.waitForFunction(
+        () => document.querySelector('.model-discharge').getAnimations().length === 0,
+      );
+      assert.equal(await fast.getAttribute('aria-pressed'), 'true');
+      assert.equal(
+        await page.locator('.model-discharge').evaluate((n) => getComputedStyle(n).opacity),
+        '0',
+      );
+      const before = await fast.boundingBox(),
+        box = await line.boundingBox();
+      await page.mouse.move(box.x + 8, box.y + 10);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 48, box.y + 10, { steps: 4 });
+      await page.mouse.up();
+      assert.equal(await line.getAttribute('data-column-width'), '260');
+      assert.equal(await fast.getAttribute('aria-pressed'), 'true');
+      assert.equal(
+        await page.evaluate(() => window.calls.filter((c) => c.action === 'apply').length),
+        1,
+      );
+      const after = await fast.boundingBox();
+      assert.equal(after.x - before.x, 40);
+      await line.press('ArrowLeft');
+      assert.equal(await line.getAttribute('data-column-width'), '244');
+      await fast.press('ArrowRight');
+      assert.equal(await line.getAttribute('data-column-width'), '244');
+      const cancel = await line.boundingBox();
+      await page.mouse.move(cancel.x + 8, cancel.y + 10);
+      await page.mouse.down();
+      await page.mouse.move(cancel.x + 48, cancel.y + 10);
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      assert.equal(await line.getAttribute('data-column-width'), '244');
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(
+        await fast.evaluate((n) => {
+          n.click();
+          return n.closest('.feature-model').querySelector('.model-discharge').getAnimations()
+            .length;
+        }),
+        0,
+      );
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await page.evaluate(() => {
+        window.fail = true;
+      });
+      await fast.click();
+      await page.waitForFunction(
+        () => document.querySelector('.model-discharge').getAnimations().length === 0,
+      );
+      assert.equal(
+        await fast.getAttribute('aria-pressed'),
+        'false',
+        'failed apply preserves actual state',
+      );
+      await page.getByRole('button', { name: '所有模型', exact: true }).click();
+      await page.getByRole('button', { name: '关闭所有模型' }).click();
+      assert.equal(
+        await page
+          .getByRole('button', { name: '所有模型', exact: true })
+          .evaluate((n) => n === document.activeElement),
+        true,
+      );
+      assert.equal(await page.getByRole('button', { name: '旧预设', exact: true }).count(), 1);
+      assert.equal(await page.evaluate(() => window.state.preferences.presets[0].id), 'kept');
+      assert.deepEqual(errors, []);
+    } finally {
+      await browser.close();
+    }
+  },
+);
