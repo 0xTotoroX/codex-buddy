@@ -1,4 +1,4 @@
-/* [INPUT]: Mounted settings labels and category navigation.
+/* [INPUT]: Mounted settings labels, explicit page catalog and lazy drawer entries.
  * [OUTPUT]: Local search with Cmd/Ctrl+K and original-control navigation without remounting forms.
  * [POS]: Presentation only; never indexes input values, credentials or chat content.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -26,45 +26,75 @@ function indexSettings(): Entry[] {
   const content = document.querySelector('.settings-content');
   if (!content) return [];
   const seen = new Set<string>();
-  return Array.from(content.querySelectorAll('label,h2,summary,button[aria-label]')).flatMap(
-    (node, i) => {
-      if (node.matches('[data-drawer-heading], [data-drawer-close]')) return [];
-      const category = node.closest<HTMLElement>('[data-settings-page]')?.dataset
-        .settingsPage as SettingsPage;
-      if (!category || !(category in pageTitles)) return [];
-      const label = (node.getAttribute('aria-label') || node.textContent || '').trim();
-      if (!label || label.length > 90) return [];
-      const target =
-        node instanceof HTMLLabelElement
-          ? (node.htmlFor && document.getElementById(node.htmlFor)) ||
-            node.querySelector<HTMLElement>('input,button,select') ||
-            node
-          : node;
-      if (!(target instanceof HTMLElement)) return [];
-      if (!target.id) {
-        let candidate = `buddy-settings-search-${i}`;
-        while (document.getElementById(candidate)) candidate += '-field';
-        target.id = candidate;
-      }
-      const id = target.id;
-      if (seen.has(id)) return [];
-      seen.add(id);
-      const section = node.closest('section');
-      const context = section?.querySelector('h2')?.textContent?.trim() || '';
-      const parentKeys = Object.entries(aliases)
-        .filter(([key]) => node.closest(`#${key}`) || id === key)
-        .map(([, value]) => value)
-        .join(' ');
-      return [
-        {
-          id,
-          label,
-          category,
-          context,
-          keywords: normalize(`${label} ${context} ${pageTitles[category]} ${parentKeys}`),
-        },
-      ];
+  const fields = Array.from(
+    content.querySelectorAll('label,h2,summary,button[aria-label]'),
+  ).flatMap((node, i) => {
+    if (node.matches('[data-drawer-heading], [data-drawer-close]')) return [];
+    const category = node.closest<HTMLElement>('[data-settings-page]')?.dataset
+      .settingsPage as SettingsPage;
+    if (!category || !(category in pageTitles)) return [];
+    const label = (node.getAttribute('aria-label') || node.textContent || '').trim();
+    if (!label || label.length > 90) return [];
+    const target =
+      node instanceof HTMLLabelElement
+        ? (node.htmlFor && document.getElementById(node.htmlFor)) ||
+          node.querySelector<HTMLElement>('input,button,select') ||
+          node
+        : node;
+    if (!(target instanceof HTMLElement)) return [];
+    if (!target.id) {
+      let candidate = `buddy-settings-search-${i}`;
+      while (document.getElementById(candidate)) candidate += '-field';
+      target.id = candidate;
+    }
+    const id = target.id;
+    if (seen.has(id)) return [];
+    seen.add(id);
+    const section = node.closest('section');
+    const context = section?.querySelector('h2')?.textContent?.trim() || '';
+    const parentKeys = Object.entries(aliases)
+      .filter(([key]) => node.closest(`#${key}`) || id === key)
+      .map(([, value]) => value)
+      .join(' ');
+    return [
+      {
+        id,
+        label,
+        category,
+        context,
+        keywords: normalize(`${label} ${context} ${pageTitles[category]} ${parentKeys}`),
+      },
+    ];
+  });
+  const pages = (Object.keys(pageTitles) as SettingsPage[])
+    .filter((category) => category !== 'dev' || document.getElementById('buddy-dev-sources'))
+    .map((category) => ({
+      id: '',
+      label: pageTitles[category],
+      category,
+      context: '',
+      keywords: normalize(pageTitles[category]),
+    }));
+  const drawers: Entry[] = [
+    {
+      id: 'settings-library',
+      label: '词库管理',
+      category: 'terminology',
+      context: '术语释义',
+      keywords: '词库管理 导入 导出',
     },
+    {
+      id: 'model-organization',
+      label: '模型分组',
+      category: 'model-control',
+      context: '模型快切',
+      keywords: '模型分组 厂家 分类',
+    },
+  ];
+  return [...fields, ...pages, ...drawers].filter(
+    (entry, index, all) =>
+      all.findIndex((other) => other.category === entry.category && other.label === entry.label) ===
+      index,
   );
 }
 function searchEntries(entries: Entry[], query: string) {
@@ -120,7 +150,10 @@ export function SettingsSearch({
   }, [query]);
   const results = searchEntries(entries, query);
   function select(entry: Entry) {
-    navigate(entry.category, `#settings-${entry.category}/${encodeURIComponent(entry.id)}`);
+    navigate(
+      entry.category,
+      `#settings-${entry.category}${entry.id ? '/' + encodeURIComponent(entry.id) : ''}`,
+    );
     setQuery('');
   }
   return (

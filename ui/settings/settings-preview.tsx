@@ -284,11 +284,19 @@ function WorkspacePreview({
   );
 }
 
-function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
+function FeaturePreview({ form, tasks, model, view, dirty, page }: PreviewProps) {
   const [tab, setTab] = useState<'outline' | 'next' | 'board' | 'model'>('next');
   const [selected, setSelected] = useState(0);
   const [demoDraft, setDemoDraft] = useState('');
-  const transition = usePreviewTransition(tab);
+  const activeScene =
+    page === 'board'
+      ? 'board'
+      : page === 'model-control'
+        ? 'model'
+        : ['next', 'prompts'].includes(page)
+          ? 'next'
+          : tab;
+  const transition = usePreviewTransition(activeScene);
   const enabled = {
     outline: form?.answerOutlineEnabled,
     next: form?.enabled,
@@ -305,9 +313,20 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
   const examples = ['完善实现方案', '检查边界条件', '补充验证步骤'];
   return (
     <Frame title="功能如何呈现" label={dirty ? '未保存编辑 · 交互示例' : '交互示例'}>
-      <div className="preview-selector" role="group" aria-label="功能预览" data-settings-navigation>
+      <div
+        className="preview-selector"
+        role="group"
+        aria-label="功能预览"
+        hidden={page !== 'features'}
+        data-settings-navigation
+      >
         {(['outline', 'next', 'board', 'model'] as const).map((id) => (
-          <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
+          <button
+            key={id}
+            type="button"
+            aria-pressed={activeScene === id}
+            onClick={() => setTab(id)}
+          >
             {titles[id]}
           </button>
         ))}
@@ -320,9 +339,9 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
               key={scene}
               className="preview-scene"
               data-preview-scene={scene}
-              data-active={tab === scene}
-              aria-hidden={tab !== scene}
-              inert={tab !== scene}
+              data-active={activeScene === scene}
+              aria-hidden={activeScene !== scene}
+              inert={activeScene !== scene}
             >
               <div className="preview-demo" data-enabled={active !== false}>
                 <div className="preview-demo-heading">
@@ -537,16 +556,18 @@ function ConnectionPreview({ view, live, form }: PreviewProps) {
 }
 
 export function SettingsPreview(props: PreviewProps) {
-  const workspace = props.mode === 'simple' || props.page === 'surfaces';
+  const workspace =
+    props.mode === 'simple' || props.page === 'surfaces' || props.page === 'appearance';
   return (
     <aside
       className="settings-preview"
       aria-label="联动预览"
+      hidden={props.mode !== 'simple' && ['terminology', 'codex-host', 'dev'].includes(props.page)}
       data-preview-kind={workspace ? 'workspace' : props.page}
     >
       {workspace ? (
         <WorkspacePreview features={props.features} surfaces={props.surfaces} live={props.live} />
-      ) : props.page === 'features' ? (
+      ) : ['features', 'next', 'prompts', 'board', 'model-control'].includes(props.page) ? (
         <FeaturePreview {...props} />
       ) : props.page === 'model' ? (
         <GenerationPreview {...props} />

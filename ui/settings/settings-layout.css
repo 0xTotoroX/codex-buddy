@@ -677,3 +677,85 @@ html:root .settings-nav {
     gap: 8px;
   }
 }
+
+/* Two navigation levels stay visible; only the active group's links use narrow-screen space. */
+.settings-mobile-groups {
+  display: none;
+}
+html:root .settings-nav {
+  border: 0;
+}
+.settings-category-links {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.settings-nav-group h2 {
+  margin: 0 0 6px;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--buddy-muted);
+}
+.settings-nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.settings-nav .settings-nav-children a {
+  min-height: 32px;
+  padding: 6px 0 6px 12px;
+  font-size: 0.8125em;
+}
+.settings-body:has(> .settings-preview[hidden]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settings-app[data-settings-category='terminology']
+  #settings-terminology
+  > .settings-section-heading,
+.settings-app[data-settings-category='dev'] .settings-form-column > section > h2 {
+  display: none;
+}
+@media (min-width: 761px) {
+  html:root .settings-nav {
+    max-height: calc(100dvh - var(--settings-sticky-offset, 100px) - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    margin-top: 30px;
+  }
+}
+@media (max-width: 760px) {
+  .settings-mobile-groups {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 8px;
+  }
+  .settings-mobile-groups button {
+    min-height: 32px;
+    background: transparent;
+    color: var(--buddy-muted);
+    font-size: 0.8125em;
+  }
+  .settings-mobile-groups button[aria-pressed='true'] {
+    color: var(--buddy-text);
+    font-weight: 650;
+  }
+  .settings-category-links {
+    display: block;
+  }
+  .settings-nav-group h2,
+  .settings-nav-group[data-active='false'] {
+    display: none;
+  }
+  .settings-nav-children {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 2px 18px;
+  }
+  .settings-nav .settings-nav-children a {
+    padding: 5px 0;
+  }
+  html:root .settings-nav {
+    padding-bottom: 12px;
+    margin-top: 10px;
+  }
+}

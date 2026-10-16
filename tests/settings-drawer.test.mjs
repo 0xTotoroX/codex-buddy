@@ -145,8 +145,10 @@ test('manual submit reveals invalid hidden drawer fields without discarding thei
     await page.getByRole('button', { name: '高级设置', exact: true }).click();
     await page.getByLabel('超时草稿').fill('');
     await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
+    await page.getByRole('button', { name: '功能', exact: true }).click();
     await page.getByRole('button', { name: '提交测试', exact: true }).click();
     await page.locator('#settings-limits-drawer[open]').waitFor();
+    assert.equal(new URL(page.url()).hash, '#settings-model/timeout');
     assert.equal(await page.getByLabel('超时草稿').inputValue(), '');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'timeout');
     assert.equal(await page.evaluate(() => window.counts.submit), 0);

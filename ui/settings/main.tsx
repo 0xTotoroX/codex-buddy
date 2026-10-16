@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、按宽度切换的头部与分类导航、主题/字体及联动预览，保留保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、分组与二级页面导航、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -93,8 +93,9 @@ function App() {
   const contentRef = useSettingsMotion(`${mode}:${page}`);
   const tasks = useTasks(live);
   const simple = mode === 'simple';
-  const featuresVisible = simple || page === 'features';
-  const surfacesVisible = simple || page === 'surfaces';
+  const common = simple || page === 'features';
+  const featuresVisible = common || ['next', 'board', 'model-control'].includes(page);
+  const surfacesVisible = simple || page === 'surfaces' || page === 'appearance';
   useEffect(() => {
     setNotice((current) => (current.failed ? current : { text: '', failed: false }));
   }, [page]);
@@ -162,8 +163,8 @@ function App() {
                 className="settings-section settings-feature-list"
                 aria-label="常用功能"
               >
-                <h2>常用功能</h2>
-                <div id="settings-outline">
+                <h2 hidden={!simple}>常用功能</h2>
+                <div id="settings-outline" hidden={!common}>
                   <FeatureSwitch
                     name="大纲"
                     checked={editor.form?.answerOutlineEnabled ?? false}
@@ -171,20 +172,33 @@ function App() {
                     onChange={(v) => editor.change('answerOutlineEnabled', v)}
                   />
                 </div>
-                <FeatureSwitch
-                  name="下一步"
-                  checked={editor.form?.enabled ?? false}
-                  disabled={!live || !editor.form}
-                  onChange={(v) => editor.change('enabled', v)}
-                />
-                <FeatureSwitch
-                  name="看板"
-                  checked={tasks.state?.store.boardEnabled ?? false}
-                  disabled={tasks.busy || !tasks.state || !!tasks.state.error}
-                  onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
-                />
-                <ModelControlSettings live={live} detailed={!simple} onSnapshot={setModel} />
-                <div id="settings-prompt-enhancement">
+                <div data-settings-page="next" hidden={!common && page !== 'next'}>
+                  <FeatureSwitch
+                    name="下一步"
+                    checked={editor.form?.enabled ?? false}
+                    disabled={!live || !editor.form}
+                    onChange={(v) => editor.change('enabled', v)}
+                  />
+                </div>
+                <div data-settings-page="board" hidden={!common && page !== 'board'}>
+                  <FeatureSwitch
+                    name="看板"
+                    checked={tasks.state?.store.boardEnabled ?? false}
+                    disabled={tasks.busy || !tasks.state || !!tasks.state.error}
+                    onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
+                  />
+                </div>
+                <div
+                  data-settings-page="model-control"
+                  hidden={!common && page !== 'model-control'}
+                >
+                  <ModelControlSettings
+                    live={live}
+                    detailed={!simple && page === 'model-control'}
+                    onSnapshot={setModel}
+                  />
+                </div>
+                <div id="settings-prompt-enhancement" hidden={!common}>
                   <FeatureSwitch
                     name="提示词优化"
                     checked={editor.form?.promptEnhancementEnabled ?? true}
@@ -192,7 +206,10 @@ function App() {
                     onChange={(value) => editor.change('promptEnhancementEnabled', value)}
                   />
                 </div>
-                <div hidden={!editor.form?.enabled}>
+                <div
+                  data-settings-page="next"
+                  hidden={!editor.form?.enabled || (!simple && page !== 'next')}
+                >
                   <Field id="generation-mode" label="建议生成方式">
                     <NativeSelect
                       id="generation-mode"
@@ -220,24 +237,33 @@ function App() {
                   appearance={view?.panelPreferences}
                   fontBase={view?.panelFontBase}
                   simple={simple}
+                  page={page === 'appearance' ? 'appearance' : 'surfaces'}
                   onFeatures={setFeatures}
                   onSnapshot={setSurfaces}
                 />
-                <LauncherSettings
-                  value={view?.panelPreferences}
-                  outsideAvailable={editor.saved?.popoutSupported === true}
-                />
+                <div data-settings-page="appearance" hidden={!simple && page !== 'appearance'}>
+                  <LauncherSettings
+                    value={view?.panelPreferences}
+                    outsideAvailable={editor.saved?.popoutSupported === true}
+                  />
+                </div>
               </section>
-              <div data-settings-page="features" hidden={simple || page !== 'features'}>
-                <TerminologySettings active={!simple && page === 'features'} />
+              <div data-settings-page="terminology" hidden={simple || page !== 'terminology'}>
+                <TerminologySettings active={!simple && page === 'terminology'} />
               </div>
               <SettingsForm
                 editor={editor}
                 notify={notify}
-                active={simple || page === 'model' || page === 'features' || page === 'connection'}
+                active={
+                  simple || ['model', 'next', 'prompts', 'features', 'connection'].includes(page)
+                }
               >
-                <div data-settings-page="features" hidden={simple || page !== 'features'}>
-                  <NextSettings editor={editor} appearance={view?.panelPreferences} />
+                <div hidden={simple || !['next', 'prompts'].includes(page)}>
+                  <NextSettings
+                    editor={editor}
+                    appearance={view?.panelPreferences}
+                    section={page === 'prompts' ? 'prompts' : 'next'}
+                  />
                 </div>
                 <div data-settings-page="model" hidden={!simple && page !== 'model'}>
                   <h2 className="settings-simple-model-title" hidden={!simple}>
@@ -249,15 +275,15 @@ function App() {
                   <ConnectionSettings editor={editor} view={view} live={live} notify={notify} />
                 </div>
               </SettingsForm>
-              <div data-settings-page="features" hidden={simple || page !== 'features'}>
+              <div data-settings-page="board" hidden={simple || page !== 'board'}>
                 <TaskSettings tasks={tasks} />
               </div>
-              <div data-settings-page="connection" hidden={simple || page !== 'connection'}>
-                <CodexHostSettings live={live} active={!simple && page === 'connection'} />
+              <div data-settings-page="codex-host" hidden={simple || page !== 'codex-host'}>
+                <CodexHostSettings live={live} active={!simple && page === 'codex-host'} />
               </div>
               <section
-                data-settings-page="connection"
-                hidden={simple || page !== 'connection' || !dev}
+                data-settings-page="dev"
+                hidden={simple || page !== 'dev' || !dev}
                 className="settings-section"
               >
                 <h2>开发来源</h2>

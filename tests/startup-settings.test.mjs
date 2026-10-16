@@ -137,7 +137,7 @@ test(
       });
       await page.goto(`http://127.0.0.1:${server.address().port}/#token=fixture`);
       await page.getByRole('button', { name: '详细设置', exact: true }).click();
-      await page.getByRole('link', { name: '启动与开发', exact: true }).click();
+      await page.getByRole('link', { name: '启动与连接', exact: true }).click();
       const policy = page.getByLabel('ChatGPT 已打开，但没有调试连接时');
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'ask');
@@ -158,7 +158,7 @@ test(
       await page.reload();
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'force');
-      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('link', { name: '生成模型', exact: true }).click();
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
       const context = page.getByLabel('输入上下文', { exact: true });
       await context.selectOption('latest');
@@ -187,9 +187,9 @@ test(
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       await page
         .getByRole('navigation', { name: '设置分类' })
-        .getByRole('link', { name: '功能与交互', exact: true })
+        .getByRole('link', { name: '常用开关', exact: true })
         .click();
-      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('link', { name: '生成模型', exact: true }).click();
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
       assert.equal(await input.inputValue(), '9000');
       await input.fill('10000');
@@ -271,10 +271,10 @@ test(
       await input.waitFor();
       assert.equal(await input.inputValue(), '13000');
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
-      await page.getByRole('link', { name: '功能与交互', exact: true }).click();
+      await page.getByRole('link', { name: '常用提示词', exact: true }).click();
       const quick = page.getByLabel('常用提示词 1 内容', { exact: true });
       await quick.fill('请继续推进整体目标');
-      await page.getByRole('heading', { name: '常用提示词', exact: true }).click();
+      await page.getByRole('heading', { name: '常用提示词', exact: true, level: 1 }).click();
       await until(() => settings.quickPrompts[0].prompt === '请继续推进整体目标');
       await page.waitForFunction(
         () =>
@@ -283,6 +283,7 @@ test(
       await page.reload();
       await quick.waitFor();
       assert.equal(await quick.inputValue(), '请继续推进整体目标');
+      await page.getByRole('link', { name: '下一步', exact: true }).click();
       const source = page.getByLabel('方向来源', { exact: true });
       await source.selectOption('manual');
       await until(() => settings.directionSource === 'manual');

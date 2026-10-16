@@ -1,4 +1,4 @@
-/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Directly visible per-form themes, edge placement and read-only preview snapshots.
+/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Separate layout and appearance pages retaining their mounted controls and shared preview snapshots.
  * [POS]: Presentation settings, no feature enable/disable or business state.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
@@ -23,10 +23,12 @@ export function SurfaceSettings({
   appearance,
   fontBase,
   simple = false,
+  page,
   onFeatures,
   onSnapshot,
 }: {
   simple?: boolean;
+  page?: 'surfaces' | 'appearance';
   live: boolean;
   desktopSupported: boolean;
   appearance?: AppearanceSettings;
@@ -107,14 +109,20 @@ export function SurfaceSettings({
       aria-label="呈现形式设置"
       className="settings-section"
     >
-      <FeatureSettings
-        live={live}
-        desktopSupported={desktopSupported}
-        onPlacement={setPrimary}
-        onSnapshot={onFeatures}
-        simple={simple}
-      />
-      <section className="settings-section settings-surface-group">
+      <div hidden={page === 'appearance'} data-settings-page="surfaces">
+        <FeatureSettings
+          live={live}
+          desktopSupported={desktopSupported}
+          onPlacement={setPrimary}
+          onSnapshot={onFeatures}
+          simple={simple}
+        />
+      </div>
+      <section
+        className="settings-section settings-surface-group"
+        data-settings-page="appearance"
+        hidden={!simple && page === 'surfaces'}
+      >
         <h2 hidden={simple}>各形式外观</h2>
         <div className="space-y-3">
           {Object.entries(labels).map(([placement, label]) => {
@@ -168,12 +176,13 @@ export function SurfaceSettings({
         </div>
       </section>
       <div hidden={simple}>
-        <PanelSettings value={appearance} fontBase={fontBase} />
+        <PanelSettings value={appearance} fontBase={fontBase} page={page} />
       </div>
       <section
         id="edge-position"
+        data-settings-page="surfaces"
         className="settings-section settings-surface-group"
-        hidden={simple}
+        hidden={simple || page === 'appearance'}
       >
         <h2>贴边 / 刘海位置</h2>
         <div className="mt-3 space-y-3">

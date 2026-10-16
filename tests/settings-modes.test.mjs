@@ -260,18 +260,27 @@ test(
     page.on('pageerror', (e) => errors.push(e.message));
     const simple = () => page.getByRole('button', { name: '简易', exact: true }).click();
     const detail = () => page.getByRole('button', { name: '详细设置', exact: true }).click();
-    const category = (id) =>
-      page
-        .getByRole('link', {
-          name: {
-            features: '功能与交互',
-            model: '模型与生成',
-            surfaces: '外观与布局',
-            connection: '启动与开发',
-          }[id],
-          exact: true,
-        })
-        .click();
+    const category = async (id) => {
+      const group = [
+        'features',
+        'next',
+        'prompts',
+        'terminology',
+        'board',
+        'model-control',
+      ].includes(id)
+        ? '功能'
+        : id === 'model'
+          ? '生成'
+          : ['surfaces', 'appearance'].includes(id)
+            ? '界面'
+            : '系统';
+      const link = page.locator(`.settings-nav a[href="#settings-${id}"]`);
+      await link.waitFor({ state: 'attached' });
+      if (!(await link.isVisible()))
+        await page.getByRole('button', { name: group, exact: true }).click();
+      await link.click();
+    };
     const themeButton = (name) =>
       page
         .locator('.settings-theme-menu')
@@ -425,7 +434,50 @@ test(
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
       assert.equal(writes.length, 0, 'mode/category changes do not save typed drafts');
       await detail();
-      await category('features');
+      const splitWrites = writes.length;
+      for (const id of [
+        'features',
+        'next',
+        'prompts',
+        'board',
+        'model-control',
+        'surfaces',
+        'appearance',
+        'connection',
+        'codex-host',
+      ]) {
+        await category(id);
+        assert.equal(await model.isVisible(), false, `${id} does not include model configuration`);
+        assert.equal(await model.inputValue(), '未保存模型草稿');
+        assert.equal(await key.inputValue(), 'fixture-unsaved-key');
+        assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
+        assert.equal(await page.getByLabel('搜索术语', { exact: true }).isVisible(), false);
+        if (['next', 'prompts', 'board', 'model-control'].includes(id))
+          assert.equal(await page.locator('.preview-scene[data-active="true"]').count(), 1);
+        if (id === 'features') {
+          assert.equal(await page.getByRole('switch').count(), 5);
+          assert.equal(
+            await page.getByRole('button', { name: '模型分组', exact: true }).isVisible(),
+            false,
+          );
+        }
+        if (id === 'surfaces')
+          assert.equal(await page.getByLabel('侧栏主题', { exact: true }).isVisible(), false);
+        if (id === 'appearance')
+          assert.equal(await page.getByLabel('主界面布局', { exact: true }).isVisible(), false);
+      }
+      assert.equal(
+        writes.length,
+        splitWrites,
+        'all subpage navigation preserves unsaved fields without writes',
+      );
+      // A not-yet-loaded library remains searchable and opens its own page and drawer.
+      const splitSearch = page.getByRole('searchbox', { name: '搜索设置' });
+      await splitSearch.fill('词库管理');
+      await splitSearch.press('Enter');
+      await page.getByRole('dialog', { name: '词库管理', exact: true }).waitFor();
+      assert.equal(new URL(page.url()).hash, '#settings-terminology/settings-library');
+      await page.getByRole('button', { name: '关闭词库管理', exact: true }).click();
       await page.getByLabel('搜索术语', { exact: true }).waitFor();
       assert.equal(
         await page.getByText('结合问答核对词义与识别概念', { exact: true }).isVisible(),
@@ -435,6 +487,7 @@ test(
       await page.getByRole('button', { name: '恢复提示：合成术语', exact: true }).click();
       await page.getByRole('button', { name: '已掌握：合成术语', exact: true }).waitFor();
       assert.deepEqual(terminology.preferences.mastered, []);
+      await category('board');
       assert.equal(await page.getByLabel('分组名称：待办', { exact: true }).isVisible(), true);
       const group = page.getByLabel('分组名称：待办', { exact: true });
       await group.fill('未保存分组');
@@ -491,16 +544,17 @@ test(
       await page.setViewportSize({ width: 1100, height: 850 });
       assert.equal(await page.getByLabel('详细设置分类').isVisible(), false);
       assert.equal(
-        await page.getByRole('link', { name: '外观与布局', exact: true }).isVisible(),
+        await page.getByRole('link', { name: '布局与位置', exact: true }).isVisible(),
         true,
       );
-      await page.getByRole('link', { name: '外观与布局', exact: true }).click();
-      for (const label of ['字体大小', '侧栏宽度（px）', '大纲默认位置', '贴边屏幕'])
+      await page.getByRole('link', { name: '布局与位置', exact: true }).click();
+      for (const label of ['侧栏宽度（px）', '大纲默认位置', '贴边屏幕'])
         assert.equal(
           await page.getByLabel(label, { exact: true }).isVisible(),
           true,
           `${label} is directly visible`,
         );
+      await category('appearance');
       await page.getByLabel('自定义字号（px）', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('自定义字号（px）', { exact: true }).inputValue(), '17');
       const font = page.getByLabel('自定义字号（px）', { exact: true });
@@ -558,7 +612,7 @@ test(
       );
       assert.equal(writes.length, count);
       await page.goto(origin + '/#settings-limits/timeout');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).waitFor();
+      await page.getByRole('heading', { name: '生成模型', exact: true, level: 1 }).waitFor();
       await page.getByLabel('请求超时（秒）', { exact: true }).waitFor();
       assert.equal(await limits.locator('dialog').getAttribute('open'), '');
       assert.equal(settings.directionSource, fixtureSettings.directionSource);
@@ -568,7 +622,7 @@ test(
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       // Previews consume existing saved snapshots; rejected saves never look successful.
       await page.setViewportSize({ width: 1360, height: 900 });
-      await page.getByRole('link', { name: '外观与布局', exact: true }).click();
+      await page.getByRole('link', { name: '布局与位置', exact: true }).click();
       const preview = page.getByRole('complementary', { name: '联动预览' });
       await preview.locator('[data-ready="true"]').waitFor();
       assert.equal(
@@ -576,14 +630,17 @@ test(
         'frosted',
       );
       rejectSurface = true;
+      await category('appearance');
       await page.getByLabel('侧栏主题', { exact: true }).selectOption('black');
       await page.getByText('合成材质保存失败', { exact: false }).waitFor();
       assert.equal(
         await preview.locator('.preview-workspace').getAttribute('data-material'),
         'frosted',
       );
+      await category('appearance');
       await page.getByLabel('侧栏主题', { exact: true }).selectOption('black');
       await preview.locator('.preview-workspace[data-material="black"]').waitFor();
+      await category('surfaces');
       await page.getByLabel('主界面布局', { exact: true }).selectOption('horizontal');
       await preview.locator('.preview-split[data-axis="horizontal"]').waitFor();
       assert.equal(
@@ -591,6 +648,7 @@ test(
         3,
         'only opened main features appear',
       );
+      await category('surfaces');
       await page.getByRole('button', { name: '页面浮层', exact: true }).click();
       await preview.locator('.preview-host[data-placement="overlay"]').waitFor();
       assert.equal(
@@ -630,12 +688,12 @@ test(
       await page.waitForFunction(() => document.querySelectorAll('.preview-pane').length === 2);
       assert.equal(await preview.getByRole('button', { name: '看板', exact: true }).count(), 0);
 
-      await page.getByRole('link', { name: '功能与交互', exact: true }).click();
+      await page.getByRole('link', { name: '常用开关', exact: true }).click();
       const demoWrites = writes.length;
       await preview.getByRole('button', { name: /完善实现方案/ }).click();
       assert.equal(await preview.getByRole('status').textContent(), '完善实现方案');
       assert.equal(writes.length, demoWrites, 'sample interactions do not write or send');
-      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('link', { name: '生成模型', exact: true }).click();
       await model.fill('新的预览模型草稿');
       await preview.getByText('新的预览模型草稿', { exact: true }).waitFor();
       assert.ok((await preview.textContent()).includes('未全部保存'));
@@ -715,10 +773,10 @@ test(
               await page
                 .getByRole('link', {
                   name: {
-                    surfaces: '外观与布局',
-                    features: '功能与交互',
-                    model: '模型与生成',
-                    connection: '启动与开发',
+                    surfaces: '布局与位置',
+                    features: '常用开关',
+                    model: '生成模型',
+                    connection: '启动与连接',
                   }[id],
                   exact: true,
                 })
@@ -730,7 +788,7 @@ test(
             );
           }
           if (width <= 760) await category('surfaces');
-          else await page.getByRole('link', { name: '外观与布局', exact: true }).click();
+          else await page.getByRole('link', { name: '布局与位置', exact: true }).click();
           await page.screenshot({
             path: `target/reports/settings-tom-${colorScheme}-${width}.png`,
             fullPage: true,
@@ -808,7 +866,7 @@ test(
         'placement changes animate only the illustration',
       );
       const beforeMotion = writes.length;
-      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('link', { name: '生成模型', exact: true }).click();
       const drawer = limits.locator('dialog.settings-drawer');
       const entryHeight = await limits.evaluate((n) => n.getBoundingClientRect().height);
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
@@ -830,14 +888,14 @@ test(
         '0s',
         'keyboard closing is immediate',
       );
-      const nav = page.getByRole('link', { name: '外观与布局', exact: true });
+      const nav = page.getByRole('link', { name: '布局与位置', exact: true });
       await nav.press('Enter');
       assert.equal(
         await page.locator('.settings-content').evaluate((n) => n.getAnimations().length),
         0,
         'keyboard navigation has no entry animation',
       );
-      await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('link', { name: '生成模型', exact: true }).click();
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await page.emulateMedia({ reducedMotion: 'reduce' });
       assert.equal(await drawer.evaluate((n) => getComputedStyle(n).transitionDuration), '0s');
@@ -848,8 +906,9 @@ test(
         beforeMotion,
         'drawer motion and navigation never save configuration',
       );
-      await page.getByRole('link', { name: '启动与开发', exact: true }).click();
+      await category('connection');
       await page.addScriptTag({ content: await readFile('ui/settings/dev-sources.js', 'utf8') });
+      await category('dev');
       await page.getByText('开发来源 · main · 1234567', { exact: true }).waitFor();
       const source = page.getByLabel('调试 worktree', { exact: true });
       const sourceWrites = writes.length;
@@ -932,7 +991,10 @@ test(
               visible: !!n.getBoundingClientRect().height,
             })),
           );
-          assert.ok(links.length === 4 && links.every((n) => n.visible && n.width >= n.content));
+          assert.equal(links.length, 12);
+          assert.ok(links.filter((n) => n.visible).every((n) => n.width >= n.content));
+          assert.equal(links.filter((n) => n.visible).length, width <= 760 ? 1 : 12);
+          assert.equal(await page.locator('.settings-nav summary').count(), 0);
           const layout = await page.evaluate(() => {
             const nav = document.querySelector('.settings-nav').getBoundingClientRect();
             const content = document.querySelector('.settings-content').getBoundingClientRect();

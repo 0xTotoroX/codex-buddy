@@ -459,6 +459,7 @@ try {
   await settingsPage.goto(`${base}/#token=${runtime.token}`);
   await settingsPage.getByRole('button', { name: '详细设置', exact: true }).click();
   {
+    await settingsPage.getByRole('link', { name: '模型快切', exact: true }).click();
     const modelSettings = settingsPage.locator('#settings-model-control');
     await modelSettings.getByRole('button', { name: '模型分组', exact: true }).click();
     const preserved = (await api('state')).preferences;
@@ -519,7 +520,7 @@ try {
 
   await settingsPage
     .getByRole('navigation', { name: '设置分类' })
-    .getByRole('link', { name: '外观与布局', exact: true })
+    .getByRole('link', { name: '布局与位置', exact: true })
     .click();
   const section = settingsPage.locator('#settings-surfaces');
   const themeControl = async (placement, label) => {

@@ -1,5 +1,5 @@
 /* [INPUT]: 版本化外观偏好与认证 API。
- * [OUTPUT]: 下一步的显示/点击设置，及直接显示的全局跟随/自定义字体、宽度和置顶设置。
+ * [OUTPUT]: 下一步的显示/点击设置，及按布局/外观页面显示的全局字体、宽度和置顶设置，草稿持续挂载。
  * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { DOCK_MIN_WIDTH } from '../surfaces/embedded/width.js';
@@ -15,10 +15,12 @@ export function PanelSettings({
   value,
   fontBase = 13,
   section = 'surfaces',
+  page,
 }: {
   value?: AppearanceSettings;
   fontBase?: number;
   section?: 'next' | 'surfaces';
+  page?: 'surfaces' | 'appearance';
 }) {
   const [prefs, setPrefs] = useState(value),
     [busy, setBusy] = useState(false),
@@ -168,14 +170,24 @@ export function PanelSettings({
         </>
       ) : (
         <>
-          <section className="settings-section settings-surface-group" id="settings-fonts">
+          <section
+            className="settings-section settings-surface-group"
+            id="settings-fonts"
+            data-settings-page="appearance"
+            hidden={page === 'surfaces'}
+          >
             <h2>字体</h2>
             <TypographySettings
               value={prefs.typography}
               save={(typography) => update({ typography })}
             />
           </section>
-          <section className="settings-section settings-surface-group" id="settings-window">
+          <section
+            className="settings-section settings-surface-group"
+            id="settings-window"
+            data-settings-page="surfaces"
+            hidden={page === 'appearance'}
+          >
             <h2>尺寸与窗口</h2>
             {number('dock-width', '侧栏宽度（px）', ui.dockWidth, DOCK_MIN_WIDTH, Infinity, (n) =>
               change('dockWidth', n),

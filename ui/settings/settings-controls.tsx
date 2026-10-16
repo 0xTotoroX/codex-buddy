@@ -1,9 +1,9 @@
 /* [INPUT]: 现有基础控件、动作反馈和设置保存队列。
- * [OUTPUT]: 统一设置行、功能开关、反馈及表单保存状态。
+ * [OUTPUT]: 统一设置行、功能开关、反馈、表单保存状态及跨页无效字段定位。
  * [POS]: 设置页组合组件，不持有业务数据或新增保存服务。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useId, useRef, useState, useEffect, type ReactNode } from 'react';
-import { revealSettingsDrawer } from './settings-drawer';
+import { revealSettingsField } from './settings-outline';
 import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import { ActionIcon, type ActionState } from './components/ui/action-feedback';
@@ -127,7 +127,14 @@ export function SettingsForm({
   }
   return (
     <form
-      onInvalidCapture={(event) => revealSettingsDrawer(event.target as HTMLElement)}
+      onInvalidCapture={(event) => {
+        if ((event.target as HTMLElement).closest('[hidden],dialog:not([open])'))
+          event.preventDefault();
+        const first = event.currentTarget.querySelector(
+          'input:invalid,select:invalid,textarea:invalid',
+        );
+        if (event.target === first) revealSettingsField(event.target as HTMLElement);
+      }}
       onBlurCapture={(e) => {
         // Closing a drawer or confirmation can move focus; navigation is not a draft edit.
         if (e.target instanceof Element && e.target.closest('[data-settings-navigation]')) return;
