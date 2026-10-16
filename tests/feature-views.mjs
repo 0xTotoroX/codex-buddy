@@ -334,7 +334,10 @@ try {
   assert.equal(await view.locator('[data-model-group], .model-visibility').count(), 0);
   assert.equal(await view.locator('.model-row, [data-refresh="model"]').count(), 0);
   assert.equal(await view.locator('hr, .model-section-divider, .model-group-label').count(), 0);
-  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 1);
+  assert.equal(await view.locator('.model-matrix-head .model-fast').count(), 0);
+  assert.equal(await view.locator('.model-quick-actions .model-fast').count(), 1);
+  assert.equal(await view.locator('.model-quick-actions .model-add-preset').count(), 1);
+  assert.equal(await view.locator('.model-collections-heading').innerText(), '');
   await showOthers();
   assert.equal(await view.locator('.model-tile').count(), 2);
   assert.equal(await view.locator('.model-tile svg').count(), 0);

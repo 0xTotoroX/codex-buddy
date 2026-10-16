@@ -717,28 +717,29 @@ try {
     'native long favorites fixture',
   );
   const longBounds = windowInfo().kCGWindowBounds;
-  const pickerY = await command(
-    "document.querySelector('[data-model-picker]').getBoundingClientRect().y",
-  );
+  const wideColumnHeight = telemetry.native.layoutHeight;
   prefs.modelColumnWidth = 100;
   revision++;
-  await until(() => Number(telemetry.columnWidth) === 100, 'narrow long favorite names');
+  await until(
+    () => Number(telemetry.columnWidth) === 100 && telemetry.native.layoutHeight > wideColumnHeight,
+    'narrow long favorite names expand the panel height',
+  );
   const overflow = await command(`(() => {
     const root = document.querySelector('.edge-view').shadowRoot;
-    const list = root.querySelector('.model-scroll'), button = document.querySelector('[data-model-picker]');
-    list.scrollTop = list.scrollHeight;
+    const list = root.querySelector('.model-favorites');
     const last = root.querySelector('[data-model-row="long-4"] .model-choices').getBoundingClientRect();
     const viewport = list.getBoundingClientRect();
-    return {scrollable: list.scrollHeight > list.clientHeight, buttonY: button.getBoundingClientRect().y,
+    return {scrollable: list.scrollHeight > list.clientHeight + 1,
       lastVisible: last.top >= viewport.top && last.bottom <= viewport.bottom};
   })()`);
-  assert.deepEqual(windowInfo().kCGWindowBounds, longBounds);
+  const narrowBounds = windowInfo().kCGWindowBounds;
+  assert.equal(narrowBounds.Width, longBounds.Width);
+  assert.equal(narrowBounds.X, longBounds.X);
   assert.ok(
-    overflow.scrollable && overflow.lastVisible,
-    'native long favorites stay reachable by internal scrolling',
+    !overflow.scrollable && overflow.lastVisible,
+    'native long favorites are fully visible without internal scrolling',
   );
-  assert.ok(Math.abs(overflow.buttonY - pickerY) < 1, 'native picker button stays in place');
-  check('native narrow column keeps the chooser visible and last favorite reachable', overflow);
+  check('native narrow column grows the panel to show every favorite', overflow);
   snapshot.models = savedModels;
   prefs.pinned = savedPinned;
   prefs.modelColumnWidth = originalColumn;

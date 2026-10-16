@@ -1,5 +1,5 @@
 /* [INPUT]: Model matrix, all-model picker, wrapping presets and surface semantic colors.
- * [OUTPUT]: Stable columns, fixed Fast control and a single-surface model catalog.
+ * [OUTPUT]: Content-sized matrix, footer controls and a single-surface model catalog.
  * [POS]: Shared model content styling; no outer window or material.
  * [PROTOCOL]: Keep model/AGENTS.md in sync. */
 .feature-model {
@@ -27,8 +27,7 @@
   width: 18px;
   height: 18px;
 }
-.feature-model > :not(.model-main),
-.model-main > :not(.model-scroll) {
+.feature-model > :not(.model-main) {
   flex: none;
 }
 .model-main {
@@ -37,6 +36,11 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+.model-favorites {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 .model-main[data-view='all'] > :not(.model-picker) {
   visibility: hidden;
@@ -58,12 +62,12 @@
 }
 .model-scroll {
   min-height: 0;
-  flex: 1 1 auto;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .model-matrix {
   position: relative;
-  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
+  min-width: calc(var(--name-width) + 16px + var(--reasoning-min-width));
 }
 .model-primary {
   position: relative;
@@ -71,7 +75,7 @@
 .feature-model .model-column-resize {
   position: absolute;
   z-index: 1;
-  left: calc(var(--name-width) - 10px);
+  left: calc(var(--name-width) - 28px);
   top: 0;
   width: 28px;
   height: 28px;
@@ -90,18 +94,20 @@
 .model-row {
   display: grid;
   grid-template-columns: var(--name-width) minmax(0, 1fr);
-  gap: 8px;
+  gap: 16px;
   align-items: center;
-  min-width: calc(var(--name-width) + 8px + var(--reasoning-min-width));
+  min-width: calc(var(--name-width) + 16px + var(--reasoning-min-width));
 }
 .model-matrix-head {
   min-height: 28px;
   color: var(--muted);
   font-size: inherit;
 }
-.model-fixed-tools {
+.model-quick-actions {
   display: flex;
-  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 .feature-model .model-fast {
   padding: 5px;
@@ -162,13 +168,16 @@
   font-weight: normal;
   overflow-wrap: anywhere;
 }
-/* 自然尺寸与拖动列宽分离，避免贴边窗口追随名称换行跳动。 */
+/* 外框宽度使用稳定预算，高度按实际名称列宽及换行测量。 */
 .model-intrinsic-width {
-  min-width: max(432px, calc(280px + 8px + var(--reasoning-min-width)));
+  min-width: max(432px, calc(280px + 16px + var(--reasoning-min-width)));
 }
 :host([data-measuring='true']) .feature-model {
-  --name-width: 280px !important;
   flex: none;
+}
+:host([data-measuring='true']) .model-favorites {
+  flex: none;
+  overflow: visible;
 }
 [data-reasoning-label] {
   display: inline-block;
@@ -179,7 +188,7 @@
   margin: 8px 0;
 }
 .model-collections {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .model-collections-heading {
   display: flex;
@@ -188,14 +197,22 @@
   min-height: 28px;
   color: var(--muted);
 }
+.feature-model .model-collections-heading button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+}
 .model-presets {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px;
-  max-height: calc(3 * var(--model-preset-height) + 8px);
-  overflow: auto;
-  overscroll-behavior: contain;
+  margin-top: 6px;
+}
+.model-presets:empty {
+  display: none;
 }
 .feature-model .model-presets > button {
   flex: none;
@@ -208,11 +225,6 @@
 }
 .feature-model .model-presets > button[aria-pressed='true'] {
   background: var(--model-tile-on);
-}
-.feature-model .model-presets > .model-add-preset {
-  width: var(--model-preset-height);
-  padding: 5px;
-  background: transparent;
 }
 .model-preset {
   display: flex;
@@ -322,13 +334,4 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-@media (hover: hover) and (pointer: fine) {
-  .model-collections-heading button {
-    opacity: 0;
-  }
-  .model-collections-heading:hover button,
-  .model-collections-heading button:focus-visible {
-    opacity: 1;
-  }
 }

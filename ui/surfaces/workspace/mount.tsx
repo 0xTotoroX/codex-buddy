@@ -117,6 +117,8 @@ export function mountFeature(
     measure() {
       const body = element.shadowRoot?.querySelector<HTMLElement>('.feature-body');
       if (!body?.firstElementChild) return null;
+      // 列宽拖动期间保持原生外框，松手后再按实际换行适配高度。
+      if (body.querySelector('[data-resizing="true"]')) return null;
       const intrinsic = body.querySelector<HTMLElement>('[data-intrinsic-width]');
       const bodyStyle = getComputedStyle(body);
       const padding = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);

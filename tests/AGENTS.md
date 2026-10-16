@@ -17,10 +17,10 @@ model-control-host 覆盖能力延迟到达、空列表刷新超时及重试、�
 - [dev-source-fixture.mjs](dev-source-fixture.mjs)：上项测试的可控编译器和单实例后台夹具，不连接用户应用。
 
 - [model-control-host.mjs](model-control-host.mjs)：官方能力响应关联、唯一输入目标、新聊天临时目标及其替换/身份建立/双聊天隔离、引用身份隔离、新旧菜单/内联/隐藏视图、菜单打开占位文字/速度可访问标签/高级视图返回、推理滑块、锁定选项、重复失败清理与完整回读、单次菜单事务、生成期间调整与官方禁用、迟到/部分失败及清理的合成宿主回归。
-- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、常用和预设增删/改名、禁用原生 prompt 时的名称输入/取消/失败重试与完整配置保留、四功能独立字号同步且不放大标签、桌面长模型名称完整换行及超280px列宽保存、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
+- [feature-views.mjs](feature-views.mjs)：真实通用页面的贴边收起/标签草稿保留、模型回读、底部图标操作行、常用和预设增删/改名、禁用原生 prompt 时的名称输入/取消/失败重试与完整配置保留、四功能独立字号同步且不放大标签、桌面长模型名称完整换行及超280px列宽保存、原桌面头部、共享标签草稿、Shadow DOM 内真实鼠标拖放、原生唤起、纯黑切回宿主色及返回失败恢复/重试的浏览器验收。
 - [model-control-fixture.mjs](model-control-fixture.mjs)：共享的合成官方模型菜单与能力响应宿主。
 - [model-control-e2e.mjs](model-control-e2e.mjs)：真实 Rust HTTP/CDP 到合成官方菜单的链路、鉴权、新聊天无保存身份时切换与完整回读、旧目标拒绝及设置页四形式主题隔离/持久化及贴边位置保存及私有末次诊断验收。
-- [edge-native.mjs](edge-native.mjs)：共享 NSPanel 的稳定视口、原生轮廓/材质、scene-ready 首帧、焦点、悬停、定位、租约退出；合成后端，不操作官方宿主；默认不截图，只有明确需要截图时才传 --screenshots，截图失败后本轮不再重试。
+- [edge-native.mjs](edge-native.mjs)：共享 NSPanel 的稳定视口、模型名称换行后的自然增高、原生轮廓/材质、scene-ready 首帧、焦点、悬停、定位、租约退出；合成后端，不操作官方宿主；默认不截图，只有明确需要截图时才传 --screenshots，截图失败后本轮不再重试。
 - [model-control-probe.swift](model-control-probe.swift)：仅操作指定合成原生面板的窗口、焦点和鼠标验收探针。
 
 - [startup-settings.test.mjs](startup-settings.test.mjs)：实际 React 启动选项默认值、强退提示、完整/限长上下文切换、失焦/选择自动保存、串行在途编辑、失败重试/冲突保护、快捷词及三种方向配置/位置排序/自定义积木/Jev 同意与密钥编辑、无效草稿及在途失败不阻止停用/撤回同意、页面重载恢复；合成本机 API，不退出真实宿主。
