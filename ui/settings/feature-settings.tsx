@@ -144,9 +144,8 @@ export function FeatureSettings({
         </div>
       </div>
       <div hidden={simple}>
-        <p className="settings-hint mb-5">主界面只保留一份，贴边窗口可以独立显示。</p>
-        <details id="feature-placements" className="settings-details">
-          <summary>各功能位置</summary>
+        <section id="feature-placements" className="settings-subsection">
+          <h3>各功能位置</h3>
           {Object.entries(titles).map(([id, title]) => (
             <Field key={id} id={`placement-${id}`} label={title}>
               <NativeSelect
@@ -168,7 +167,7 @@ export function FeatureSettings({
               </NativeSelect>
             </Field>
           ))}
-        </details>
+        </section>
         <Field id="main-layout" label="主界面布局">
           <NativeSelect
             id="main-layout"

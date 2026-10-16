@@ -63,8 +63,8 @@ export function ConnectionSettings({
               label="ChatGPT 已打开，但没有调试连接时"
               hint={
                 form.hostRestartPolicy === 'force'
-                  ? '直接强制退出并重开，可能中断任务或丢失未保存内容。普通接入已有调试连接时不会重启；切换 CodexHost 按其启停状态处理。'
-                  : '先询问；确认后请求正常退出，再重开并注入。取消或未能正常退出时保留应用。'
+                  ? '强制重开可能中断任务或丢失未保存内容。'
+                  : undefined
               }
             >
               <NativeSelect
@@ -86,13 +86,13 @@ export function ConnectionSettings({
       )}
       <Card tabIndex={-1} id="settings-connection" aria-labelledby="connection-title">
         <h2 id="connection-title">桌面连接</h2>
-        <p className="settings-hint mb-5">
-          {import.meta.env.DEV
-            ? '开发配置独立保存；模型请求使用真实服务。'
-            : view?.connection.message || '正在连接本地服务…'}
-        </p>
-        <details className="settings-details">
-          <summary>连接详情</summary>
+        {!connected && view?.connection.message && (
+          <p role="status" className="settings-hint">
+            {view.connection.message}
+          </p>
+        )}
+        <details className="settings-details" open={import.meta.env.DEV ? undefined : true}>
+          <summary hidden={!import.meta.env.DEV}>连接详情</summary>
           <Field id="cdp-endpoint" label="本机调试端口">
             <Input
               id="cdp-endpoint"
@@ -159,7 +159,7 @@ export function ConnectionSettings({
             </Button>
           )}
         </div>
-        {!import.meta.env.DEV && (
+        {!import.meta.env.DEV && !connected && (
           <div className="mt-6 text-sm text-muted-foreground [&>button]:mt-3 [&>button]:w-full [&>button]:justify-between [&_code]:font-mono [&_code]:text-sm">
             <span>首次接入：等待任务结束并完整退出 ChatGPT，再在终端运行</span>
             <Button

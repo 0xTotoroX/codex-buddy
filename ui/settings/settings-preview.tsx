@@ -279,7 +279,7 @@ function WorkspacePreview({
           ['显示功能', ready ? ids.map((id) => titles[id]).join('、') || '暂无' : '读取中'],
         ]}
       />
-      <p className="preview-note">配置保存后同步。内容为示例，材质效果以实际窗口为准。</p>
+      <p className="preview-note">材质效果以实际窗口为准。</p>
     </Frame>
   );
 }
@@ -303,7 +303,7 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
   };
   const examples = ['完善实现方案', '检查边界条件', '补充验证步骤'];
   return (
-    <Frame title="功能如何呈现" label={dirty ? '含未保存编辑 · 示例' : '交互示例'}>
+    <Frame title="功能如何呈现" label={dirty ? '未保存编辑 · 交互示例' : '交互示例'}>
       <div className="preview-selector" role="group" aria-label="功能预览" data-settings-navigation>
         {(['outline', 'next', 'board', 'model'] as const).map((id) => (
           <button key={id} type="button" aria-pressed={tab === id} onClick={() => setTab(id)}>
@@ -433,7 +433,7 @@ function FeaturePreview({ form, tasks, model, view, dirty }: PreviewProps) {
           ]}
         />
       )}
-      <p className="preview-note">示例操作只在此处展示，不发送消息或修改任务。</p>
+      <p className="preview-note">示例操作不发送消息或修改任务。</p>
     </Frame>
   );
 }
@@ -483,7 +483,6 @@ function GenerationPreview({ form, dirty }: PreviewProps) {
           ['请求超时', `${form ? form.timeoutMs / 1000 : '—'} 秒`],
         ]}
       />
-      <p className="preview-note">展示当前表单参数，不发起模型请求。</p>
     </Frame>
   );
 }
@@ -513,7 +512,6 @@ function ConnectionPreview({ view, live, form }: PreviewProps) {
           ['版本', view?.version || '—'],
         ]}
       />
-      <p className="preview-note">连接操作保留在设置区，状态按实际响应更新。</p>
     </Frame>
   );
 }

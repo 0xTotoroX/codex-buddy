@@ -189,7 +189,7 @@ test(
         view = page.locator('#view');
       assert.equal(await view.locator('.model-row').count(), 1);
       assert.equal(await view.locator('[data-model-group]').count(), 0);
-      await view.getByRole('button', { name: '所有', exact: true }).click();
+      await view.getByRole('button', { name: '所有模型', exact: true }).click();
       assert.equal(await view.locator('.model-tile').count(), 4);
       assert.equal(
         await view.locator('[data-model-tile="gpt-test"]').getAttribute('aria-pressed'),
@@ -203,7 +203,7 @@ test(
         (await page.evaluate(() => window.applied)).selection.model,
         'route-b/claude-test',
       );
-      await view.getByRole('button', { name: '所有', exact: true }).click();
+      await view.getByRole('button', { name: '所有模型', exact: true }).click();
       await view.locator('[data-model-tile="route-b/claude-test"]').click();
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await settings.getByLabel('新模型分组名称').fill('编程');
@@ -268,13 +268,13 @@ test(
       });
       await settings.getByLabel('分组名称 编程', { exact: true }).fill('工作');
       conflictNext = true;
-      await settings.getByRole('button', { name: '改名', exact: true }).click();
+      await settings.getByRole('button', { name: /^保存分组名称 / }).click();
       await settings.getByText(/已在其他窗口更新/).waitFor();
       assert.equal(
         await settings.getByLabel('分组名称 编程', { exact: true }).inputValue(),
         '工作',
       );
-      await settings.getByRole('button', { name: '改名', exact: true }).click();
+      await settings.getByRole('button', { name: /^保存分组名称 / }).click();
       await settings.getByRole('region', { name: '分组：工作' }).waitFor();
       const beforeDelete = writes;
       await settings.getByRole('button', { name: '删除分组' }).click();
@@ -295,7 +295,7 @@ test(
         'custom',
       ]);
       await page.evaluate((state) => window.render(state), state);
-      await view.getByRole('button', { name: '所有', exact: true }).click();
+      await view.getByRole('button', { name: '所有模型', exact: true }).click();
       await view.locator('[data-model-group="vendor:Anthropic"]').waitFor();
       assert.equal(
         await view.locator('[data-model-group="vendor:Anthropic"] .model-tile').count(),
@@ -443,7 +443,7 @@ test(
         fixedFast,
         'Fast never follows column width',
       );
-      const scroller = view.locator('.model-scroll');
+      const scroller = view.locator('.model-favorites');
       assert.ok(
         await scroller.evaluate((n) => n.scrollHeight > n.clientHeight),
         'wrapped names scroll inside the fixed table',
@@ -497,13 +497,19 @@ test(
           rows: new Set(buttons.map((button) => button.offsetTop)).size,
           height: node.clientHeight,
           scroll: node.scrollHeight,
-          rowHeight: buttons[0].getBoundingClientRect().height,
         };
       });
-      assert.ok(wrapped.rows > 3 && wrapped.scroll > wrapped.height);
+      assert.ok(wrapped.rows > 3, 'presets continue wrapping in the collection');
+      assert.equal(wrapped.scroll, wrapped.height, 'presets use the shared favorites scroller');
+      assert.ok(await scroller.evaluate((node) => node.scrollHeight > node.clientHeight));
+      await scroller.evaluate((node) => (node.scrollTop = node.scrollHeight));
+      const lastPreset = view.getByRole('button', { name: '收藏快捷组合 24', exact: true });
+      const presetBox = await lastPreset.boundingBox(),
+        presetViewport = await scroller.boundingBox();
       assert.ok(
-        wrapped.height <= wrapped.rowHeight * 3 + 9,
-        'preset wrapping is capped at three rows',
+        presetBox.y >= presetViewport.y &&
+          presetBox.y + presetBox.height <= presetViewport.y + presetViewport.height,
+        'last wrapped preset remains reachable in the shared viewport',
       );
       assert.deepEqual(errors, []);
     } finally {

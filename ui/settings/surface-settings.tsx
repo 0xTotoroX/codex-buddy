@@ -1,8 +1,7 @@
-/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Per-form themes, edge placement and read-only preview snapshots.
+/* [INPUT]: Independent surface preferences and display inventory. [OUTPUT]: Directly visible per-form themes, edge placement and read-only preview snapshots.
  * [POS]: Presentation settings, no feature enable/disable or business state.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useRef, useState } from 'react';
-import { SettingsDisclosure } from './settings-disclosure';
 import { FeatureSettings } from './feature-settings';
 import { request } from './api';
 import { NativeSelect } from './components/ui/native-select';
@@ -124,17 +123,13 @@ export function SurfaceSettings({
               liquidVariant: 'regular',
             };
             return (
-              <SettingsDisclosure
+              <div
                 key={placement}
                 id={`theme-${placement}`}
                 hidden={simple && placement !== primary}
-                initiallyOpen={placement === primary}
-                forceOpen={simple ? placement === primary : undefined}
-                className="settings-details"
               >
-                <summary hidden={simple}>{label}</summary>
                 <div className="settings-field">
-                  <span className="text-sm">{simple ? '主界面材质' : '材质'}</span>
+                  <span className="text-sm">{simple ? '主界面材质' : label}</span>
                   <div className="flex min-w-0 flex-wrap gap-2 [&>div]:flex-1">
                     <NativeSelect
                       aria-label={`${label}主题`}
@@ -167,7 +162,7 @@ export function SurfaceSettings({
                     )}
                   </div>
                 </div>
-              </SettingsDisclosure>
+              </div>
             );
           })}
         </div>
@@ -175,12 +170,12 @@ export function SurfaceSettings({
       <div hidden={simple}>
         <PanelSettings value={appearance} fontBase={fontBase} />
       </div>
-      <details
+      <section
         id="edge-position"
         className="settings-section settings-surface-group"
         hidden={simple}
       >
-        <summary className="settings-group-title">贴边 / 刘海位置</summary>
+        <h2>贴边 / 刘海位置</h2>
         <div className="mt-3 space-y-3">
           <label className="settings-field text-sm">
             <span className="whitespace-nowrap">屏幕</span>
@@ -243,7 +238,7 @@ export function SurfaceSettings({
             />
           </label>
         </div>
-      </details>
+      </section>
       {(message || state?.error) && (
         <p role="status" className="mt-2 text-[14px] text-muted-foreground">
           {message || state?.error}

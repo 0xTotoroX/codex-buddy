@@ -79,8 +79,6 @@ test('workbench settings save only their own preference fields', { timeout: 3000
       window.notices = [];
       window.renderSettings(value);
     }, prefs);
-    await page.locator('#settings-fonts summary').click();
-    await page.locator('#settings-window summary').click();
     assert.equal(await page.getByLabel('字体大小', { exact: true }).inputValue(), 'follow');
     assert.equal(await page.getByLabel('跟随对象', { exact: true }).inputValue(), 'body');
     const width = page.getByLabel('侧栏宽度（px）', { exact: true });
@@ -95,7 +93,7 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     );
     await page.getByLabel('内容显示', { exact: true }).selectOption('true');
     await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
-    await page.getByText('双击常用提示词或推荐指令会直接发送。', { exact: true }).waitFor();
+    await page.getByText('双击即发送；已有草稿时只追加。', { exact: true }).waitFor();
     await page.waitForFunction(() =>
       [...document.querySelectorAll('fieldset')].every((field) => !field.disabled),
     );

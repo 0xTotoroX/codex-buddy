@@ -1,5 +1,5 @@
-/* [INPUT]: Independent task API and shared settings controls.
- * [OUTPUT]: Group personalization, board/sync switches, explicit authorization and single-list binding.
+/* [INPUT]: Independent task API, shared settings controls and action icons.
+ * [OUTPUT]: Direct group personalization with accessible save/add actions; retained sync authorization and single-list binding UI.
  * [POS]: Task settings do not modify model-control or workbench preferences.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useState } from 'react';
@@ -7,6 +7,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Switch } from './components/ui/switch';
 import { NativeSelect } from './components/ui/native-select';
+import { Icon } from '../shared/icons/react';
 import {
   useTasks,
   columns as defaultColumns,
@@ -40,8 +41,8 @@ export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) 
     (!!hasLinks && !!currentId && !needsRepair);
   return (
     <section id="settings-tasks" className="settings-section space-y-5">
-      <details id="board-groups" className="group">
-        <summary className="cursor-pointer text-[15px] group-open:mb-4">看板分组</summary>
+      <section id="board-groups">
+        <h2>看板分组</h2>
         <div className="space-y-3">
           {(state?.store.columns ?? defaultColumns).map((column) => (
             <form
@@ -76,13 +77,13 @@ export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) 
               <Button
                 type="submit"
                 variant="ghost"
-                className="w-24 shrink-0 text-[15px]"
+                size="icon"
                 aria-label={`保存分组：${column.title}`}
                 disabled={
                   busy || !groupNames[column.id]?.trim() || groupNames[column.id] === column.title
                 }
               >
-                保存
+                <Icon name="check" />
               </Button>
             </form>
           ))}
@@ -107,14 +108,15 @@ export function TaskSettings({ tasks }: { tasks: ReturnType<typeof useTasks> }) 
             <Button
               type="submit"
               variant="ghost"
-              className="w-24 shrink-0 text-[15px]"
+              size="icon"
+              aria-label="新增分组"
               disabled={busy || !state || !newGroup.trim()}
             >
-              新增分组
+              <Icon name="plus" />
             </Button>
           </form>
         </div>
-      </details>
+      </section>
       {remindersSettingsVisible && (
         <>
           <div className="flex items-center justify-between gap-4">

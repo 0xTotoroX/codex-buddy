@@ -1,11 +1,13 @@
-/* [INPUT]: 认证术语 API、共用卡片呈现与用户导入/输入。
- * [OUTPUT]: 共用卡片与材质预览、检索、掌握列表、分类入库和文档导出。
+/* [INPUT]: 认证术语 API、共用卡片/动作图标与用户导入/输入。
+ * [OUTPUT]: 直接显示识别、预览、检索和掌握列表，自定义入库与导入导出保留折叠。
  * [POS]: 详细设置的功能区，不访问主聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useRef, useState } from 'react';
 import { request } from './api';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import { NativeSelect } from './components/ui/native-select';
+import { Button } from './components/ui/button';
+import { Icon } from '../shared/icons/react';
 import { cardStyles, createCard } from '../terminology/card.js';
 
 type Term = {
@@ -133,15 +135,22 @@ export function TerminologySettings({ active }: { active: boolean }) {
         {cardStyles +
           `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{max-width:100%}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
       </style>
-      <h2>术语释义</h2>
-      <button
-        type="button"
-        onClick={() =>
-          void request('features', { op: 'reveal', id: 'terms' }).catch((e) => setError(e.message))
-        }
-      >
-        打开术语模块
-      </button>
+      <div className="settings-section-heading">
+        <h2>术语释义</h2>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="打开术语模块"
+          onClick={() =>
+            void request('features', { op: 'reveal', id: 'terms' }).catch((e) =>
+              setError(e.message),
+            )
+          }
+        >
+          <Icon name="detach" />
+        </Button>
+      </div>
       {error && (
         <p role="alert" className="text-destructive">
           {error}
@@ -168,9 +177,6 @@ export function TerminologySettings({ active }: { active: boolean }) {
               在聊天中标注术语
             </label>
           </div>
-          <p className="settings-hint">
-            细下划线 · 悬停查看释义 · Alt + Shift + T 打开当前可见术语
-          </p>
           <div className="term-style-options">
             <label>
               背景材质
@@ -233,8 +239,8 @@ export function TerminologySettings({ active }: { active: boolean }) {
             )}
           </div>
           <Preview term={preview} preferences={prefs} />
-          <details>
-            <summary>识别与自动积累</summary>
+          <section className="settings-subsection">
+            <h3>识别与自动积累</h3>
             <div className="settings-row">
               <label>
                 <input
@@ -269,15 +275,12 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 联网核对并补充缺失术语
               </label>
             </div>
-            <p className="settings-hint">
-              语义识别使用 Buddy
-              配置的模型，独立处理当前一问一答；联网仅查询短术语名。当前查询公共百科，找不到可靠资料时不自动入库。结果不写回主聊天。
-            </p>
-          </details>
-          <details>
-            <summary>
+            <p className="settings-hint">语义识别使用已配置模型处理当前问答；联网仅查询术语名。</p>
+          </section>
+          <section className="settings-subsection">
+            <h3>
               术语库 · {data.entries.length} 条 · 已掌握 {prefs.mastered.length} 条
-            </summary>
+            </h3>
             <input
               className="term-search"
               aria-label="搜索术语"
@@ -308,8 +311,11 @@ export function TerminologySettings({ active }: { active: boolean }) {
                     {t.name}
                     {t.english !== t.name && <small> · {t.english}</small>}
                   </button>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`${prefs.mastered.includes(t.id) ? '恢复提示' : '已掌握'}：${t.name}`}
                     disabled={busy}
                     onClick={() =>
                       void command({
@@ -318,8 +324,8 @@ export function TerminologySettings({ active }: { active: boolean }) {
                       })
                     }
                   >
-                    {prefs.mastered.includes(t.id) ? '恢复提示' : '已掌握'}
-                  </button>
+                    <Icon name={prefs.mastered.includes(t.id) ? 'return' : 'check'} />
+                  </Button>
                 </div>
               ))}
               {!results.length && <p>没有匹配的术语</p>}
@@ -329,9 +335,9 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 匹配 {results.length} 条，显示前 80 条；输入更具体的名称可缩小范围。
               </p>
             )}
-          </details>
+          </section>
           <details>
-            <summary>手动添加</summary>
+            <summary>添加自定义术语</summary>
             <div className="term-entry">
               <input
                 aria-label="中文术语名"
@@ -382,9 +388,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 自动分类并添加
               </button>
             </div>
-            <p className="settings-hint">
-              使用已配置模型分类。手动词条独立保存，分类失败保留输入。
-            </p>
+            <p className="settings-hint">使用已配置模型分类。</p>
           </details>
           <details>
             <summary>导入与导出</summary>

@@ -6,22 +6,22 @@
 
 成员清单：
 
-- [main.tsx](main.tsx)：Tom Modern 双模式入口、共享功能开关、唯一任务状态与分类容器；组合现有模块及其只读预览快照，表单保持单份挂载；版本位于页面末尾，不覆盖内容，不持有任务或模型业务。
+- [main.tsx](main.tsx)：Tom Modern 双模式入口、共享功能开关、唯一任务状态与分类容器；组合现有模块及其只读预览快照，表单保持单份挂载；常规配置直接显示，详细模式的打开图标位于对应功能开关旁；版本位于页面末尾，不覆盖内容，不持有任务或模型业务。
 - [settings-overview.tsx](settings-overview.tsx)：按承载与功能组织只读总览；显示已保存的功能归属、承载主题与布局、生成配置、看板分组计数及当前/常用模型和预设，字号只显示一位小数，属性链接定位对应设置控件并展开折叠项；分类可见时读取现有 API，不直接修改配置或打开功能。
 - [settings-outline.tsx](settings-outline.tsx)：默认简易模式，模式/四分类导航、浏览器历史、旧锚点按字段分流、阅读位置保存及 Dev 来源挂载；支持分类/属性锚点，等待异步表单就绪后展开并聚焦目标；重新挂载前保留外部注入的 Dev 节点，避免热更新丢失来源入口。
-- [settings-disclosure.tsx](settings-disclosure.tsx)：原生details的展示强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
-- [settings-controls.tsx](settings-controls.tsx)：共用设置行、各功能页顶部的独立开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
+- [settings-disclosure.tsx](settings-disclosure.tsx)：保留的原生details展示兼容组件，当前常规配置已改为直接显示；支持强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
+- [settings-controls.tsx](settings-controls.tsx)：共用设置行、功能开关及可选 onOpen 图标回调、反馈及自动/手动保存表单；图标带无障碍名称，开启状态和禁用态与开关一致，不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步的方向、常用提示词和点击/显示行为；共享模型配置移入model-settings，不复制表单。
-- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，简易模式按需展开，详细模式显示协议/环境变量及请求限制；局部模型列表、密钥显示及简单展开状态保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，保留自由输入与原失焦保存。
+- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，两种模式均直接显示；详细模式增加协议/环境变量，高级生成参数保留折叠；局部模型列表、密钥显示与草稿保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，保留自由输入与原失焦保存。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
 - [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
 - [panel-settings.tsx](panel-settings.tsx)：有效旧字段的分区适配；下一步显示及常用提示词/推荐指令共用的点击行为、统一字体跟随来源、相对比例及自定义字号、侧栏宽度/桌面置顶逐项保存；旧 fontOffset 作为大纲与下一步的兼容回退。不再编辑旧 dockLayout/popoutLayout、位置或主题。
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
-- [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；屏幕可显式跟随 Codex，保留自动选择与固定屏幕及断开屏幕的选择，写入带 revision 校验。
-- [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关、分类状态与串行修订保存，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；冲突重新读取但不自动重放，失败保留编辑草稿；不持有位置或主题。
-- `model-organization.tsx`：详细模式按需展开模型分组；批量纠正厂家/移动/恢复自动、自定义组增删改名及组内/组间排序。厂家候选使用共用 SuggestionInput，仍可自填并显式应用。暂不可用模型保留配置，同名模型显示完整 ID 以区分渠道；不改常用与预设。
-- [task-settings.tsx](task-settings.tsx)：看板分组管理及看板开关；同步授权/列表界面保留源码但不挂载；不修改同步规则。
+- [surface-settings.tsx](surface-settings.tsx)：功能位置与布局、主题、字体、尺寸与窗口、贴边位置直接分组显示；管理四种形式各自主题及贴边屏幕/位置；屏幕可显式跟随 Codex，保留自动选择与固定屏幕及断开屏幕的选择，写入带 revision 校验。
+- [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关、可选打开回调、分类状态与串行修订保存，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；冲突重新读取但不自动重放，失败保留编辑草稿；不持有位置或主题。
+- `model-organization.tsx`：详细模式按需展开“自定义模型分组”；批量纠正厂家/移动/恢复自动、自定义组增删改名及组内/组间排序。厂家候选使用共用 SuggestionInput，仍可自填并显式应用。暂不可用模型保留配置，同名模型显示完整 ID 以区分渠道；不改常用与预设。
+- [task-settings.tsx](task-settings.tsx)：直接显示看板分组，使用保存/新增图标及明确无障碍名称；同步授权/列表界面保留源码但不挂载；不修改同步规则。
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
 - [styles.css](styles.css)：Tailwind v4、语义主题映射、搜索和保留的旧总览样式；只扫描本目录，不注入宿主。
@@ -54,13 +54,13 @@
 
 设置凭据以同源localStorage共享并兼容迁移旧sessionStorage；入口hash令牌优先，读取后移出URL。storage/hashchange/focus触发SSE重连，不卸载表单或重放写入；新地址首次仍须通过眼睛菜单授权入口进入。开发来源请求实时读取共享凭据，不再固定旧令牌。
 
-模式/分类按钮带data-settings-navigation；切换不触发模型表单或字号输入的失焦保存。原“打开功能”动作保留在详细功能分类的折叠操作区，不与每个开关常驻。字号、窗口、功能归属及贴边位置按需展开。
+模式/分类按钮带data-settings-navigation；切换不触发模型表单或字号输入的失焦保存。常规模型、各形式材质、字体、窗口、功能位置、看板分组及术语识别/词库直接显示。仅高级生成、自定义方向/模型分组/术语、导入导出及诊断保留折叠；Dev 来源属于高级开发配置。小字去掉装饰和重复描述，保留发送/重开后果、数据使用、环境覆盖、失败和必要状态。
 
 - codex-host-settings.tsx：详细模式“启动与开发”内独立管理区域，分类可见时轮询codex-host API；启停保存独立revision，安装、更新、回退、启动及重启停用均为显式操作。旧settings-codex-host锚点仍可定位，不新增整页。
 
 View.connection.status支持unresponsive：主标题显示页面暂未响应，启动与连接仍保留断开/手动重连操作，不将短暂页面迟缓显示为凭据错误。
 
-- `terminology-settings.tsx`：详细功能设置中的标注开关、独立上下文词义核对/联网选项、贴字浮层的共用预览及五类背景材质、词库检索、已掌握恢复、手动自动分类、JSON 导入和两份中文文档导出。失败时保留输入，材质与液态变体/自定义背景持久化。
+- `terminology-settings.tsx`：详细功能设置中直接显示标注开关、上下文词义核对/联网选项、贴字浮层预览及五类背景材质、词库检索与掌握/恢复图标；添加自定义术语和导入导出保留折叠。失败时保留输入，材质与液态变体/自定义背景持久化。
 
 settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/标题索引分类和控件ID，Enter/点击通过settings-outline导航到详细分类并展开祖先details；搜索本身不提交表单，也不索引输入值、密钥或聊天。main以data-settings-page标记归属，锚点字段支持URL解码。提示词优化开关共用SettingsEditor独立控制补丁，避免提交其他未保存凭据。
 

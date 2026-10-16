@@ -1,5 +1,5 @@
 /* [INPUT]: 版本化外观偏好与认证 API。
- * [OUTPUT]: 下一步的显示/点击设置，及全局跟随/自定义字体、宽度和置顶设置。
+ * [OUTPUT]: 下一步的显示/点击设置，及直接显示的全局跟随/自定义字体、宽度和置顶设置。
  * [POS]: 保留有效旧字段的设置适配；不再编辑旧两功能布局、主题或窗口归属。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { DOCK_MIN_WIDTH } from '../surfaces/embedded/width.js';
@@ -149,9 +149,9 @@ export function PanelSettings({
             label="指令执行模式"
             hint={
               ui.promptClickMode === 'direct'
-                ? '单击常用提示词或推荐指令会直接发送。'
+                ? '单击即发送；已有草稿时只追加。'
                 : ui.promptClickMode === 'hybrid'
-                  ? '双击常用提示词或推荐指令会直接发送。'
+                  ? '双击即发送；已有草稿时只追加。'
                   : undefined
             }
           >
@@ -168,15 +168,15 @@ export function PanelSettings({
         </>
       ) : (
         <>
-          <details className="settings-section settings-surface-group" id="settings-fonts">
-            <summary className="settings-group-title">字体</summary>
+          <section className="settings-section settings-surface-group" id="settings-fonts">
+            <h2>字体</h2>
             <TypographySettings
               value={prefs.typography}
               save={(typography) => update({ typography })}
             />
-          </details>
-          <details className="settings-section settings-surface-group" id="settings-window">
-            <summary className="settings-group-title">尺寸与窗口</summary>
+          </section>
+          <section className="settings-section settings-surface-group" id="settings-window">
+            <h2>尺寸与窗口</h2>
             {number('dock-width', '侧栏宽度（px）', ui.dockWidth, DOCK_MIN_WIDTH, Infinity, (n) =>
               change('dockWidth', n),
             )}
@@ -187,7 +187,7 @@ export function PanelSettings({
                 onChange={(v) => void update({ alwaysOnTop: v })}
               />
             </div>
-          </details>
+          </section>
         </>
       )}
       <Feedback text={error} failed />

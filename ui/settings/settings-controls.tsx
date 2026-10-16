@@ -1,10 +1,11 @@
-/* [INPUT]: 现有基础控件和设置保存队列。
+/* [INPUT]: 现有基础控件、共用图标、可选功能打开回调和设置保存队列。
  * [OUTPUT]: 统一设置行、功能开关/唤起、反馈及表单保存状态。
  * [POS]: 设置页组合组件，不持有业务数据或新增保存服务。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useId, type ReactNode } from 'react';
 import { Button } from './components/ui/button';
 import { Switch } from './components/ui/switch';
+import { Icon } from '../shared/icons/react';
 import { request, type Settings } from './api';
 import type { SettingsEditor } from './use-settings-form';
 export function Field({
@@ -51,17 +52,31 @@ export function FeatureSwitch({
   checked,
   disabled,
   onChange,
+  onOpen,
 }: {
   name: string;
   checked: boolean;
   disabled?: boolean;
   onChange: (value: boolean) => void;
+  onOpen?: () => void;
 }) {
   const id = useId();
   return (
     <div className="settings-row settings-feature-switch">
       <label htmlFor={id}>启用{name}</label>
       <div className="flex shrink-0 items-center gap-4">
+        {onOpen && (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label={`打开${name}`}
+            disabled={disabled || !checked}
+            onClick={onOpen}
+          >
+            <Icon name="detach" />
+          </Button>
+        )}
         <Switch
           id={id}
           aria-label={`启用${name}`}

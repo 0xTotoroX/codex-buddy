@@ -21,6 +21,29 @@ test(
     let panelTheme = null;
     let connectionStatus = 'connected';
     const streams = new Set();
+    const terminology = {
+      entries: [
+        {
+          id: 'fixture-term',
+          name: '合成术语',
+          english: 'Fixture',
+          definition: '合成释义',
+          aliases: [],
+          category: ['测试'],
+          example: '',
+          source: '',
+        },
+      ],
+      preferences: {
+        enabled: true,
+        semantic: false,
+        autoExpand: false,
+        cardStyle: 'plain',
+        mastered: [],
+        favorites: [],
+        revision: 1,
+      },
+    };
     let appearance = {
       revision: 1,
       webRevision: 1,
@@ -179,6 +202,10 @@ test(
               revision: appearance.revision + 1,
             };
           value = appearance;
+        } else if (path === '/api/terminology') {
+          if (body?.action === 'master') terminology.preferences.mastered = [body.id];
+          if (body?.action === 'restore') terminology.preferences.mastered = [];
+          value = terminology;
         } else if (path === '/api/tasks/state') value = tasks;
         else if (path === '/api/dev/sources')
           value = {
@@ -320,6 +347,30 @@ test(
       await mkdir('target/reports', { recursive: true });
       await page.screenshot({ path: 'target/reports/settings-simple-default.png', fullPage: true });
       await detail();
+      const openOutline = page.getByRole('button', { name: '打开大纲', exact: true });
+      assert.equal(
+        (await openOutline.innerText()).trim(),
+        '',
+        'open action uses an accessible icon',
+      );
+      const [revealed] = await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.url().endsWith('/api/features') &&
+            response.request().postData()?.includes('reveal'),
+        ),
+        openOutline.click(),
+      ]);
+      await revealed.finished();
+      assert.ok(
+        writes.some(
+          (entry) =>
+            entry.path === '/api/features' &&
+            entry.body.op === 'reveal' &&
+            entry.body.id === 'outline',
+        ),
+      );
+      writes.length = 0;
       await simple();
       await page.goBack();
       await page.waitForFunction(
@@ -331,7 +382,11 @@ test(
         () =>
           document.querySelector('.settings-app').getAttribute('data-settings-mode') === 'simple',
       );
-      await page.getByText('更改模型', { exact: true }).click();
+      assert.equal(
+        await page.getByLabel('模型名称', { exact: true }).isVisible(),
+        true,
+        'model configuration is visible without a disclosure',
+      );
       const model = page.getByLabel('模型名称', { exact: true }),
         key = page.getByLabel('API 密钥', { exact: true });
       const modelNode = await model.elementHandle();
@@ -367,7 +422,16 @@ test(
       assert.equal(writes.length, 0, 'mode/category changes do not save typed drafts');
       await detail();
       await category('features');
-      await page.getByText('看板分组', { exact: true }).click();
+      await page.getByLabel('搜索术语', { exact: true }).waitFor();
+      assert.equal(
+        await page.getByText('结合问答核对词义与识别概念', { exact: true }).isVisible(),
+        true,
+      );
+      await page.getByRole('button', { name: '已掌握：合成术语', exact: true }).click();
+      await page.getByRole('button', { name: '恢复提示：合成术语', exact: true }).click();
+      await page.getByRole('button', { name: '已掌握：合成术语', exact: true }).waitFor();
+      assert.deepEqual(terminology.preferences.mastered, []);
+      assert.equal(await page.getByLabel('分组名称：待办', { exact: true }).isVisible(), true);
       const group = page.getByLabel('分组名称：待办', { exact: true });
       await group.fill('未保存分组');
       await simple();
@@ -424,7 +488,12 @@ test(
         true,
       );
       await page.getByRole('link', { name: '外观与布局', exact: true }).click();
-      await page.locator('#settings-fonts summary').click();
+      for (const label of ['字体大小', '侧栏宽度（px）', '大纲默认位置', '贴边屏幕'])
+        assert.equal(
+          await page.getByLabel(label, { exact: true }).isVisible(),
+          true,
+          `${label} is directly visible`,
+        );
       await page.getByLabel('自定义字号（px）', { exact: true }).waitFor();
       assert.equal(await page.getByLabel('自定义字号（px）', { exact: true }).inputValue(), '17');
       const font = page.getByLabel('自定义字号（px）', { exact: true });
@@ -437,14 +506,14 @@ test(
       assert.equal(appearance.ui.fontSizes.outline, 17);
       assert.equal(writes.length, beforeFont, 'mode switch keeps unsaved font input');
       const theme = page.locator('#theme-sidebar');
-      if (await theme.evaluate((n) => n.open)) await theme.locator('summary').click();
+      assert.equal(await theme.locator('summary').count(), 0);
       await simple();
       await page.getByLabel('侧栏主题', { exact: true }).waitFor();
       await detail();
       assert.equal(
-        await theme.evaluate((n) => n.open),
-        false,
-        'detailed theme disclosure restored',
+        await page.getByLabel('侧栏主题', { exact: true }).isVisible(),
+        true,
+        'theme controls stay visible after mode changes',
       );
 
       await page.setViewportSize({ width: 360, height: 800 });
@@ -498,7 +567,6 @@ test(
         await preview.locator('.preview-workspace').getAttribute('data-material'),
         'frosted',
       );
-      if (!(await theme.evaluate((n) => n.open))) await theme.locator('summary').click();
       rejectSurface = true;
       await page.getByLabel('侧栏主题', { exact: true }).selectOption('black');
       await page.getByText('合成材质保存失败', { exact: false }).waitFor();

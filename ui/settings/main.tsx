@@ -1,5 +1,5 @@
 /* [INPUT]: 现有设置表单、认证 API 与共用设置控件。
- * [OUTPUT]: Tom Modern 双模式设置、Codex/手动主题、共享字体及只读联动预览，保留自动保存与错误反馈。
+ * [OUTPUT]: 常规配置直接显示的 Tom Modern 双模式设置、功能打开图标、主题/字体及联动预览，保留保存与错误反馈。
  * [POS]: 设置展示层，不执行后台业务或读取聊天正文。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useTypography } from './use-typography';
@@ -97,6 +97,16 @@ function App() {
   useEffect(() => {
     setNotice((current) => (current.failed ? current : { text: '', failed: false }));
   }, [page]);
+  function openFeature(id: 'outline' | 'next' | 'board' | 'model') {
+    const action =
+      id === 'board'
+        ? tasks.command({ op: 'open' })
+        : request(
+            id === 'model' ? 'model-control/open' : 'features',
+            id === 'model' ? {} : { op: 'reveal', id },
+          );
+    void action.catch((error) => notify(error.message, true));
+  }
   const connected = live && view?.connection.status === 'connected';
   return (
     <div className="settings-app" data-settings-mode={mode} data-settings-category={page}>
@@ -141,22 +151,7 @@ function App() {
         <SettingsOutline page={page} mode={mode} dev={dev} navigate={navigate} />
         <main className="settings-content min-w-0" ref={contentRef}>
           <div className="settings-page-heading">
-            <span className="settings-eyebrow" aria-hidden="true">
-              {simple
-                ? 'WORKSPACE / ESSENTIALS'
-                : `SETTINGS / 0${Object.keys(pageTitles).indexOf(page) + 1}`}
-            </span>
             <h1 className="settings-title">{simple ? '设置' : pageTitles[page]}</h1>
-            <p>
-              {simple
-                ? '让工作空间，顺手一点。'
-                : {
-                    features: '选择你的工具，调整它们的工作方式。',
-                    model: '配置生成服务，把每一步交给合适的模型。',
-                    surfaces: '位置、材质与排列，组成你的工作空间。',
-                    connection: '管理本地连接与启动行为。',
-                  }[page]}
-            </p>
           </div>
           <Feedback text={error} failed />
           {!editor.form && !error && <p role="status">正在读取设置…</p>}
@@ -173,6 +168,7 @@ function App() {
                 <div id="settings-outline">
                   <FeatureSwitch
                     name="大纲"
+                    onOpen={simple ? undefined : () => openFeature('outline')}
                     checked={editor.form?.answerOutlineEnabled ?? false}
                     disabled={!live || !editor.form}
                     onChange={(v) => editor.change('answerOutlineEnabled', v)}
@@ -180,17 +176,24 @@ function App() {
                 </div>
                 <FeatureSwitch
                   name="下一步"
+                  onOpen={simple ? undefined : () => openFeature('next')}
                   checked={editor.form?.enabled ?? false}
                   disabled={!live || !editor.form}
                   onChange={(v) => editor.change('enabled', v)}
                 />
                 <FeatureSwitch
                   name="看板"
+                  onOpen={simple ? undefined : () => openFeature('board')}
                   checked={tasks.state?.store.boardEnabled ?? false}
                   disabled={tasks.busy || !tasks.state || !!tasks.state.error}
                   onChange={(boardEnabled) => void tasks.command({ op: 'modules', boardEnabled })}
                 />
-                <ModelControlSettings live={live} detailed={!simple} onSnapshot={setModel} />
+                <ModelControlSettings
+                  live={live}
+                  detailed={!simple}
+                  onSnapshot={setModel}
+                  onOpen={simple ? undefined : () => openFeature('model')}
+                />
                 <div id="settings-prompt-enhancement">
                   <FeatureSwitch
                     name="提示词优化"
@@ -214,46 +217,6 @@ function App() {
                     </NativeSelect>
                   </Field>
                 </div>
-                <details hidden={simple} className="settings-details settings-feature-actions">
-                  <summary>功能操作</summary>
-                  <div className="flex flex-wrap gap-2">
-                    {(['outline', 'next', 'board', 'model'] as const).map((id, index) => (
-                      <button
-                        type="button"
-                        className="settings-open-action"
-                        key={id}
-                        disabled={
-                          !live ||
-                          [
-                            !editor.form?.answerOutlineEnabled,
-                            !editor.form?.enabled,
-                            !tasks.state?.store.boardEnabled,
-                            !editor.saved?.modelControlEnabled,
-                          ][index]
-                        }
-                        onClick={() => {
-                          const action =
-                            id === 'board'
-                              ? tasks.command({ op: 'open' })
-                              : request(
-                                  id === 'model' ? 'model-control/open' : 'features',
-                                  id === 'model' ? {} : { op: 'reveal', id },
-                                );
-                          void action.catch((error) => notify(error.message, true));
-                        }}
-                      >
-                        {['打开大纲', '打开下一步', '打开看板', '打开模型快切'][index]}
-                      </button>
-                    ))}
-                  </div>
-                </details>
-                {simple &&
-                  editor.form &&
-                  (editor.form.directionSource !== 'auto' || editor.form.maxInputChars !== 0) && (
-                    <p className="settings-hint">
-                      自定义生成配置生效中 · <a href="#settings-model">查看详细设置</a>
-                    </p>
-                  )}
               </section>
               <section
                 data-settings-page="surfaces"
@@ -327,7 +290,6 @@ function App() {
         </main>
       </div>
       <footer className="settings-footer">
-        <span>你的设置 · 本机保存</span>
         <span>CodexBuddy {view?.version || '—'}</span>
       </footer>
     </div>

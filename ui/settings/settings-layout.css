@@ -245,12 +245,6 @@ html:root
   padding-right: 22px;
   border-right: 1px solid var(--buddy-border);
 }
-.settings-nav-caption {
-  color: var(--buddy-muted);
-  font-size: 0.6875em;
-  letter-spacing: 0.06em;
-  margin: 0 0 18px;
-}
 .settings-nav > .relative {
   display: none;
 }
@@ -297,24 +291,6 @@ html:root
 .settings-page-heading {
   margin-bottom: 32px;
 }
-.settings-eyebrow {
-  display: block;
-  font:
-    0.625em ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-  letter-spacing: 0.1em;
-  color: var(--buddy-muted);
-}
-.settings-eyebrow::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 8px;
-  background: var(--settings-orange);
-}
 .settings-title {
   margin: 10px 0 8px;
   font-size: 1.9em;
@@ -322,10 +298,7 @@ html:root
   letter-spacing: -0.045em;
   font-weight: 650;
 }
-.settings-page-heading > p {
-  font-size: 0.8125em;
-  color: var(--buddy-muted);
-}
+
 .settings-body {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(290px, 0.95fr);
@@ -470,42 +443,24 @@ html:root
 .settings-choice button:disabled {
   opacity: 0.45;
 }
-.settings-feature-actions {
-  margin-top: 16px;
+/* 常规分组直接展示；低频高级配置保留原生 details。 */
+.settings-subsection {
+  margin-block: 24px;
 }
-.settings-feature-actions > summary {
-  color: var(--buddy-muted);
+.settings-subsection > h3 {
+  margin: 0 0 16px;
+  font-size: 0.875em;
+  font-weight: 600;
 }
-.settings-open-action {
-  padding: 6px 10px;
-  border: 1px solid var(--buddy-border);
-  font-size: 0.8125em;
-}
-.settings-open-action:disabled {
-  opacity: 0.45;
-}
-.settings-model-summary {
+.settings-section-heading {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  min-height: 36px;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
 }
-.settings-model-summary > span:first-child {
-  overflow-wrap: anywhere;
-  font-weight: 550;
-}
-.settings-model-purpose {
-  margin-bottom: 12px;
-}
-.settings-model-editor > summary {
-  cursor: pointer;
-  color: var(--buddy-muted);
-  padding: 8px 0;
-  font-size: 0.8125em;
-}
-.settings-model-editor[open] > summary {
-  margin-bottom: 18px;
+.settings-section-heading > h2 {
+  margin: 0;
 }
 .settings-app[data-settings-mode='simple'] .settings-common-surface .settings-section {
   margin-bottom: 18px;
@@ -648,8 +603,7 @@ html:root
   .settings-nav > .relative {
     display: block;
   }
-  .settings-category-links,
-  .settings-nav-caption {
+  .settings-category-links {
     display: none;
   }
   .settings-content {

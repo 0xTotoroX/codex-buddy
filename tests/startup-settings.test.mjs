@@ -267,7 +267,7 @@ test(
       await until(() => settings.selectedDirections.length === 2);
       await page.getByRole('button', { name: '上移方向 2', exact: true }).click();
       await until(() => settings.selectedDirections[0] === 'advance');
-      await page.getByText('编辑方向库', { exact: true }).click();
+      await page.getByText('自定义方向库', { exact: true }).click();
       await page.getByRole('button', { name: '添加自定义方向', exact: true }).click();
       await page.getByLabel('方向名称 4', { exact: true }).fill('长期维护');
       await page.getByLabel('倾向说明 4', { exact: true }).fill('关注维护成本与依赖负担');

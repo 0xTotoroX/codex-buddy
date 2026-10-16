@@ -216,9 +216,6 @@ export function SettingsOutline({
       hidden={mode === 'simple'}
       data-settings-navigation
     >
-      <div className="settings-nav-caption" aria-hidden="true">
-        工作空间设置
-      </div>
       <NativeSelect
         className="settings-category-select"
         aria-label="详细设置分类"

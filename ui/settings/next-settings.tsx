@@ -40,13 +40,6 @@ export function NextSettings({
         <h2 id="quick-prompts-title" className="mb-2 text-[15px] font-semibold">
           常用提示词
         </h2>
-        <p className="mb-4 text-[14px] text-muted-foreground">
-          {appearance?.ui.promptClickMode === 'direct'
-            ? '与推荐指令相同，点击直接发送；已有草稿时只追加。'
-            : appearance?.ui.promptClickMode === 'hybrid'
-              ? '与推荐指令相同，单击填入、双击发送；已有草稿时只追加。'
-              : '显示在下一步面板中，点击只填入，不自动发送。'}
-        </p>
         <div className="space-y-3">
           {form.quickPrompts.map((item, index) => (
             <div
@@ -86,6 +79,7 @@ export function NextSettings({
               <Button
                 type="button"
                 variant="ghost"
+                size="icon"
                 aria-label={`删除常用提示词 ${index + 1}`}
                 onClick={() => {
                   change(
@@ -95,19 +89,21 @@ export function NextSettings({
                   schedule();
                 }}
               >
-                删除
+                <Icon name="trash" />
               </Button>
             </div>
           ))}
           <Button
             type="button"
             variant="outline"
+            size="icon"
+            aria-label="添加提示词"
             disabled={form.quickPrompts.length >= 8}
             onClick={() =>
               change('quickPrompts', [...form.quickPrompts, { label: '', prompt: '' }])
             }
           >
-            添加提示词
+            <Icon name="plus" />
           </Button>
         </div>
       </Card>

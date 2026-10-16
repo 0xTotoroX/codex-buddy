@@ -1,8 +1,7 @@
 /* [INPUT]: Shared model editor, serialized save queue and free-text suggestion control.
- * [OUTPUT]: One model form for simple and detailed settings, retaining credentials/drafts while hidden.
+ * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced limits remain collapsible.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
-import { SettingsDisclosure } from './settings-disclosure';
 import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -64,15 +63,7 @@ export function ModelSettings({
   return (
     <>
       <Card tabIndex={-1} id="settings-model" aria-labelledby="model-title">
-        <div hidden={!simple} className="settings-model-summary">
-          <span>{form.model || saved.model || '沿用 Codex 当前模型'}</span>
-          <span className="settings-hint">
-            {dirty ? '编辑中' : saved.available ? '已配置' : '待配置'}
-          </span>
-        </div>
-        <p className="settings-hint settings-model-purpose">用于下一步建议与提示词优化</p>
-        <SettingsDisclosure className="settings-model-editor" forceOpen={simple ? undefined : true}>
-          <summary hidden={!simple}>更改模型</summary>
+        <div className="settings-model-editor">
           <div>
             <h2 id="model-title" hidden={simple}>
               生成模型
@@ -111,7 +102,7 @@ export function ModelSettings({
                     </NativeSelect>
                   </Field>
                 </div>
-                <Field id="base-url" label="API 地址" hint="填写 API 根地址或完整请求端点。">
+                <Field id="base-url" label="API 地址">
                   <Input
                     id="base-url"
                     type="url"
@@ -121,15 +112,7 @@ export function ModelSettings({
                     spellCheck={false}
                   />
                 </Field>
-                <Field
-                  id="api-key"
-                  label="API 密钥"
-                  hint={
-                    saved.apiKeyConfigured
-                      ? '已配置。留空保留现有密钥，保存后不会回显。'
-                      : '密钥只保存在本机后台，桌面浮窗不会收到密钥。'
-                  }
-                >
+                <Field id="api-key" label="API 密钥">
                   <div className="relative flex items-center [&_input]:pr-[43px]">
                     <Input
                       id="api-key"
@@ -174,7 +157,7 @@ export function ModelSettings({
                   <Field
                     id="api-key-env"
                     label="或使用密钥环境变量"
-                    hint="填写变量名，读取后台进程的环境；环境值优先于已存密钥。"
+                    hint="环境变量优先于已存密钥。"
                   >
                     <Input
                       id="api-key-env"
@@ -187,16 +170,8 @@ export function ModelSettings({
                 </div>
               </>
             )}
-            <Field
-              id="model"
-              label="模型名称"
-              hint={
-                form.provider === 'codex'
-                  ? '留空沿用 Codex 当前模型。'
-                  : '可以手动输入，或保存连接后读取可用模型。'
-              }
-            >
-              <div className="relative flex items-center [&_input]:pr-[110px]">
+            <Field id="model" label="模型名称">
+              <div className="relative flex items-center [&_input]:pr-[43px]">
                 <SuggestionInput
                   id="model"
                   value={form.model}
@@ -207,9 +182,10 @@ export function ModelSettings({
                 />
                 <Button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  className="absolute right-[5px]"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1"
+                  aria-label="读取模型"
                   disabled={!!busy || dirty}
                   onClick={() =>
                     void run('models', async () => {
@@ -223,7 +199,6 @@ export function ModelSettings({
                     name="refresh"
                     className={busy === 'models' ? 'animate-spin [animation-duration:1.2s]' : ''}
                   />
-                  读取模型
                 </Button>
               </div>
             </Field>
@@ -243,11 +218,8 @@ export function ModelSettings({
                 {busy === 'test' ? '正在测试…' : dirty ? '保存并测试' : '测试连接'}
               </Button>
             </div>
-            <p className="mt-[7px] text-[14px] leading-[1.7] text-muted-foreground">
-              连接测试使用固定示例，不读取你的聊天。
-            </p>
           </div>
-        </SettingsDisclosure>
+        </div>
       </Card>
       <details id="settings-limits" className="settings-section" hidden={simple}>
         <summary>高级生成设置</summary>

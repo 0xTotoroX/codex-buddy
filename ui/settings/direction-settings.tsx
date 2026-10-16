@@ -74,13 +74,6 @@ export function DirectionSettings({
         <option value="manual">我来选择</option>
         <option value="smart">智能挑选（实验）</option>
       </NativeSelect>
-      <p className="my-3 text-[14px] text-muted-foreground">
-        {form.directionSource === 'auto'
-          ? '根据最近一问一答自由探索，不受方向库限制。'
-          : form.directionSource === 'manual'
-            ? '按所选方向生成具体提问；不适用的方向会跳过。'
-            : 'Jev 仅判断候选方向是否适用；具体提问由你配置的生成模型撰写。'}
-      </p>
       {form.directionSource !== 'manual' ? (
         <div className="mt-4">
           <label htmlFor="max-items" className={labelClass}>
@@ -171,13 +164,15 @@ export function DirectionSettings({
             <Button
               type="button"
               variant="outline"
+              size="icon"
+              aria-label="加入"
               disabled={!adding || form.selectedDirections.length >= 6}
               onClick={() => {
                 slots([...form.selectedDirections, adding]);
                 setAdding('');
               }}
             >
-              加入
+              <Icon name="plus" />
             </Button>
           </div>
           <p className="text-[14px] text-muted-foreground">
@@ -189,7 +184,7 @@ export function DirectionSettings({
       )}
       {form.directionSource !== 'auto' && (
         <details className="mt-5" open={form.directionSource === 'smart' || undefined}>
-          <summary className="cursor-pointer text-[14px] font-medium">编辑方向库</summary>
+          <summary className="cursor-pointer text-[14px] font-medium">自定义方向库</summary>
           <div className="mt-4 space-y-5">
             {library.map((item, index) => (
               <div key={item.id} className="space-y-2 border-b border-border pb-4">
@@ -252,6 +247,8 @@ export function DirectionSettings({
             <Button
               type="button"
               variant="outline"
+              size="icon"
+              aria-label="添加自定义方向"
               disabled={library.length >= 24}
               onClick={() =>
                 change('directionLibrary', [
@@ -260,7 +257,7 @@ export function DirectionSettings({
                 ])
               }
             >
-              添加自定义方向
+              <Icon name="plus" />
             </Button>
           </div>
         </details>
