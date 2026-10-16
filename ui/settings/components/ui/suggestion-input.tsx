@@ -1,35 +1,41 @@
-/* [INPUT]: Editable text, optional suggestions and the caller's existing draft callback.
+/* [INPUT]: Editable text, suggestions, optional dropdown loading/status and the caller's draft callback.
  * [OUTPUT]: Accessible free-text combobox with a themed suggestion list.
  * [POS]: Settings UI only; selection updates the same draft without submitting a form.
  * [PROTOCOL]: Keep components/ui/AGENTS.md in sync. */
-import { useId, useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ComponentProps } from 'react';
 import { Input } from './input';
+import { Button } from './button';
+import { Icon } from '../../../shared/icons/react';
 
 type Props = Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'list' | 'ref'> & {
   value: string;
   options: readonly string[];
   onValueChange: (value: string) => void;
+  dropdown?: { label: string; onOpen: () => void; loading?: boolean; message?: string };
 };
 
 export function SuggestionInput({
   value,
   options,
   onValueChange,
+  dropdown,
   onFocus,
   onBlur,
   onKeyDown,
   ...props
 }: Props) {
   const id = useId();
+  const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false);
   const [above, setAbove] = useState(false);
   const [active, setActive] = useState(-1);
-  const matches = [...new Set(options)].filter((option) =>
-    option.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
+  const [showAll, setShowAll] = useState(false);
+  const matches = [...new Set(options)].filter(
+    (option) => showAll || option.toLocaleLowerCase().includes(value.trim().toLocaleLowerCase()),
   );
-  const expanded = open && !props.disabled && matches.length > 0;
+  const expanded = open && !props.disabled && (!!dropdown || matches.length > 0);
   const index = active >= 0 ? Math.min(active, matches.length - 1) : -1;
 
   function show() {
@@ -41,13 +47,40 @@ export function SuggestionInput({
     onValueChange(option);
     setOpen(false);
     setActive(-1);
+    input.current?.focus();
+  }
+  function openDropdown() {
+    setShowAll(true);
+    setActive(-1);
+    show();
+    dropdown?.onOpen();
   }
   useLayoutEffect(() => {
     if (expanded && index >= 0) list.current?.children[index]?.scrollIntoView({ block: 'nearest' });
   }, [expanded, index]);
+  useEffect(() => {
+    if (!expanded) return;
+    const dismiss = (event: Event) => {
+      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.isComposing) {
+        event.preventDefault();
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('focusin', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('focusin', dismiss);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [expanded]);
 
   return (
-    <div className="settings-suggestion-input">
+    <div ref={root} className="settings-suggestion-input" data-dropdown={!!dropdown}>
       <Input
         {...props}
         ref={input}
@@ -59,7 +92,7 @@ export function SuggestionInput({
         aria-controls={expanded ? id : undefined}
         aria-activedescendant={expanded && index >= 0 ? `${id}-${index}` : undefined}
         onFocus={(event) => {
-          show();
+          if (!dropdown) show();
           onFocus?.(event);
         }}
         onBlur={(event) => {
@@ -69,13 +102,17 @@ export function SuggestionInput({
         }}
         onChange={(event) => {
           onValueChange(event.target.value);
+          setShowAll(false);
           setActive(-1);
           show();
         }}
         onKeyDown={(event) => {
           onKeyDown?.(event);
           if (event.defaultPrevented || event.nativeEvent.isComposing) return;
-          if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && matches.length) {
+          if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && dropdown && !expanded) {
+            event.preventDefault();
+            openDropdown();
+          } else if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && matches.length) {
             event.preventDefault();
             show();
             setActive(
@@ -96,15 +133,48 @@ export function SuggestionInput({
           }
         }}
       />
+      {dropdown && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="settings-suggestion-trigger"
+          tabIndex={-1}
+          aria-label={dropdown.label}
+          aria-expanded={expanded}
+          aria-controls={expanded ? id : undefined}
+          disabled={props.disabled}
+          onPointerDown={(event) => event.preventDefault()}
+          onClick={() => {
+            if (expanded) setOpen(false);
+            else openDropdown();
+          }}
+        >
+          <Icon
+            name={dropdown.loading ? 'refresh' : 'chevron-down'}
+            className={dropdown.loading ? 'animate-spin [animation-duration:1.2s]' : ''}
+          />
+        </Button>
+      )}
       {expanded && (
         <ul
           ref={list}
           id={id}
           role="listbox"
-          aria-label="可选建议"
+          aria-label={dropdown?.label || '可选建议'}
+          aria-busy={dropdown?.loading || undefined}
           className="settings-suggestion-list"
           data-above={above}
         >
+          {dropdown && !matches.length && (
+            <li role="presentation" className="settings-suggestion-status">
+              <span role="status">
+                {dropdown.loading
+                  ? '正在读取模型…'
+                  : dropdown.message || '没有匹配的模型，可直接输入模型 ID。'}
+              </span>
+            </li>
+          )}
           {matches.map((option, position) => (
             <li
               key={option}

@@ -1,8 +1,8 @@
-/* [INPUT]: Shared model editor, serialized save queue and free-text suggestion control.
+/* [INPUT]: Shared model editor, serialized save queue, saved-connection model API and free-text dropdown.
  * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced limits remain collapsible.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
@@ -34,8 +34,54 @@ export function ModelSettings({
     setClearKey,
   } = editor;
   const [showKey, setShowKey] = useState(false),
-    [models, setModels] = useState<string[]>([]),
     [busy, setBusy] = useState('');
+  const [catalog, setCatalog] = useState<{
+    revision: number;
+    models: string[];
+    loading: boolean;
+    message?: string;
+  } | null>(null);
+  const modelRequest = useRef(0);
+  const connectionDirty =
+    !!form &&
+    !!saved &&
+    (!!apiKey ||
+      clearKey ||
+      remoteChanged ||
+      editor.saving ||
+      (['provider', 'protocol', 'baseUrl', 'apiKeyEnv'] as const).some(
+        (key) => form[key] !== saved[key],
+      ));
+  const currentCatalog = catalog?.revision === saved?.configurationRevision ? catalog : null;
+  async function readModels() {
+    if (!saved || connectionDirty || currentCatalog?.loading) return;
+    const requestId = ++modelRequest.current;
+    const revision = saved.configurationRevision;
+    setCatalog({ revision, models: [], loading: true });
+    try {
+      const result = await request<{ models: string[] }>('settings/models');
+      if (modelRequest.current !== requestId) return;
+      setCatalog({
+        revision,
+        models: result.models,
+        loading: false,
+        message:
+          result.models.length > 0
+            ? undefined
+            : saved.provider === 'codex'
+              ? '当前登录未返回候选，可留空沿用当前模型，或直接输入模型 ID。'
+              : '服务未返回模型列表，可直接输入模型 ID。',
+      });
+    } catch (error) {
+      if (modelRequest.current !== requestId) return;
+      setCatalog({
+        revision,
+        models: [],
+        loading: false,
+        message: `${(error as Error).message}。可直接输入模型 ID，或重新展开重试。`,
+      });
+    }
+  }
   async function run(name: string, action: () => Promise<unknown>) {
     if (busy) return;
     setBusy(name);
@@ -156,8 +202,8 @@ export function ModelSettings({
                 <div hidden={simple}>
                   <Field
                     id="api-key-env"
-                    label="或使用密钥环境变量"
-                    hint="环境变量优先于已存密钥。"
+                    label="密钥环境变量名（可选）"
+                    hint="填变量名，不是密钥。后台读到非空值时优先使用；直接填写 API 密钥可留空。"
                   >
                     <Input
                       id="api-key-env"
@@ -171,36 +217,22 @@ export function ModelSettings({
               </>
             )}
             <Field id="model" label="模型名称">
-              <div className="relative flex items-center [&_input]:pr-[43px]">
-                <SuggestionInput
-                  id="model"
-                  value={form.model}
-                  options={models}
-                  onValueChange={(value) => change('model', value)}
-                  placeholder={form.provider === 'codex' ? '沿用当前模型' : '模型 ID'}
-                  spellCheck={false}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1"
-                  aria-label="读取模型"
-                  disabled={!!busy || dirty}
-                  onClick={() =>
-                    void run('models', async () => {
-                      const result = await request<{ models: string[] }>('settings/models');
-                      setModels(result.models);
-                      notify(`已读取 ${result.models.length} 个模型，可在模型输入框中选择。`);
-                    })
-                  }
-                >
-                  <Icon
-                    name="refresh"
-                    className={busy === 'models' ? 'animate-spin [animation-duration:1.2s]' : ''}
-                  />
-                </Button>
-              </div>
+              <SuggestionInput
+                id="model"
+                value={form.model}
+                options={connectionDirty ? [] : currentCatalog?.models || []}
+                onValueChange={(value) => change('model', value)}
+                placeholder={form.provider === 'codex' ? '沿用当前模型' : '模型 ID'}
+                spellCheck={false}
+                dropdown={{
+                  label: '选择模型',
+                  onOpen: () => void readModels(),
+                  loading: !connectionDirty && currentCatalog?.loading,
+                  message: connectionDirty
+                    ? '请先保存连接配置，再读取模型列表；也可直接输入模型 ID。'
+                    : currentCatalog?.message,
+                }}
+              />
             </Field>
             <div className="mt-5 flex flex-wrap items-center gap-4">
               {!saved.available && <p className="settings-error">{saved.reason || '等待配置'}</p>}

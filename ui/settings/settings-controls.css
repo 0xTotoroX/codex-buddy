@@ -60,6 +60,19 @@
   width: 100%;
   min-width: 0;
 }
+.settings-suggestion-input[data-dropdown='true'] input {
+  padding-right: 43px;
+}
+.settings-app .settings-suggestion-trigger {
+  position: absolute;
+  right: 4px;
+  top: 3px;
+}
+.settings-suggestion-status {
+  padding: 8px 10px;
+  color: var(--buddy-muted);
+  overflow-wrap: anywhere;
+}
 .settings-suggestion-list {
   position: absolute;
   z-index: 20;
