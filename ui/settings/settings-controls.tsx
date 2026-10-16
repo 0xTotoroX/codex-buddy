@@ -3,6 +3,7 @@
  * [POS]: 设置页组合组件，不持有业务数据或新增保存服务。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
 import { useId, useRef, useState, useEffect, type ReactNode } from 'react';
+import { revealSettingsDrawer } from './settings-drawer';
 import { ConfirmationButton } from './settings-confirmation';
 import { Button } from './components/ui/button';
 import { ActionIcon, type ActionState } from './components/ui/action-feedback';
@@ -126,10 +127,10 @@ export function SettingsForm({
   }
   return (
     <form
+      onInvalidCapture={(event) => revealSettingsDrawer(event.target as HTMLElement)}
       onBlurCapture={(e) => {
-        // Confirmation controls can blur when busy/removed; they are not draft edits.
-        if (e.target instanceof Element && e.target.closest('dialog[data-settings-navigation]'))
-          return;
+        // Closing a drawer or confirmation can move focus; navigation is not a draft edit.
+        if (e.target instanceof Element && e.target.closest('[data-settings-navigation]')) return;
         if (!(
           e.relatedTarget instanceof Element &&
           e.relatedTarget.closest('button[type="submit"], [data-settings-navigation]')

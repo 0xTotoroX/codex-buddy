@@ -11,7 +11,7 @@ import { chromium } from 'playwright';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
-  'settings modes retain drafts, details, custom preferences and reading without saving on switch',
+  'settings modes retain drafts, drawers, custom preferences and reading without saving on switch',
   { timeout: 60000 },
   async () => {
     let settings = structuredClone(fixtureSettings),
@@ -429,12 +429,15 @@ test(
         await page.getByRole('button', { name: '保存设置', exact: true }).click();
       await page.locator('.settings-save[data-save-state="saved"]').waitFor({ state: 'attached' });
       const limits = page.locator('#settings-limits');
-      await limits.locator('summary').click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await page.getByLabel('输入字符上限', { exact: true }).fill('18000');
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       await simple();
       await detail();
-      assert.equal(await limits.getAttribute('open'), '');
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
+      assert.equal(await limits.locator('dialog').getAttribute('open'), '');
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).inputValue(), '18000');
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       const before = writes.length;
       await simple();
       await detail();
@@ -461,7 +464,7 @@ test(
       rejectNext = true;
       await model.fill('失败后保留模型');
       await page.getByRole('heading', { name: '生成模型', exact: true, level: 2 }).click();
-      await page.getByText('合成保存失败', { exact: true }).waitFor();
+      await page.locator('.settings-feedback').filter({ hasText: '合成保存失败' }).waitFor();
       await simple();
       await detail();
       assert.equal(await model.inputValue(), '失败后保留模型');
@@ -537,11 +540,12 @@ test(
       await page.goto(origin + '/#settings-limits/timeout');
       await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).waitFor();
       await page.getByLabel('请求超时（秒）', { exact: true }).waitFor();
-      assert.equal(await limits.getAttribute('open'), '');
+      assert.equal(await limits.locator('dialog').getAttribute('open'), '');
       assert.equal(settings.directionSource, fixtureSettings.directionSource);
       assert.equal(appearance.ui.fontSizes.outline, 17);
       assert.equal(tasks.store.syncEnabled, false);
 
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       // Previews consume existing saved snapshots; rejected saves never look successful.
       await page.setViewportSize({ width: 1360, height: 900 });
       await page.getByRole('link', { name: '外观与布局', exact: true }).click();
@@ -788,87 +792,45 @@ test(
       );
       const beforeMotion = writes.length;
       await page.getByRole('link', { name: '模型与生成', exact: true }).click();
-      if (await limits.evaluate((node) => node.open)) await limits.locator('summary').click();
-      await limits.evaluate(async (node) => {
-        await Promise.allSettled(node.getAnimations({ subtree: true }).map((a) => a.finished));
-      });
-      await limits.locator('summary').click();
-      // Native details pseudo-element transitions are not exposed by Element.getAnimations in every Chromium.
-      const opening = await limits.evaluate(async (node) => {
-        const heights = [];
-        for (let frame = 0; frame < 20; frame++) {
-          await new Promise(requestAnimationFrame);
-          heights.push(node.getBoundingClientRect().height);
-        }
-        return {
-          first: Math.min(...heights),
-          last: heights.at(-1),
-          intermediate: new Set(heights.map((height) => Math.round(height))).size,
-        };
-      });
-      assert.ok(
-        opening.last > opening.first + 8 && opening.intermediate > 2,
-        `disclosure grows smoothly: ${JSON.stringify(opening)}`,
-      );
-      await limits.locator('summary').click();
-      await limits.locator('summary').click();
-      await limits.evaluate(async (node) => {
-        await Promise.allSettled(node.getAnimations({ subtree: true }).map((a) => a.finished));
+      const drawer = limits.locator('dialog.settings-drawer');
+      const entryHeight = await limits.evaluate((n) => n.getBoundingClientRect().height);
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
+      await drawer.evaluate(async (n) => {
+        await Promise.allSettled(n.getAnimations().map((a) => a.finished));
       });
       assert.equal(
-        await limits.evaluate((node) => node.open),
-        true,
-        'rapid reversal keeps intended state',
+        await limits.evaluate((n) => n.getBoundingClientRect().height),
+        entryHeight,
+        'drawer does not reflow the main page',
       );
-      await page.waitForFunction(
-        (height) =>
-          Math.abs(
-            document.querySelector('#settings-limits').getBoundingClientRect().height - height,
-          ) < 1,
-        opening.last,
-      );
-
-      await limits.locator('summary').press('Enter');
-      assert.equal(await limits.evaluate((node) => node.open), false);
+      const bounds = await drawer.boundingBox();
+      assert.ok(Math.abs(bounds.x + bounds.width - page.viewportSize().width) < 2);
+      assert.ok(bounds.width <= 720);
+      await page.keyboard.press('Escape');
+      assert.equal(await drawer.evaluate((n) => n.open), false);
       assert.equal(
-        await limits.evaluate(
-          (node) => getComputedStyle(node, '::details-content').transitionDuration,
-        ),
+        await drawer.evaluate((n) => getComputedStyle(n).transitionDuration),
         '0s',
-      );
-      assert.equal(
-        await limits.evaluate((node) => node.getAnimations({ subtree: true }).length),
-        0,
-        'keyboard disclosure is immediate',
+        'keyboard closing is immediate',
       );
       const nav = page.getByRole('link', { name: '外观与布局', exact: true });
       await nav.press('Enter');
       assert.equal(
-        await page.locator('.settings-content').evaluate((node) => node.getAnimations().length),
+        await page.locator('.settings-content').evaluate((n) => n.getAnimations().length),
         0,
         'keyboard navigation has no entry animation',
       );
       await page.getByRole('link', { name: '模型与生成', exact: true }).click();
-      await limits.locator('summary').click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await page.emulateMedia({ reducedMotion: 'reduce' });
+      assert.equal(await drawer.evaluate((n) => getComputedStyle(n).transitionDuration), '0s');
+      assert.equal(await drawer.evaluate((n) => n.getAnimations().length), 0);
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       assert.equal(
-        await limits.evaluate((node) => node.getAnimations({ subtree: true }).length),
-        0,
-        'enabling reduced motion cancels disclosure motion',
+        writes.length,
+        beforeMotion,
+        'drawer motion and navigation never save configuration',
       );
-      assert.equal(
-        await limits.evaluate(
-          (node) => getComputedStyle(node, '::details-content').transitionDuration,
-        ),
-        '0s',
-      );
-      assert.ok(
-        Math.abs(
-          (await limits.evaluate((node) => node.getBoundingClientRect().height)) - opening.last,
-        ) < 1,
-        'reduced motion resolves the full expanded height immediately',
-      );
-      assert.equal(writes.length, beforeMotion, 'motion and disclosures never save configuration');
       await page.getByRole('link', { name: '启动与开发', exact: true }).click();
       await page.addScriptTag({ content: await readFile('ui/settings/dev-sources.js', 'utf8') });
       await page.getByText('开发来源 · main · 1234567', { exact: true }).waitFor();

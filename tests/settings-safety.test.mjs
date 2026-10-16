@@ -107,7 +107,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       await page.goto('http://safety.test/');
       await page.evaluate((value) => (window.fixture = value), settings);
       await page.addScriptTag({ content: script });
-      const dialog = page.locator('dialog[open]');
+      const dialog = page.locator('.settings-key-dialog[open]');
       const cancel = () => dialog.getByRole('button', { name: '取消', exact: true }).click();
       const accept = (label) => dialog.getByRole('button', { name: label, exact: true }).click();
       const jevDelete = page.getByRole('button', { name: '删除已保存的 Jev 密钥', exact: true });
@@ -120,7 +120,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       assert.equal(writes.length, 0);
       await page.getByRole('button', { name: '取消更换' }).click();
       assert.equal(writes.length, 0);
-      await page.getByText('高级设置', { exact: true }).click();
+      await page.getByRole('button', { name: 'Jev 高级设置', exact: true }).click();
       await jevDelete.click();
       assert.equal(
         await dialog
@@ -144,11 +144,13 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       assert.equal(settings.storedJevApiKey, true);
       assert.equal(settings.storedApiKey, fixtureSettings.storedApiKey);
       await cancel();
+      await page.getByRole('button', { name: '关闭Jev 高级设置', exact: true }).click();
       const failedCount = writes.length;
       await page.getByRole('heading', { name: '建议方向', exact: true }).click();
       await page.waitForTimeout(250);
       assert.equal(writes.length, failedCount, 'failed deletion is not retried by blur');
       failKey = false;
+      await page.getByRole('button', { name: 'Jev 高级设置', exact: true }).click();
       await jevDelete.click();
       await accept('确认删除');
       await page.locator('input#jev-key').waitFor();
@@ -211,7 +213,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
         assert.equal(writes.at(-1).path, path);
         if (op) assert.equal(writes.at(-1).body.op, op);
       }
-      await page.getByText('词库管理', { exact: true }).click();
+      await page.getByRole('button', { name: '词库管理', exact: true }).click();
       assert.equal(
         await page.getByRole('textbox', { name: '中文术语名', exact: true }).isVisible(),
         true,

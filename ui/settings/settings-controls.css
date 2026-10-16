@@ -199,3 +199,149 @@
 .settings-key-dialog::backdrop {
   background: rgb(0 0 0 / 30%);
 }
+
+/* [INPUT]: Settings drawer markup, shared theme tokens and motion preferences.
+ * [OUTPUT]: Quiet entry rows and a responsive right sheet without page reflow.
+ * [POS]: Settings-only overlay styles; does not alter form data or host surfaces.
+ * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
+.settings-drawer-entry {
+  margin-block: 24px;
+}
+.settings-app .settings-drawer-trigger {
+  width: 100%;
+  justify-content: space-between;
+  padding: 14px 16px;
+  min-height: 48px;
+  border: 0;
+  background: var(--buddy-subtle);
+  text-align: left;
+  color: var(--buddy-text);
+  border-radius: var(--settings-control-radius);
+}
+.settings-drawer-trigger > span:first-child {
+  font-weight: 500;
+}
+.settings-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  margin: 0;
+  padding: 0;
+  width: min(720px, calc(100vw - 80px));
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  border: 0;
+  border-radius: 0;
+  color: var(--buddy-text);
+  background: var(--buddy-page);
+  box-shadow: -12px 0 40px rgb(0 0 0 / 10%);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(24px);
+  transition:
+    opacity 180ms ease,
+    transform 220ms var(--settings-ease),
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+}
+.settings-drawer[open] {
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+  transform: none;
+}
+.settings-drawer::backdrop {
+  background: rgb(0 0 0 / 22%);
+  opacity: 0;
+  transition:
+    opacity 180ms ease,
+    display 220ms allow-discrete,
+    overlay 220ms allow-discrete;
+}
+.settings-drawer[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  .settings-drawer[open] {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  .settings-drawer[open]::backdrop {
+    opacity: 0;
+  }
+}
+.settings-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  flex-shrink: 0;
+  padding: 24px 28px 16px;
+}
+.settings-app .settings-drawer-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  outline: none;
+}
+.settings-drawer-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 28px 32px;
+}
+.settings-drawer-content > * + * {
+  margin-top: 24px;
+}
+.settings-app .settings-drawer .settings-field {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.settings-app .settings-drawer .settings-field > * {
+  grid-column: 1;
+}
+.settings-app .settings-drawer .settings-field > label {
+  padding-top: 0;
+}
+html:has(.settings-drawer[open]) {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+html[data-settings-input='keyboard'] .settings-drawer,
+html[data-settings-input='keyboard'] .settings-drawer::backdrop {
+  transition: none !important;
+}
+@media (max-width: 600px) {
+  .settings-drawer {
+    width: 100vw;
+  }
+  .settings-drawer-header {
+    padding: 20px 20px 12px;
+  }
+  .settings-drawer-content {
+    padding: 12px 20px 28px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-app .settings-drawer,
+  .settings-app .settings-drawer::backdrop {
+    transition: none !important;
+  }
+}
+
+.settings-drawer-footer {
+  flex-shrink: 0;
+  padding: 16px 28px 24px;
+}
+.settings-drawer-footer:empty {
+  display: none;
+}
+.settings-drawer-footer > * + * {
+  margin-top: 12px;
+}
+@media (max-width: 600px) {
+  .settings-drawer-footer {
+    padding: 12px 20px 20px;
+  }
+}

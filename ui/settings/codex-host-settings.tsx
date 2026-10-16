@@ -1,6 +1,7 @@
 /* [INPUT]: 认证 CodexHost API。 [OUTPUT]: CodexHost 独立开关、运行状态、版本更新及显式重启停用。
  * [POS]: 设置展示，不管理进程或复制其他功能配置；只在此分类可见时轮询。
  * [PROTOCOL]: 变更时同步 settings/AGENTS.md。 */
+import { SettingsDrawer } from './settings-drawer';
 import { useEffect, useRef, useState } from 'react';
 import { request } from './api';
 import { Toggle, Feedback } from './settings-controls';
@@ -128,8 +129,7 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
             )}
           </dl>
           {state.executable && (
-            <details className="group">
-              <summary className="cursor-pointer group-open:mb-4">程序路径</summary>
+            <SettingsDrawer title="程序路径">
               <dl className="space-y-4">
                 {state.executable && (
                   <div className="space-y-2">
@@ -144,7 +144,7 @@ export function CodexHostSettings({ live, active }: { live: boolean; active: boo
                   </div>
                 )}
               </dl>
-            </details>
+            </SettingsDrawer>
           )}
           {state.state === 'pendingEnable' && (
             <p>需要重开 Codex 才能启用时，请先结束任务，再打开 Buddy。</p>

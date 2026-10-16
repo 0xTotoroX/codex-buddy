@@ -185,7 +185,6 @@ test(
       });
       await page.addScriptTag({ content: bundle.outputFiles[0].text });
       await page.evaluate((state) => window.render(state), state);
-      await page.locator('#model-organization summary').click();
       const settings = page.locator('#settings'),
         view = page.locator('#view');
       assert.equal(await view.locator('.model-row').count(), 1);
@@ -207,10 +206,14 @@ test(
       await view.getByRole('button', { name: '所有模型', exact: true }).click();
       await view.locator('[data-model-tile="route-b/claude-test"]').click();
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await settings.getByRole('button', { name: '模型分组', exact: true }).click();
       await settings.getByLabel('新模型分组名称').fill('编程');
       rejectNext = true;
       await settings.getByRole('button', { name: '新增分组' }).click();
-      await settings.getByText(/模拟保存失败/).waitFor();
+      await settings
+        .locator('.settings-drawer')
+        .getByText(/模拟保存失败/)
+        .waitFor();
       assert.equal(await settings.getByLabel('新模型分组名称').inputValue(), '编程');
       await settings.getByRole('button', { name: '新增分组' }).click();
       await settings.getByRole('region', { name: '分组：编程' }).waitFor();
@@ -270,7 +273,10 @@ test(
       await settings.getByLabel('分组名称 编程', { exact: true }).fill('工作');
       conflictNext = true;
       await settings.getByRole('button', { name: /^保存分组名称 / }).click();
-      await settings.getByText(/已在其他窗口更新/).waitFor();
+      await settings
+        .locator('.settings-drawer')
+        .getByText(/已在其他窗口更新/)
+        .waitFor();
       assert.equal(
         await settings.getByLabel('分组名称 编程', { exact: true }).inputValue(),
         '工作',
@@ -279,11 +285,14 @@ test(
       await settings.getByRole('region', { name: '分组：工作' }).waitFor();
       const beforeDelete = writes;
       await settings.getByRole('button', { name: '删除分组' }).click();
-      await settings.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+      await settings
+        .locator('.settings-key-dialog[open]')
+        .getByRole('button', { name: '取消', exact: true })
+        .click();
       assert.equal(writes, beforeDelete, 'cancelled deletion does not write preferences');
       await settings.getByRole('button', { name: '删除分组' }).click();
       await settings
-        .getByRole('dialog')
+        .locator('.settings-key-dialog[open]')
         .getByRole('button', { name: '确认删除', exact: true })
         .click();
       await settings.getByRole('region', { name: '分组：私人厂家' }).waitFor();
@@ -291,7 +300,7 @@ test(
       assert.equal(state.preferences.modelOverrides.custom.groupId, undefined);
       await settings.getByRole('button', { name: '恢复自动分类' }).click();
       await settings
-        .getByRole('dialog')
+        .locator('.settings-key-dialog[open]')
         .getByRole('button', { name: '确认恢复', exact: true })
         .click();
       await settings
@@ -306,6 +315,7 @@ test(
         'route-b/claude-test',
         'custom',
       ]);
+      await settings.getByRole('button', { name: '关闭模型分组' }).click();
       await page.evaluate((state) => window.render(state), state);
       await view.getByRole('button', { name: '所有模型', exact: true }).click();
       await view.locator('[data-model-group="vendor:Anthropic"]').waitFor();
@@ -316,6 +326,7 @@ test(
       state.snapshot.models = state.snapshot.models.filter((m) => m.id !== 'custom');
       state.preferences.modelOverrides.custom = { manufacturer: '保留厂家' };
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      await settings.getByRole('button', { name: '模型分组', exact: true }).click();
       await settings.getByText('保留厂家 · 手动 · 暂不可用').waitFor();
       state.snapshot.models.push(
         model('custom', '私有别名'),
@@ -344,6 +355,7 @@ test(
         path: 'target/reports/model-groups/settings-narrow.png',
         fullPage: true,
       });
+      await settings.getByRole('button', { name: '关闭模型分组' }).click();
       // Render the real component with a representative dense catalog, not a hand-drawn mockup.
       const favoriteLabels = [
         'GPT-6-Astra',

@@ -42,6 +42,7 @@ export function useSettingsForm(
     clearJevKey: false,
   });
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [remoteChanged, setRemoteChanged] = useState(false);
   const current = useRef(draft);
   const baseline = useRef(saved);
@@ -64,6 +65,7 @@ export function useSettingsForm(
     setDraft(value);
   }
   function load(value: Settings) {
+    setSaveError('');
     clearTimeout(timer.current);
     queued.current = null;
     controls.current = null;
@@ -127,6 +129,7 @@ export function useSettingsForm(
     if (flight.current) return flight.current;
     if (conflict.current)
       return Promise.reject(new Error('设置已在其他窗口更新，请重新载入后再保存'));
+    setSaveError('');
     setSaving(true);
     const operation = async () => {
       try {
@@ -198,6 +201,7 @@ export function useSettingsForm(
         }
         return baseline.current;
       } catch (error) {
+        setSaveError((error as Error).message);
         queued.current = null;
         if ((error as Error).message.includes('其他窗口')) {
           controls.current = null;
@@ -240,6 +244,7 @@ export function useSettingsForm(
     if (!current.current.form) return;
     const previous = current.current.form;
     update({ ...current.current, form: { ...previous, [key]: value } });
+    setSaveError('');
     notifyRef.current('');
     const control: ControlPatch | null =
       key === 'enabled' || key === 'answerOutlineEnabled' || key === 'promptEnhancementEnabled'
@@ -316,6 +321,7 @@ export function useSettingsForm(
     clearKey: draft.clearKey,
     remoteChanged,
     saving,
+    saveError,
     load,
     change,
     save,

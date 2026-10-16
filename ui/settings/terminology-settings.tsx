@@ -2,12 +2,14 @@
  * [OUTPUT]: 直接显示识别、预览、检索和掌握列表；统一词库管理入口，导入先确认覆盖影响。
  * [POS]: 详细设置的功能区，不访问主聊天内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { SettingsDrawer } from './settings-drawer';
 import { useEffect, useRef, useState } from 'react';
 import { useConfirmation } from './settings-confirmation';
 import { request } from './api';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import { NativeSelect } from './components/ui/native-select';
 import { Button } from './components/ui/button';
+import { Input, inputStyles } from './components/ui/input';
 import { Switch } from './components/ui/switch';
 import { Icon } from '../shared/icons/react';
 import { cardStyles, createCard } from '../terminology/card.js';
@@ -138,7 +140,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
       {confirmation}
       <style>
         {cardStyles +
-          `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{max-width:100%}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-entry input,.term-entry textarea{padding:8px;border:1px solid var(--border);border-radius:8px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
+          `.term-preview{margin:18px 0;--term-bg:var(--background);--term-fg:var(--foreground);--term-muted:var(--muted-foreground);--term-border:var(--border)}.term-preview .term-card{max-width:100%}.term-style-options{display:flex;gap:8px;flex-wrap:wrap}.term-style-options button{padding:7px 12px;border:1px solid var(--border);border-radius:8px}.term-style-options button[aria-pressed=true]{background:var(--muted);font-weight:600}.term-search{width:100%;margin:12px 0;padding:8px;border:1px solid var(--border);border-radius:8px}.term-results{max-height:300px;overflow:auto}.term-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;gap:12px;border-bottom:1px solid var(--border)}.term-row button{font-size:13px}.term-entry{display:grid;gap:10px;margin-top:14px}.term-actions{display:flex;flex-wrap:wrap;gap:14px;margin:14px 0}`}
       </style>
       <div className="settings-section-heading">
         <h2>术语释义</h2>
@@ -339,30 +341,41 @@ export function TerminologySettings({ active }: { active: boolean }) {
               </p>
             )}
           </section>
-          <details>
-            <summary>词库管理</summary>
+          <SettingsDrawer
+            id="settings-library"
+            title="词库管理"
+            footer={
+              error ? (
+                <p role="alert" className="settings-error text-sm">
+                  {error}
+                </p>
+              ) : undefined
+            }
+          >
             <h3 className="mt-4">添加自定义术语</h3>
             <div className="term-entry">
-              <input
+              <Input
                 aria-label="中文术语名"
                 placeholder="中文术语名"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
-              <input
+              <Input
                 aria-label="英文名称"
                 placeholder="英文名称（可选）"
                 value={english}
                 onChange={(e) => setEnglish(e.target.value)}
               />
               <textarea
+                className={inputStyles + ' min-h-28 py-2 resize-y'}
                 aria-label="中文释义"
                 placeholder="中文释义"
                 rows={3}
                 value={definition}
                 onChange={(e) => setDefinition(e.target.value)}
               />
-              <button
+              <Button
+                variant="outline"
                 type="button"
                 disabled={busy || !name.trim() || !definition.trim()}
                 onClick={async () => {
@@ -390,24 +403,28 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 }}
               >
                 自动分类并添加
-              </button>
+              </Button>
             </div>
             <p className="settings-hint">使用已配置模型分类。</p>
             <h3 className="mt-5">导入与导出</h3>
             <div className="term-actions">
-              <button type="button" onClick={() => void exportFile()}>
+              <Button variant="outline" type="button" onClick={() => void exportFile()}>
                 导出术语文档
-              </button>
-              <button type="button" onClick={() => void exportFile(true)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => void exportFile(true)}>
                 导出手动词条
-              </button>
-              <button type="button" onClick={() => void exportFile(false, true)}>
+              </Button>
+              <Button variant="outline" type="button" onClick={() => void exportFile(false, true)}>
                 导出可导入备份
-              </button>
-              <label>
+              </Button>
+              <label className="grid w-full gap-2 text-sm">
                 导入词库{' '}
                 <input
                   type="file"
+                  className={
+                    inputStyles +
+                    ' h-auto py-2 file:mr-3 file:border-0 file:bg-transparent file:text-foreground'
+                  }
                   accept=".json,application/json"
                   disabled={busy}
                   onChange={async (e) => {
@@ -453,7 +470,7 @@ export function TerminologySettings({ active }: { active: boolean }) {
                 />
               </label>
             </div>
-          </details>
+          </SettingsDrawer>
         </>
       )}
     </section>

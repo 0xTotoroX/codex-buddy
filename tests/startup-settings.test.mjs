@@ -159,13 +159,13 @@ test(
       await policy.waitFor();
       assert.equal(await policy.inputValue(), 'force');
       await page.getByRole('link', { name: '模型与生成', exact: true }).click();
-      await page.getByText('高级设置', { exact: true }).click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       const context = page.getByLabel('输入上下文', { exact: true });
       await context.selectOption('latest');
       await until(() => settings.maxInputChars === 0);
       assert.equal(await page.getByLabel('输入字符上限', { exact: true }).count(), 0);
       await page.reload();
-      await page.getByText('高级设置', { exact: true }).click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await context.waitFor();
       assert.equal(await context.inputValue(), 'latest');
       await context.selectOption('limited');
@@ -174,7 +174,7 @@ test(
       await input.fill('8000');
       // Typed input stays local until blur or the explicit save button.
       assert.equal(settings.maxInputChars, 12000);
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
+      await page.locator('label[for="context-scope"]').click();
       await until(() => settings.maxInputChars === 8000);
       await page.waitForFunction(
         () =>
@@ -182,20 +182,22 @@ test(
       );
       hold = true;
       await input.fill('9000');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
+      await page.locator('label[for="context-scope"]').click();
       await until(() => pending.length === 1);
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       await page
         .getByRole('navigation', { name: '设置分类' })
         .getByRole('link', { name: '功能与交互', exact: true })
         .click();
       await page.getByRole('link', { name: '模型与生成', exact: true }).click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       assert.equal(await input.inputValue(), '9000');
       await input.fill('10000');
       pending.shift()();
       await until(() => settings.maxInputChars === 9000);
       assert.equal(await input.inputValue(), '10000', 'slow save must not erase newer typing');
       assert.equal(pending.length, 0, 'typing alone must not be saved');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
+      await page.locator('label[for="context-scope"]').click();
       await until(() => pending.length === 1);
       hold = false;
       pending.shift()();
@@ -207,11 +209,17 @@ test(
       assert.equal(maxInFlight, 1);
       rejectNext = true;
       await input.fill('11000');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
-      await page.getByText('合成保存失败，请重试', { exact: true }).waitFor();
+      await page.locator('label[for="context-scope"]').click();
+      await page
+        .locator('.settings-drawer[open]')
+        .getByText('合成保存失败，请重试', { exact: true })
+        .waitFor();
       assert.equal(await input.inputValue(), '11000');
       assert.equal(settings.maxInputChars, 10000);
-      await page.getByRole('button', { name: '保存设置', exact: true }).click();
+      await page
+        .locator('.settings-drawer[open]')
+        .getByRole('button', { name: '保存设置', exact: true })
+        .click();
       await until(() => settings.maxInputChars === 11000);
       await page.waitForFunction(
         () =>
@@ -219,10 +227,10 @@ test(
       );
       hold = true;
       await input.fill('12000');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
+      await page.locator('label[for="context-scope"]').click();
       await until(() => pending.length === 1);
       await input.fill('13000');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
+      await page.locator('label[for="context-scope"]').click();
       // Allow the second blur debounce to join the active save queue.
       await page.waitForTimeout(300);
       assert.equal(pending.length, 1);
@@ -238,10 +246,14 @@ test(
       assert.equal(maxInFlight, 1, 'queued saves must use the new revision serially');
       settings = { ...settings, configurationRevision: settings.configurationRevision + 1 };
       await input.fill('14000');
-      await page.getByRole('heading', { name: '模型与生成', exact: true, level: 1 }).click();
-      await page.getByText('设置已在其他窗口更新，请重新载入后再保存', { exact: true }).waitFor();
+      await page.locator('label[for="context-scope"]').click();
+      await page
+        .locator('.settings-drawer[open]')
+        .getByText('设置已在其他窗口更新，请重新载入后再保存', { exact: true })
+        .waitFor();
       assert.equal(await input.inputValue(), '14000');
       assert.equal(settings.maxInputChars, 13000);
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       assert.equal(
         await page.getByRole('button', { name: '保存设置', exact: true }).isDisabled(),
         true,
@@ -255,9 +267,10 @@ test(
       await reloadDialog.waitFor({ state: 'hidden' });
       assert.equal(await input.inputValue(), '13000');
       await page.reload();
-      await page.getByText('高级设置', { exact: true }).click();
+      await page.getByRole('button', { name: '高级设置', exact: true }).click();
       await input.waitFor();
       assert.equal(await input.inputValue(), '13000');
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       await page.getByRole('link', { name: '功能与交互', exact: true }).click();
       const quick = page.getByLabel('常用提示词 1 内容', { exact: true });
       await quick.fill('请继续推进整体目标');

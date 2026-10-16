@@ -1,7 +1,8 @@
 /* [INPUT]: 模型状态、带修订校验的保存与刷新操作、共用自由输入候选控件与操作图标。
- * [OUTPUT]: 自定义模型分组、厂家纠正与稳定排序；删除和恢复分类统一确认并校验修订。
+ * [OUTPUT]: 右侧抽屉中的自定义模型分组、厂家纠正与稳定排序；删除和恢复分类统一确认并校验修订。
  * [POS]: 只管理模型展示偏好，不切换模型或修改预设。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { SettingsDrawer } from './settings-drawer';
 import { useSettingsListMotion } from './settings-list-motion';
 import { useState } from 'react';
 import { ConfirmationButton } from './settings-confirmation';
@@ -29,11 +30,13 @@ export function ModelOrganization({
   busy,
   save,
   refresh,
+  feedback,
 }: {
   state: ModelState;
   busy: boolean;
   save: (patch: Partial<ModelPreferences>) => Promise<boolean>;
   refresh: () => Promise<boolean>;
+  feedback?: string;
 }) {
   const listRef = useSettingsListMotion();
   const [refreshState, setRefreshState] = useState<ActionState>('idle');
@@ -90,8 +93,17 @@ export function ModelOrganization({
     return ok;
   }
   return (
-    <details id="model-organization" className="settings-details mt-3">
-      <summary>自定义模型分组</summary>
+    <SettingsDrawer
+      id="model-organization"
+      title="模型分组"
+      footer={
+        feedback ? (
+          <p role="alert" className="settings-error text-sm">
+            {feedback}
+          </p>
+        ) : undefined
+      }
+    >
       <div ref={listRef} data-settings-list="model-groups" className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
           <Button
@@ -447,6 +459,6 @@ export function ModelOrganization({
           );
         })}
       </div>
-    </details>
+    </SettingsDrawer>
   );
 }

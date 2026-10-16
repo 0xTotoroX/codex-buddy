@@ -1,7 +1,8 @@
 /* [INPUT]: Shared model editor, serialized save queue, saved-connection model API, credential controls and free-text dropdown.
- * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced controls stay collapsed; connection tests report progress and results beside the action.
+ * [OUTPUT]: One directly visible model form in both modes, retaining credentials/drafts across navigation; advanced controls use a retained right-side drawer; connection tests report progress and results beside the action.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
+import { SettingsDrawer, DrawerSaveControls } from './settings-drawer';
 import { useProviderFieldsMotion } from './settings-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from './components/ui/button';
@@ -260,8 +261,12 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
           </div>
         </div>
       </Card>
-      <details id="settings-limits" className="settings-section" hidden={simple}>
-        <summary>高级设置</summary>
+      <SettingsDrawer
+        id="settings-limits"
+        title="高级设置"
+        hidden={simple}
+        footer={<DrawerSaveControls editor={editor} />}
+      >
         <section hidden={form.provider !== 'api'}>
           <h3>连接与密钥</h3>
           <Field
@@ -328,7 +333,7 @@ export function ModelSettings({ editor, simple }: { editor: SettingsEditor; simp
             />
           </Field>
         </div>
-      </details>
+      </SettingsDrawer>
     </>
   );
 }

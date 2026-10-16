@@ -28,6 +28,7 @@ function indexSettings(): Entry[] {
   const seen = new Set<string>();
   return Array.from(content.querySelectorAll('label,h2,summary,button[aria-label]')).flatMap(
     (node, i) => {
+      if (node.matches('[data-drawer-heading], [data-drawer-close]')) return [];
       const category = node.closest<HTMLElement>('[data-settings-page]')?.dataset
         .settingsPage as SettingsPage;
       if (!category || !(category in pageTitles)) return [];

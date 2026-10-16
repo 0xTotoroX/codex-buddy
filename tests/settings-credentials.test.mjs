@@ -78,7 +78,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       await page.addScriptTag({ content: script });
       const replace = page.getByRole('button', { name: '更换密钥', exact: true });
       const key = page.locator('input#api-key');
-      const advanced = page.getByText('高级设置', { exact: true });
+      const advanced = page.getByRole('button', { name: '高级设置', exact: true });
       const remove = page.getByRole('button', { name: '删除已保存的密钥', exact: true });
       const dialog = page.getByRole('dialog', { name: '删除已保存的 API 密钥？' });
       await page.getByText('密钥已配置', { exact: true }).waitFor();
@@ -134,9 +134,11 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       assert.equal(writes.length, before);
 
       // Deleting a saved key must not save an unrelated unfinished form draft.
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       const model = page.getByRole('combobox', { name: '模型名称', exact: true });
       await model.fill('unsaved-model');
       await model.press('Escape');
+      await advanced.click();
       await remove.click();
       fail = true;
       await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
@@ -148,6 +150,8 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       });
       await dialog.getByRole('button', { name: '取消', exact: true }).click();
       fail = false;
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
+      await model.focus();
       const nextSave = page.waitForResponse((r) => r.url().endsWith('/api/settings'));
       await page.getByRole('heading', { name: '生成模型', exact: true }).click();
       await (await nextSave).finished();
@@ -160,6 +164,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       assert.equal(storedKey, 'fixture-replacement');
       assert.equal(settings.model, 'unsaved-model');
 
+      await advanced.click();
       await remove.click();
       settings = { ...settings, configurationRevision: settings.configurationRevision + 1 };
       await page.evaluate((settings) => window.receiveSettings(settings), settings);
@@ -176,6 +181,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       const beforeDelete = settings.configurationRevision;
       await dialog.getByRole('button', { name: '确认删除', exact: true }).click();
       await dialog.waitFor({ state: 'hidden' });
+      await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
       await key.waitFor();
       assert.equal(storedKey, '');
       assert.deepEqual(writes.at(-1), { clearApiKey: true, expectedRevision: beforeDelete });

@@ -41,7 +41,7 @@ Enable **点击术语时跳转到上下文** in detailed settings → Features a
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
-In Web settings, choose **详细设置 → 模型与生成 → 高级生成设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
+In Web settings, choose **详细设置 → 模型与生成 → 高级设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
 
 **Suggestion directions** are independent of when generation starts:
 
@@ -71,7 +71,7 @@ Write a draft in the chat composer and click the pencil-and-sparkle icon. The re
 
 ## Simple and detailed settings
 
-Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Narrow panels use a category selector. Both modes use the same forms and save queue; switching retains unfinished edits, disclosure state and reading position without changing advanced values. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
+Settings open in Simple mode for feature switches, main placement/material, eyes behavior and model setup. Switch to Detailed for **功能与交互**, **模型与生成**, **外观与布局**, and **启动与开发**. Narrow panels use a category selector. Both modes use the same forms and save queue; switching retains unfinished edits and reading position without changing advanced values. Common settings stay visible; advanced settings, terminology management and model groups use right-side drawers. Closing a drawer retains its unfinished inputs and scroll position. Shared generation-model settings serve both next-step suggestions and prompt enhancement.
 
 The Tom Modern settings design includes linked workspace, feature, generation and connection previews. Saved placement, nested layout and materials update the workspace diagram; generation previews identify unsaved edits. Sample interactions stay inside the preview. Settings follow Codex's light/dark appearance by default; the page header also offers a saved light or dark override, while the brand icon retains its original appearance. Reduced-motion preferences and existing shared font settings remain in effect.
 

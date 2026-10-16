@@ -116,6 +116,7 @@ export function ModelControlSettings({
       <div hidden={!detailed}>
         {state?.snapshot?.models && (
           <ModelOrganization
+            feedback={message}
             state={state}
             busy={busy || !live}
             save={(patch) => operate(patch)}

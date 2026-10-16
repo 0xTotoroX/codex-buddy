@@ -4,6 +4,7 @@
  * [POS]: Web 设置中的 Stepwise 方向配置，不在日常面板增加控制项。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
+import { SettingsDrawer, DrawerSaveControls } from './settings-drawer';
 import { useSettingsListMotion } from './settings-list-motion';
 import { useState } from 'react';
 import { Icon } from '../shared/icons/react';
@@ -294,10 +295,13 @@ export function DirectionSettings({ editor }: { editor: SettingsEditor }) {
           </div>
           <ModelApiKey editor={editor} busy={editor.saving} kind="jev" />
           {saved.storedJevApiKey && (
-            <details className="settings-details">
-              <summary>高级设置</summary>
+            <SettingsDrawer
+              id="settings-jev-advanced"
+              title="Jev 高级设置"
+              footer={<DrawerSaveControls editor={editor} />}
+            >
               <DeleteModelApiKey editor={editor} busy={editor.saving} kind="jev" />
-            </details>
+            </SettingsDrawer>
           )}
           <p className="text-[14px] text-muted-foreground">
             {saved.directionSource !== 'smart' || !saved.jev.consent

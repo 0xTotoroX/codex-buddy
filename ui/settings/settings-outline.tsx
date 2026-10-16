@@ -3,6 +3,7 @@
  * [POS]: Presentation state only; never changes backend configuration or remounts forms.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { closeSettingsDrawers, revealSettingsDrawer } from './settings-drawer';
 import { NativeSelect } from './components/ui/native-select';
 import { Icon } from '../shared/icons/react';
 export const pageTitles = {
@@ -93,12 +94,7 @@ export function useSettingsPage(ready: boolean) {
   const positionKey = (value: { mode: SettingsMode; page: SettingsPage }) =>
     value.mode === 'simple' ? 'simple' : `detail:${value.page}`;
   function select(next: { mode: SettingsMode; page: SettingsPage }, hash: string) {
-    if (
-      current.current.mode === next.mode &&
-      current.current.page === next.page &&
-      current.current.hash === hash
-    )
-      return;
+    closeSettingsDrawers();
     positions.current.set(positionKey(current.current), window.scrollY);
     setSelection({ ...next, hash });
   }
@@ -151,8 +147,9 @@ export function useSettingsPage(ready: boolean) {
         : '');
     if (!target) return;
     const focusTarget = () => {
-      const node = document.getElementById(target);
+      let node = document.getElementById(target);
       if (!node || node.closest('[hidden]')) return false;
+      node = revealSettingsDrawer(node);
       for (let parent: HTMLElement | null = node; parent; parent = parent.parentElement)
         if (parent instanceof HTMLDetailsElement) parent.open = true;
       if (!node.hasAttribute('tabindex') && !node.matches('input,select,button,a'))
@@ -171,7 +168,7 @@ export function useSettingsPage(ready: boolean) {
       observer.disconnect();
       clearTimeout(timer);
     };
-  }, [page, mode, hash, ready]);
+  }, [selection, ready]);
   useLayoutEffect(() => {
     let attachedHost: HTMLElement | null = null;
     const attach = () => {

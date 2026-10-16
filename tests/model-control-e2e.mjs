@@ -460,7 +460,7 @@ try {
   await settingsPage.getByRole('button', { name: '详细设置', exact: true }).click();
   {
     const modelSettings = settingsPage.locator('#settings-model-control');
-    await modelSettings.locator('#model-organization > summary').click();
+    await modelSettings.getByRole('button', { name: '模型分组', exact: true }).click();
     const preserved = (await api('state')).preferences;
     await modelSettings.getByLabel('新模型分组名称').fill('合成分组');
     await modelSettings.getByRole('button', { name: '新增分组', exact: true }).click();
@@ -483,7 +483,7 @@ try {
       'model group persisted through settings',
     );
     await settingsPage.reload();
-    await modelSettings.locator('#model-organization > summary').click();
+    await modelSettings.getByRole('button', { name: '模型分组', exact: true }).click();
     await modelSettings
       .getByRole('region', { name: '分组：合成分组' })
       .locator('[data-model-id="alpha"]')
@@ -494,7 +494,7 @@ try {
     assert.deepEqual(restored.modelOrder, preserved.modelOrder);
     await modelSettings.getByRole('button', { name: '删除分组', exact: true }).click();
     await modelSettings
-      .getByRole('dialog')
+      .locator('.settings-key-dialog[open]')
       .getByRole('button', { name: '确认删除', exact: true })
       .click();
     await modelSettings
@@ -504,13 +504,14 @@ try {
     await modelSettings.locator('[data-model-id="alpha"] input[type="checkbox"]').check();
     await modelSettings.getByRole('button', { name: '恢复自动分类', exact: true }).click();
     await modelSettings
-      .getByRole('dialog')
+      .locator('.settings-key-dialog[open]')
       .getByRole('button', { name: '确认恢复', exact: true })
       .click();
     await waitFor(
       async () => !(await api('state')).preferences.modelOverrides.alpha,
       'automatic classification restored',
     );
+    await modelSettings.getByRole('button', { name: '关闭模型分组' }).click();
     record(
       'real settings persist manufacturer and custom group across reload, delete safely and preserve favorites/order/presets',
     );
