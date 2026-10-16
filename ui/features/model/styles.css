@@ -106,7 +106,7 @@
 .model-quick-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 0;
 }
 .feature-model .model-fast {
   padding: 5px;
@@ -189,8 +189,8 @@
   margin-top: 12px;
   padding: 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--paper) 96%, var(--ink));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 7%, transparent);
+  background: color-mix(in srgb, var(--paper) 90%, var(--ink));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 16%, transparent);
 }
 .model-collections-row {
   display: flex;
@@ -199,7 +199,7 @@
   color: var(--muted);
 }
 .feature-model .model-quick-actions button,
-.feature-model .model-preset-tools {
+.feature-model .model-preset-add {
   display: grid;
   place-items: center;
   width: 28px;
@@ -214,11 +214,11 @@
   flex-wrap: wrap;
   gap: 4px;
 }
-.model-preset-tools {
+.model-preset-add {
   flex: none;
 }
-.model-presets:empty {
-  display: none;
+.feature-model .model-presets > button[aria-disabled='true'] {
+  opacity: 0.45;
 }
 .feature-model .model-presets > button {
   flex: none;
@@ -227,7 +227,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: var(--hover);
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--paper) 82%, var(--ink));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 12%, transparent);
 }
 .feature-model .model-presets > button[aria-pressed='true'] {
   background: var(--model-tile-on);
@@ -252,16 +254,22 @@
 }
 .model-preset-editor {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 8px 0;
+  flex: 0 1 250px;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--paper) 82%, var(--ink));
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .model-preset-editor input {
-  flex: 1 1 120px;
+  flex: 1 1 80px;
   min-width: 0;
-  width: 100%;
+  width: auto;
   padding: 5px 8px;
-  border: 1px solid var(--line);
+  border: 0;
   border-radius: 5px;
   background: transparent;
 }

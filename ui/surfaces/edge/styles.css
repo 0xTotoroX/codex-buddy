@@ -41,8 +41,15 @@ body {
   border-radius: 5px;
   padding: 6px;
 }
-#edge-panel button[aria-pressed='true'] {
-  background: #8883;
+#edge-panel nav button {
+  min-height: 28px;
+  padding-inline: 12px;
+  opacity: 0.6;
+}
+#edge-panel nav button[aria-pressed='true'] {
+  background: transparent;
+  font-weight: 600;
+  opacity: 1;
 }
 #edge-panel button:focus-visible,
 #edge-handle:focus-visible {

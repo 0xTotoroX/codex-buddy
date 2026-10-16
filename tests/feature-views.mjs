@@ -456,7 +456,8 @@ try {
   await nameInput.press('Escape');
   await editor.waitFor({ state: 'hidden' });
   assert.equal(model.preferences.presets.length, 0);
-  await presetButton.click();
+  await view.getByRole('button', { name: '添加预设', exact: true }).click();
+  assert.equal(await view.locator('.model-presets > .model-preset-editor').count(), 1);
   await nameInput.fill('  日常  ');
   await page.screenshot({ path: join(output, 'model-preset-editor.png') });
   rejectPresetSave = true;
@@ -484,7 +485,7 @@ try {
     )
     .waitFor();
   assert.deepEqual(model.snapshot.current, savedSelection);
-  await view.getByLabel('模型工具').click();
+  await view.getByRole('button', { name: '日常', exact: true }).click({ button: 'right' });
   await view.getByRole('button', { name: '重命名预设 日常', exact: true }).click();
   const rename = view.getByRole('form', { name: '重命名模型预设' });
   assert.equal(await rename.getByRole('textbox').inputValue(), '日常');
@@ -600,6 +601,7 @@ try {
     (height) => document.getElementById('edge-panel').getBoundingClientRect().height > height,
     compactModelHeight,
   );
+  await view.getByRole('button', { name: '工作', exact: true }).click({ button: 'right' });
   await view.getByLabel('删除预设 工作').click();
   await view.getByRole('button', { name: '工作', exact: true }).waitFor({ state: 'detached' });
   record(
@@ -609,8 +611,9 @@ try {
   assert.equal(
     await view.getByRole('button', { name: '模型工具' }).count(),
     0,
-    'no empty preset tools',
+    'no separate preset tools button',
   );
+  assert.equal(await view.getByRole('button', { name: '添加预设', exact: true }).count(), 1);
   await page.screenshot({ path: join(output, 'edge-model.png') });
   model.snapshot.models[0].reasoning = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
   model.snapshot.models.push({
