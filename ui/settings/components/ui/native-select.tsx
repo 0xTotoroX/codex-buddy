@@ -1,6 +1,6 @@
 /*
- * [INPUT]: React 属性、Tailwind 语义变量与 cn 类名合并。
- * [OUTPUT]: 可复用设置页控件；基于 shadcn/ui 定制，许可见 LICENSE。
+ * [INPUT]: React select 属性、选项与设置页语义变量。
+ * [OUTPUT]: 原生选择语义/事件；settings-controls.css 渐进增强菜单，保留不支持浏览器的原生回退。
  * [POS]: Web 设置页基础组件，不用于宿主注入。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */

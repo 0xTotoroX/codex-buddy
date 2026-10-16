@@ -12,7 +12,7 @@
 - [settings-disclosure.tsx](settings-disclosure.tsx)：原生details的展示强制展开与用户折叠状态接续；在布局阶段暂存/还原DOM开合，不用异步toggle事件覆盖用户状态，不卸载子内容。
 - [settings-controls.tsx](settings-controls.tsx)：共用设置行、各功能页顶部的独立开关/打开按钮、反馈及自动/手动保存表单；不新增保存服务。
 - [next-settings.tsx](next-settings.tsx)：下一步的方向、常用提示词和点击/显示行为；共享模型配置移入model-settings，不复制表单。
-- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，简易模式按需展开，详细模式显示协议/环境变量及请求限制；局部模型列表、密钥显示及简单展开状态保留，调用共用SettingsEditor。
+- [model-settings.tsx](model-settings.tsx)：唯一生成模型/凭据表单，简易模式按需展开，详细模式显示协议/环境变量及请求限制；局部模型列表、密钥显示及简单展开状态保留，调用共用SettingsEditor。模型候选使用共用 SuggestionInput，保留自由输入与原失焦保存。
 - [direction-settings.tsx](direction-settings.tsx)：方向来源、方向库及有序位置、Jev 同意与独立凭据，共用模型保存队列。
 - [connection-settings.tsx](connection-settings.tsx)：启动策略及本机连接详情；Dev 固定启动时的目标，重连和断开不提交模型表单。
 - [use-settings-form.ts](use-settings-form.ts)：模型及两套独立密钥的草稿、修订校验、保存队列及在途编辑合并；大纲与下一步开关单独提交，不携带其他字段或密钥草稿；导出 SettingsEditor 供展示模块组合。
@@ -20,12 +20,13 @@
 - [feature-settings.tsx](feature-settings.tsx)：唯一主界面形式、每个功能加入主界面或贴边、四功能布局；与工作台共用 resolveFeatureLayout 读取旧布局，嵌套布局显示为自定义分栏、预设重排保留全部叶子功能，通过 main-layout 校验原快照后保存，未读取配置前禁用操作。
 - [surface-settings.tsx](surface-settings.tsx)：按功能位置与布局、主题、内容字号、尺寸与窗口、贴边位置分组，仅大组间加分隔线；管理四种形式各自主题及贴边屏幕/位置；保留断开屏幕的选择，写入带 revision 校验。
 - [model-control-settings.tsx](model-control-settings.tsx)：模型快切开关、分类状态与串行修订保存，聚焦及轮询回读外部变更，写入期间不被旧读取覆盖；冲突重新读取但不自动重放，失败保留编辑草稿；不持有位置或主题。
-- `model-organization.tsx`：详细模式按需展开模型分组；批量纠正厂家/移动/恢复自动、自定义组增删改名及组内/组间排序。暂不可用模型保留配置，同名模型显示完整 ID 以区分渠道；不改常用与预设。
+- `model-organization.tsx`：详细模式按需展开模型分组；批量纠正厂家/移动/恢复自动、自定义组增删改名及组内/组间排序。厂家候选使用共用 SuggestionInput，仍可自填并显式应用。暂不可用模型保留配置，同名模型显示完整 ID 以区分渠道；不改常用与预设。
 - [task-settings.tsx](task-settings.tsx)：看板分组管理及看板开关；同步授权/列表界面保留源码但不挂载；不修改同步规则。
 - [dev-sources.js](dev-sources.js)：Dev 监督进程注入的来源、资源确认及 worktree 切换；新版移入开发分类，旧 worktree 继续使用顶部独立入口，不进入正式页面。
 - [api.ts](api.ts)：认证请求、错误和 SSE 状态订阅，共用 ../shared/contracts.ts；普通入口根据认证状态跳转 Dev 统一页。
 - [styles.css](styles.css)：Tailwind v4、语义主题映射、搜索和保留的旧总览样式；只扫描本目录，不注入宿主。
-- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、细线/直角布局、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。深色使用低对比灰线与深灰选中底，不将正文白色复用作结构线或大面积选中底。浅色取消背景网格、页头/列表/预览内的重复线条，选择器使用浅灰面与字重；保留大组和输入控件的轻边界，以原间距和对齐表达层次。
+- [settings-layout.css](settings-layout.css)：Tom Modern 设置专属色值、简易/详细导航、表单与深浅/窄屏适配；继续跟随统一字体，不修改共享工作台主题。主布局和表单节奏的唯一样式入口。两套主题均取消背景网格、页头/列表/预览内的重复线条，选择器使用灰阶底面与字重；保留大组和输入控件的轻边界，以原间距和对齐表达层次。
+- [settings-controls.css](settings-controls.css)：按钮、输入框、选择器、开关的统一高度、微圆角、中性焦点与禁用态；支持 base-select 时定制原生菜单和选项，原生键盘、点击、取消、禁用及 change 事件不变，不支持时保留系统菜单。自由输入候选和搜索弹层沿用同一菜单样式。Dev 来源因 Shadow DOM 隔离，在 dev-sources.js 内以同一语义变量适配，不依赖新版源码文件。
 - [settings-preview.tsx](settings-preview.tsx)：只读联动预览。复用既有模块回读的功能、材质、模型和看板快照；嵌套布局复用 resolveFeatureLayout，过滤关闭功能。生成参数显示当前草稿并标识未保存；主形式与材质只显示成功保存的值。示例操作只改变本组件状态，不请求 API、不读任务正文或凭据。
 - [settings-preview.css](settings-preview.css)：预览画布、功能示例、生成路径和连接示意的样式，材质为近似效果，不用于实际业务视图。
 - [settings-motion.ts](settings-motion.ts)：分类入场和预览位置/分栏变化的可中断动画，尊重运行期间的减少动态效果偏好；不重新挂载控件、不存储配置。

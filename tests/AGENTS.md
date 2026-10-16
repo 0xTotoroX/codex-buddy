@@ -158,6 +158,10 @@ settings-modes 继续覆盖 Tom Modern 联动预览：材质保存失败回读�
 
 设置主题回归覆盖默认跟随 Codex、首个宿主快照前的系统回退、宿主与浏览器明暗相反、动态 SSE、主题缺失时保留末次值、手动覆盖/刷新记忆/跨标签页同步/无效偏好回退及受限存储。主题按钮保留焦点草稿与同一 DOM、零业务写入；实际计算颜色、原生控件 color-scheme 与品牌图标保持原图一并检查。
 
+settings-modes 使用真实键盘和鼠标验收原生定制菜单：Escape 取消不写入，选择继续进入原保存队列；深浅主题与三档宽度检查菜单视口边界，Dev 来源长路径菜单只读展开，不执行来源交接。
+
+settings-suggestions.test.mjs 使用真实 SuggestionInput 与合成数据，核对候选去重、底部向上展示、键盘/指针选择不提前失焦保存或提交、Esc 取消、自由输入失焦保留，以及输入法确认不误选；不访问真实模型或配置。
+
 codex-host-settings.test验证独立API、版本修订与开关不隐式启动；codex-host-compatibility.test验证输入框Agent隔离。Rust codex_host验证旧配置/额外字段保留、过期写入拒绝、安装身份、取消不退出；host验证动态端口/固定绑定；dev-host验证仅显式Dev准备应用选择。本轮不自动执行真实宿主重启或安装。
 
 补齐项验证：Rust features用例覆盖模型排序持久化/过期版本/非法ID拒绝、首次接入补登记及既有关闭/旧窗口/布局保留；state.connection_tests用合成WebSocket检查超时不destroy、丢弃迟到响应、正常响应恢复、真实关闭与不兼容清理。dev-launcher新增合成进程退出/并发重开仅启动一次、身份复用和读取异常保留检查；不退出真实ChatGPT。

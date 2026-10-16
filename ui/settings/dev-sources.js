@@ -27,10 +27,21 @@ view.innerHTML = `<style>
 @media(max-width:650px){:host{padding:0 18px!important}}
 :host-context(#settings-dev-content){max-width:none;margin:0!important;padding:0!important;font-size:14px}
 :host-context(#settings-dev-content) details{border:0;background:transparent;padding:0}
-details{border:1px solid var(--buddy-border,GrayText);border-radius:12px;background:var(--buddy-surface,Canvas);padding:12px 16px}
+details{border:1px solid var(--buddy-border,GrayText);border-radius:var(--settings-control-radius,4px);background:var(--buddy-surface,Canvas);padding:12px 16px}
 summary{cursor:pointer}p{margin:8px 0;overflow-wrap:anywhere;color:var(--buddy-muted,GrayText)}
-form{display:flex;align-items:center;gap:10px;flex-wrap:wrap}select,button{font:inherit;color:inherit;background:var(--buddy-subtle,Canvas);border:1px solid var(--buddy-border,GrayText);border-radius:7px;padding:6px 10px;max-width:100%}
-button{cursor:pointer}button:disabled,select:disabled{opacity:.5;cursor:default}:focus-visible{outline:2px solid var(--buddy-focus,Highlight);outline-offset:2px}
+form{display:flex;align-items:center;gap:10px;flex-wrap:wrap}select,button{box-sizing:border-box;font:inherit;color:inherit;background:var(--buddy-input,Canvas);border:1px solid var(--buddy-border,GrayText);border-radius:var(--settings-control-radius,4px);padding:6px 10px;max-width:100%;min-height:var(--settings-control-height,38px)}
+button{cursor:pointer;background:var(--settings-selected,ButtonFace);color:var(--settings-selected-text,ButtonText)}button:disabled,select:disabled{opacity:.45;cursor:not-allowed}:focus-visible{outline:1px solid var(--buddy-focus,Highlight);outline-offset:2px}
+@supports(appearance:base-select){
+select,select::picker(select){appearance:base-select}
+select{align-items:center;cursor:pointer}
+select::picker-icon{color:var(--buddy-muted,GrayText)}
+select::picker(select){font:inherit;color:var(--buddy-text,CanvasText);background:var(--buddy-surface,Canvas);border:1px solid var(--buddy-border,GrayText);border-radius:var(--settings-control-radius,4px);box-shadow:var(--settings-menu-shadow,0 8px 28px #0002);padding:4px;margin-block:5px;min-width:anchor-size(width);max-width:calc(100vw - 24px);max-height:min(360px,60vh);overflow-y:auto}
+option{display:flex;align-items:center;gap:12px;min-height:36px;padding:8px 10px;border:0;border-radius:2px;font:inherit;color:inherit;background:transparent;white-space:normal;overflow-wrap:anywhere}
+option:checked{background:var(--settings-selected,ButtonFace);color:var(--settings-selected-text,ButtonText);font-weight:600}
+option::checkmark{order:1;margin-inline-start:auto;color:var(--buddy-muted,GrayText)}
+option:focus-visible{outline-offset:-1px}option:disabled{opacity:.45;cursor:not-allowed}
+@media(hover:hover){option:hover:not(:checked):not(:disabled){background:var(--buddy-subtle,ButtonFace)}}
+}
 </style><details><summary>开发来源 · 读取中</summary><p data-path></p>
 <form><label for="source">调试 worktree</label><select id="source" aria-label="调试 worktree"></select><button type="submit">切换来源</button></form>
 <p data-state role="status" aria-live="polite"></p><p>切换只交接 Buddy，不重启 Codex。各 worktree 保留独立配置；建议缓存等运行期状态不会跨来源迁移。</p></details>`;

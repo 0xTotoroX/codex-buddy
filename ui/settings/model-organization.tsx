@@ -1,4 +1,4 @@
-/* [INPUT]: 模型状态、带修订校验的保存与刷新操作。
+/* [INPUT]: 模型状态、带修订校验的保存与刷新操作、共用自由输入候选控件。
  * [OUTPUT]: 厂家纠正、自定义组、批量归属与稳定排序的设置界面。
  * [POS]: 只管理模型展示偏好，不切换模型或修改预设。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
+import { SuggestionInput } from './components/ui/suggestion-input';
 import {
   automaticManufacturer,
   manufacturer,
@@ -156,20 +157,15 @@ export function ModelOrganization({
           <div className="flex flex-wrap items-end gap-2">
             <label className="min-w-0 flex-1 basis-40 space-y-1">
               厂家
-              <Input
+              <SuggestionInput
                 aria-label="批量指定厂家"
-                list="model-manufacturers"
+                options={manufacturerNames}
                 placeholder="选择或填写厂家"
                 maxLength={60}
                 value={maker}
-                onChange={(e) => setMaker(e.target.value)}
+                onValueChange={setMaker}
               />
             </label>
-            <datalist id="model-manufacturers">
-              {manufacturerNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
             <Button
               type="button"
               variant="outline"

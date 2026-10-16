@@ -1,4 +1,4 @@
-/* [INPUT]: Shared model editor and serialized save queue.
+/* [INPUT]: Shared model editor, serialized save queue and free-text suggestion control.
  * [OUTPUT]: One model form for simple and detailed settings, retaining credentials/drafts while hidden.
  * [POS]: Settings presentation only; prompt optimization and next steps share the configured model.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
@@ -8,6 +8,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Card } from './components/ui/card';
 import { NativeSelect } from './components/ui/native-select';
+import { SuggestionInput } from './components/ui/suggestion-input';
 import { Field } from './settings-controls';
 import { request, type EditableSettings } from './api';
 import type { SettingsEditor } from './use-settings-form';
@@ -196,11 +197,11 @@ export function ModelSettings({
               }
             >
               <div className="relative flex items-center [&_input]:pr-[110px]">
-                <Input
+                <SuggestionInput
                   id="model"
                   value={form.model}
-                  list="available-models"
-                  onChange={(e) => change('model', e.target.value)}
+                  options={models}
+                  onValueChange={(value) => change('model', value)}
                   placeholder={form.provider === 'codex' ? '沿用当前模型' : '模型 ID'}
                   spellCheck={false}
                 />
@@ -225,11 +226,6 @@ export function ModelSettings({
                   读取模型
                 </Button>
               </div>
-              <datalist id="available-models">
-                {models.map((model) => (
-                  <option key={model} value={model} />
-                ))}
-              </datalist>
             </Field>
             <div className="mt-5 flex flex-wrap items-center gap-4">
               {!saved.available && <p className="settings-error">{saved.reason || '等待配置'}</p>}

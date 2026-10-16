@@ -1,0 +1,165 @@
+/* [INPUT]: Settings semantic colors, native form elements and shared component slots.
+ * [OUTPUT]: One control language for both themes, including the native select picker.
+ * [POS]: Settings only; preserves native events, focus, disabled states and save queues.
+ * [PROTOCOL]: Keep settings/AGENTS.md and components/ui/AGENTS.md in sync. */
+.settings-app :is(input, select, textarea, button, .settings-search-input) {
+  border-radius: var(--settings-control-radius);
+}
+.settings-app :is([data-slot='input'], [data-slot='native-select'], [data-slot='button']) {
+  min-height: var(--settings-control-height);
+}
+.settings-app :is([data-slot='input'], [data-slot='native-select']) {
+  height: var(--settings-control-height);
+}
+.settings-app :is(.settings-theme, .settings-mode, .preview-selector) {
+  border-radius: var(--settings-control-radius);
+}
+.settings-app :is(button, input, select, textarea, summary, a):focus-visible {
+  outline: 1px solid var(--buddy-focus);
+  outline-offset: 2px;
+}
+.settings-app .settings-search input:focus-visible {
+  outline: none;
+}
+.settings-app :is(input, select, textarea):disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.settings-app input:is([type='checkbox'], [type='radio'], [type='range']) {
+  accent-color: var(--settings-switch-on);
+}
+.settings-app [data-slot='switch'] {
+  border-radius: var(--settings-control-radius);
+  width: 36px;
+  height: 22px;
+  min-height: 22px;
+  background: var(--switch-track);
+}
+.settings-app [data-slot='switch'][data-state='checked'] {
+  background: var(--settings-switch-on);
+}
+.settings-app [data-slot='switch-thumb'] {
+  border-radius: 2px;
+  box-shadow: none;
+  width: 16px;
+  height: 16px;
+  background: var(--settings-switch-thumb);
+}
+.settings-app [data-slot='switch-thumb'][data-state='checked'] {
+  translate: 17px 0;
+}
+.settings-app [data-slot='switch-thumb'][data-state='unchecked'] {
+  translate: 3px 0;
+}
+.settings-suggestion-input {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+.settings-suggestion-list {
+  position: absolute;
+  z-index: 20;
+  inset: calc(100% + 5px) 0 auto;
+  max-height: min(260px, 40vh);
+  overflow: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  color: var(--buddy-text);
+  background: var(--buddy-surface);
+  border: 1px solid var(--buddy-border);
+  border-radius: var(--settings-control-radius);
+  box-shadow: var(--settings-menu-shadow);
+  font-size: 0.875em;
+}
+.settings-suggestion-list[data-above='true'] {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+.settings-suggestion-list [role='option'] {
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.settings-suggestion-list [aria-selected='true'] {
+  background: var(--settings-selected);
+  color: var(--settings-selected-text);
+}
+@media (hover: hover) {
+  .settings-suggestion-list [role='option']:hover {
+    background: var(--buddy-subtle);
+  }
+}
+
+/* Unsupported browsers retain the native picker and its keyboard/form behavior. */
+@supports (appearance: base-select) {
+  .settings-app select[data-slot='native-select'],
+  .settings-app select[data-slot='native-select']::picker(select) {
+    appearance: base-select;
+  }
+  .settings-app select[data-slot='native-select'] {
+    align-items: center;
+    cursor: pointer;
+  }
+  .settings-app select[data-slot='native-select']:disabled {
+    cursor: not-allowed;
+  }
+  .settings-app select[data-slot='native-select']::picker-icon {
+    display: none;
+  }
+  .settings-app select[data-slot='native-select']::picker(select) {
+    color-scheme: inherit;
+    color: var(--buddy-text);
+    background: var(--buddy-surface);
+    border: 1px solid var(--buddy-border);
+    border-radius: var(--settings-control-radius);
+    box-shadow: var(--settings-menu-shadow);
+    padding: 4px;
+    margin-block: 5px;
+    min-width: anchor-size(width);
+    max-width: calc(100vw - 24px);
+    max-height: min(360px, 60vh);
+    overflow-y: auto;
+    font: inherit;
+  }
+  .settings-app select[data-slot='native-select'] option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 36px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 2px;
+    color: var(--buddy-text);
+    background: transparent;
+    font: inherit;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+  .settings-app select[data-slot='native-select'] option:checked {
+    background: var(--settings-selected);
+    color: var(--settings-selected-text);
+    font-weight: 600;
+  }
+  .settings-app select[data-slot='native-select'] option:focus-visible {
+    outline: 1px solid var(--buddy-focus);
+    outline-offset: -1px;
+  }
+  .settings-app select[data-slot='native-select'] option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--buddy-muted);
+  }
+  .settings-app select[data-slot='native-select'] option:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  @media (hover: hover) {
+    .settings-app select[data-slot='native-select'] option:hover:not(:disabled):not(:checked) {
+      background: var(--buddy-subtle);
+    }
+  }
+}

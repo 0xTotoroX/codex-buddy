@@ -180,6 +180,22 @@ test(
             };
           value = appearance;
         } else if (path === '/api/tasks/state') value = tasks;
+        else if (path === '/api/dev/sources')
+          value = {
+            active: '/fixture/main',
+            loaded: true,
+            connected: true,
+            resource: 'fixture',
+            sources: [
+              { path: '/fixture/main', branch: 'main', commit: '1234567', dirty: false },
+              {
+                path: '/fixture/a-long-worktree-path-for-menu-width-and-wrapping-checks',
+                branch: 'codex/long-source-name',
+                commit: '7654321',
+                dirty: false,
+              },
+            ],
+          };
         else if (path === '/api/model-control/state') value = { preferences: { enabled: true } };
         else value = { ok: true };
         res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(value));
@@ -256,6 +272,37 @@ test(
       await page.emulateMedia({ colorScheme: 'dark' });
       await expectTheme('light');
       assert.equal(writes.length, 0, 'theme subscription never writes business preferences');
+      // Exercise the styled native picker through actual keyboard/pointer input, not selectOption.
+      const generation = page.getByLabel('建议生成方式', { exact: true });
+      await generation.click();
+      await page.locator('#generation-mode:open').waitFor();
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Escape');
+      assert.equal(await generation.inputValue(), 'manual', 'Escape cancels the pending choice');
+      assert.equal(writes.length, 0, 'opening and dismissing a menu never saves');
+      await generation.press('Space');
+      await page.locator('#generation-mode:open').waitFor();
+      await page.keyboard.press('End');
+      const menuSave = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/settings') && response.request().method() === 'POST',
+      );
+      await page.keyboard.press('Enter');
+      await (await menuSave).finished();
+      assert.equal(
+        settings.generationMode,
+        'auto',
+        'keyboard selection uses the original save queue',
+      );
+      await generation.click();
+      const restoreSave = page.waitForResponse(
+        (response) =>
+          response.url().endsWith('/api/settings') && response.request().method() === 'POST',
+      );
+      await page.getByRole('option', { name: '手动刷新', exact: true }).click();
+      await (await restoreSave).finished();
+      assert.equal(settings.generationMode, 'manual', 'pointer selection uses the same queue');
+      writes.length = 0;
       assert.equal(
         await page.locator('.settings-app').getAttribute('data-settings-mode'),
         'simple',
@@ -570,6 +617,32 @@ test(
             path: `target/reports/settings-tom-${colorScheme}-${width}.png`,
             fullPage: true,
           });
+          await page.getByLabel('主界面布局', { exact: true }).click();
+          await page.locator('#main-layout:open').waitFor();
+          const menuGeometry = await page.locator('#main-layout option').evaluateAll((options) =>
+            options.map((option) => {
+              const box = option.getBoundingClientRect();
+              return {
+                x: box.x,
+                right: box.right,
+                bottom: box.bottom,
+                top: box.top,
+                viewport: innerWidth,
+                height: innerHeight,
+              };
+            }),
+          );
+          assert.ok(
+            menuGeometry.every(
+              (box) =>
+                box.x >= 0 && box.right <= box.viewport && box.top >= 0 && box.bottom <= box.height,
+            ),
+            'menu stays inside the viewport',
+          );
+          await page.screenshot({
+            path: `target/reports/settings-menu-${colorScheme}-${width}.png`,
+          });
+          await page.keyboard.press('Escape');
           assert.equal(
             await page.evaluate(
               () =>
@@ -619,6 +692,31 @@ test(
         await preview.locator('.preview-workspace').evaluate((n) => n.getAnimations().length > 0),
         'placement changes animate only the illustration',
       );
+      await page.getByRole('link', { name: '启动与开发', exact: true }).click();
+      await page.addScriptTag({ content: await readFile('ui/settings/dev-sources.js', 'utf8') });
+      await page.getByText('开发来源 · main · 1234567', { exact: true }).waitFor();
+      const source = page.getByLabel('调试 worktree', { exact: true });
+      const sourceWrites = writes.length;
+      for (const mode of ['浅色', '深色']) {
+        await themeButton(mode).click();
+        await page.setViewportSize({ width: 360, height: 900 });
+        await source.click();
+        await page.locator('#buddy-dev-sources select:open').waitFor();
+        assert.equal(await source.evaluate((n) => getComputedStyle(n).appearance), 'base-select');
+        const bounds = await page.locator('#buddy-dev-sources option').evaluateAll((nodes) =>
+          nodes.map((node) => ({
+            left: node.getBoundingClientRect().left,
+            right: node.getBoundingClientRect().right,
+            width: innerWidth,
+          })),
+        );
+        assert.ok(
+          bounds.every((box) => box.left >= 0 && box.right <= box.width),
+          'long Dev source labels remain inside a narrow viewport',
+        );
+        await page.keyboard.press('Escape');
+      }
+      assert.equal(writes.length, sourceWrites, 'previewing Dev menus never switches sources');
       const restricted = await browser.newContext({ colorScheme: 'dark', reducedMotion: 'reduce' });
       await restricted.addInitScript(() => {
         const get = Storage.prototype.getItem,
