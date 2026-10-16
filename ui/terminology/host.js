@@ -1,9 +1,9 @@
 /* [INPUT]: Buddy 已识别的聊天根节点、一问一答与受限后台请求。
- * [OUTPUT]: 术语优先的加粗标注、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
+ * [OUTPUT]: 术语加粗标注、悬停释义与按聊天身份定位已确认范围；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { readTypography } from '../codex/typography.js';
-import { textIndex, semanticSpans } from './text-ranges.js';
+import { textIndex, semanticSpans, scrollToRange } from './text-ranges.js';
 import { createMatcher } from './matcher.js';
 import { createTermPopover } from './popover.js';
 import { inheritedAppearance } from './appearance.js';
@@ -22,6 +22,8 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     entries: [],
   };
   let annotations = [],
+    locations = [],
+    locateTimer = 0,
     semanticMatches = [],
     active = null,
     pending = '',
@@ -35,6 +37,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     failures = 0;
   const cache = new Map();
   const ACTIVE = HIGHLIGHT + '-active';
+  const LOCATED = HIGHLIGHT + '-located';
   let point = { x: 0, y: 0 },
     appearanceKey = '';
   const popup = createTermPopover({
@@ -70,7 +73,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     // 暗色下提亮标注并减少下划线透明度，避免深色强调色融入背景；正文颜色保持继承。
     const mark = dark ? `color-mix(in srgb,${accent} 70%,#fff)` : accent;
     // Highlight 不支持 font-weight；同色、无模糊描粗保留原文字节点和排版。
-    highlightStyle.textContent = `::highlight(${HIGHLIGHT}),::highlight(${ACTIVE}){text-shadow:-.45px 0 0 currentColor,.45px 0 0 currentColor}::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${mark} ${dark ? 18 : 11}%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${mark} ${dark ? 86 : 58}%,transparent);text-decoration-thickness:2.5px;text-underline-offset:3px}::highlight(${ACTIVE}){background-color:color-mix(in srgb,${mark} ${dark ? 28 : 19}%,transparent);text-decoration-color:color-mix(in srgb,${mark} ${dark ? 100 : 88}%,transparent)}`;
+    highlightStyle.textContent = `::highlight(${HIGHLIGHT}),::highlight(${ACTIVE}),::highlight(${LOCATED}){text-shadow:-.45px 0 0 currentColor,.45px 0 0 currentColor}::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${mark} ${dark ? 18 : 11}%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${mark} ${dark ? 86 : 58}%,transparent);text-decoration-thickness:2.5px;text-underline-offset:3px}::highlight(${ACTIVE}),::highlight(${LOCATED}){background-color:color-mix(in srgb,${mark} ${dark ? 28 : 19}%,transparent);text-decoration-color:color-mix(in srgb,${mark} ${dark ? 100 : 88}%,transparent)}`;
     if (active) popup.update(active.term, cardOptions(active));
   }
   const api = async (payload, path = '/terminology') => {
@@ -86,6 +89,9 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   function clear() {
     void hide(true);
     annotations = [];
+    locations = [];
+    clearTimeout(locateTimer);
+    CSS.highlights?.delete(LOCATED);
     CSS.highlights?.delete(HIGHLIGHT);
     CSS.highlights?.delete(ACTIVE);
   }
@@ -209,14 +215,14 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       }
     }
     const involved = hits.map((h) => h.term.id);
-    // 仅限制屏幕绘制量，当前聊天词条集合仍完整收集，已掌握不再绘制。
-    for (const h of hits
-      .filter((h) => !state.preferences.mastered.includes(h.term.id))
-      .sort((a, b) => b.start - a.start)
-      .slice(0, 400)) {
+    // 定位保留所有已确认范围，已掌握或超过绘制上限的词条仍可显式跳转。
+    for (const h of hits.sort((a, b) => b.start - a.start)) {
       const range = index.range(h.start, h.end);
-      if (range) annotations.push({ ...h, range, text: range.toString() });
+      if (range) locations.push({ ...h, range, text: range.toString() });
     }
+    annotations = locations
+      .filter((h) => !state.preferences.mastered.includes(h.term.id))
+      .slice(0, 400);
     if (CSS.highlights && typeof Highlight !== 'undefined')
       CSS.highlights.set(HIGHLIGHT, new Highlight(...annotations.map((a) => a.range)));
     report(involved);
@@ -412,6 +418,19 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
   const apiObject = {
     lastError: '',
     contextKey,
+    locate(id, context) {
+      if (!alive || !context || context !== contextKey() || !state.preferences.enabled)
+        return false;
+      // 重新采集当前根内的范围，拒绝重绘失效节点和其他聊天的旧请求。
+      scan();
+      const hit = locations.find((a) => a.term.id === id && valid(a));
+      if (!hit || context !== contextKey() || !scrollToRange(hit.range)) return false;
+      if (CSS.highlights && typeof Highlight !== 'undefined') {
+        CSS.highlights.set(LOCATED, new Highlight(hit.range));
+        locateTimer = window.setTimeout(() => CSS.highlights.delete(LOCATED), 1800);
+      }
+      return true;
+    },
     typography: () => (root?.isConnected ? typography() : null),
     verify: (id) => alive && pending === id && identity()?.key === lastAnalysis,
     refresh,

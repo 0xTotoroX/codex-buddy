@@ -69,3 +69,5 @@ settings-search.tsx在页头提供本地设置搜索：从唯一挂载的标签/
 术语设置增加打开模块与收藏筛选；移除阅读批注候选，旧 note 偏好读取为 plain。
 
 `typography-settings.tsx` 是字体唯一设置入口，复用 PanelSettings 外观 revision 保存，数字草稿跨模式/分类保留；`use-typography.ts` 通过认证 SSE 接收字体快照，更新自有文档字体和 rem 基准。设置文字层级按同一基准缩放，颜色由 settings-theme 独立管理。旧分功能字号表单由统一跟随/自定义控件替换，旧值不删除。
+
+术语设置提供“点击术语时跳转到上下文”开关，默认关闭；通过原 terminology settings/revision 通道持久保存 jumpOnClick，失败保留原值。

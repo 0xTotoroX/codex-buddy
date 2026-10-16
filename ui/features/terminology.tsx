@@ -1,5 +1,5 @@
 /* [INPUT]: 术语状态、当前聊天涉及编号、窗口阅读状态与受限操作。
- * [OUTPUT]: 术语积木、详情、收藏及已掌握；复用既有容器，不增加侧栏占位。
+ * [OUTPUT]: 术语积木、详情、收藏及已掌握；可选的点击定位通过受限操作回到宿主执行。
  * [POS]: 仅消费后台投影，不采集或改写宿主聊天。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { useState, useRef, useLayoutEffect } from 'react';
@@ -21,6 +21,7 @@ export type TermData = {
   preferences: {
     favorites: string[];
     mastered: string[];
+    jumpOnClick?: boolean;
     cardMaterial?: string | null;
     cardStyle?: string;
     cardLiquidVariant?: string;
@@ -138,6 +139,10 @@ export function TerminologyView({
               setReveal((n) => n + 1);
               setSelected(t.id);
               reading.termsSelected = t.id;
+              if (state.preferences.jumpOnClick && !locked) {
+                // 复用容器的错误反馈及 owner 校验，始终携带点击时的聊天身份。
+                void action({ action: 'locate', id: t.id, context: state.context }).catch(() => {});
+              }
             }}
           >
             {t.name}

@@ -1,5 +1,5 @@
 // [INPUT]: 私有术语文件、认证命令与独立检索结果。
-// [OUTPUT]: 术语库/手动词条、收藏/掌握、当前聊天涉及编号、样式设置与中文 Markdown 导出。
+// [OUTPUT]: 术语库/手动词条、收藏/掌握、当前聊天涉及编号、样式与跳转设置、身份校验定位及中文 Markdown 导出。
 // [POS]: 本机知识服务，不写主聊天；完整词库不随源码或安装包分发。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 use crate::{config::write_private, state::App};
@@ -33,6 +33,7 @@ pub(crate) struct Preferences {
     pub enabled: bool,
     pub semantic: bool,
     pub auto_expand: bool,
+    pub jump_on_click: bool,
     pub card_style: String,
     pub card_material: Option<String>,
     pub card_liquid_variant: String,
@@ -48,6 +49,7 @@ impl Default for Preferences {
             enabled: true,
             semantic: true,
             auto_expand: true,
+            jump_on_click: false,
             card_style: "plain".into(),
             card_material: None,
             card_liquid_variant: "regular".into(),
@@ -244,6 +246,7 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
                 ("enabled", &mut prefs.enabled),
                 ("semantic", &mut prefs.semantic),
                 ("autoExpand", &mut prefs.auto_expand),
+                ("jumpOnClick", &mut prefs.jump_on_click),
             ] {
                 if let Some(v) = input.get(key) {
                     *target = v.as_bool().context("设置值必须为开关")?;
@@ -280,6 +283,26 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
             }
             prefs.revision += 1;
             save(root, "terminology-settings.json", &prefs)?;
+        }
+        "locate" => {
+            ensure!(prefs.jump_on_click, "请先开启点击术语时跳转到上下文");
+            ensure!(prefs.enabled, "术语标注已关闭");
+            let id = input["id"].as_str().context("缺少术语编号")?;
+            let context = input["context"].as_str().context("缺少聊天身份")?;
+            ensure!(!context.is_empty() && context.len() <= 180, "聊天身份无效");
+            ensure!(terms.iter().any(|term| term.id == id), "术语已不存在");
+            let client = app.desktop_client().await.context("宿主未连接")?;
+            let located = client
+                .evaluate(format!(
+                    "window.__codexBuddyTerminology?.locate({}, {}) ?? false",
+                    json!(id),
+                    json!(context)
+                ))
+                .await?;
+            ensure!(
+                located == true,
+                "当前聊天中未找到该术语的位置，聊天可能已切换或内容已更新"
+            );
         }
         "observe" => {
             let context = input["context"].as_str().context("缺少聊天身份")?;
@@ -427,6 +450,68 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn jump_defaults_off_and_persists_with_revision_checks() {
+        let dir = tempfile::tempdir().unwrap();
+        let app = App::new(
+            crate::config::Paths::new(Some(dir.path().into())).unwrap(),
+            Default::default(),
+            None,
+            false,
+        );
+        let old: Preferences = serde_json::from_str(r#"{"enabled":true,"revision":4}"#).unwrap();
+        assert!(!old.jump_on_click);
+        let initial = command(&app, json!({"action":"state"})).await.unwrap();
+        assert_eq!(initial["preferences"]["jumpOnClick"], false);
+        let disabled = command(
+            &app,
+            json!({"action":"locate","id":"TERM-1","context":"one"}),
+        )
+        .await
+        .unwrap_err();
+        assert!(disabled.to_string().contains("请先开启"));
+        command(
+            &app,
+            json!({"action":"settings","revision":0,"jumpOnClick":true}),
+        )
+        .await
+        .unwrap();
+        let saved: Preferences = read(dir.path(), "terminology-settings.json").unwrap();
+        assert!(saved.jump_on_click);
+        assert_eq!(saved.revision, 1);
+        assert!(
+            command(
+                &app,
+                json!({"action":"settings","revision":0,"jumpOnClick":false})
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            command(
+                &app,
+                json!({"action":"settings","revision":1,"jumpOnClick":"yes"})
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            read::<Preferences>(dir.path(), "terminology-settings.json")
+                .unwrap()
+                .jump_on_click
+        );
+        command(
+            &app,
+            json!({"action":"settings","revision":1,"jumpOnClick":false}),
+        )
+        .await
+        .unwrap();
+        assert!(
+            !read::<Preferences>(dir.path(), "terminology-settings.json")
+                .unwrap()
+                .jump_on_click
+        );
+    }
     #[tokio::test]
     async fn card_materials_preserve_old_preferences_and_reject_bad_colors() {
         let dir = tempfile::tempdir().unwrap();

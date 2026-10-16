@@ -83,7 +83,7 @@ Config.codex_host兼容旧codexHost键，App.codex_host_operation串行管理，
 
 features.task_command承接原server看板命令协调：主界面已接管时，未登记看板的打开/启用进入共享容器；旧窗口草稿仍按原规则保护。restore_unregistered_main_features在feature_operation内只补缺失条目。模型preferences白名单加入modelOrder，继续校验owner、唯一ID及revision。state.handle_refresh_failure保留仍存活客户端上的Elapsed；Connection.status新增unresponsive，下一次正常refresh即恢复connected。
 
-- `terminology.rs`：本机私有术语/手动词库、背景材质/液态变体/自定义色/宽度偏好及已掌握状态（兼容旧样式字段），认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
+- `terminology.rs`：本机私有术语/手动词库、背景材质/液态变体/自定义色/宽度、默认关闭的 jumpOnClick 偏好及已掌握状态（兼容旧样式字段），认证命令、中文文档与可导入备份导出；通过独立操作锁串行保存，损坏文件拒绝覆盖。
 - `terminology_lookup.rs`：验证宿主检索身份，独立模型识别原句、含义与领域，并批量核对同名词条的定义；未命中时仅向固定公共百科发送带领域消歧的短检索词，先核对原文证据，再生成释义与分类，异义词独立编号保存；已确认词条先通过受身份校验的 progress 送达，联网补充完成后继续追加，不等待整批结束，切换上下文或关闭功能拒绝迟到结果。
 
 settings.Options/Update支持promptEnhancementEnabled，默认true并沿原修订保存；model.same_generation_config忽略这一工具开关。prompt_enhancement在开始和取消校验中检查开关，关闭后拒绝请求并终止在途操作。
@@ -99,3 +99,5 @@ panel.Preferences 顶层 typography 单独持久化并验证 follow/custom、bod
 贴边 screen="codex" 显式跟随当前 CDP 连接窗口，surfaces/window 仅此模式读取临时 hostBounds（500ms 超时），edge_geometry 将顶部逻辑坐标转换为 AppKit 后取最大相交屏幕；缺失或无交集时沿原回退保留屏幕。拖动贴边位置不取消跟随，轮询不写回显示器偏好。原空值自动选择与固定 UUID 保留。
 
 开发回读新增 model（最多六行四个数字：常用行数/滚动高度/可用高度/末行底部、常用区矩形、Fast 矩形、加号矩形、预设数/行数/滚动宽度/可用宽度、预设区矩形）和 displayGeometry（三个矩形：AppKit 屏幕、CDP 宿主、AppKit 面板），不记录模型名称、预设内容或聊天。
+
+术语 locate 命令校验已保存的 jumpOnClick、标注开关、词条编号及聊天身份，再经当前 CDP 调用宿主 locate；features 的术语操作继续先验 owner。设置缺省与旧配置均不自动跳转。

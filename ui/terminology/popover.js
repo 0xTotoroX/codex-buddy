@@ -1,5 +1,5 @@
 /* [INPUT]: 共用卡片、文字/积木锚点和主题选项。
- * [OUTPUT]: 可中断开合、视口定位、键盘关闭及资源回收。
+ * [OUTPUT]: 可中断开合、视口定位、键盘关闭及资源回收；侧栏释义不因独立正文滚动关闭。
  * [POS]: 正文与侧栏共用浮层；不拥有词库业务状态。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { layoutZoom } from '../codex/typography.js';
@@ -106,7 +106,9 @@ export function createTermPopover({
       void hide();
   }
   function scroll(e) {
-    if (!e.composedPath().includes(layer)) void hide(true);
+    if (e.composedPath().includes(layer)) return;
+    // 侧栏锚点不随聊天滚动；点击定位正文时保留释义。
+    if (!returnFocus || e.target === document || e.target.contains?.(returnFocus)) void hide(true);
   }
   const peer = (e) => {
     if (e.detail !== layer && card) void hide(true);

@@ -17,9 +17,11 @@ CodexBuddy adds a companion panel to Codex / ChatGPT. Navigate long answers, gen
 
 Use the eyes entry in the left rail to open the workbench. Hover for Inside, Desktop, and Settings; the default single-click action is configurable. Double-click or Alt+Enter moves the main interface between the chat and desktop. Right-click opens settings in ChatGPT’s built-in browser side panel. The desktop window has return-to-chat, maximize/restore, and pin controls; it stays on top by default and remembers your choice.
 
-Terminology annotations are available under detailed settings → Features and interactions. Import a local glossary to underline terms in chat, hover for Chinese definitions, and mark concepts as mastered. Chat hovers and sidebar selections share a compact popover with theme colors, matte, frosted, liquid, black, or custom backgrounds, plus favorites, manual entries, and document export. Optional semantic detection sends the current question and answer to the configured model; online enrichment queries only short term names and does not write to the main chat. Glossaries stay in local data and are not bundled with releases.
+Terminology annotations are available under detailed settings → Features and interactions. Import a local glossary to show bold, underlined terms in chat, hover for Chinese definitions, and mark concepts as mastered. Chat hovers and sidebar selections share a compact popover with theme colors, matte, frosted, liquid, black, or custom backgrounds, plus favorites, manual entries, and document export. Optional semantic detection sends the current question and answer to the configured model; online enrichment queries only short term names and does not write to the main chat. Glossaries stay in local data and are not bundled with releases.
 
 The workbench also provides a Terminology tab with concepts encountered in the current chat, favorites, and mastered terms. Semantic spans can cross paragraphs and inline formatting; results are cached and failed analysis is retried a bounded number of times.
+
+Enable **点击术语时跳转到上下文** in detailed settings → Features and interactions → Terminology to scroll to the latest confirmed occurrence in the current chat when selecting a term. It is off by default and keeps the definition popover; unavailable or stale positions do not switch chats.
 
 ## Features
 

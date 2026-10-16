@@ -1,8 +1,9 @@
 /* [INPUT]: 已确认的聊天根节点、语义原句与对应词条；复用 matcher 的名称/别名和英文边界。
- * [OUTPUT]: 规范化正文与原始文字节点的双向位置映射；原句内优先定位术语，没有名称时保留语义句段。
- * [POS]: 只读 DOM 定位，不改宿主正文、行距或选择区。
+ * [OUTPUT]: 正文位置映射、语义范围及指定范围的滚动定位。
+ * [POS]: 不改宿主正文、行距或选择区；定位仅滚动文字所属容器。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { createMatcher } from './matcher.js';
+import { layoutZoom } from '../codex/typography.js';
 export const normalizeQuote = (text) =>
   String(text || '')
     .replace(/[\s\u200b]+/gu, ' ')
@@ -94,4 +95,30 @@ export function semanticSpans(text, quote, term = null) {
     cursor = end;
   }
   return ranges;
+}
+
+export function scrollToRange(range) {
+  const rect = [...range.getClientRects()].find((r) => r.width && r.height);
+  if (!rect) return false;
+  let container = range.startContainer.parentElement;
+  while (container && container !== document.documentElement) {
+    if (
+      /(auto|scroll|overlay)/.test(getComputedStyle(container).overflowY) &&
+      container.scrollHeight > container.clientHeight + 4
+    )
+      break;
+    container = container.parentElement;
+  }
+  container =
+    container === document.documentElement || !container ? document.scrollingElement : container;
+  if (!container) return false;
+  const documentScroll = container === document.scrollingElement;
+  const bounds = container.getBoundingClientRect();
+  const scale = documentScroll ? layoutZoom(container) : bounds.height / container.clientHeight;
+  const center = documentScroll ? innerHeight / 2 : bounds.top + bounds.height / 2;
+  container.scrollBy({
+    top: (rect.top + rect.height / 2 - center) / (scale || 1),
+    behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  });
+  return true;
 }

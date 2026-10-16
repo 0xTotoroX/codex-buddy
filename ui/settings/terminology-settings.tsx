@@ -7,6 +7,7 @@ import { request } from './api';
 import { inheritedAppearance } from '../terminology/appearance.js';
 import { NativeSelect } from './components/ui/native-select';
 import { Button } from './components/ui/button';
+import { Switch } from './components/ui/switch';
 import { Icon } from '../shared/icons/react';
 import { cardStyles, createCard } from '../terminology/card.js';
 
@@ -26,6 +27,7 @@ type Library = {
     enabled: boolean;
     semantic: boolean;
     autoExpand: boolean;
+    jumpOnClick?: boolean;
     cardStyle: string;
     cardMaterial?: string | null;
     cardLiquidVariant?: string;
@@ -176,6 +178,17 @@ export function TerminologySettings({ active }: { active: boolean }) {
               />{' '}
               在聊天中标注术语
             </label>
+          </div>
+          <div className="settings-row">
+            <label htmlFor="terms-jump-on-click">点击术语时跳转到上下文</label>
+            <Switch
+              id="terms-jump-on-click"
+              checked={prefs.jumpOnClick ?? false}
+              disabled={busy}
+              onCheckedChange={(jumpOnClick) =>
+                void command({ action: 'settings', revision: prefs.revision, jumpOnClick })
+              }
+            />
           </div>
           <div className="term-style-options">
             <label>

@@ -8,4 +8,4 @@
 
 features.rs负责主界面接管后的缺失成员补登记，只补开关已开启且无条目的outline/next/board；旧桌面/旧看板窗口存在、整组交接中或当前系统不支持目标形式时暂不迁移。已有条目的owner/open/布局不改。task_command复用原任务服务，打开看板与功能开关统一接入这一策略。
 
-terms 使用同一主窗口与功能owner，业务读取/操作转 terminology；有私有词库时为已管理主界面补登记，不重开已关闭条目。
+terms 使用同一主窗口与功能owner，业务读取/操作转 terminology，locate 沿用 owner 与交接互斥校验；有私有词库时为已管理主界面补登记，不重开已关闭条目。

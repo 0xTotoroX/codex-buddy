@@ -107,6 +107,77 @@ test('hover, style, mastery, navigation and cleanup preserve host content', asyn
   }
 });
 
+test('term navigation targets the latest current-chat range and rejects stale contexts', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({
+      reducedMotion: 'reduce',
+      viewport: { width: 1100, height: 800 },
+    });
+    await page.setContent(`<main style="height:360px;width:600px;overflow:auto;zoom:1.25">
+      <p>先前的竞态条件。</p><div style="height:1000px"></div>
+      <p id="latest">这里的竞态<strong>条件</strong>需要定位。</p><div style="height:800px"></div>
+      <textarea>未发送草稿：竞态条件</textarea></main>
+      <aside style="height:80px;overflow:auto"><div style="height:500px">另一个面板</div></aside>`);
+    const original = await page.locator('main').innerHTML();
+    await page.addScriptTag({ content: bundle });
+    await page.waitForFunction(() => CSS.highlights.get('codex-buddy-terms')?.size === 2);
+    const locate = (context = 'one', id = 'TERM-1') =>
+      page.evaluate(({ context, id }) => window.__codexBuddyTerminology.locate(id, context), {
+        context,
+        id,
+      });
+    assert.equal(await locate('old-chat'), false);
+    assert.equal(await locate('one', 'missing'), false);
+    assert.equal(await page.locator('main').evaluate((n) => n.scrollTop), 0);
+    assert.equal(await locate(), true);
+    const position = await page.evaluate(() => {
+      const main = document.querySelector('main');
+      const bounds = main.getBoundingClientRect();
+      const highlight = [...CSS.highlights.get('codex-buddy-terms-located')][0];
+      const rect = highlight.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        min: bounds.top,
+        max: bounds.bottom,
+        latest: document.querySelector('#latest').contains(highlight.startContainer),
+        other: document.querySelector('aside').scrollTop,
+      };
+    });
+    assert.equal(position.latest, true);
+    assert.ok(position.top > position.min && position.bottom < position.max);
+    assert.equal(position.other, 0);
+    assert.equal(await page.locator('main').innerHTML(), original);
+    assert.equal(await page.locator('textarea').inputValue(), '未发送草稿：竞态条件');
+    await page.evaluate(async () => {
+      window.state.preferences.mastered = ['TERM-1'];
+      await window.__codexBuddyTerminology.refresh();
+    });
+    assert.equal(await page.evaluate(() => CSS.highlights.get('codex-buddy-terms').size), 0);
+    assert.equal(await locate(), true, 'mastered terms remain explicitly navigable');
+    await page.evaluate(async () => {
+      window.session = 'two';
+      window.state.preferences.semantic = true;
+      await window.__codexBuddyTerminology.refresh();
+    });
+    assert.equal(
+      await locate(),
+      false,
+      'previous chat identity is rejected even with the same DOM',
+    );
+    assert.equal(
+      await locate('two'),
+      false,
+      'semantic mode never falls back to an unverified name',
+    );
+    await page.evaluate(() => window.__codexBuddyTerminology.destroy());
+    assert.equal(await page.evaluate(() => CSS.highlights.has('codex-buddy-terms-located')), false);
+  } finally {
+    await browser.close();
+  }
+});
+
 test('dark term marks remain visible and follow the host theme without recoloring text', async () => {
   const browser = await chromium.launch({ headless: true });
   try {

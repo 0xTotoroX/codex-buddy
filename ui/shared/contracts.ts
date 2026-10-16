@@ -220,6 +220,7 @@ declare global {
       typeof import('../codex/typography.js').createTypographyTracker
     >;
     __codexBuddyTerminology?: {
+      locate(id: string, context: string): boolean;
       typography?(): {
         fontFamily: string;
         fontSize: number;

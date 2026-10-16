@@ -631,7 +631,7 @@ impl App {
         match id {
             "terms" => {
                 ensure!(
-                    ["favorite", "unfavorite", "master", "restore"]
+                    ["favorite", "unfavorite", "master", "restore", "locate"]
                         .contains(&data["action"].as_str().unwrap_or("")),
                     "术语视图不允许此操作"
                 );
