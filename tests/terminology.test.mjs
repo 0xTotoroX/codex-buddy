@@ -167,9 +167,17 @@ test('dark term marks remain visible and follow the host theme without recolorin
           active: contrast(active),
           color: style.color,
           text: getComputedStyle(node).color,
+          shadow: style.textShadow,
+          activeShadow: active.textShadow,
+          thickness: parseFloat(style.textDecorationThickness),
+          originalShadow: getComputedStyle(node).textShadow,
         };
       });
       assert.equal(metrics.color, metrics.text, 'highlight keeps the original text color');
+      assert.notEqual(metrics.shadow, 'none', 'term strokes remain bold without hovering');
+      assert.notEqual(metrics.activeShadow, 'none', 'hover keeps bold term strokes');
+      assert.equal(metrics.originalShadow, 'none', 'unmarked text keeps its original weight');
+      assert.ok(metrics.thickness >= 2.5, 'term underline is visibly thicker');
       if (theme === 'dark') {
         assert.ok(metrics.normal >= 3, `dark underline contrast ${metrics.normal.toFixed(2)} < 3`);
         assert.ok(metrics.active >= 3, `dark active contrast ${metrics.active.toFixed(2)} < 3`);

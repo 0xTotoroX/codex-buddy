@@ -1,5 +1,5 @@
 /* [INPUT]: Buddy 已识别的聊天根节点、一问一答与受限后台请求。
- * [OUTPUT]: 术语优先的细下划线、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
+ * [OUTPUT]: 术语优先的加粗标注、悬停加深与贴字释义卡；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import { readTypography } from '../codex/typography.js';
@@ -69,7 +69,8 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       (!theme.theme && matchMedia('(prefers-color-scheme: dark)').matches);
     // 暗色下提亮标注并减少下划线透明度，避免深色强调色融入背景；正文颜色保持继承。
     const mark = dark ? `color-mix(in srgb,${accent} 70%,#fff)` : accent;
-    highlightStyle.textContent = `::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${mark} ${dark ? 18 : 11}%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${mark} ${dark ? 86 : 58}%,transparent);text-decoration-thickness:1.5px;text-underline-offset:2px}::highlight(${ACTIVE}){background-color:color-mix(in srgb,${mark} ${dark ? 28 : 19}%,transparent);text-decoration-color:color-mix(in srgb,${mark} ${dark ? 100 : 88}%,transparent)}`;
+    // Highlight 不支持 font-weight；同色、无模糊描粗保留原文字节点和排版。
+    highlightStyle.textContent = `::highlight(${HIGHLIGHT}),::highlight(${ACTIVE}){text-shadow:-.45px 0 0 currentColor,.45px 0 0 currentColor}::highlight(${HIGHLIGHT}){background-color:color-mix(in srgb,${mark} ${dark ? 18 : 11}%,transparent);text-decoration:underline;text-decoration-color:color-mix(in srgb,${mark} ${dark ? 86 : 58}%,transparent);text-decoration-thickness:2.5px;text-underline-offset:3px}::highlight(${ACTIVE}){background-color:color-mix(in srgb,${mark} ${dark ? 28 : 19}%,transparent);text-decoration-color:color-mix(in srgb,${mark} ${dark ? 100 : 88}%,transparent)}`;
     if (active) popup.update(active.term, cardOptions(active));
   }
   const api = async (payload, path = '/terminology') => {
