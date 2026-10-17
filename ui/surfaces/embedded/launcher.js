@@ -214,6 +214,7 @@ export function syncLauncher(options) {
       if (!previewEnabled()) current?.pointerDown(event);
     });
     button.addEventListener('click', (event) => {
+      face?.acknowledge();
       radial?.close();
       event.stopPropagation();
       if (previewEnabled()) {

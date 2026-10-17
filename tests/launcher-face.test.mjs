@@ -18,7 +18,8 @@ import {runtimeState,contextState,stepwiseState,shellState} from './ui/codex/run
 Object.assign(runtimeState,{settings:{enabled:true,answerOutlineEnabled:false,baseUrlConfigured:true,model:'fixture',apiKeyConfigured:true,generationMode:'auto'}});
 Object.assign(shellState,{activeTab:'next',surpriseUntil:0});Object.assign(contextState,{scanBusy:false,scanStatus:''});
 window.clicks=0;window.actions=[];
-window.refresh=(kind,pane='left')=>{contextState.activeContext={paneRoot:document.getElementById(pane)};contextState.scanBusy=kind==='answering';stepwiseState.bridgeStatus=kind==='generating'?'pending':kind==='error'?'failed':['ready','empty'].includes(kind)?'ok':'idle';stepwiseState.prompts=kind==='ready'?[{label:'fixture'}]:[];const expression=resolveFabExpression();syncLauncher({open:false,root:null,expression,expressionLabel:fabExpressionLabel(expression),sourceCue:activePaneCue(),click:()=>window.clicks++,pointerDown:()=>{},keyDown:()=>{},settings:()=>{},action:kind=>{window.actions.push(kind);if(window.captureFeedback){window.feedback=window.currentEye().querySelector('.csw-fab-face').getAnimations()[0];window.feedback?.pause();if(window.feedback)window.feedback.currentTime=Number(window.feedback.effect.getTiming().duration)*.28;}if(window.failAction)throw new Error('fixture action failed');}});};
+window.captureEyeFeedback=()=>{if(window.captureFeedback){window.feedback=window.currentEye().querySelector('.csw-fab-face').getAnimations()[0];window.feedback?.pause();if(window.feedback)window.feedback.currentTime=Number(window.feedback.effect.getTiming().duration)*.28;}};
+window.refresh=(kind,pane='left')=>{contextState.activeContext={paneRoot:document.getElementById(pane)};contextState.scanBusy=kind==='answering';stepwiseState.bridgeStatus=kind==='generating'?'pending':kind==='error'?'failed':['ready','empty'].includes(kind)?'ok':'idle';stepwiseState.prompts=kind==='ready'?[{label:'fixture'}]:[];const expression=resolveFabExpression();syncLauncher({open:false,root:null,expression,expressionLabel:fabExpressionLabel(expression),sourceCue:activePaneCue(),click:()=>{window.clicks++;window.captureEyeFeedback();},pointerDown:()=>{},keyDown:()=>{},settings:()=>{},action:kind=>{window.actions.push(kind);window.captureEyeFeedback();if(window.failAction)throw new Error('fixture action failed');}});};
 window.stopLauncher=stopLauncher;window.refresh('idle');window.originalEye=launcherButton();window.currentEye=launcherButton;
 `,
   },
@@ -118,6 +119,9 @@ test('launcher reuses original expressions and source geometry while retaining i
     });
     assert.equal(await eye.locator('.csw-launcher-source').isHidden(), true);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     assert.equal(
       await eye
         .locator('.csw-fab-eye')
@@ -126,11 +130,60 @@ test('launcher reuses original expressions and source geometry while retaining i
       'none',
     );
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     await page.evaluate(() => {
       window.captureFeedback = true;
       window.actions = [];
       window.refresh('generating');
     });
+    const clicksBefore = await page.evaluate(() => window.clicks);
+    for (const activate of [
+      () => eye.click(),
+      () => eye.press('Enter'),
+      () => eye.press('Space'),
+      () => eye.dblclick(),
+    ]) {
+      await page.evaluate(() => {
+        window.previousFeedback = window.feedback;
+      });
+      await activate();
+      assert.equal(
+        await eye.locator('.csw-fab-face').evaluate((node) => node.getAnimations().length),
+        1,
+        'direct activation starts one feedback animation',
+      );
+      assert.ok((await eye.locator('.csw-fab-eye').first().boundingBox()).height < 3);
+      assert.deepEqual(await eye.boundingBox(), eyeBox);
+      assert.equal(await eye.getAttribute('data-expression'), 'generating');
+      assert.equal(
+        await page.evaluate(
+          () => !window.previousFeedback || window.previousFeedback.playState === 'idle',
+        ),
+        true,
+        'repeated eye activation cancels previous feedback',
+      );
+    }
+    assert.equal(await page.evaluate(() => window.clicks), clicksBefore + 5);
+    assert.deepEqual(await page.evaluate(() => window.actions), []);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
+    await eye.click();
+    assert.equal(
+      await eye.locator('.csw-fab-face').evaluate((node) => getComputedStyle(node).transform),
+      'none',
+    );
+    assert.equal(
+      await eye.locator('.csw-fab-face').evaluate((node) => getComputedStyle(node).opacity),
+      '0.65',
+    );
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     for (const [action, name] of [
       ['inside', '在聊天内打开'],
       ['outside', '在桌面打开'],
@@ -170,6 +223,9 @@ test('launcher reuses original expressions and source geometry while retaining i
     }
     assert.deepEqual(await page.evaluate(() => window.actions), ['inside', 'outside', 'settings']);
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     await eye.focus();
     await page.keyboard.press('ArrowRight');
     await page.keyboard.press('Enter');
@@ -186,6 +242,9 @@ test('launcher reuses original expressions and source geometry while retaining i
       () => window.currentEye().querySelector('.csw-fab-face').getAnimations().length === 0,
     );
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    );
     await page.evaluate(() => {
       window.failAction = true;
     });
