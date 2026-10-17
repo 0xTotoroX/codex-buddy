@@ -96,8 +96,14 @@ test('settings default to no jump and card clicks use the saved toggle and curre
       { action: 'locate', id: 'a', context: 'chat-one' },
     ]);
     await page.getByRole('dialog', { name: '防抖释义' }).waitFor();
-    await page.locator('#chat').dispatchEvent('scroll');
-    assert.equal(await page.getByRole('dialog', { name: '防抖释义' }).isVisible(), true);
+    assert.equal(
+      await page.getByRole('dialog', { name: '防抖释义' }).evaluate((dialog) => {
+        document.getElementById('chat').dispatchEvent(new Event('scroll', { bubbles: true }));
+        return dialog.isConnected && dialog.checkVisibility({ visibilityProperty: true });
+      }),
+      true,
+      'unrelated chat scrolling preserves the open sidebar definition',
+    );
     await page.locator('#sidebar').dispatchEvent('scroll');
     await page.getByRole('dialog', { name: '防抖释义' }).waitFor({ state: 'hidden' });
     await page.keyboard.press('Escape');

@@ -692,15 +692,20 @@ try {
     0,
     'remounted picker defaults to favorites only',
   );
-  assert.equal(
-    await view.locator('.model-scroll').evaluate((node) => node.scrollLeft),
-    await view
-      .locator('.model-scroll')
-      .evaluate(
-        (node, saved) => Math.min(saved, node.scrollWidth - node.clientWidth),
-        modelReading.modelLeft,
-      ),
-  );
+  const restoredModelReading = await view.locator('.model-scroll').evaluate(async (node, saved) => {
+    const deadline = performance.now() + 4000;
+    let state;
+    do {
+      await new Promise(requestAnimationFrame);
+      state = {
+        actual: node.scrollLeft,
+        expected: Math.min(saved, node.scrollWidth - node.clientWidth),
+      };
+      if (state.actual === state.expected) return state;
+    } while (performance.now() < deadline);
+    return state;
+  }, modelReading.modelLeft);
+  assert.equal(restoredModelReading.actual, restoredModelReading.expected);
   await showOthers();
   assert.equal(await view.locator('[data-model-group="vendor:Google"] .model-tile').count(), 1);
   assert.equal(await tile('c').getAttribute('aria-pressed'), 'true');
