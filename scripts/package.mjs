@@ -53,7 +53,7 @@ writeFileSync(
   join(folder, 'README.md'),
   `# CodexBuddy ${version}
 
-Codex 的本地辅助工具：回答大纲、下一步建议、任务看板、模型快切、术语释义与提示词优化。
+Codex 的本地辅助工具：回答大纲、下一步建议、任务看板、模型切换、术语释义与提示词优化。
 此归档适用于 macOS 14.0+ Apple Silicon，包含可直接运行的程序，无需 Node.js 或 Rust。桌面浮窗需要 macOS 15+；macOS 14 仍可使用 Codex 内嵌面板。
 
 ## 开始使用

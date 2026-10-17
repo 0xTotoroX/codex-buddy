@@ -19,7 +19,7 @@
         try {
           const status = probe.status();
           if (status?.version !== 2)
-            return { officialModel: false, message: '当前 CodexHost 版本尚未适配模型快切' };
+            return { officialModel: false, message: '当前 CodexHost 版本尚未适配模型切换' };
           const selections = status.selections?.filter((item) => item.composerId === id);
           if (!id || selections?.length !== 1)
             return { officialModel: false, message: '无法确认当前 CodexHost Agent' };
