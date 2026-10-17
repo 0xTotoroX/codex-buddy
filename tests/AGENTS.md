@@ -86,6 +86,8 @@ workbench 用例覆盖三材质、标签/分栏/专注、旧 capsule 偏好弹�
 
 `independent-features.mjs`：唯一主界面的十轮侧栏/浮层交接、关闭状态与草稿保留、模型回读及无额外业务操作的浏览器回归。`features-e2e.mjs`：真实 Rust/HTTP/CDP 的整组位置、来源草稿确认、旧 owner 拒绝与断连本地编辑；--native 额外验证真实 Wry 自动 ready、共享 PID、恰好一个可见主窗口、返回后旧租约立即回收及往返。
 
+`overlay-motion.mjs`：由 independent-features 调用，暂停真实动画采样中间帧，核对完整内容可见、曲面像素、入口方向、快速反向、展开尺寸与草稿保留；覆盖减少动态效果、动画中切侧栏、窗口缩放和入口缺失。independent-features 另在动画中销毁，检查滤镜与功能节点回收。
+
 看板简化验收：board.mjs 覆盖组内创建、宽跨列/窄标签真实拖放、分组改名新增与重启保留、旧 waiting/日期及归档记录保留、本地删除持久化与双端删除拒绝；feature-surfaces 保持搜索与草稿跨容器接续。
 
 independent-features 的配置操作模拟设置 API；十轮往返保留草稿，并验证桥繁忙后的 ready/handoff 重试、侧栏收起再开，实际采样胶囊展开/收回中的 morphing 状态及 84×36 收起尺寸，检查没有新增功能菜单或位置选择器。

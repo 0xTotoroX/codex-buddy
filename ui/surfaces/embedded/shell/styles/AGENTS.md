@@ -10,4 +10,4 @@ install-styles 安装 ui/shared/tokens.css、theme/tokens、外壳样式、featu
 
 [PROTOCOL]: 变更时更新本文，然后检查父级 AGENTS.md。
 
-表情形状、状态动画与关键帧已提取到上级 face-styles.js，由 install-styles 按原顺序插入；layout/motion 保留外壳几何和收放动效。独立入口共享同一表情样式，不恢复旧紧凑胶囊显示。
+表情形状、状态动画与关键帧已提取到上级 face-styles.js，由 install-styles 按原顺序插入；layout/motion 保留外壳几何和收放动效。独立入口共享同一表情样式，不恢复旧紧凑胶囊显示。layout 的 data-overlay-motion 期间保留完整内容可见、禁用交互，整体曲面收放由上级 overlay-motion 驱动，不裁切成胶囊。

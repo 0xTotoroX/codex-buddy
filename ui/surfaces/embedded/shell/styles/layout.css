@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 胶囊 DOM、状态属性与共享变量。
- * [OUTPUT]: 隔离宿主默认样式的公共基础规则、外壳、眼睛、标题和几何；工具按钮统一透明底色、悬停明暗反馈；不包含材质配方。
+ * [OUTPUT]: 隔离宿主默认样式的公共基础规则、外壳、眼睛、标题和几何；工具按钮统一透明底色、悬停明暗反馈；曲面收放期间保持完整内容可见；不包含材质配方。
  * [POS]: 样式分层，由 install-styles 按顺序安装。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -185,6 +185,22 @@
 
 [data-companion-stepwise-root][data-presentation='embedded'] .csw-fab {
   display: none;
+  pointer-events: none;
+}
+
+/* 浮层保持完整布局，整个实时表面向入口收拢；途中不显露旧胶囊。 */
+.csw-popover[data-overlay-motion='true'] {
+  transform-origin: 0 0;
+  will-change: transform, opacity, filter;
+}
+
+.csw-popover[data-overlay-motion='true'] .csw-panel {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: none;
+}
+
+.csw-popover[data-overlay-motion='true'] .csw-glass {
   pointer-events: none;
 }
 

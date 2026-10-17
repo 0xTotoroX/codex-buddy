@@ -1,11 +1,12 @@
 /*
  * [INPUT]: 胶囊状态、DOM 尺寸、滚动容器与原生窗口偏好。
- * [OUTPUT]: 内嵌几何、收放及完成后的外壳切换，收起后键盘焦点回到左栏入口；保留胶囊位置与原生尺寸同步，停靠开合始终交由通知协调，临时不可用不改变位置偏好。
+ * [OUTPUT]: 内嵌几何、浮层向入口的整面曲面收放及完成后的外壳切换；保留胶囊位置与原生尺寸同步，停靠开合交由通知协调。
  * [POS]: 交互与视图共用的空间计算层。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
 
 import { launcherButton } from '../launcher.js';
+import { animateOverlay, cancelOverlayMotion, overlayMotionState } from './overlay-motion.js';
 import {
   CHIP_HEIGHT,
   CHIP_RADIUS,
@@ -244,6 +245,7 @@ function phaseSplitOf(geometry) {
 }
 
 function cancelMorphAnimations() {
+  cancelOverlayMotion();
   const transition = shellState.morphTransition;
   if (transition) {
     transition.cancelled = true;
@@ -442,7 +444,10 @@ function applyMorphShell(shell, geometry) {
 function applyMorphProgress(progress) {
   if (!shellState.glass && !shellState.rim && !shellState.panel && !shellState.fab) return;
   const geometry = shellState.layout || shellLayout();
-  const shell = unfoldShell(geometry, progress, false);
+  const shell =
+    !IS_POPOUT && shellState.layoutMode !== 'workbench'
+      ? geometry.expandedShell
+      : unfoldShell(geometry, progress, false);
   applyMorphShell(shell, geometry);
 }
 
@@ -501,6 +506,10 @@ function startMorph(expanded, focusTarget = '') {
     return;
   resetEyePointer();
   const geometry = shellState.layout || shellLayout();
+  const overlay = shellState.layoutMode !== 'workbench';
+  const overlayState = overlayMotionState();
+  const startProgress = overlayState?.progress ?? (shellState.open ? 1 : 0);
+  const anchor = overlayState ? overlayState.anchor : launcherButton()?.getBoundingClientRect();
   const currentShell = readGlassGeometry(geometry);
   cancelMorphAnimations();
   shellState.open = expanded;
@@ -511,8 +520,16 @@ function startMorph(expanded, focusTarget = '') {
   shellState.panel.inert = true;
   shellState.panel.setAttribute('aria-hidden', 'true');
   shellState.fab.setAttribute('aria-expanded', String(expanded));
-  const path = buildMorphPath(currentShell, expanded, geometry);
-  applyMorphShell(currentShell, geometry);
+  const path = overlay
+    ? {
+        duration: Math.round((expanded ? 320 : 260) * Math.abs(Number(expanded) - startProgress)),
+        targetProgress: Number(expanded),
+        frames: [],
+        panelFrames: [],
+        fabFrames: [],
+      }
+    : buildMorphPath(currentShell, expanded, geometry);
+  applyMorphShell(overlay ? geometry.expandedShell : currentShell, geometry);
 
   if (prefersReducedMotion() || path.duration === 0) {
     settleMorph(path.targetProgress, focusTarget);
@@ -526,10 +543,21 @@ function startMorph(expanded, focusTarget = '') {
     easing: 'cubic-bezier(.2, .72, .2, 1)',
     fill: 'forwards',
   };
-  const animation = shellState.glass.animate(path.frames, timing);
-  shellState.rimMorphAnimation = shellState.rim.animate(path.frames, timing);
-  shellState.panelMorphAnimation = shellState.panel.animate(path.panelFrames, timing);
-  shellState.fabMorphAnimation = shellState.fab.animate(path.fabFrames, timing);
+  const animation = overlay
+    ? animateOverlay(
+        shellState.popover,
+        geometry,
+        anchor,
+        startProgress,
+        path.targetProgress,
+        path.duration,
+      )
+    : shellState.glass.animate(path.frames, timing);
+  if (!overlay) {
+    shellState.rimMorphAnimation = shellState.rim.animate(path.frames, timing);
+    shellState.panelMorphAnimation = shellState.panel.animate(path.panelFrames, timing);
+    shellState.fabMorphAnimation = shellState.fab.animate(path.fabFrames, timing);
+  }
   shellState.morphAnimation = animation;
   const animations = [
     animation,
@@ -597,6 +625,7 @@ function panelDragPosition(drag, dx, dy) {
 
 function applyPosition() {
   if (!shellState.popover || !shellState.fab || !shellState.position) return;
+  if (overlayMotionState()) settleMorph(shellState.open ? 1 : 0);
   shellState.position = clampPosition(shellState.position);
   shellState.layout = shellLayout();
   shellState.popover.style.left = `${shellState.layout.left}px`;

@@ -1,5 +1,5 @@
 /* [INPUT]: Feature owners, main ownership, saved placements and the existing capsule/dock.
- * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, and reveal of the existing main window.
+ * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, reveal of the existing main window, and cancellation of motion when changing surfaces.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { mountFeature } from '../workspace/mount';
@@ -11,6 +11,7 @@ import { IS_POPOUT } from '../../shared/constants.js';
 import { emitSignal } from '../../codex/runtime/signals.js';
 import { stopWorkbench } from './legacy.js';
 import { resolveFabExpression } from './shell/shell.js';
+import { cancelMorphAnimations } from './shell/geometry.js';
 import { workbenchHeadHtml } from '../workspace/chrome.js';
 let timer = 0,
   epoch = 0,
@@ -207,8 +208,13 @@ function render(next) {
     independent = true;
     shellState.open = false;
   }
-  primary =
+  const nextPrimary =
     next.mainPlacement || next.features.find((e) => e.placement !== 'edge')?.placement || 'sidebar';
+  if (nextPrimary !== primary && shellState.morphAnimation) {
+    cancelMorphAnimations();
+    shellState.popover.dataset.morphing = 'false';
+  }
+  primary = nextPrimary;
   shellState.layoutMode = primary === 'sidebar' ? 'workbench' : 'capsule';
   shellState.dockStatus = primary === 'sidebar' ? dockValue.status : '';
   shellState.dockRect = primary === 'sidebar' ? dockValue.rect : null;

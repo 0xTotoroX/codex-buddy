@@ -6,7 +6,7 @@
 
 - `main.ts`：带认证的通用窗口入口，根据 surface 路由桌面或贴边。
 - [workspace/AGENTS.md](workspace/AGENTS.md)：公共头部、标签、分栏、比例、临时放大、阅读与草稿交接。
-- [embedded/AGENTS.md](embedded/AGENTS.md)：Codex 内侧栏占位与页面浮层、原胶囊收放和调宽。
+- [embedded/AGENTS.md](embedded/AGENTS.md)：Codex 内侧栏占位、页面浮层曲面收放和调宽，保留原胶囊兼容实现。
 - [desktop/AGENTS.md](desktop/AGENTS.md)：独立桌面窗口与原生尺寸、置顶、往返适配。
 - [edge/AGENTS.md](edge/AGENTS.md)：贴边标签、悬停收放与原生首帧/轮廓适配。
 - [theme/AGENTS.md](theme/AGENTS.md)：各形式主题语义色、材质和内嵌 SVG 液态。

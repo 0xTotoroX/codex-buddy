@@ -3,6 +3,7 @@
  * [POS]: Browser regression; no live tasks or Apple lists.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import assert from 'node:assert/strict';
+import { checkOverlayMotion } from './overlay-motion.mjs';
 export function independentFeatureCases({ mode, syncSettings }) {
   return [
     [
@@ -406,6 +407,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
           await board.getByLabel('新任务标题', { exact: true }).waitFor();
           assert.equal(await outline.count(), 1);
           if (i === 0) {
+            await checkOverlayMotion(page, configureFeature);
             await page.emulateMedia({ reducedMotion: 'no-preference' });
             const face = page.getByRole('button', { name: 'CodexBuddy', exact: true });
             await face.press('Enter');
@@ -713,7 +715,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         });
         await model.getByText('模型快切已停用，请在设置页开启。').waitFor();
         assert.equal(
-          await model.getByRole('button', { name: 'Fast', exact: true }).isDisabled(),
+          await page.getByRole('button', { name: 'Fast', exact: true }).isDisabled(),
           true,
         );
         assert.equal(
@@ -738,7 +740,23 @@ export function independentFeatureCases({ mode, syncSettings }) {
         );
         await page.keyboard.press('Escape');
         assert.equal(await page.locator('.csw-dock-menu').count(), 0);
-        await page.evaluate(() => window.__companionFloatingPanel.destroy());
+        await configureFeature('model', 'overlay');
+        await page.waitForFunction(
+          () =>
+            window.__companionFloatingPanel.state.layoutMode === 'capsule' &&
+            !window.workbenchFixture.features.get('model').pending,
+        );
+        await page.evaluate(() => window.__companionFloatingPanel.setOpen(true));
+        await page.emulateMedia({ reducedMotion: 'no-preference' });
+        const destroyedDuringMotion = await page.evaluate(() => {
+          const runtime = window.__companionFloatingPanel;
+          runtime.setOpen(false);
+          const moving = !!runtime.state.morphAnimation;
+          runtime.destroy();
+          return moving;
+        });
+        assert.equal(destroyedDuringMotion, true);
+        assert.equal(await page.locator('[id^="csw-overlay-warp-"]').count(), 0);
         assert.equal(await page.locator('[data-codex-buddy-features-root]').count(), 0);
         assert.equal(await page.locator('[data-codex-buddy-dock]').count(), 0);
       },
