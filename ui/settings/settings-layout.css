@@ -1,5 +1,5 @@
 /* [INPUT]: Tom Modern visual direction, shared typography and resolved settings theme.
- * [OUTPUT]: Settings-only tokens, compact narrow header and wide sidebar navigation and form rhythm.
+ * [OUTPUT]: Settings-only editorial type, tonal planes, hard shadows and responsive grouped navigation.
  * [POS]: Does not alter the workspace or host theme tokens.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 /* Shared tokens may be emitted after the entry CSS by Vite; specificity keeps both builds aligned. */
@@ -15,9 +15,9 @@ html:root {
   --buddy-focus: #85858f;
   --buddy-subtle: #f1f1f2;
   --buddy-radius-small: 4px;
-  --settings-control-radius: 4px;
+  --settings-control-radius: 2px;
   --settings-control-height: 38px;
-  --settings-menu-shadow: 0 8px 28px #18181b14;
+  --settings-menu-shadow: 4px 4px 0 #27272a12, 0 8px 24px #18181b0a;
   --switch-track: #d7d7dd;
   --notice: #faf6ed;
   --notice-border: #ded5c4;
@@ -26,13 +26,15 @@ html:root {
   --error-border: #e6cccc;
   --error-foreground: #9d5353;
   --settings-orange: #ff5a00;
-  --settings-shadow: 0 4px 18px #00000006;
+  --settings-shadow: 5px 5px 0 #27272a0b;
+  --settings-accent-text: #bd4200;
+  --settings-preview-surface: #f0f0f2;
   --settings-rule: #e2e2e6;
   --settings-top-rule-width: 1px;
-  --settings-selected: #e7e7eb;
-  --settings-selected-text: var(--buddy-text);
+  --settings-selected: #27272a;
+  --settings-selected-text: #fafafa;
   --settings-selected-border: transparent;
-  --settings-switch-on: #5d5d66;
+  --settings-switch-on: #27272a;
   --settings-switch-thumb: var(--buddy-page);
   --settings-glass-highlight: #ffffff65;
   --settings-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -55,15 +57,17 @@ html:root[data-settings-theme='dark'] {
   --error: #302324;
   --error-border: #533536;
   --error-foreground: #ce9191;
-  --settings-shadow: 0 6px 20px #00000018;
-  --settings-menu-shadow: 0 8px 28px #00000040;
+  --settings-shadow: 5px 5px 0 #00000036;
+  --settings-accent-text: #ff9a64;
+  --settings-preview-surface: #202023;
+  --settings-menu-shadow: 4px 4px 0 #00000040, 0 8px 24px #00000020;
   --settings-rule: #3c3c43;
   --settings-top-rule-width: 1px;
-  --settings-selected: #34343b;
-  --settings-selected-text: #eeeeef;
+  --settings-selected: #d9d9de;
+  --settings-selected-text: #202023;
   --settings-selected-border: transparent;
-  --settings-switch-on: #62626c;
-  --settings-switch-thumb: #dedee3;
+  --settings-switch-on: #b9b9c2;
+  --settings-switch-thumb: #252528;
   --settings-glass-highlight: #ffffff1c;
 }
 /* Both themes share spacing and tonal surfaces; transparent rules retain existing geometry. */
@@ -179,7 +183,7 @@ html:root :is(.settings-theme, .settings-choice, .preview-selector) button[aria-
   max-width: calc(100vw - 32px);
   padding: 5px;
   border: 1px solid var(--buddy-border);
-  border-radius: 9px;
+  border-radius: var(--settings-control-radius);
   background: var(--buddy-surface);
   box-shadow: var(--settings-menu-shadow);
 }
@@ -226,7 +230,7 @@ html:root :is(.settings-theme, .settings-choice, .preview-selector) button[aria-
 }
 html:root .settings-search-input {
   min-height: 36px;
-  border-radius: 7px;
+  border-radius: var(--settings-control-radius);
 }
 .settings-search input {
   font-size: 0.875em;
@@ -239,7 +243,7 @@ html:root .settings-search-input {
   font-family: inherit;
 }
 .settings-search ul {
-  border-radius: 9px;
+  border-radius: var(--settings-control-radius);
   border-color: var(--settings-rule);
   box-shadow: var(--settings-menu-shadow);
 }
@@ -286,24 +290,44 @@ html:root .settings-nav {
   padding-top: 30px;
 }
 .settings-page-heading {
-  margin-bottom: 32px;
+  margin-bottom: 30px;
 }
 .settings-title {
   margin: 0 0 8px;
-  font-size: 1.5625em;
-  line-height: 1.2;
+  font-size: 1.85em;
+  line-height: 1.15;
   letter-spacing: -0.045em;
-  font-weight: 650;
+  font-weight: 720;
+}
+.settings-title::after {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 12px;
+  background: var(--settings-orange);
 }
 
 .settings-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(290px, 0.95fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(290px, 0.85fr);
   gap: 32px;
   align-items: start;
 }
 .settings-form-column {
   min-width: 0;
+  padding: 28px;
+  background: var(--buddy-surface);
+  box-shadow: var(--settings-shadow);
+}
+.settings-form-column > :last-child {
+  margin-bottom: 0;
+}
+.settings-form-column .settings-section {
+  border-color: transparent;
+}
+.settings-form-column > .settings-feature-list {
+  margin-bottom: 0;
 }
 
 .settings-app[data-settings-category='surfaces'] .settings-form-column {
@@ -358,7 +382,7 @@ html:root .settings-nav {
   margin: 0;
 }
 .settings-feature-list .settings-row {
-  min-height: 54px;
+  min-height: 58px;
   border-bottom: 1px solid var(--buddy-border);
 }
 .settings-feature-list .settings-field {
@@ -415,8 +439,8 @@ html:root .settings-nav {
   min-width: 0;
   min-height: 40px;
   padding: 7px 8px;
-  border: 1px solid var(--buddy-border);
-  background: var(--buddy-surface);
+  border: 1px solid transparent;
+  background: var(--buddy-subtle);
   font-size: 0.8125em;
   cursor: pointer;
 }
@@ -496,7 +520,7 @@ html:root .settings-nav {
   }
   .settings-title {
     margin: 10px 0 8px;
-    font-size: 1.9em;
+    font-size: 2.35em;
   }
 }
 @media (min-width: 761px) and (max-width: 1190px) {
@@ -619,12 +643,13 @@ html:root .settings-nav {
 .settings-category-links {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 26px;
 }
 .settings-nav-group h2 {
   margin: 0 0 6px;
-  font-size: 0.75em;
-  font-weight: 600;
+  font-size: 0.6875em;
+  font-weight: 550;
+  letter-spacing: 0.08em;
   color: var(--buddy-muted);
 }
 .settings-nav-children {
@@ -633,8 +658,9 @@ html:root .settings-nav {
   gap: 2px;
 }
 .settings-nav .settings-nav-children a {
-  min-height: 32px;
-  padding: 6px 0 6px 12px;
+  position: relative;
+  min-height: 34px;
+  padding: 6px 0 6px 16px;
   font-size: 0.8125em;
 }
 .settings-body:has(> .settings-preview[hidden]) {
@@ -688,5 +714,38 @@ html:root .settings-nav {
   html:root .settings-nav {
     padding-bottom: 12px;
     margin-top: 10px;
+  }
+}
+
+/* Editorial hierarchy comes from type, ink and surfaces, without page grids or dividers. */
+.settings-nav .settings-nav-children a[aria-current='page'] {
+  color: var(--settings-accent-text);
+}
+.settings-nav .settings-nav-children a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  width: 4px;
+  height: 12px;
+  background: var(--settings-orange);
+}
+.settings-feature-switch > label {
+  font-weight: 550;
+}
+@media (max-width: 760px) {
+  .settings-form-column {
+    padding: 22px 20px;
+    box-shadow: 3px 3px 0 color-mix(in srgb, var(--buddy-text) 6%, transparent);
+  }
+  .settings-mobile-groups button[aria-pressed='true'] {
+    color: var(--settings-accent-text);
+  }
+  .settings-nav .settings-nav-children a[aria-current='page']::before {
+    content: none;
+  }
+}
+@media (max-width: 420px) {
+  .settings-form-column {
+    padding: 20px 16px;
   }
 }
