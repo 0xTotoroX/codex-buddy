@@ -202,7 +202,7 @@ function App(){const[active,setActive]=useState(true);window.setActive=setActive
     await page.getByText('2.0%', { exact: true }).waitFor();
     await page.getByRole('img', { name: /Buddy 后台 CPU.*1个采样点/ }).waitFor();
     await page.getByRole('img', { name: /Buddy 后台物理内存.*2个采样点/ }).waitFor();
-    await page.getByText('查看工作明细', { exact: true }).click();
+    await page.getByText('工作明细', { exact: true }).click();
     await page.getByText('聊天检查', { exact: true }).waitFor();
     const beforeResize = requests;
     for (const width of [320, 680, 1100]) {

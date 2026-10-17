@@ -97,18 +97,17 @@ export function PerformanceSettings({ live, active }: { live: boolean; active: b
             disabled={!live || !state || busy}
             onChange={(integrationEnabled) => void save({ integrationEnabled })}
           />
-          <p className="performance-control-note" role="status">
-            <span>
+          {(!state ||
+            !state.preferences.integrationEnabled ||
+            state.connectionStatus !== 'connected') && (
+            <p className="performance-control-note" role="status">
               {!state
                 ? '正在读取…'
                 : !state.preferences.integrationEnabled
                   ? 'Codex 集成已暂停'
-                  : state.connectionStatus === 'connected'
-                    ? '已连接 Codex'
-                    : '已开启，等待连接 Codex'}
-            </span>
-            {' · '}关闭可暂停宿主集成，功能与数据保留。
-          </p>
+                  : '等待连接 Codex'}
+            </p>
+          )}
         </div>
         <Toggle
           label="性能监测"
@@ -125,18 +124,6 @@ export function PerformanceSettings({ live, active }: { live: boolean; active: b
         connected={state?.connectionStatus === 'connected'}
         failed={!!message}
       />
-      <details className="performance-scope">
-        <summary>这些读数如何计算</summary>
-        <p>
-          CPU 100%
-          表示占用一个核心；后台内存不含独立窗口。宿主内耗时仅覆盖已计时的同步工作，整页内存和长任务包含
-          Codex 自身。
-        </p>
-        <p>
-          本页可见时每 5 秒读取，离开后最多 12
-          秒停止宿主计时。历史仅在本页内存中保留，关闭监测后清空。暂停集成保留独立任务窗口和提醒事项同步。
-        </p>
-      </details>
     </section>
   );
 }

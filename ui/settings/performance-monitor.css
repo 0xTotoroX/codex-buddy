@@ -1,18 +1,18 @@
 /* [INPUT]: 监视窗语义结构、数值比例与系统减少动态效果偏好。
- * [OUTPUT]: 隔离的深色仪表、轻量 SVG 走势与窄屏布局；无常驻动画。
+ * [OUTPUT]: 跟随设置主题的仪表、轻量 SVG 走势与窄屏布局；无常驻动画。
  * [POS]: 仅设置性能页使用，不改变宿主或其余设置页主题。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 .performance-dashboard {
-  --monitor-bg: #191c20;
-  --monitor-text: #f2f4f5;
-  --monitor-muted: #a6afb8;
-  --monitor-line: #ffffff12;
+  --monitor-bg: var(--buddy-surface);
+  --monitor-text: var(--buddy-text);
+  --monitor-muted: var(--buddy-muted);
+  --monitor-line: var(--buddy-border);
   color: var(--monitor-text);
   background: var(--monitor-bg);
-  border: 1px solid #ffffff13;
-  border-radius: 12px;
+  border: 1px solid var(--buddy-border);
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 8px 24px #0000000c;
+  box-shadow: var(--settings-shadow);
   container-type: inline-size;
   container-name: monitor;
   font-variant-numeric: tabular-nums;
@@ -28,42 +28,10 @@
   color: inherit;
   line-height: 1.5;
 }
-.performance-monitor-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--monitor-line);
-}
-.performance-monitor-head > div {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-}
-.performance-monitor-head strong {
+.performance-dashboard .performance-status {
+  padding: 16px 22px 0;
   font-size: 14px;
-  font-weight: 600;
-}
-.performance-status,
-.performance-cadence {
-  font-size: 12px;
   color: var(--monitor-muted);
-}
-.performance-cadence {
-  white-space: nowrap;
-}
-.performance-indicator {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #737b84;
-  flex: 0 0 auto;
-}
-.performance-indicator[data-running='true'] {
-  background: #8ed7b9;
-  box-shadow: 0 0 0 4px #8ed7b912;
 }
 .performance-primary {
   display: grid;
@@ -72,22 +40,17 @@
 .performance-instrument {
   padding: 22px 22px 16px;
   min-width: 0;
-  --chart-color: #ffae81;
+  --chart-color: var(--settings-accent-text);
 }
 .performance-instrument + .performance-instrument {
   border-left: 1px solid var(--monitor-line);
-  --chart-color: #8bcacb;
+  --chart-color: var(--buddy-text);
 }
 .performance-instrument-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-}
-.performance-instrument-title > span {
-  color: var(--monitor-muted);
-  font-size: 12px;
-  white-space: nowrap;
 }
 .performance-value-row {
   display: flex;
@@ -123,7 +86,7 @@
   stroke-width: 3;
 }
 .performance-dial-track {
-  stroke: #ffffff12;
+  stroke: var(--buddy-subtle);
 }
 .performance-dial-value {
   stroke: currentColor;
@@ -163,16 +126,9 @@
   vector-effect: non-scaling-stroke;
 }
 .performance-chart-foot {
-  display: flex;
-  justify-content: space-between;
   color: var(--monitor-muted);
-  font-size: 11px;
+  font-size: 12px;
   margin-top: 7px;
-}
-.performance-dashboard .performance-empty {
-  padding: 0 22px 18px;
-  color: var(--monitor-muted);
-  font-size: 13px;
 }
 .performance-host-work {
   display: grid;
@@ -181,11 +137,6 @@
   padding: 22px;
   border-top: 1px solid var(--monitor-line);
   align-items: center;
-}
-.performance-host-work > div > p {
-  color: var(--monitor-muted);
-  font-size: 12px;
-  margin-top: 3px;
 }
 .performance-work-value {
   font-size: 25px;
@@ -200,19 +151,19 @@
 .performance-work-track {
   height: 4px;
   border-radius: 2px;
-  background: #ffffff10;
+  background: var(--buddy-subtle);
   overflow: hidden;
   grid-column: 1 / -1;
 }
 .performance-work-track > div {
   height: 100%;
-  background: #c0cbd4;
+  background: var(--buddy-muted);
   transform-origin: left;
   transition: transform 240ms ease-out;
 }
 .performance-host {
   padding: 20px 22px;
-  background: #ffffff03;
+  background: transparent;
   border-top: 1px solid var(--monitor-line);
 }
 .performance-host-heading {
@@ -221,10 +172,6 @@
   justify-content: space-between;
   align-items: baseline;
   flex-wrap: wrap;
-}
-.performance-host-heading > span {
-  font-size: 12px;
-  color: var(--monitor-muted);
 }
 .performance-host-metrics {
   display: grid;
@@ -253,7 +200,7 @@
   color: var(--monitor-muted);
 }
 .performance-host-metrics [data-alert='true'] {
-  color: #ffae81;
+  color: var(--settings-accent-text);
 }
 .performance-events {
   display: flex;
@@ -266,22 +213,13 @@
   flex: 1 1 0;
   min-width: 0;
   border-radius: 1px;
-  background: #ffffff12;
+  background: var(--buddy-subtle);
 }
 .performance-events > [data-known='true'] {
-  background: #7f8f9d;
+  background: var(--buddy-muted);
 }
 .performance-events > [data-event='true'] {
-  background: #ffae81;
-}
-.performance-monitor-foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 14px 22px;
-  font-size: 11px;
-  color: var(--monitor-muted);
-  border-top: 1px solid var(--monitor-line);
+  background: var(--settings-accent-text);
 }
 .performance-details {
   padding: 16px 22px 20px;
@@ -293,7 +231,7 @@
   width: fit-content;
 }
 .performance-details summary:focus-visible {
-  outline: 2px solid #aab9c5;
+  outline: 2px solid var(--buddy-focus);
   outline-offset: 5px;
   border-radius: 2px;
 }
@@ -317,7 +255,7 @@
   white-space: nowrap;
 }
 .performance-mini-track {
-  background: #ffffff0c;
+  background: var(--buddy-subtle);
   height: 3px;
   margin-top: 9px;
   overflow: hidden;
@@ -325,15 +263,9 @@
 .performance-mini-track span {
   display: block;
   height: 100%;
-  background: #93a7b5;
+  background: var(--buddy-muted);
   transform-origin: left;
   transition: transform 240ms ease-out;
-}
-.performance-scope {
-  margin-top: 14px;
-  color: var(--buddy-muted);
-  font-size: 12px;
-  line-height: 1.7;
 }
 .performance-controls {
   display: grid;
@@ -353,7 +285,6 @@
     border-left: 0;
     border-top: 1px solid var(--monitor-line);
   }
-  .performance-monitor-head,
   .performance-host,
   .performance-host-work,
   .performance-instrument {
@@ -367,12 +298,6 @@
   }
   .performance-trend > svg {
     height: 68px;
-  }
-  .performance-monitor-head > div {
-    gap: 6px;
-  }
-  .performance-cadence > span {
-    display: none;
   }
   .performance-host-work {
     grid-template-columns: 1fr;
@@ -389,10 +314,6 @@
   }
   .performance-host-metrics > div > span {
     font-size: 11px;
-  }
-  .performance-monitor-foot {
-    padding: 14px 16px;
-    flex-wrap: wrap;
   }
   .performance-details {
     padding: 16px;

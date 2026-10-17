@@ -87,10 +87,7 @@ function Trend({
           </g>
         )}
       </svg>
-      <div className="performance-chart-foot">
-        <span>−{minutes} 分钟</span>
-        <span>{history.length ? '最新样本' : '等待采样'}</span>
-      </div>
+      <div className="performance-chart-foot">最近 {minutes} 分钟</div>
     </div>
   );
 }
@@ -143,22 +140,15 @@ export function PerformanceMonitor({
   const maxTasks = Math.max(1, ...ticks.map((point) => point.longTasks ?? 0));
   return (
     <div className="performance-dashboard" data-paused={!enabled} aria-label="运行监视器">
-      <header className="performance-monitor-head">
-        <div>
-          <span className="performance-indicator" data-running={enabled && active && !!current} />
-          <strong>运行监视器</strong>
-          <span className="performance-status">{status}</span>
-        </div>
-        <span className="performance-cadence">
-          {current ? clock(current.sampledAt) : '—'}
-          <span> · 5 秒</span>
-        </span>
-      </header>
+      {(!enabled || failed || !active || !current) && (
+        <p className="performance-status" role="status">
+          {status}
+        </p>
+      )}
       <div className="performance-primary" aria-label="性能读数">
         <section className="performance-instrument" data-metric="cpu" aria-label="Buddy 后台 CPU">
           <div className="performance-instrument-title">
-            <h3>后台 CPU</h3>
-            <span>单核 100%</span>
+            <h3 title="Buddy 后台进程；100% 表示占用一个核心">Buddy CPU</h3>
           </div>
           <div className="performance-value-row">
             <p className="performance-value">
@@ -181,13 +171,6 @@ export function PerformanceMonitor({
                 pathLength="100"
                 strokeDasharray={`${Math.min(cpu ?? 0, 100)} 100`}
               />
-              <path
-                d="M24 33h5l3-9 4 16 3-7h4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                opacity=".65"
-              />
             </svg>
           </div>
           <Trend history={points} metric="cpu" ceiling={cpuCeiling} unit="%" />
@@ -198,8 +181,7 @@ export function PerformanceMonitor({
           aria-label="Buddy 后台物理内存"
         >
           <div className="performance-instrument-title">
-            <h3>物理内存</h3>
-            <span>Buddy 后台</span>
+            <h3 title="Buddy 后台物理内存，不含独立窗口">Buddy 内存</h3>
           </div>
           <div className="performance-value-row">
             <p className="performance-value">
@@ -210,16 +192,9 @@ export function PerformanceMonitor({
           <Trend history={points} metric="memory" ceiling={memoryCeiling} unit=" MB" />
         </section>
       </div>
-      {!enabled && <p className="performance-empty">开启上方“性能监测”，开始记录实时走势。</p>}
-      {enabled && !failed && cpu === null && (
-        <p className="performance-empty">
-          {current ? '等待下一次采样，计算 CPU 用量。' : '正在等待性能数据…'}
-        </p>
-      )}
       <div className="performance-host-work">
         <div>
-          <h3>Buddy 在宿主内的已测工作</h3>
-          <p>已计时的同步工作</p>
+          <h3 title="仅统计 Buddy 在 Codex 页面内已计时的同步工作">Buddy 页面耗时</h3>
         </div>
         <p className="performance-work-value">
           {host ? host.busyMs.toFixed(1) : '—'}
@@ -235,8 +210,7 @@ export function PerformanceMonitor({
       </div>
       <section className="performance-host" aria-label="Codex 整页指标">
         <div className="performance-host-heading">
-          <h3>Codex 整页</h3>
-          <span>包含 Codex 自身，非 Buddy 独占</span>
+          <h3 title="包含 Codex 自身，不能视为 Buddy 独占">Codex 整页</h3>
         </div>
         <div className="performance-host-metrics">
           <div>
@@ -247,7 +221,7 @@ export function PerformanceMonitor({
             </strong>
           </div>
           <div>
-            <span>长任务 · 超过 50 ms</span>
+            <span title="执行超过 50 ms 的页面任务">长任务</span>
             <strong data-alert={!!host?.hostLongTasks}>
               {host ? host.hostLongTasks : '—'}
               <small> 次</small>
@@ -286,13 +260,10 @@ export function PerformanceMonitor({
           })}
         </div>
       </section>
-      <footer className="performance-monitor-foot">
-        <span>本页记录 · 最多 5 分钟</span>
-        <span>隐藏后停止请求</span>
-      </footer>
+
       {host && (
         <details className="performance-details">
-          <summary>查看工作明细</summary>
+          <summary>工作明细</summary>
           <div className="performance-work-list">
             {work.map((item) => (
               <div className="performance-work-item" key={item.label}>
