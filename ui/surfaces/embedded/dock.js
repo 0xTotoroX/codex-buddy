@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已识别的 Codex 主内容、标签页与前景聊天布局、期望侧栏宽度和开合状态。
- * [OUTPUT]: dockWidthLimit 提供聊天实际可用宽度，自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；收起占位归零，宿主不可用时仅保留左栏入口，不创建提示或替代菜单。
+ * [OUTPUT]: dockWidthLimit 提供聊天实际可用宽度，自有根节点挂载、可撤销布局占位、含回程锚点的几何通知与临时让位状态；缩放下将屏幕顶部留白换算为局部尺寸；收起占位归零，宿主不可用时仅保留左栏入口，不创建提示或替代菜单。
  * [POS]: 宿主布局适配；不移动聊天节点，不读取正文，不包含功能视图。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -178,7 +178,8 @@ export function createDock(onChange, beforeMove = () => {}) {
     if (slot.style.width !== `${width}px`) slot.style.width = `${width}px`;
     slot.dataset.reason = enough ? '' : 'space';
     const rect = slot.getBoundingClientRect();
-    slot.style.setProperty('--csw-dock-inset', `${Math.max(0, 48 - rect.top)}px`);
+    const scaleY = slot.offsetHeight > 0 ? rect.height / slot.offsetHeight : 1;
+    slot.style.setProperty('--csw-dock-inset', `${Math.max(0, 48 - rect.top) / scaleY}px`);
     // 确认宿主真的让出了空间；失败时撤销，不用浮层冒充停靠。
     if (
       host.content.getBoundingClientRect().right > rect.left + 1 ||

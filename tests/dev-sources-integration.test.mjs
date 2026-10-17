@@ -38,7 +38,7 @@ test(
     const base = realpathSync(mkdtempSync(join(tmpdir(), 'buddy-source-flow-')));
     const project = resolve(import.meta.dirname, '..');
     const fetch = (url, options = {}) =>
-      globalThis.fetch(url, { ...options, signal: AbortSignal.timeout(20000) });
+      globalThis.fetch(url, { ...options, signal: options.signal || AbortSignal.timeout(20000) });
     const main = join(base, 'main'),
       other = join(base, 'Stepwise'),
       bin = join(base, 'bin');
@@ -180,6 +180,7 @@ test(
       const send = (path, body) =>
         fetch(session.url + '/api/' + path, {
           method: body ? 'POST' : 'GET',
+          signal: AbortSignal.timeout(body && path === 'dev/sources' ? 60000 : 20000),
           headers: { Authorization: `Bearer ${session.token}`, 'Content-Type': 'application/json' },
           body: body ? JSON.stringify(body) : undefined,
         });
@@ -235,16 +236,20 @@ test(
         /__buddy_dev.js/,
         'selector supplied to older source too',
       );
+      // Token CSS also queues a native rebuild. Allow that serialized pipeline
+      // under the four-worker check run, while still requiring a new revision and readback.
       const revision = readRecord(join(other, 'target/dev/panel.json')).revision;
       appendFileSync(join(other, 'ui/shared/tokens.css'), '\n:root { --fixture-change: 1; }');
       await until(
         () => readRecord(join(other, 'target/dev/panel.json')).revision !== revision,
         'selected worktree hot update',
+        45000,
       );
       // Snapshot publication precedes backend application; wait for the same real readback gate.
       await until(
         async () => (await (await send('dev/sources')).json()).loaded === true,
         'selected worktree hot update applied',
+        45000,
       );
       // Render the complete React page together with the injected source selector.
       stage = 'launch pinned browser';
@@ -287,14 +292,10 @@ test(
               path.startsWith('/api/')
             )
               return;
-            if (duringSwitch && path.startsWith('/api/')) {
-              const body = await response.json().catch(() => null);
-              if (
-                response.status() === 503 &&
-                ['开发来源正在切换，请等待完成。', '开发后台正在重启'].includes(body?.message)
-              )
-                return;
-            }
+            // A switched-away document can keep CDP response.body pending until
+            // teardown. The gateway uses 503 only while switching/restarting;
+            // inspect its status here and verify body semantics in dev-proxy tests.
+            if (duringSwitch && path.startsWith('/api/') && response.status() === 503) return;
             errors.push(
               `HTTP ${response.status()} ${path} (switching=${duringSwitch}, oldSource=${oldSource})`,
             );
@@ -304,13 +305,12 @@ test(
       stage = 'render complete settings';
       await page.goto(`${session.url}/#token=${session.token}`);
       const navigation = page.getByRole('navigation', { name: '设置分类' });
-      await page.getByRole('heading', { name: '设置', exact: true }).waitFor({ state: 'attached' });
-      await page.getByRole('button', { name: '详细设置', exact: true }).click();
-      await navigation.getByRole('link', { name: '功能与交互', exact: true }).click();
+      await page.getByRole('heading', { name: '常用开关', exact: true }).waitFor();
+      await navigation.getByRole('link', { name: '常用开关', exact: true }).click();
       const outlineSwitch = page.getByRole('switch', { name: '启用大纲', exact: true });
       await outlineSwitch.waitFor();
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings controls must be usable');
-      await navigation.getByRole('link', { name: '启动与开发', exact: true }).click();
+      await navigation.getByRole('link', { name: '开发来源', exact: true }).click();
       await page.getByText(/开发来源 · Stepwise/).waitFor();
       await Promise.all(responseChecks);
       assert.deepEqual(errors, [], 'complete settings page must render without React errors');
@@ -340,7 +340,7 @@ test(
       switchingSource = false;
       assert.notEqual(readRecord(join(main, 'target/dev/session.json')).sourceEpoch, previousEpoch);
       stage = 'check switched settings usability';
-      await navigation.getByRole('link', { name: '功能与交互', exact: true }).click();
+      await navigation.getByRole('link', { name: '常用开关', exact: true }).click();
       await outlineSwitch.waitFor();
       await until(() => outlineSwitch.isEnabled(), 'settings remain usable after switching');
       assert.equal(await outlineSwitch.isEnabled(), true, 'settings remain usable after switching');
@@ -366,7 +366,7 @@ test(
         200,
         'current page automatically includes its source identity',
       );
-      await navigation.getByRole('link', { name: '启动与开发', exact: true }).click();
+      await navigation.getByRole('link', { name: '开发来源', exact: true }).click();
       mkdirSync(join(project, 'target/reports'), { recursive: true });
       await page.screenshot({ path: join(project, 'target/reports/dev-source-selector.png') });
       stage = 'check missing and expired credentials';
@@ -378,10 +378,9 @@ test(
       await unauthenticated.close();
       const expired = await browser.newPage();
       await expired.goto(`${session.url}/#token=expired`);
-      await expired.getByRole('button', { name: '详细设置', exact: true }).click();
       await expired
         .getByRole('navigation', { name: '设置分类' })
-        .getByRole('link', { name: '启动与开发', exact: true })
+        .getByRole('link', { name: '开发来源', exact: true })
         .click();
       await expired.getByText('开发来源 · 无法连接', { exact: true }).waitFor();
       await expired.getByRole('alert').filter({ hasText: '设置连接已过期' }).waitFor();

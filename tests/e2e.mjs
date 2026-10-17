@@ -58,7 +58,7 @@ async function selectSettingsCategory(page, id) {
   )
     ? '功能'
     : id === 'model'
-      ? '生成'
+      ? '模型'
       : ['surfaces', 'appearance'].includes(id)
         ? '界面'
         : '系统';
@@ -120,6 +120,7 @@ async function checkSettingsNavigation(page, context, base, runtime) {
   assert.equal(await group.inputValue(), '尚未保存的分组名称');
   await page.evaluate(() => (location.hash = 'settings-limits'));
   await page.getByLabel('输入上下文', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
   const gated = await context.newPage();
   await gated.route('**/api/settings', async (route) => {
     const response = await route.fetch();
@@ -408,7 +409,7 @@ try {
     };
     for (const [id, name] of [
       ['outline', '大纲'],
-      ['next', '下一步'],
+      ['next', '下一步建议'],
       ['board', '看板'],
       ['model', '模型切换'],
     ]) {
@@ -825,13 +826,19 @@ try {
     await switchView('outline');
     const outlineButtons = desktop.locator('.csw-outline-row');
     if ((await outlineButtons.count()) === 0) throw new Error('Outline buttons missing');
+    // Observe the real transient highlight before clicking: a delayed CDP reply
+    // must not make an already completed flash look like a missing highlight.
+    await desktop.evaluate(() => {
+      window.outlineFlashObserved = false;
+      window.outlineFlashObserver = new MutationObserver(() => {
+        const target = document.querySelector('.companion-stepwise-outline-target-flash');
+        if (target?.getBoundingClientRect().height) window.outlineFlashObserved = true;
+      });
+      window.outlineFlashObserver.observe(document.body, { attributes: true, subtree: true });
+    });
     await outlineButtons.nth(1).click();
-    await delay(800);
-    assert.ok(
-      await desktop.evaluate(() =>
-        document.querySelector('.companion-stepwise-outline-target-flash'),
-      ),
-    );
+    await desktop.waitForFunction(() => window.outlineFlashObserved);
+    await desktop.evaluate(() => window.outlineFlashObserver.disconnect());
     assert.ok(!(await panelState()).outline.some((item) => item.text.includes('代码中的')));
     record('原有大纲解析、去重、定位与原文高亮');
 
@@ -1095,10 +1102,11 @@ try {
     );
     await checkSettingsNavigation(page, context, base, runtime);
     await page.getByRole('link', { name: '生成模型', exact: true }).click();
-    await page.getByText('高级生成设置', { exact: true }).click();
-
+    await page.getByText('密钥已配置', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '更换密钥', exact: true }).click();
     assert.equal(await page.getByLabel('API 密钥', { exact: true }).inputValue(), '');
-    await selectSettingsCategory(page, 'features');
+    await page.getByRole('button', { name: '取消更换', exact: true }).click();
+    await selectSettingsCategory(page, 'next');
     await page.getByLabel('最多建议数量').fill('3');
     await page.getByRole('button', { name: '保存设置', exact: true }).click();
     await waitFor(async () => (await settings()).maxItems === 3, 'Web settings were not saved');
@@ -1106,17 +1114,19 @@ try {
     assert.equal(JSON.parse(readFileSync(join(dataDir, 'config.json'))).unrelatedOption.keep, true);
     assert.equal(statSync(join(dataDir, 'secrets.json')).mode & 0o777, 0o600);
     await selectSettingsCategory(page, 'model');
-    await page.getByRole('button', { name: '读取模型', exact: true }).click();
+    await page.getByRole('button', { name: '选择模型', exact: true }).click();
     await waitFor(
-      async () => (await page.locator('#available-models option').count()) === 2,
+      async () =>
+        (await page.getByRole('listbox', { name: '选择模型' }).getByRole('option').count()) === 2,
       'Models list did not load',
     );
+    await page.getByRole('combobox', { name: '模型名称', exact: true }).press('Escape');
     await page.getByRole('button', { name: '测试连接', exact: true }).click();
-    await page.getByText('连接正常，已生成 3 条测试建议。', { exact: true }).waitFor();
+    await page.getByText(/^连接成功 · .* · 已生成 3 条测试建议。$/).waitFor();
     record('网页保存、模型列表、连接测试、密钥保留与私有权限');
     const appearanceBefore = (await api('appearance')).body;
     // Themes belong to surfaces; legacy panel appearance remains compatible but is not edited here.
-    await page.getByRole('link', { name: '布局与位置', exact: true }).click();
+    await page.getByRole('link', { name: '外观与字体', exact: true }).click();
     const surfaceBefore = (await api('surfaces', { op: 'state' })).body;
     const theme = page.getByLabel('侧栏主题', { exact: true });
     await theme.selectOption('native-glass');
@@ -1142,7 +1152,7 @@ try {
       theme: surfaceBefore.preferences.themes.sidebar,
     });
     await page.screenshot({ path: join(output, 'settings-single-liquid.png') });
-    await selectSettingsCategory(page, 'features');
+    await selectSettingsCategory(page, 'next');
     await page.getByLabel('指令执行模式', { exact: true }).selectOption('hybrid');
     await waitFor(
       async () => (await panelState()).clickMode === 'hybrid',
@@ -1160,8 +1170,7 @@ try {
       ui: { material: 'frosted' },
     });
     assert.notEqual(staleAppearance.status, 200);
-    await page.getByRole('link', { name: '布局与位置', exact: true }).click();
-    await page.locator('#settings-fonts summary').click();
+    await page.getByRole('link', { name: '外观与字体', exact: true }).click();
     await page.getByLabel('字体大小', { exact: true }).selectOption('custom');
     await page.getByLabel('自定义字号（px）', { exact: true }).fill('18');
     await page.getByLabel('自定义字号（px）', { exact: true }).blur();

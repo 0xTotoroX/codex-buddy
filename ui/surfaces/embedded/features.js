@@ -1,6 +1,6 @@
 import { measureWork } from '../../shared/performance.js';
 /* [INPUT]: Feature owners, main ownership, saved placements and the existing capsule/dock.
- * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, reveal of the existing main window, and cancellation of motion when changing surfaces.
+ * [OUTPUT]: Business views inside the original shell, geometry refresh on dock changes, window round trips retaining the departure state, reveal of the existing main window, and cancellation of motion when changing surfaces.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { mountFeature } from '../workspace/mount';
@@ -170,10 +170,11 @@ function updateDock() {
     dock = createDock((value) => {
       dockValue = value;
       if (primary === 'sidebar') {
-        const changed = shellState.dockStatus !== value.status;
         shellState.dockStatus = value.status;
         shellState.dockRect = value.rect;
-        if (changed) emitSignal('render', undefined);
+        // createDock already deduplicates geometry; a resize needs shell layout even
+        // when the business state and the dock's open status remain unchanged.
+        emitSignal('render', undefined);
       }
     });
   if (!dock) return;

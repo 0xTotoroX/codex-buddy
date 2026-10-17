@@ -245,17 +245,33 @@ export function independentFeatureCases({ mode, syncSettings }) {
           await page.evaluate((zoom) => {
             document.querySelector('.workspace').style.zoom = zoom;
           }, zoom);
-          await page.waitForFunction(() => {
-            const slot = document.querySelector('[data-codex-buddy-dock]');
-            const panel = slot?.querySelector('.csw-panel');
-            if (!panel) return false;
-            const available = slot.getBoundingClientRect();
-            const actual = panel.getBoundingClientRect();
-            return (
-              Math.abs(actual.width - available.width) < 2 &&
-              Math.abs(actual.bottom - available.bottom) < 2
-            );
-          });
+          await page
+            .waitForFunction(() => {
+              const slot = document.querySelector('[data-codex-buddy-dock]');
+              const panel = slot?.querySelector('.csw-panel');
+              if (!panel) return false;
+              const available = slot.getBoundingClientRect();
+              const actual = panel.getBoundingClientRect();
+              return (
+                Math.abs(actual.width - available.width) < 2 &&
+                Math.abs(actual.top - Math.max(available.top, 48)) < 2 &&
+                Math.abs(actual.bottom - available.bottom) < 2
+              );
+            })
+            .catch(async (error) => {
+              const geometry = await page.evaluate(() => {
+                const slot = document.querySelector('[data-codex-buddy-dock]');
+                const panel = slot?.querySelector('.csw-panel');
+                return {
+                  slot: slot?.getBoundingClientRect().toJSON(),
+                  panel: panel?.getBoundingClientRect().toJSON(),
+                  style: panel?.getAttribute('style'),
+                };
+              });
+              throw new Error(`Dock geometry at zoom ${zoom}: ${JSON.stringify(geometry)}`, {
+                cause: error,
+              });
+            });
           const title = await outline.locator('.csw-empty-title').boundingBox();
           const pane = await page.locator('.csw-workbench-pane[data-pane="outline"]').boundingBox();
           const area = await outline.locator('.feature-projection').boundingBox();
@@ -512,7 +528,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
           .getByRole('button', { name: '重新生成建议', exact: true })
           .boundingBox();
         const nextTabBox = await page
-          .getByRole('tab', { name: '下一步', exact: true })
+          .getByRole('tab', { name: '下一步建议', exact: true })
           .boundingBox();
         assert.ok(
           Math.abs(
@@ -713,7 +729,7 @@ export function independentFeatureCases({ mode, syncSettings }) {
         await page.evaluate(() => {
           window.workbenchFixture.modelState.preferences.enabled = false;
         });
-        await model.getByText('模型快切已停用，请在设置页开启。').waitFor();
+        await model.getByText('模型切换已停用，请在设置页开启。').waitFor();
         assert.equal(
           await page.getByRole('button', { name: 'Fast', exact: true }).isDisabled(),
           true,

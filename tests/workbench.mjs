@@ -678,7 +678,7 @@ const cases = [
           });
         });
         await settle(page);
-        await startDrag('下一步', '[data-pane="outline"]', true);
+        await startDrag('下一步建议', '[data-pane="outline"]', true);
         assert.equal(
           await scope.locator('.csw-drop-preview').isVisible(),
           false,

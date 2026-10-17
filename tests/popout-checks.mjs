@@ -538,11 +538,16 @@ export async function checkPopout({
     await waitFor(async () => (await state()).count === 4, 'Generation from popout failed');
     record('大纲回到关联宿主定位，回答变化拒绝旧操作并从桌面窗口重新生成');
 
+    const pinnedBefore = (await api('appearance')).body.alwaysOnTop;
     await pop.locator('.csw-layout-menu summary').evaluate((node) => node.click());
     await pop.locator('[data-action="pin"]').evaluate((node) => node.click());
     await waitFor(
-      () => JSON.parse(readFileSync(join(dataDir, 'panel.json'))).alwaysOnTop,
-      'Pin setting not saved',
+      () => JSON.parse(readFileSync(join(dataDir, 'panel.json'))).alwaysOnTop === !pinnedBefore,
+      'Pin toggle not saved',
+    );
+    await waitFor(
+      () => native.findLast((message) => message.kind === 'pin')?.value === !pinnedBefore,
+      'Pin toggle did not reach native window',
     );
     await pop.locator('.csw-head').hover();
     await showWorkbenchView(pop, 'settings');

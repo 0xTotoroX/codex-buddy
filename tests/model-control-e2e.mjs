@@ -492,7 +492,7 @@ try {
     assert.deepEqual(restored.pinned, preserved.pinned);
     assert.deepEqual(restored.presets, preserved.presets);
     assert.deepEqual(restored.modelOrder, preserved.modelOrder);
-    await modelSettings.getByRole('button', { name: '删除分组', exact: true }).click();
+    await modelSettings.getByRole('button', { name: '删除分组 合成分组', exact: true }).click();
     await modelSettings
       .locator('.settings-key-dialog[open]')
       .getByRole('button', { name: '确认删除', exact: true })
@@ -523,8 +523,8 @@ try {
     .click();
   const section = settingsPage.locator('#settings-surfaces');
   const themeControl = async (placement, label) => {
-    const details = section.locator(`#theme-${placement}`);
-    if (!(await details.evaluate((node) => node.open))) await details.locator('summary').click();
+    await settingsPage.getByRole('link', { name: '外观与字体', exact: true }).click();
+    await section.locator(`#theme-${placement}`).waitFor();
     return settingsPage.getByLabel(`${label}主题`, { exact: true });
   };
   const surfaceState = async () => (await request('surfaces', { op: 'state' })).body;
@@ -555,7 +555,7 @@ try {
     async () => (await surfaceState()).preferences.themes.edge.liquidVariant === 'clear',
     'variant saves',
   );
-  await section.locator('#edge-position > summary').click();
+  await settingsPage.getByRole('link', { name: '布局与位置', exact: true }).click();
   await settingsPage.getByLabel('贴边边缘', { exact: true }).selectOption('left');
   await waitFor(async () => (await surfaceState()).preferences.edge.edge === 'left', 'edge saves');
   const position = settingsPage.getByLabel('贴边位置', { exact: true });
@@ -585,6 +585,7 @@ try {
   );
   assert.deepEqual((await request('state')).body.panelPreferences, beforeAppearance);
   assert.deepEqual((await api('state')).preferences, beforeModel);
+  await settingsPage.getByRole('link', { name: '布局与位置', exact: true }).click();
   await settingsPage
     .getByRole('group', { name: '主界面形式', exact: true })
     .getByRole('button', { name: '页面浮层', exact: true })

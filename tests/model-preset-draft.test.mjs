@@ -1,5 +1,5 @@
 /* [INPUT]: Real FeatureView/ModelView with synthetic owner handoff and model preferences.
- * [OUTPUT]: Creation/rename drafts survive remount, failed saves and current-model changes; clearing is synchronous.
+ * [OUTPUT]: Immediate preset creation and legacy creation/rename drafts survive remount, failed saves and current-model changes; clearing is synchronous.
  * [POS]: Isolated browser regression; no native windows, real host or model requests.
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。 */
 import test from 'node:test';
@@ -21,6 +21,7 @@ window.alpha={model:'alpha',reasoning:'high',speed:'fast'};
 window.beta={model:'beta',reasoning:'low',speed:'standard'};
 window.model={revision:1,preferences:{enabled:true,pinned:['alpha','beta'],presets:[{id:'existing',name:'原名称',selection:window.alpha}]},snapshot:{target:{id:'chat'},revision:'r1',status:'ready',message:'',current:window.alpha,models:[{id:'alpha',label:'Alpha',reasoning:['high'],fast:true},{id:'beta',label:'Beta',reasoning:['low'],fast:false}]}};
 window.entry={id:'model',owner:'owner-1',placement:'sidebar',open:true,pending:null,view:{},size:[500,400],reveal:0};
+if(window.legacyDraft) window.entry.view.modelPresetDraft={id:'legacy-create',name:'',selection:window.alpha,creating:true};
 const notify=()=>{};
 const request=async(input)=>{
   window.calls.push(structuredClone(input));
@@ -65,7 +66,7 @@ window.mount();`,
   })
 ).outputFiles[0].text;
 
-async function fixture(browser) {
+async function fixture(browser, legacyDraft = false) {
   const page = await browser.newPage();
   await page.route('http://localhost:19991/**', (route) =>
     route.fulfill({
@@ -74,8 +75,9 @@ async function fixture(browser) {
     }),
   );
   await page.goto('http://localhost:19991/');
+  if (legacyDraft) await page.evaluate(() => (window.legacyDraft = true));
   await page.addScriptTag({ content: bundle });
-  await page.getByRole('button', { name: '保存预设', exact: true }).waitFor();
+  await page.getByRole('button', { name: '添加预设', exact: true }).waitFor();
   return page;
 }
 async function move(page) {
@@ -85,16 +87,15 @@ async function move(page) {
   );
   const captured = await page.evaluate(() => window.calls.findLast((c) => c.op === 'handoff'));
   await page.evaluate(() => window.finishMove());
-  await page.getByRole('button', { name: '保存预设', exact: true }).waitFor();
+  await page.getByRole('button', { name: '添加预设', exact: true }).waitFor();
   return captured.view;
 }
 
-test('new preset draft survives owner handoff, failure, model changes and immediate unmount', async () => {
+test('legacy preset creation draft survives owner handoff, failure, model changes and immediate unmount', async () => {
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await fixture(browser);
+    const page = await fixture(browser, true);
     const input = page.getByRole('textbox', { name: '预设名称' });
-    await page.getByRole('button', { name: '保存预设', exact: true }).click();
     await input.fill('新增草稿');
     const first = (await move(page)).modelPresetDraft;
     assert.equal(first.name, '新增草稿');
@@ -135,8 +136,8 @@ test('rename draft retains identity and captured selection; cancel and Escape cl
   try {
     const page = await fixture(browser);
     const input = page.getByRole('textbox', { name: '预设名称' });
-    await page.getByRole('button', { name: '模型工具', exact: true }).click();
-    await page.getByRole('button', { name: '重命名预设 原名称' }).click();
+    await page.getByRole('button', { name: '编辑预设', exact: true }).click();
+    await page.getByRole('button', { name: '原名称', exact: true }).click();
     await input.fill('改名草稿');
     const draft = (await move(page)).modelPresetDraft;
     assert.deepEqual(draft, {
@@ -154,12 +155,12 @@ test('rename draft retains identity and captured selection; cancel and Escape cl
     assert.equal((await move(page)).modelPresetDraft, undefined);
     assert.equal(await input.count(), 0);
     assert.equal(await page.evaluate(() => window.model.preferences.presets[0].name), '原名称');
-    await page.getByRole('button', { name: '保存预设', exact: true }).click();
-    await input.fill('取消创建');
+    await page.getByRole('button', { name: '原名称', exact: true }).click();
+    await input.fill('取消改名');
     await input.press('Escape');
     assert.equal((await move(page)).modelPresetDraft, undefined);
     assert.equal(await input.count(), 0);
-    await page.getByRole('button', { name: '重命名预设 原名称' }).click();
+    await page.getByRole('button', { name: '原名称', exact: true }).click();
     await input.fill('保存改名');
     await move(page);
     await page.evaluate(() => (window.failSave = false));
@@ -169,6 +170,28 @@ test('rename draft retains identity and captured selection; cancel and Escape cl
       { id: 'existing', name: '保存改名', selection: draft.selection },
     ]);
     assert.equal((await move(page)).modelPresetDraft, undefined);
+  } finally {
+    await browser.close();
+  }
+});
+
+test('add preset captures the current selection immediately and failed saves do not add a tag', async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await fixture(browser);
+    await page.evaluate(() => (window.failSave = true));
+    await page.getByRole('button', { name: '添加预设', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: '模拟保存失败' }).waitFor();
+    assert.equal(await page.evaluate(() => window.model.preferences.presets.length), 1);
+    assert.equal(await page.getByRole('textbox', { name: '预设名称' }).count(), 0);
+    await page.evaluate(() => (window.failSave = false));
+    await page.getByRole('button', { name: '添加预设', exact: true }).click();
+    await page.getByRole('button', { name: 'Alpha', exact: true }).waitFor();
+    const saved = await page.evaluate(() => window.model.preferences.presets.at(-1));
+    assert.ok(saved.id);
+    assert.deepEqual(saved.selection, { model: 'alpha', reasoning: 'high', speed: 'fast' });
+    assert.equal((await move(page)).modelPresetDraft, undefined);
+    assert.deepEqual(await page.evaluate(() => window.model.preferences.presets.at(-1)), saved);
   } finally {
     await browser.close();
   }

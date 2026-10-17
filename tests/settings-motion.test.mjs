@@ -89,7 +89,23 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       const rect = await preview.boundingBox();
       const tabs = page.getByRole('group', { name: '功能预览' });
       await preview.getByRole('button', { name: /完善实现方案/ }).click();
+      // Record the real WAAPI animation when it starts. Under parallel browser load,
+      // the click acknowledgement can arrive after a 200ms animation has finished.
+      await page.evaluate(() => {
+        const animate = Element.prototype.animate;
+        window.previewTransitions = [];
+        Element.prototype.animate = function (...args) {
+          const animation = animate.apply(this, args);
+          if (this.closest('.preview-scenes'))
+            window.previewTransitions.push({
+              duration: animation.effect.getTiming().duration,
+              frames: animation.effect.getKeyframes(),
+            });
+          return animation;
+        };
+      });
       for (const name of ['大纲', '看板', '模型切换', '下一步建议']) {
+        await page.evaluate(() => (window.previewTransitions = []));
         await tabs.getByRole('button', { name, exact: true }).click();
         const frames = await page.locator('.preview-scenes').evaluate(async (el) => {
           const samples = [];
@@ -110,15 +126,12 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
           frames.every((f) => Math.abs(f.height - rect.height) < 1),
           'frame never changes height',
         );
+        const transitions = await page.evaluate(() => window.previewTransitions);
         assert.ok(
-          frames.some((f) => f.animations.some((a) => a.duration === 200)),
+          transitions.some((a) => a.duration === 200),
           'content has a real transition',
         );
-        assert.ok(
-          frames
-            .flatMap((f) => f.animations)
-            .some((a) => a.frames.some((k) => k.transform === 'translateY(4px)')),
-        );
+        assert.ok(transitions.some((a) => a.frames.some((k) => k.transform === 'translateY(4px)')));
         assert.equal(await page.locator('.preview-scene:not([inert])').count(), 1);
       }
       assert.equal(

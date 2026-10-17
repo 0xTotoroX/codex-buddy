@@ -518,6 +518,11 @@ try {
   );
   assert.deepEqual(model.preferences.presets[0].selection, savedSelection);
   await view.getByRole('button', { name: '编辑预设', exact: true }).click();
+  // Leaving edit mode removes the delete-button gutter (10px). Let its
+  // ResizeObserver and queued native-size measurement finish before the drag baseline.
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
   record(
     'preset add saves immediately; rename/cancel preserve draft and saved model/effort/speed on failure',
   );
@@ -763,11 +768,16 @@ try {
   await page.getByRole('separator', { name: '调整分栏比例' }).waitFor();
   assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 2);
   const separator = page.getByRole('separator', { name: '调整分栏比例' });
+  const firstPaneBefore = await page.locator('.csw-feature-panes > section').first().boundingBox();
   await separator.focus();
   await separator.press('ArrowDown');
   await page.waitForFunction(
-    () =>
-      Number(document.querySelector('.csw-workbench-split').getAttribute('data-column-width')) > 50,
+    () => Number(document.querySelector('.csw-workbench-split').getAttribute('aria-valuenow')) > 50,
+  );
+  const firstPaneAfter = await page.locator('.csw-feature-panes > section').first().boundingBox();
+  assert.ok(
+    firstPaneAfter.height > firstPaneBefore.height,
+    'keyboard resize changes real pane geometry',
   );
   await tab.dblclick();
   assert.equal(await page.locator('.csw-feature-panes > section:visible').count(), 1);
@@ -887,7 +897,7 @@ try {
   );
   for (const [id, name, label, kind] of [
     ['outline', '大纲', '刷新大纲', 'outline-refresh'],
-    ['next', '下一步', '重新生成建议', 'generate'],
+    ['next', '下一步建议', '重新生成建议', 'generate'],
   ]) {
     const button = page.getByRole('button', { name: label, exact: true });
     await button.waitFor();
@@ -1106,7 +1116,7 @@ try {
   };
   await dragTab('看板', '.csw-feature-panes > section', 'bottom');
   const topBefore = await page.locator('.csw-feature-panes > section').first().boundingBox();
-  await dragTab('下一步', '[data-pane="board"]', 'right');
+  await dragTab('下一步建议', '[data-pane="board"]', 'right');
   assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 3);
   assert.equal(await page.locator('.csw-feature-split').count(), 1);
   const upper = await page.locator('[data-pane="outline"]').boundingBox();
@@ -1126,11 +1136,11 @@ try {
   assert.equal(await inner.getAttribute('aria-orientation'), 'vertical');
   await inner.focus();
   await inner.press('ArrowRight');
-  assert.ok(Number(await inner.getAttribute('data-column-width')) > 50);
-  assert.equal(await outer.getAttribute('data-column-width'), '50');
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
+  assert.equal(await outer.getAttribute('aria-valuenow'), '50');
   await outer.focus();
   await outer.press('ArrowDown');
-  assert.ok(Number(await outer.getAttribute('data-column-width')) > 50);
+  assert.ok(Number(await outer.getAttribute('aria-valuenow')) > 50);
   await page.getByRole('tab', { name: '下一步建议', exact: true }).dblclick();
   assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 1);
   assert.equal(await page.getByRole('separator', { name: '调整分栏比例' }).count(), 0);
@@ -1145,7 +1155,7 @@ try {
   await page.reload();
   await inner.waitFor();
   assert.deepEqual(layouts.desktop, savedNested);
-  assert.ok(Number(await inner.getAttribute('data-column-width')) > 50);
+  assert.ok(Number(await inner.getAttribute('aria-valuenow')) > 50);
   await page.setViewportSize({ width: 360, height: 900 });
   await page.waitForFunction(
     () => document.querySelector('.csw-feature-split')?.dataset.axis === 'vertical',
@@ -1160,7 +1170,7 @@ try {
   await page.waitForFunction(
     () => document.querySelector('.csw-feature-split')?.dataset.axis === 'horizontal',
   );
-  await dragTab('下一步', '[data-pane="board"]', 'merge');
+  await dragTab('下一步建议', '[data-pane="board"]', 'merge');
   assert.equal(
     await page.locator('.csw-feature-split').count(),
     0,
@@ -1176,7 +1186,7 @@ try {
   await page.goto('http://127.0.0.1:47991/feature.html?surface=edge#token=fixture');
   for (const [id, name, label] of [
     ['outline', '大纲', '刷新大纲'],
-    ['next', '下一步', '重新生成建议'],
+    ['next', '下一步建议', '重新生成建议'],
   ]) {
     await page
       .locator('#edge-panel > header nav')

@@ -1,5 +1,5 @@
 /* [INPUT]: Existing model control envelope and serialized actions.
- * [OUTPUT]: Title-aligned reasoning headings, content-sized favorites matrix, independent Fast charge/strike and divider controls, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff and capability-driven selection.
+ * [OUTPUT]: Title-aligned reasoning headings, content-sized favorites matrix, independent Fast charge/strike and divider controls, recessed preset tags, in-panel catalog and wrapping presets with synchronous draft handoff, measured horizontal reading restoration and capability-driven selection.
  * [POS]: Reusable business view; surfaces own placement and theme.
  * [PROTOCOL]: Keep AGENTS.md in this module in sync. */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
@@ -113,9 +113,7 @@ export function ModelView({
     value: number;
     scale: number;
   } | null>(null);
-  useLayoutEffect(() => {
-    if (matrix.current) matrix.current.scrollLeft = reading.modelLeft || 0;
-  }, []);
+  const restoredReading = useRef(false);
   const s = state.snapshot,
     prefs = state.preferences;
   const currentModel = s.models.find((model) => model.id === s.current?.model);
@@ -198,6 +196,29 @@ export function ModelView({
     : 560;
   const clampWidth = (width: number) => Math.max(100, Math.min(maxNameWidth, Math.round(width)));
   const nameWidth = clampWidth(columnWidth ?? prefs.modelColumnWidth ?? 140);
+  useLayoutEffect(() => {
+    const node = matrix.current;
+    // Initial fallback column widths are replaced after measuring the heading.
+    // Restoring sooner clamps the saved offset and the resulting scroll event
+    // overwrites it before the final matrix width is available.
+    if (!node || !metrics.available || restoredReading.current) return;
+    node.scrollLeft = reading.modelLeft || 0;
+    restoredReading.current = node.scrollWidth - node.clientWidth >= (reading.modelLeft || 0);
+  }, [metrics.available, nameWidth, widths.join('|'), reading]);
+  useLayoutEffect(() => {
+    const node = matrix.current;
+    if (!node) return;
+    const takeOver = () => {
+      restoredReading.current = true;
+      reading.modelLeft = node.scrollLeft;
+    };
+    for (const event of ['wheel', 'pointerdown', 'keydown', 'touchstart'])
+      node.addEventListener(event, takeOver, { passive: true });
+    return () => {
+      for (const event of ['wheel', 'pointerdown', 'keydown', 'touchstart'])
+        node.removeEventListener(event, takeOver);
+    };
+  }, [reading]);
   const rows = (items: typeof models) =>
     items.map((m) => (
       <div
@@ -396,7 +417,7 @@ export function ModelView({
             className="model-scroll"
             ref={matrix}
             onScroll={(event) => {
-              if (event.currentTarget.clientWidth)
+              if (restoredReading.current && event.currentTarget.clientWidth)
                 reading.modelLeft = event.currentTarget.scrollLeft;
             }}
           >
