@@ -1,3 +1,4 @@
+import { measureWork } from '../../shared/performance.js';
 /* [INPUT]: Feature owners, main ownership, saved placements and the existing capsule/dock.
  * [OUTPUT]: Business views inside the original shell, window round trips retaining the departure state, reveal of the existing main window, and cancellation of motion when changing surfaces.
  * [POS]: Embedded surface adapter. Geometry and gestures remain in shell.
@@ -24,6 +25,7 @@ let dockValue = { status: '', rect: null };
 let primary = 'overlay';
 let selected = '';
 let returnState = null;
+let stateFingerprint = '';
 const mounts = new Map();
 /** @type {import('../../shared/features').Request} */
 const request = async (input) => {
@@ -189,10 +191,16 @@ function updateDock() {
 }
 /** @param {import('../../shared/features').FeatureState} next */
 function render(next) {
+  return measureWork('features', () => renderState(next));
+}
+function renderState(next) {
   if (!next.features.length) return;
   // A restored model edge window does not own the legacy outline/next workbench.
   // Older backends omit the flag; retain their existing takeover behavior.
   if (!independent && next.mainManaged === false) return;
+  const fingerprint = JSON.stringify(next);
+  if (fingerprint === stateFingerprint) return;
+  stateFingerprint = fingerprint;
   const previous = state;
   if (
     previous &&
@@ -307,6 +315,7 @@ export function stopFeatureHost() {
   dock?.destroy();
   dock = null;
   state = null;
+  stateFingerprint = '';
   returnState = null;
   independent = false;
 }

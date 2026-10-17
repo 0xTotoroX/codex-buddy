@@ -133,6 +133,10 @@ fn router(service: Service) -> Router {
         .route("/tasks/command", post(tasks_command))
         .route("/state", get(state))
         .route(
+            "/performance",
+            get(performance_state).post(performance_update),
+        )
+        .route(
             "/development",
             get(development_status).post(development_report),
         )
@@ -231,6 +235,24 @@ async fn authorize(State(service): State<Service>, request: Request, next: Next)
 
 async fn state(State(service): State<Service>) -> impl IntoResponse {
     Json(public_view(service.app.view()))
+}
+
+async fn performance_state(
+    State(service): State<Service>,
+    Query(query): Query<std::collections::HashMap<String, String>>,
+) -> Json<Value> {
+    Json(
+        service
+            .app
+            .performance_state(query.get("sample").is_some_and(|v| v == "1"))
+            .await,
+    )
+}
+async fn performance_update(
+    State(service): State<Service>,
+    Json(patch): Json<crate::performance::Update>,
+) -> Result<Json<Value>, ApiError> {
+    Ok(Json(service.app.update_performance(patch).await?))
 }
 
 fn public_view(view: crate::state::View) -> Value {
@@ -396,7 +418,10 @@ async fn development_status(State(service): State<Service>) -> Response {
     };
     if !service.app.appearance().await.detached {
         let mut report = if let Some(client) = service.app.desktop_client().await {
-            client.evaluate(dev.probe).await.unwrap_or(Value::Null)
+            client
+                .evaluate(dev.probe.clone())
+                .await
+                .unwrap_or(Value::Null)
         } else {
             Value::Null
         };
@@ -507,15 +532,15 @@ async fn asset(Path(path): Path<String>) -> Response {
     if let Some(dev) = crate::assets::development() {
         let resource = match path.as_str() {
             "feature.html" if !dev.feature_html.is_empty() => {
-                Some(("text/html; charset=utf-8", dev.feature_html))
+                Some(("text/html; charset=utf-8", dev.feature_html.clone()))
             }
             "feature-dev.js" if !dev.feature_script.is_empty() => {
-                Some(("text/javascript; charset=utf-8", dev.feature_script))
+                Some(("text/javascript; charset=utf-8", dev.feature_script.clone()))
             }
-            "panel" => Some(("text/html; charset=utf-8", dev.html)),
-            "panel.js" => Some(("text/javascript; charset=utf-8", dev.script)),
-            "panel-boot.js" => Some(("text/javascript; charset=utf-8", dev.boot)),
-            "dev-client.js" => Some(("text/javascript; charset=utf-8", dev.client)),
+            "panel" => Some(("text/html; charset=utf-8", dev.html.clone())),
+            "panel.js" => Some(("text/javascript; charset=utf-8", dev.script.clone())),
+            "panel-boot.js" => Some(("text/javascript; charset=utf-8", dev.boot.clone())),
+            "dev-client.js" => Some(("text/javascript; charset=utf-8", dev.client.clone())),
             "dev-state.json" => Some((
                 "application/json",
                 json!({"revision":dev.revision,"page":dev.page,"feature":dev.feature_revision})

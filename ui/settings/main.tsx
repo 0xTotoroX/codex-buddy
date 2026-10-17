@@ -28,6 +28,7 @@ import { Field } from './settings-controls';
 import { NativeSelect } from './components/ui/native-select';
 import { ConnectionSettings } from './connection-settings';
 import { CodexHostSettings } from './codex-host-settings';
+import { PerformanceSettings } from './performance-settings';
 import { SettingsSearch } from './settings-search';
 import { SettingsPreview } from './settings-preview';
 import { useSettingsMotion } from './settings-motion';
@@ -179,6 +180,7 @@ function App() {
                 >
                   <ModelControlSettings
                     live={live}
+                    active={common || page === 'model-control'}
                     detailed={page === 'model-control'}
                     onSnapshot={setModel}
                   />
@@ -215,6 +217,7 @@ function App() {
                 {/* Layout and appearance keep their existing section headings. */}
                 <SurfaceSettings
                   live={live}
+                  active={surfacesVisible}
                   desktopSupported={editor.saved?.popoutSupported === true}
                   appearance={view?.panelPreferences}
                   fontBase={view?.panelFontBase}
@@ -257,6 +260,9 @@ function App() {
               </div>
               <div data-settings-page="codex-host" hidden={page !== 'codex-host'}>
                 <CodexHostSettings live={live} active={page === 'codex-host'} />
+              </div>
+              <div data-settings-page="performance" hidden={page !== 'performance'}>
+                <PerformanceSettings live={live} active={page === 'performance'} />
               </div>
               <section
                 data-settings-page="dev"

@@ -11,6 +11,7 @@ import { resolveFeatureLayout } from '../surfaces/workspace/layout';
 import { layoutGroups } from '../surfaces/workspace/layout-tree';
 export function FeatureSettings({
   live,
+  active = true,
   desktopSupported,
   onPlacement,
   onSnapshot,
@@ -18,6 +19,7 @@ export function FeatureSettings({
 }: {
   simple?: boolean;
   live: boolean;
+  active?: boolean;
   desktopSupported: boolean;
   onPlacement: (placement: string) => void;
   onSnapshot?: (state: FeatureState | null) => void;
@@ -34,9 +36,10 @@ export function FeatureSettings({
       setReady(false);
       return;
     }
+    if (!active) return;
     let disposed = false;
     const read = async () => {
-      if (writing.current) return;
+      if (writing.current || document.hidden) return;
       const version = ++generation.current;
       try {
         const next = await request<FeatureState>('features', { op: 'state' });
@@ -55,7 +58,7 @@ export function FeatureSettings({
       disposed = true;
       clearInterval(timer);
     };
-  }, [live]);
+  }, [live, active]);
   const primary = state.mainPlacement || 'sidebar';
   useEffect(() => onPlacement(primary), [primary, onPlacement]);
   useEffect(() => onSnapshot?.(ready ? state : null), [state, ready, onSnapshot]);

@@ -41,6 +41,8 @@ Enable **点击术语时跳转到上下文** in settings → Features → Termin
 
 Outlines are parsed locally and do not require a model. Next-step suggestions require model configuration. You can disable either feature independently.
 
+Under **System → Performance & switches** (系统 → 性能与开关), turn off **Connect to Codex** to remove Buddy's host interface and listeners. Settings, task data, drafts and independent Reminders sync are retained; turning it back on reconnects without restarting Codex. Optional monitoring runs while this settings page is visible and separates Buddy backend CPU/physical memory, instrumented Buddy work, and whole-host page metrics. Whole-page memory is not Buddy's exclusive usage.
+
 In Web settings, choose **设置 → 模型 → 生成模型 → 高级设置 → 输入上下文 → 最近一次聊天（完整）** to send the complete latest question and answer without local character truncation. New configurations use this mode by default; existing character limits are preserved and remain configurable. The selected model’s context window still applies. Suggestions preserve the complete goal and authorization boundaries instead of splitting related tasks into competing buttons. Results are self-contained Chinese follow-up prompts; technical names may stay in their original language.
 
 **Suggestion directions** are independent of when generation starts:

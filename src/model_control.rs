@@ -233,6 +233,12 @@ impl App {
     }
 
     pub async fn model_control_state(&self, refresh: bool) -> Result<Value> {
+        {
+            let control = self.model_control.lock().await;
+            if !control.preferences.enabled {
+                return Ok(control.envelope(unavailable("模型快切已停用")));
+            }
+        }
         let operation = self.model_control.lock().await.operation.clone();
         let Ok(_guard) = operation.try_lock() else {
             let control = self.model_control.lock().await;

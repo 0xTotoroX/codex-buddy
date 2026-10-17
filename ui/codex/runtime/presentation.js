@@ -358,20 +358,25 @@ async function animateHandoff(next) {
 async function setDetached(value, ui = null, presentation = null) {
   if (IS_POPOUT || !isCurrentRuntime()) return;
   const next = value === true;
-  const fingerprint = JSON.stringify(ui);
-  if ((next || shellState.detached) && shellState.presentationFingerprint !== fingerprint) {
+  const changed = next !== shellState.detached;
+  const fingerprint = next || shellState.detached ? JSON.stringify(ui) : null;
+  const preferencesChanged =
+    (next || shellState.detached) && shellState.presentationFingerprint !== fingerprint;
+  if (preferencesChanged) {
     shellState.presentationFingerprint = fingerprint;
     applyPanelPreferences(ui);
   }
   shellState.detached = next;
-  if (shellState.layoutMode === 'workbench') emitSignal('render', undefined);
+  if ((changed || preferencesChanged) && shellState.layoutMode === 'workbench')
+    emitSignal('render', undefined);
   clearTimeout(shellState.detachedRecoveryTimer);
   shellState.detachedRecoveryTimer = next
     ? window.setTimeout(() => {
         if (isCurrentRuntime() && shellState.detached) void setDetached(false, null, null);
       }, 15000)
     : 0;
-  sessionStorage.setItem(DETACHED_KEY, String(next));
+  if (changed || sessionStorage.getItem(DETACHED_KEY) !== String(next))
+    sessionStorage.setItem(DETACHED_KEY, String(next));
   const currentToken = presentation ? exportPanelState()?.viewToken : null;
   if (!next && applyReadingSelection(presentation, currentToken)) emitSignal('render', undefined);
   if (!next) restoreReadingScroll(presentation, currentToken);
@@ -391,7 +396,7 @@ async function setDetached(value, ui = null, presentation = null) {
     }
     await shellState.handoffPromise;
   }
-  window.dispatchEvent(new Event('codex-buddy:appearance'));
+  if (changed || preferencesChanged) window.dispatchEvent(new Event('codex-buddy:appearance'));
 }
 
 /** @returns {import("../../shared/contracts").PanelSnapshot|null} */

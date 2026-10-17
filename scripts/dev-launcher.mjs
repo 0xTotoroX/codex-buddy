@@ -212,7 +212,10 @@ export async function openDevelopment(directory, { timeout = 120000, interval = 
         supervisorPid: startedPid,
         requireOwner: running,
       });
-      logLaunch(directory, '开发工作台已就绪。');
+      logLaunch(
+        directory,
+        result.paused ? 'Codex 集成已暂停，开发设置仍可用。' : '开发工作台已就绪。',
+      );
       return result;
     } catch (error) {
       // The old host may exit between the initial identity check and reveal.
@@ -389,6 +392,7 @@ export async function revealDevelopment(
           // Reuse the pinned development target; never discover a different window or restart it.
           reconnected = true;
           const config = readJson(join(data, 'config.json'), {});
+          if (config.performance?.integrationEnabled === false) return { paused: true };
           await requestRuntime(runtime, 'connect', {
             endpoint: config.cdpEndpoint,
             targetId: config.targetId,

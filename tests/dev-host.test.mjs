@@ -306,6 +306,31 @@ test('selected CodexHost applies only through explicitly authorized Dev preparat
   assert.equal(prepared, 1);
 });
 
+test('paused integration never prepares or restarts a missing or available Dev host', async (t) => {
+  const source = temporary(t);
+  const host = await server(t, (_, res) =>
+    res.end(JSON.stringify([{ id: 'same', type: 'page', url: 'app://-/index.html' }])),
+  );
+  writeFileSync(
+    join(source, 'config.json'),
+    JSON.stringify({
+      cdpEndpoint: host.origin,
+      codexHost: { enabled: true },
+      performance: { integrationEnabled: false },
+    }),
+  );
+  const prepare = () => assert.fail('paused integration must not prepare a host');
+  const found = await findDevelopmentHost(source, { 'restart-running': true }, prepare);
+  assert.equal(found.target.id, 'same');
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('fixture: no host');
+  });
+  await assert.rejects(
+    findDevelopmentHost(source, { 'restart-running': true }, prepare),
+    /没有找到可调试/,
+  );
+});
+
 test('first real session copies settings privately and later sessions preserve development edits', (t) => {
   const root = temporary(t),
     source = join(root, 'installed'),

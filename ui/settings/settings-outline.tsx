@@ -5,6 +5,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeSettingsDrawers, revealSettingsDrawer } from './settings-drawer';
 export const pageTitles = {
+  performance: '性能与开关',
   features: '常用开关',
   next: '下一步建议',
   prompts: '常用提示词',
@@ -26,7 +27,7 @@ export const pageGroups: { title: string; pages: SettingsPage[] }[] = [
   },
   { title: '界面', pages: ['surfaces', 'appearance'] },
   { title: '模型', pages: ['model'] },
-  { title: '系统', pages: ['connection', 'codex-host', 'dev'] },
+  { title: '系统', pages: ['performance', 'connection', 'codex-host', 'dev'] },
 ];
 export const pageGroup = (page: SettingsPage) =>
   pageGroups.find((group) => group.pages.includes(page))!;

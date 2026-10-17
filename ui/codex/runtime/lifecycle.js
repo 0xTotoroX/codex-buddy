@@ -1,3 +1,4 @@
+import { measureWork, samplePerformance, stopPerformance } from '../../shared/performance.js';
 import { bridgeCall } from './state.js';
 import { installPromptEnhancer } from '../prompt-enhancement.js';
 import { createTypographyTracker } from '../typography.js';
@@ -149,6 +150,9 @@ import {
 import { updateGenerationModeControl } from '../../surfaces/embedded/shell/settings-view.js';
 
 function scan(generation = runtimeState.runtimeGeneration, timerId = 0) {
+  return measureWork('scan', () => scanCurrent(generation, timerId));
+}
+function scanCurrent(generation, timerId) {
   if (IS_POPOUT || !isCurrentRuntime(generation)) return;
   if (timerId && runtimeState.timer !== timerId) return;
   if (timerId) runtimeState.timer = 0;
@@ -469,6 +473,7 @@ function activateRuntime() {
 }
 
 function destroy() {
+  stopPerformance();
   if (!IS_POPOUT) window.__codexBuddyPromptEnhancer?.destroy();
   if (!IS_POPOUT) window.__codexBuddyTerminology?.destroy();
   shellState.featureCleanup?.();
@@ -528,6 +533,31 @@ async function launcherAction(action, toggle = false) {
   else setOpen(toggle ? !shellState.open : true);
 }
 
+function syncTools() {
+  if (IS_POPOUT || !isCurrentInstance() || !runtimeState.settingsLoaded) return;
+  if (runtimeState.settings?.promptEnhancementEnabled !== false) {
+    if (!window.__codexBuddyPromptEnhancer)
+      installPromptEnhancer({
+        request: bridgeCall,
+        isEnabled: () =>
+          isCurrentInstance() && runtimeState.settings?.promptEnhancementEnabled !== false,
+      });
+  } else window.__codexBuddyPromptEnhancer?.destroy();
+  if (runtimeState.settings?.terminologyEnabled !== false) {
+    if (!window.__codexBuddyTerminology)
+      installTerminology({
+        request: bridgeCall,
+        getRoot: chatRoot,
+        isBusy: chatBusy,
+        getExchange: () => ({
+          ...terminologyExchange(),
+          sessionId: contextSnapshot().sessionId,
+          title: document.title,
+        }),
+      });
+  } else window.__codexBuddyTerminology?.destroy();
+}
+
 function install() {
   // Re-injection replaces stale instances instead of layering another UI on top.
   const previous = window[API_KEY];
@@ -567,46 +597,49 @@ function install() {
     diagnostics: readDiagnostics(),
   });
   const stopSignals = [
-    onSignal('render', (options) => {
-      renderFloat(options);
-      if (IS_POPOUT || !runtimeState.runtimeActive) return;
-      const expression = resolveFabExpression();
-      syncLauncher({
-        open:
-          shellState.open ||
-          shellState.detached ||
-          (independentFeatures() && featurePlacement() === 'desktop'),
-        root: shellState.root,
-        canUseOfficial: () => Boolean(chatRoot()),
-        pluginOpened: () => {
-          cancelFaceClick();
-          if (independentFeatures()) toggleFeatureDock(false);
-          else if (!shellState.detached) setOpen(false);
-        },
-        expression,
-        expressionLabel: fabExpressionLabel(expression),
-        sourceCue: activePaneCue(),
-        defaultAction: shellState.launcherAction,
-        colors: panelAppearance().colors,
-        theme: shellState.theme,
-        outsideAvailable: runtimeState.settings?.popoutSupported === true,
-        action: (action) => launcherAction(action),
-        click: (event) =>
-          onLauncherClick(event, () => {
-            void launcherAction(shellState.launcherAction, true).catch((error) => {
-              stepwiseState.bridgeError = String(error);
-              emitSignal('render', undefined);
-            });
-          }),
-        pointerDown: onLauncherPointerDown,
-        keyDown: onLauncherKeyDown,
-        settingsBrowser: () => emitSignal('openSettings', 'web'),
-        settings: () => {
-          cancelFaceClick();
-          void openSettings();
-        },
-      });
-    }),
+    onSignal('tools', syncTools),
+    onSignal('render', (options) =>
+      measureWork('render', () => {
+        renderFloat(options);
+        if (IS_POPOUT || !runtimeState.runtimeActive) return;
+        const expression = resolveFabExpression();
+        syncLauncher({
+          open:
+            shellState.open ||
+            shellState.detached ||
+            (independentFeatures() && featurePlacement() === 'desktop'),
+          root: shellState.root,
+          canUseOfficial: () => Boolean(chatRoot()),
+          pluginOpened: () => {
+            cancelFaceClick();
+            if (independentFeatures()) toggleFeatureDock(false);
+            else if (!shellState.detached) setOpen(false);
+          },
+          expression,
+          expressionLabel: fabExpressionLabel(expression),
+          sourceCue: activePaneCue(),
+          defaultAction: shellState.launcherAction,
+          colors: panelAppearance().colors,
+          theme: shellState.theme,
+          outsideAvailable: runtimeState.settings?.popoutSupported === true,
+          action: (action) => launcherAction(action),
+          click: (event) =>
+            onLauncherClick(event, () => {
+              void launcherAction(shellState.launcherAction, true).catch((error) => {
+                stepwiseState.bridgeError = String(error);
+                emitSignal('render', undefined);
+              });
+            }),
+          pointerDown: onLauncherPointerDown,
+          keyDown: onLauncherKeyDown,
+          settingsBrowser: () => emitSignal('openSettings', 'web'),
+          settings: () => {
+            cancelFaceClick();
+            void openSettings();
+          },
+        });
+      }),
+    ),
     onSignal('scan', (delay) => scheduleScan(delay)),
     onSignal('runtime', (enabled) => (enabled ? activateRuntime() : stopRuntime())),
     onSignal('bindingUnavailable', () => {
@@ -662,6 +695,8 @@ function install() {
       return debugState();
     },
     scan,
+    samplePerformance,
+    stopPerformance,
     start,
     destroy,
     loadSettings,
@@ -711,23 +746,6 @@ function install() {
     },
   };
 
-  if (!IS_POPOUT) {
-    installPromptEnhancer({
-      request: bridgeCall,
-      isEnabled: () =>
-        runtimeState.settingsLoaded && runtimeState.settings?.promptEnhancementEnabled !== false,
-    });
-    installTerminology({
-      request: bridgeCall,
-      getRoot: chatRoot,
-      isBusy: chatBusy,
-      getExchange: () => ({
-        ...terminologyExchange(),
-        sessionId: contextSnapshot().sessionId,
-        title: document.title,
-      }),
-    });
-  }
   void start();
 }
 

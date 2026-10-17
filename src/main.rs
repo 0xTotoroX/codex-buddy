@@ -20,6 +20,7 @@ mod model_control;
 mod native_backdrop;
 mod panel;
 mod panel_window;
+mod performance;
 mod prompt_enhancement;
 mod requests;
 mod server;

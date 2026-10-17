@@ -254,8 +254,8 @@ impl Client {
                     )
                     .await?;
                 *installed = result["identifier"].as_str().map(str::to_owned);
-                self.evaluate(dev.script).await?;
-                *revision = dev.revision;
+                self.evaluate(dev.script.clone()).await?;
+                *revision = dev.revision.clone();
             }
         }
         let expression = format!(
@@ -318,6 +318,24 @@ impl Client {
             .await?;
         *self.script_id.lock().await = installed["identifier"].as_str().map(str::to_owned);
         self.evaluate(crate::assets::panel_script()).await?;
+        Ok(())
+    }
+
+    pub(crate) async fn suspend_desktop(&self) -> Result<()> {
+        self.evaluate("window.__companionDesktop?.destroy(); window.__companionFloatingPanel?.destroy(); window.__codexBuddyModelControl?.dispose(); true".into()).await?;
+        for installed in [&self.script_id, &self.model_control_script_id] {
+            let mut identifier = installed.lock().await;
+            if let Some(value) = identifier.as_ref() {
+                self.request(
+                    "Page.removeScriptToEvaluateOnNewDocument",
+                    json!({"identifier":value}),
+                )
+                .await?;
+                *identifier = None;
+            }
+        }
+        let clean = self.evaluate("!window.__companionFloatingPanel && !window.__codexBuddyModelControl && !window.__codexBuddyTerminology && !window.__codexBuddyPromptEnhancer".into()).await?;
+        anyhow::ensure!(clean == true, "宿主清理尚未完成，请重试；连接未报告为关闭");
         Ok(())
     }
 

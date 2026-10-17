@@ -423,13 +423,15 @@
       operation.aborted = '目标身份或 DOM 已替换';
     checkLive();
   });
-  observer.observe(document, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeOldValue: true,
-    characterData: true,
-  });
+  function observeOperation() {
+    observer.observe(document, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeOldValue: true,
+      characterData: true,
+    });
+  }
   function passive() {
     const target = resolveTarget(),
       busy = generating(target);
@@ -999,9 +1001,17 @@
       controller: new AbortController(),
       deadline: performance.now() + 11000,
     };
+    observeOperation();
     const active = operation;
     active.timer = setTimeout(() => active.controller.abort('操作超过 11 秒截止时间'), 11000);
-    guard(operation);
+    try {
+      guard(operation);
+    } catch (error) {
+      clearTimeout(active.timer);
+      observer.disconnect();
+      operation = null;
+      throw error;
+    }
     return operation;
   }
   async function finish(op) {
@@ -1030,7 +1040,10 @@
       }
     }
     checkLive();
-    if (operation === op) operation = null;
+    if (operation === op) {
+      operation = null;
+      observer.disconnect();
+    }
     return op.aborted || op.cleanupError || '';
   }
   async function snapshot(refresh = false) {

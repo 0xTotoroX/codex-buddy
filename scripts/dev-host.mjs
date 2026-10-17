@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 已安装配置、真实 Codex CDP 元数据与本机 API。
- * [OUTPUT]: 窗口选择、显式启用时使用开发配置（首次回退日常配置）委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因；按调试端口定位宿主主进程，以 PID/启动时间/路径观察退出，不以断连代替进程退出。
+ * [OUTPUT]: 暂停时禁止准备或重开宿主；窗口选择、显式启用时使用开发配置（首次回退日常配置）委托共享宿主准备、开发配置初始化、安装版连接暂停与恢复；新宿主已确认时归档失效旧目标，保留 API 错误原因；按调试端口定位宿主主进程，以 PID/启动时间/路径观察退出，不以断连代替进程退出。
  * [POS]: 真实宿主开发边界；不启动浏览器、不记录聊天、不修改官方应用。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -255,6 +255,8 @@ export async function findDevelopmentHost(
   prepareHost,
   settingsDirectory = source,
 ) {
+  const settings = readJson(join(settingsDirectory, 'config.json'), {});
+  const paused = settings.performance?.integrationEnabled === false;
   let host;
   try {
     host = await findHost(source, options);
@@ -262,6 +264,7 @@ export async function findDevelopmentHost(
     // Never turn an ambiguous/explicit target selection failure into a host restart.
     if (
       error.code !== 'NO_DEBUG_HOST' ||
+      paused ||
       !options['restart-running'] ||
       options.cdp ||
       options.target
@@ -271,7 +274,8 @@ export async function findDevelopmentHost(
     return findHost(source, { ...options, cdp: endpoint });
   }
   if (
-    readJson(join(settingsDirectory, 'config.json'), {}).codexHost?.enabled &&
+    !paused &&
+    settings.codexHost?.enabled &&
     options['restart-running'] &&
     !options.cdp &&
     !options.target

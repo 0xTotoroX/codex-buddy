@@ -197,6 +197,10 @@ pub(crate) fn known<'a>(terms: &'a [Term], query: &str) -> Option<&'a Term> {
             || t.aliases.iter().any(|a| a.to_lowercase() == q)
     })
 }
+pub(crate) fn enabled(root: &Path) -> Result<bool> {
+    Ok(read::<Preferences>(root, "terminology-settings.json")?.enabled)
+}
+
 pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
     if input["action"] == "manual" {
         let entries = input["entries"].as_array_mut().context("缺少手动词条")?;
@@ -442,9 +446,13 @@ pub(crate) async fn command(app: &App, mut input: Value) -> Result<Value> {
                 || prefs.mastered.contains(&t.id)
         });
     }
-    Ok(
-        json!({"preferences":prefs,"entries":terms,"context":seen.context,"involved":involved,"phase":seen.phase,"message":seen.message}),
-    )
+    let result = json!({"preferences":prefs,"entries":terms,"context":seen.context,"involved":involved,"phase":seen.phase,"message":seen.message});
+    drop(_guard);
+    if action == "settings" {
+        app.sync_desktop_settings(&json!({"terminologyEnabled": prefs.enabled}))
+            .await;
+    }
+    Ok(result)
 }
 
 #[cfg(test)]

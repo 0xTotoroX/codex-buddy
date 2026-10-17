@@ -1,3 +1,4 @@
+import { measureWork } from '../shared/performance.js';
 /* [INPUT]: Buddy 已识别的聊天根节点、一问一答与受限后台请求。
  * [OUTPUT]: 术语加粗标注、悬停释义与按聊天身份定位已确认范围；销毁恢复自有高亮，不改变宿主正文。
  * [POS]: 术语显示旁路；不读取输入草稿、不向主聊天写内容。
@@ -16,9 +17,10 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     scanTimer = 0,
     hoverTimer = 0,
     closeTimer = 0,
+    ticker = 0,
     frame = 0;
   let state = {
-    preferences: { enabled: true, cardStyle: 'plain', mastered: [], semantic: false },
+    preferences: { enabled: false, cardStyle: 'plain', mastered: [], semantic: false },
     entries: [],
   };
   let annotations = [],
@@ -190,6 +192,9 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       });
   }
   function scan() {
+    return measureWork('terms-scan', scanContent);
+  }
+  function scanContent() {
     clearTimeout(scanTimer);
     if (!alive) return;
     clear();
@@ -228,6 +233,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     report(involved);
   }
   function schedule() {
+    if (!alive || !state.preferences.enabled || document.hidden) return;
     clearTimeout(scanTimer);
     scanTimer = window.setTimeout(scan, 500);
   }
@@ -245,6 +251,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
         value.preferences.semantic !== state.preferences.semantic ||
         value.preferences.enabled !== state.preferences.enabled;
       state = value;
+      syncActivity();
       if (changed) {
         if (toggled || entriesChanged) {
           cache.clear();
@@ -326,7 +333,10 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     }
   }
   function tick() {
-    if (!alive) return;
+    return measureWork('terms-check', checkContext);
+  }
+  function checkContext() {
+    if (!alive || !state.preferences.enabled || document.hidden) return;
     updateTheme();
     const next = getRoot();
     if (next !== root) {
@@ -343,7 +353,18 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       clear();
       report();
       if (root) {
-        observer = new MutationObserver(schedule);
+        observer = new MutationObserver((records) => {
+          if (
+            records.some((record) => {
+              const element =
+                record.target instanceof Element ? record.target : record.target.parentElement;
+              return !element?.closest(
+                '[data-companion-stepwise-root],[data-codex-buddy-features-root],[data-codex-buddy-prompt]',
+              );
+            })
+          )
+            schedule();
+        });
         observer.observe(root, { childList: true, subtree: true, characterData: true });
         schedule();
       }
@@ -361,6 +382,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
     } else if (key) void analyze();
   }
   function move(e) {
+    if (!annotations.length || document.hidden) return;
     if (popup.contains(e)) return;
     cancelAnimationFrame(frame);
     frame = requestAnimationFrame(() => {
@@ -409,12 +431,41 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       }
     }
   }
-  document.addEventListener('pointermove', move, { passive: true });
-  document.addEventListener('keydown', keydown);
+  function syncActivity() {
+    if (state.preferences.enabled) {
+      if (ticker) return;
+      document.addEventListener('pointermove', move, { passive: true });
+      document.addEventListener('keydown', keydown);
+      document.addEventListener('visibilitychange', visible);
+      ticker = window.setInterval(tick, 1000);
+      tick();
+    } else {
+      clearInterval(ticker);
+      ticker = 0;
+      observer?.disconnect();
+      observer = null;
+      clearTimeout(scanTimer);
+      clearTimeout(hoverTimer);
+      clearTimeout(closeTimer);
+      cancelAnimationFrame(frame);
+      pending = '';
+      root = null;
+      lastText = '';
+      clear();
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('keydown', keydown);
+      document.removeEventListener('visibilitychange', visible);
+    }
+  }
+  function visible() {
+    if (!document.hidden) {
+      tick();
+      schedule();
+    }
+  }
   const changed = () => void refresh();
   document.addEventListener('buddy-terminology-change', changed);
-  const ticker = setInterval(tick, 1000),
-    poll = setInterval(refresh, 15000);
+  const poll = setInterval(refresh, 15000);
   const apiObject = {
     lastError: '',
     contextKey,
@@ -462,6 +513,7 @@ export function installTerminology({ request, getRoot, getExchange, isBusy }) {
       clearInterval(poll);
       document.removeEventListener('pointermove', move);
       document.removeEventListener('keydown', keydown);
+      document.removeEventListener('visibilitychange', visible);
       document.removeEventListener('buddy-terminology-change', changed);
       popup.destroy();
       highlightStyle.remove();

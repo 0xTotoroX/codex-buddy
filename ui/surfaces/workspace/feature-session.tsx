@@ -115,12 +115,35 @@ export function FeatureView({
     }
   }, [entry.pending, entry.owner, owner, call, capture, onState]);
   useEffect(() => {
-    let stopped = false;
-    const refresh = async () => {
+    let stopped = false,
+      refreshing = false,
+      ready = false,
+      fingerprint = '';
+    const refresh = async (initial = false) => {
+      if (stopped || refreshing || gate.current) return;
+      const node = body.current;
+      if (
+        !initial &&
+        ready &&
+        (document.hidden ||
+          !node?.getClientRects().length ||
+          getComputedStyle(node).visibility === 'hidden')
+      )
+        return;
+      refreshing = true;
       try {
         const value = await call<FeatureData & { appearance?: Appearance }>('read');
         if (stopped) return;
         setConnected(true);
+        const nextFingerprint = JSON.stringify(value);
+        if (nextFingerprint === fingerprint) {
+          if (!ready) {
+            await onReady?.();
+            ready = true;
+          }
+          return;
+        }
+        fingerprint = nextFingerprint;
         if (value.appearance) setAppearance(value.appearance);
         const token = contentToken(entry.id, value);
         if (token && reading.current.token !== token) {
@@ -134,17 +157,28 @@ export function FeatureView({
         if (['outline', 'next'].includes(entry.id) && !value.snapshot) setConnected(false);
         else setValue(value);
         await onReady?.();
+        ready = true;
       } catch {
         if (!stopped) setConnected(false);
+      } finally {
+        refreshing = false;
       }
     };
-    void refresh();
+    void refresh(true);
+    const visible = () => void refresh();
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((item) => item.isIntersecting)) visible();
+    });
+    if (body.current) observer.observe(body.current);
+    document.addEventListener('visibilitychange', visible);
     const timer = setInterval(() => {
       if (!gate.current) void refresh();
     }, 1500);
     return () => {
       stopped = true;
       clearInterval(timer);
+      observer.disconnect();
+      document.removeEventListener('visibilitychange', visible);
     };
   }, [call, entry.id]);
   useEffect(() => {
@@ -222,8 +256,22 @@ export function FeatureView({
   });
   // Save transient drafts/read position in memory; never persist task text in preferences.
   useEffect(() => {
+    let saved = '',
+      saving = false;
     const timer = setInterval(() => {
-      if (active && !gate.current) void call('save', { view: capture() }).catch(() => {});
+      if (!active || gate.current || saving) return;
+      const view = capture();
+      const fingerprint = JSON.stringify(view);
+      if (fingerprint === saved) return;
+      saving = true;
+      void call('save', { view })
+        .then(() => {
+          saved = fingerprint;
+        })
+        .catch(() => {})
+        .finally(() => {
+          saving = false;
+        });
     }, 2000);
     return () => clearInterval(timer);
   }, [active, call, capture]);

@@ -19,6 +19,7 @@ export type SurfaceState = {
 type Displays = { screens: { id: string; label: string }[]; nativeGlassAvailable: boolean };
 export function SurfaceSettings({
   live,
+  active = true,
   desktopSupported,
   appearance,
   fontBase,
@@ -30,6 +31,7 @@ export function SurfaceSettings({
   simple?: boolean;
   page?: 'surfaces' | 'appearance';
   live: boolean;
+  active?: boolean;
   desktopSupported: boolean;
   appearance?: AppearanceSettings;
   fontBase?: number;
@@ -46,7 +48,7 @@ export function SurfaceSettings({
     generation = useRef(0);
   useEffect(() => onSnapshot?.(state), [state, onSnapshot]);
   useEffect(() => {
-    if (!live) return;
+    if (!live || !active) return;
     let disposed = false;
     const load = async () => {
       if (writing.current) return;
@@ -71,7 +73,7 @@ export function SurfaceSettings({
       disposed = true;
       window.removeEventListener('focus', load);
     };
-  }, [live]);
+  }, [live, active]);
   async function save(patch: object) {
     if (!state || writing.current) return;
     writing.current = true;
@@ -112,6 +114,7 @@ export function SurfaceSettings({
       <div hidden={page === 'appearance'} data-settings-page="surfaces">
         <FeatureSettings
           live={live}
+          active={active}
           desktopSupported={desktopSupported}
           onPlacement={setPrimary}
           onSnapshot={onFeatures}

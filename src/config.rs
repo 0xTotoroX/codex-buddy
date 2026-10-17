@@ -24,6 +24,7 @@ pub enum HostRestartPolicy {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
+    pub performance: crate::performance::Preferences,
     pub codex_host: crate::codex_host::Options,
     pub host_restart_policy: HostRestartPolicy,
     pub cdp_endpoint: Option<String>,

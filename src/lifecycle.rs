@@ -1,5 +1,5 @@
 // [INPUT]: Paths、私有 runtime 信息、系统进程与本地产物。
-// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；host-only 仅准备宿主并输出端点，不启后台或写配置；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
+// [OUTPUT]: start/stop/status/doctor/launch/update 与 Runtime；暂停的 launch 仅启动设置服务；host-only 仅准备宿主并输出端点，不启后台或写配置；launch 优先复用连接，显式 --restart-running 按 ask/force 策略重开无连接宿主。
 // [POS]: CLI 进程管理层，负责复用服务和本地更新回滚；Dev 设置入口优先使用监督进程地址。
 // [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
 
@@ -221,6 +221,11 @@ pub async fn launch(
     host_only: bool,
 ) -> Result<()> {
     let config = paths.load()?;
+    if !host_only && !config.performance.integration_enabled {
+        start(paths, config::DEFAULT_PORT, None, no_open, false).await?;
+        println!("Codex 集成已暂停");
+        return Ok(());
+    }
     if config.codex_host.enabled {
         anyhow::ensure!(!isolated, "CodexHost 不支持独立 profile 启动");
         let (_, desktop, _) =
@@ -692,6 +697,49 @@ int main(void) {
             before
         );
         assert!(!paths.root.join("runtime.json").exists());
+    }
+
+    #[tokio::test]
+    async fn paused_launch_reuses_settings_without_preparing_or_connecting_host() {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(dir.path().to_owned())).unwrap();
+        let mut config = config::Config::default();
+        config.performance.integration_enabled = false;
+        config.codex_host.enabled = true;
+        paths.save(&config).unwrap();
+        let before = std::fs::read(paths.root.join("config.json")).unwrap();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let runtime = Runtime {
+            pid: std::process::id(),
+            port: listener.local_addr().unwrap().port(),
+            token: "synthetic".into(),
+            version: config::VERSION.into(),
+            executable: dir.path().join("unused"),
+        };
+        std::fs::write(paths.runtime(), serde_json::to_vec(&runtime).unwrap()).unwrap();
+        // No connect route: any attempt to reconnect makes launch fail.
+        let router = axum::Router::new().route(
+            "/api/state",
+            axum::routing::get(|| async {
+                axum::Json(json!({"connection":{"status":"disconnected"}}))
+            }),
+        );
+        let server = tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+        let result = launch(
+            &paths,
+            Some(dir.path().join("must-not-be-started")),
+            false,
+            true,
+            true,
+            false,
+        )
+        .await;
+        server.abort();
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(
+            std::fs::read(paths.root.join("config.json")).unwrap(),
+            before
+        );
     }
 
     #[test]

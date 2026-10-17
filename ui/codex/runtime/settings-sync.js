@@ -33,6 +33,7 @@ function applyRuntimeSettings(nextSettings) {
   const previousRevision = runtimeState.settings?.generationRevision;
   runtimeState.settings = nextSettings;
   runtimeState.settingsFingerprint = settingsFingerprint(nextSettings);
+  emitSignal('tools', undefined);
   if (hadStepwise && !stepwiseEnabled()) resetStepwiseFeature();
   if (hadOutline && !outlineEnabled()) resetOutlineFeature();
   if (
@@ -68,6 +69,7 @@ async function syncSettings(patch = {}) {
     typeof normalizedPatch.enabled === 'boolean' ||
     typeof normalizedPatch.answerOutlineEnabled === 'boolean' ||
     typeof normalizedPatch.promptEnhancementEnabled === 'boolean' ||
+    typeof normalizedPatch.terminologyEnabled === 'boolean' ||
     Object.prototype.hasOwnProperty.call(normalizedPatch, 'generationMode');
   if (patch?.enabled === true) {
     pushDiagnostic('settings:enabled-sync', {});

@@ -560,7 +560,7 @@ export function SettingsPreview(props: PreviewProps) {
     <aside
       className="settings-preview"
       aria-label="联动预览"
-      hidden={['terminology', 'codex-host', 'dev'].includes(props.page)}
+      hidden={['performance', 'terminology', 'codex-host', 'dev'].includes(props.page)}
       data-preview-kind={workspace ? 'workspace' : props.page}
     >
       {workspace ? (

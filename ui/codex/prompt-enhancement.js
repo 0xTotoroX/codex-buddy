@@ -1,3 +1,4 @@
+import { measureWork } from '../shared/performance.js';
 /* [INPUT]: Verified input target from the host adapter, explicit clicks and restricted model bridge.
  * [OUTPUT]: Optimize/cancel/restore controls; compare-before-write draft replacement, never send.
  * [POS]: Composer adapter; keeps only a temporary draft backup and no conversation history.
@@ -182,6 +183,10 @@ export function installPromptEnhancer({
   for (const type of ['input', 'compositionstart', 'compositionend'])
     document.addEventListener(type, changed, { signal: life.signal, capture: true });
   function tick() {
+    return measureWork('composer', checkComposer);
+  }
+  function checkComposer() {
+    if (document.hidden) return;
     if (!isEnabled()) {
       pending = null;
       undo = null;

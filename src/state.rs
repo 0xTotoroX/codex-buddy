@@ -63,6 +63,7 @@ struct Desired {
 }
 
 pub struct App {
+    pub(crate) performance: Mutex<crate::performance::Monitor>,
     pub(crate) surfaces: Mutex<crate::surfaces::Surfaces>,
     pub(crate) features: Mutex<crate::features::Features>,
     pub(crate) feature_operation: Mutex<()>,
@@ -99,7 +100,7 @@ impl App {
             } else {
                 config.target_id.clone()
             },
-            enabled: true,
+            enabled: config.performance.integration_enabled,
         };
         let model = Model::load(&config)
             .with_key(paths.load_key().ok().flatten())
@@ -108,7 +109,12 @@ impl App {
             version: crate::config::VERSION.into(),
             connection: Connection {
                 status: "disconnected".into(),
-                message: "正在寻找桌面 Codex…".into(),
+                message: if desired.enabled {
+                    "正在寻找桌面 Codex…"
+                } else {
+                    "Codex 集成已暂停，可在性能设置中重新开启。"
+                }
+                .into(),
                 endpoint: desired.endpoint.clone(),
                 target_id: None,
                 targets: Vec::new(),
@@ -124,6 +130,7 @@ impl App {
             panel_typography: Value::Null,
         });
         Arc::new(Self {
+            performance: Mutex::new(crate::performance::Monitor::default()),
             surfaces: Mutex::new(crate::surfaces::Surfaces::load(&paths)),
             features: Mutex::new(crate::features::Features::load(&paths)),
             feature_operation: Mutex::new(()),
@@ -183,7 +190,9 @@ impl App {
                 let session = self.session.read().await.clone();
                 if session.is_some() {
                     let guard = self.transition.lock().await;
-                    if let Err(error) = self.refresh().await {
+                    if self.desktop_client().await.is_some()
+                        && let Err(error) = self.refresh().await
+                    {
                         self.handle_refresh_failure(&error).await;
                     }
                     drop(guard);
@@ -192,6 +201,9 @@ impl App {
                     if attempts % 4 == 1 && self.desired.read().await.enabled {
                         let _guard = self.transition.lock().await;
                         let desired = self.desired.read().await.clone();
+                        if !desired.enabled {
+                            continue;
+                        }
                         if let Err(error) = self.establish(&desired).await {
                             tracing::debug!(error = %error, "宿主连接建立失败");
                             self.update_connection(
@@ -308,6 +320,16 @@ impl App {
             }
         }
         let _guard = self.transition.lock().await;
+        {
+            let mut config = self.config.lock().await;
+            if !config.performance.integration_enabled {
+                let mut next = config.clone();
+                next.performance.integration_enabled = true;
+                next.performance.revision += 1;
+                self.paths.save(&next)?;
+                *config = next;
+            }
+        }
         self.clear_connection("connecting", "正在连接桌面 Codex…")
             .await;
         let desired = Desired {
@@ -344,6 +366,71 @@ impl App {
         self.desired.write().await.enabled = false;
         self.clear_connection("disconnected", "已断开连接，点击连接可继续。")
             .await;
+    }
+
+    pub(crate) async fn update_performance(
+        self: &Arc<Self>,
+        patch: crate::performance::Update,
+    ) -> Result<Value> {
+        let _guard = self.transition.lock().await;
+        let previous = self.config.lock().await.performance.clone();
+        anyhow::ensure!(
+            patch.expected_revision == previous.revision,
+            "性能设置已在其他窗口更新，请重新读取后再保存"
+        );
+        let mut preferences = previous.clone();
+        if let Some(value) = patch.integration_enabled {
+            preferences.integration_enabled = value;
+        }
+        if let Some(value) = patch.monitoring_enabled {
+            preferences.monitoring_enabled = value;
+        }
+        if preferences == previous {
+            return Ok(self.performance_state(false).await);
+        }
+        if previous.integration_enabled
+            && !preferences.integration_enabled
+            && let Some(client) = self.desktop_client().await
+        {
+            let ready = client.evaluate("(async()=>{if(window.__buddyFeatureFlush && !(await window.__buddyFeatureFlush())) return false; return true})()".into()).await?;
+            anyhow::ensure!(
+                ready == true,
+                "工作台正在编辑或交接，请稍后关闭连接；当前草稿已保留"
+            );
+            client.suspend_desktop().await?;
+        }
+        preferences.revision += 1;
+        {
+            let mut config = self.config.lock().await;
+            let mut next = config.clone();
+            next.performance = preferences.clone();
+            self.paths.save(&next)?;
+            *config = next;
+        }
+        self.desired.write().await.enabled = preferences.integration_enabled;
+        let mut connection_error = None;
+        if !preferences.integration_enabled {
+            self.clear_connection("disconnected", "Codex 集成已暂停；设置和独立提醒事项同步保留。重新开启即可连接。仍可使用独立窗口中的本地任务。") .await;
+        } else if !previous.integration_enabled {
+            let desired = self.desired.read().await.clone();
+            if let Err(error) = self.establish(&desired).await {
+                connection_error = Some(error.to_string());
+                self.update_connection("disconnected", "已开启集成，正在等待原 Codex 窗口连接。");
+            }
+        }
+        if !preferences.monitoring_enabled {
+            *self.performance.lock().await = crate::performance::Monitor::default();
+            if let Some(client) = self.desktop_client().await {
+                let _ = client
+                    .evaluate("window.__companionFloatingPanel?.stopPerformance?.(); true".into())
+                    .await;
+            }
+        }
+        let mut result = self.performance_state(false).await;
+        if let Some(error) = connection_error {
+            result["connectionError"] = json!(error);
+        }
+        Ok(result)
     }
 
     pub(crate) async fn sync_desktop_settings(&self, settings: &Value) {
@@ -420,6 +507,64 @@ mod connection_tests {
     use futures_util::{SinkExt, StreamExt};
     use tokio::net::TcpListener;
     use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+    #[tokio::test]
+    async fn integration_pause_persists_without_touching_feature_data_and_monitoring_is_opt_in() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::new(Some(temp.path().into())).unwrap();
+        let config = Config::default();
+        paths.save(&config).unwrap();
+        let app = App::new(paths.clone(), config, None, true);
+        let state = app.performance_state(true).await;
+        assert!(state["sample"].is_null());
+        let feature_before = app.feature_state().await;
+        let paused = app
+            .update_performance(crate::performance::Update {
+                expected_revision: 0,
+                integration_enabled: Some(false),
+                monitoring_enabled: None,
+            })
+            .await
+            .unwrap();
+        assert_eq!(paused["preferences"]["integrationEnabled"], false);
+        assert!(!app.desired.read().await.enabled);
+        assert!(!paths.load().unwrap().performance.integration_enabled);
+        assert_eq!(feature_before, app.feature_state().await);
+        let cold = App::new(paths.clone(), paths.load().unwrap(), None, true);
+        assert!(!cold.desired.read().await.enabled);
+        assert!(cold.view().connection.message.contains("暂停"));
+        assert!(
+            app.update_performance(crate::performance::Update {
+                expected_revision: 0,
+                integration_enabled: Some(true),
+                monitoring_enabled: None,
+            })
+            .await
+            .is_err()
+        );
+        app.update_performance(crate::performance::Update {
+            expected_revision: 1,
+            integration_enabled: None,
+            monitoring_enabled: Some(true),
+        })
+        .await
+        .unwrap();
+        let first = app.performance_state(true).await;
+        let second = app.performance_state(true).await;
+        assert_eq!(
+            first["sample"], second["sample"],
+            "rapid requests share one sample"
+        );
+        assert!(first["sample"]["backend"]["cpuPercent"].is_null());
+        app.update_performance(crate::performance::Update {
+            expected_revision: 2,
+            integration_enabled: None,
+            monitoring_enabled: Some(false),
+        })
+        .await
+        .unwrap();
+        assert!(app.performance_state(true).await["sample"].is_null());
+    }
 
     #[tokio::test]
     async fn response_timeout_preserves_session_then_fresh_reply_restores_status() {

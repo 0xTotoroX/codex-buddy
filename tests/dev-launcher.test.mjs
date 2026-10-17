@@ -253,6 +253,26 @@ test('disconnected development reconnects the original target once, then reveals
   assert.equal(requests.at(-1).path, '/api/development/reveal');
 });
 
+test('reopening a paused integration keeps the service available without reconnecting', async (t) => {
+  const { root, requests } = await developmentFixture(t, (_req, res) => {
+    res.end(JSON.stringify({ connection: { status: 'disconnected' } }));
+  });
+  const config = join(root, 'target/dev/real/config.json');
+  writeFileSync(
+    config,
+    JSON.stringify({
+      cdpEndpoint: 'http://127.0.0.1:9231',
+      targetId: 'original-window',
+      performance: { integrationEnabled: false },
+    }),
+  );
+  assert.deepEqual(await revealDevelopment(root, { timeout: 500, interval: 5 }), { paused: true });
+  assert.deepEqual(
+    requests.map((r) => r.path),
+    ['/api/state'],
+  );
+});
+
 test('failed reconnect is bounded and does not restart a host or select another target', async (t) => {
   const { root, requests } = await developmentFixture(t, (req, res) => {
     if (req.url === '/api/connect') res.statusCode = 400;

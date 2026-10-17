@@ -178,6 +178,7 @@ async function startService() {
   service.on('error', (error) => {
     spawnError = error;
   });
+  let paused = false;
   await until(async () => {
     if (closing) throw new Error('开发模式退出中');
     if (spawnError || service.exitCode !== null) throw new Error(`开发后台启动失败，请查看 ${log}`);
@@ -188,11 +189,19 @@ async function startService() {
     } catch {
       return false;
     }
-    if (state.connection.status !== 'connected') return false;
+    if (state.connection.status !== 'connected') {
+      try {
+        paused = (await api('performance'))?.preferences?.integrationEnabled === false;
+      } catch {
+        /* Older sources still use the connected-state handshake. */
+      }
+      return paused;
+    }
     if (state.connection.endpoint !== host.endpoint || state.connection.targetId !== host.target.id)
       throw new Error('开发后台连接了不同的宿主目标，停止此次交接。');
     return true;
   }, `真实 Codex 连接超时，请查看 ${log}`);
+  if (paused) return;
   await until(async () => {
     if (closing) throw new Error('开发模式退出中');
     const report = await api('development');

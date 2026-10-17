@@ -8,10 +8,12 @@ import { ModelOrganization } from './model-organization';
 import type { ModelState, ModelPreferences } from '../features/model/catalog';
 export function ModelControlSettings({
   live,
+  active = true,
   detailed = true,
   onSnapshot,
 }: {
   live: boolean;
+  active?: boolean;
   detailed?: boolean;
   onSnapshot?: (state: ModelState | null) => void;
 }) {
@@ -23,10 +25,10 @@ export function ModelControlSettings({
   const generation = useRef(0);
   useEffect(() => onSnapshot?.(state), [state, onSnapshot]);
   useEffect(() => {
-    if (!live) return;
+    if (!live || !active) return;
     let disposed = false;
     const load = async () => {
-      if (writing.current) return;
+      if (writing.current || document.hidden) return;
       const version = ++generation.current;
       try {
         const value = await request<ModelState>('model-control/state');
@@ -46,7 +48,7 @@ export function ModelControlSettings({
       clearInterval(timer);
       window.removeEventListener('focus', load);
     };
-  }, [live]);
+  }, [live, active]);
   async function change(open: boolean) {
     if (writing.current) return;
     writing.current = true;

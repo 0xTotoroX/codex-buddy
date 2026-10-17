@@ -2,6 +2,8 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
+Dev 后台启动接受 performance.integrationEnabled=false 的暂停状态，不等待宿主注入；重新唤起入口时保留暂停，不自动 connect。日常 App 检测暂停后只打开设置，不请求弹出窗口。暂停的 Dev 只复用现有可调试宿主，缺失时明确停止启动，不委托宿主重开。稳定设置服务继续提供恢复开关，`npm run dev:settings` 可打开。脚本升级后正常重开一次 Dev 会话，保持原 Codex 进程与目标。
+
 npm 命令进入开发、构建、审计、安装和验证编排工具；具体测试实现与辅助文件位于 [tests/](../tests/AGENTS.md)。日常安装器生成的 macOS applet 调用已安装 CLI，运行时不依赖这些脚本或 Node；独立 Dev applet 依赖本地源码和开发工具。默认检查与打包只读取仓库及已安装依赖。
 
 成员清单：

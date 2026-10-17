@@ -340,6 +340,7 @@ impl App {
             "hostRestartPolicy": config.host_restart_policy,
             "popoutSupported": self.panel.lock().await.popout_supported,
             "taskBoardEnabled": self.tasks.board_enabled().await,
+            "terminologyEnabled": crate::terminology::enabled(&self.paths.root).unwrap_or(false),
             "modelControlEnabled": self.model_control.lock().await.preferences.enabled,
             "provider": model.provider, "model": model.name,
             "baseUrl": model.base_url, "available": info.available, "reason": info.reason,
