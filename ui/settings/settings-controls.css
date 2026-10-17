@@ -11,7 +11,7 @@
 .settings-app :is([data-slot='input'], [data-slot='native-select']) {
   height: var(--settings-control-height);
 }
-.settings-app :is(.settings-theme, .preview-selector, .settings-key-dialog) {
+.settings-app :is(.settings-theme, .preview-selector) {
   border-radius: var(--settings-control-radius);
 }
 .settings-app :is(button, input, select, textarea, summary, a):focus-visible {
@@ -345,8 +345,4 @@ html[data-settings-input='keyboard'] .settings-drawer::backdrop {
   .settings-drawer-footer {
     padding: 12px 20px 20px;
   }
-}
-
-.settings-app [data-slot='button'].bg-primary {
-  box-shadow: 2px 2px 0 color-mix(in srgb, var(--buddy-accent) 18%, transparent);
 }
