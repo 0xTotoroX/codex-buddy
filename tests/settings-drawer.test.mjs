@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { emulateMedia } from './browser-motion.mjs';
 const script = (
   await build({
     stdin: {
@@ -106,7 +107,7 @@ test('drawers retain mounted drafts and scroll without saving on close or naviga
     assert.equal(await input.evaluate((n) => n === window.originalInput), true);
     assert.equal(await page.locator('.settings-drawer[open]').count(), 1);
     await page.setViewportSize({ width: 360, height: 800 });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await emulateMedia(page, { reducedMotion: 'reduce' });
     const box = await drawer.boundingBox();
     assert.equal(Math.round(box.x), 0);
     assert.equal(Math.round(box.width), 360);

@@ -223,7 +223,8 @@
 }
 .settings-drawer {
   position: fixed;
-  inset: 0 0 0 auto;
+  /* Keep the top-layer edge at the viewport, beyond a reserved classic scrollbar gutter. */
+  inset: 0 calc(100% - 100vw) 0 auto;
   margin: 0;
   padding: 0;
   width: min(720px, calc(100vw - 80px));

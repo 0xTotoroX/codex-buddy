@@ -8,6 +8,7 @@ import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
+import { emulateMedia } from './browser-motion.mjs';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
@@ -332,7 +333,7 @@ test(
       await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
       assert.equal(await themeButton('自动').getAttribute('aria-pressed'), 'true');
       await expectTheme('dark'); // Before Codex is known, the browser supplies the fallback.
-      await page.emulateMedia({ colorScheme: 'light' });
+      await emulateMedia(page, { colorScheme: 'light' });
       await expectTheme('light');
       publishTheme('dark');
       await expectTheme('dark'); // The host wins even when the browser prefers light.
@@ -341,7 +342,7 @@ test(
       await expectTheme('dark'); // A missing host theme retains the last valid snapshot.
       publishTheme('light');
       await expectTheme('light');
-      await page.emulateMedia({ colorScheme: 'dark' });
+      await emulateMedia(page, { colorScheme: 'dark' });
       await expectTheme('light');
       assert.equal(writes.length, 0, 'theme subscription never writes business preferences');
       // Exercise the styled native picker through actual keyboard/pointer input, not selectOption.
@@ -701,7 +702,7 @@ test(
       assert.equal((await preview.textContent()).includes('fixture-unsaved-key'), false);
 
       for (const colorScheme of ['light', 'dark']) {
-        await page.emulateMedia({
+        await emulateMedia(page, {
           colorScheme: colorScheme === 'light' ? 'dark' : 'light',
           reducedMotion: 'reduce',
         });
@@ -845,11 +846,19 @@ test(
         themeWrites + 2,
         'cross-tab theme choices only save the appearance preference',
       );
-      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
+      await emulateMedia(page, { colorScheme: 'light', reducedMotion: 'no-preference' });
+      await preview.locator('.preview-workspace').evaluate((node) => {
+        window.placementAnimations = 0;
+        const animate = node.animate;
+        node.animate = function (...args) {
+          window.placementAnimations++;
+          return animate.apply(this, args);
+        };
+      });
       await page.getByRole('button', { name: '桌面窗口', exact: true }).click();
       await preview.locator('.preview-host[data-placement="desktop"]').waitFor();
       assert.ok(
-        await preview.locator('.preview-workspace').evaluate((n) => n.getAnimations().length > 0),
+        await page.evaluate(() => window.placementAnimations > 0),
         'placement changes animate only the illustration',
       );
       const beforeMotion = writes.length;
@@ -884,7 +893,7 @@ test(
       );
       await page.getByRole('link', { name: '生成模型', exact: true }).click();
       await page.getByRole('button', { name: '高级设置', exact: true }).click();
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await emulateMedia(page, { reducedMotion: 'reduce' });
       assert.equal(await drawer.evaluate((n) => getComputedStyle(n).transitionDuration), '0s');
       assert.equal(await drawer.evaluate((n) => n.getAnimations().length), 0);
       await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();

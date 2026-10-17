@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { emulateMedia, finishAnimations } from './browser-motion.mjs';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
@@ -130,7 +131,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
         const box = el.getBoundingClientRect();
         return { width: box.width, height: box.height };
       });
-      await page.waitForTimeout(220);
+      await finishAnimations(page.locator('.settings-model-editor'));
       assert.deepEqual(
         await page.locator('#base-url').evaluate((el) => {
           const box = el.getBoundingClientRect();
@@ -144,7 +145,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       await page.locator('#provider').selectOption('codex');
       await page.locator('#provider').selectOption('api');
       assert.equal(await page.locator('#base-url').inputValue(), 'https://fixture.test/v1');
-      await page.waitForTimeout(260);
+      await finishAnimations(page.locator('.settings-model-editor'));
       assert.equal(
         await page
           .locator('.settings-model-editor')
@@ -277,13 +278,13 @@ createRoot(document.getElementById('root')).render(<App/>);`,
       const closeGroups = page.getByRole('button', { name: '关闭模型分组', exact: true });
       if (await closeGroups.count()) await closeGroups.click();
       // Reduced motion cancels in flight and performs future operations immediately.
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await emulateMedia(page, { reducedMotion: 'reduce' });
       await clear();
       await page.locator('#provider').selectOption('codex');
       await page.locator('#provider').selectOption('api');
       await page.getByRole('button', { name: '添加提示词', exact: true }).click();
       assert.equal((await animations()).filter((x) => x.field || x.list).length, 0);
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await emulateMedia(page, { reducedMotion: 'no-preference' });
       await page.getByRole('button', { name: '添加提示词', exact: true }).focus();
       await clear();
       await page.keyboard.press('Enter');
@@ -305,10 +306,15 @@ createRoot(document.getElementById('root')).render(<App/>);`,
           button.click();
           await new Promise(requestAnimationFrame);
           button.click();
+          await new Promise(requestAnimationFrame);
+          const active = document
+            .querySelector('[data-settings-list="quick-prompts"]')
+            .getAnimations({ subtree: true });
+          if (!active.length) throw new Error('No reflow animation to cancel');
+          active.forEach((a) => a.pause());
         });
       assert.ok((await animations()).some((x) => x.list === 'quick-prompts' && x.duration === 200));
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.waitForTimeout(35);
+      await emulateMedia(page, { reducedMotion: 'reduce' });
       assert.equal(
         await page
           .locator('[data-settings-list="quick-prompts"]')
@@ -326,7 +332,7 @@ createRoot(document.getElementById('root')).render(<App/>);`,
         true,
         'narrow page has no horizontal overflow',
       );
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await emulateMedia(page, { reducedMotion: 'no-preference' });
       await page.locator('#provider').focus();
       await page.keyboard.press('ArrowUp');
       await clear();

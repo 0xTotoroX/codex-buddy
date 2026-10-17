@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { emulateMedia, finishAnimations } from './browser-motion.mjs';
 import { fixtureSettings } from './fixtures.mjs';
 
 test(
@@ -148,7 +149,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       await tabs.evaluate((el) => {
         el.querySelectorAll('button')[2].click();
       });
-      await page.waitForTimeout(250);
+      await finishAnimations(page.locator('.preview-scenes'));
       assert.equal(
         await page.locator('.preview-scene:not([inert])').getAttribute('data-preview-scene'),
         'board',
@@ -266,7 +267,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       await page.getByRole('button', { name: '关闭模型分组', exact: true }).click();
       // Reduced motion cancels in-flight WAAPI and suppresses spinner/CSS transforms, but keeps state feedback.
       await tabs.getByRole('button', { name: '大纲', exact: true }).click();
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await emulateMedia(page, { reducedMotion: 'reduce' });
       await page.waitForTimeout(30);
       assert.equal(
         await page
@@ -303,7 +304,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
         'reduced motion has no perceptible transition',
       );
       await testButton.locator('[data-action-state="success"]').waitFor();
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await emulateMedia(page, { reducedMotion: 'no-preference' });
       await tabs.getByRole('button', { name: '看板', exact: true }).focus();
       await page.keyboard.press('Enter');
       assert.equal(
@@ -322,14 +323,14 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
         'none',
         'keyboard keeps real waiting feedback',
       );
-      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await emulateMedia(page, { reducedMotion: 'reduce' });
       assert.equal(
         await pending.evaluate((el) => getComputedStyle(el, '::after').animationName),
         'none',
         'reduce stops the waiting line',
       );
       await testButton.locator('[data-action-state="success"]').waitFor();
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await emulateMedia(page, { reducedMotion: 'no-preference' });
       await mkdir('target/reports', { recursive: true });
       await page.screenshot({ path: 'target/reports/settings-motion-light.png', fullPage: true });
       await page.evaluate(() => (document.documentElement.dataset.settingsTheme = 'dark'));
