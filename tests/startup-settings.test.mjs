@@ -282,7 +282,7 @@ test(
       await page.reload();
       await quick.waitFor();
       assert.equal(await quick.inputValue(), '请继续推进整体目标');
-      await page.getByRole('link', { name: '下一步', exact: true }).click();
+      await page.getByRole('link', { name: '下一步建议', exact: true }).click();
       const source = page.getByLabel('方向来源', { exact: true });
       await source.selectOption('manual');
       await until(() => settings.directionSource === 'manual');

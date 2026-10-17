@@ -47,7 +47,7 @@ ui/codex 是宿主识别和写入的唯一实现，经受限请求桥请求模�
 
 - [tasks/AGENTS.md](tasks/AGENTS.md)：独立本地任务服务、单列表三共享字段合并与旧数据安全升级、原生 EventKit 辅助 App 与可调整大小的看板窗口；App 持有服务但不绑定 Codex 会话或模型调用。server 的 tasks API 共用认证，后台退出回收独立工作线程与窗口。
 
-工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token，接续自定义分组、快速新建草稿与横向位置；旧 editor 字段仅为旧客户端往返保留，新界面不呈现。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
+工作台 Ui.feature 选择兼容组合/大纲/看板；ReadingState.taskView 不使用聊天 token，接续自定义分组、快速新建草稿与横向位置；editor 字段接续详情快照和编辑草稿。panel 的 expand 交接意图只来自显式位置选择。requests 对宿主任务操作限制为视图命令；桌面本机 HTTP 仍使用既有 bearer 认证。
 
 独立功能呈现：
 - [features.rs](features.rs)：固定四功能的位置偏好、来源快照/目标 ready 交接、owner 校验、返回位置、只读锚点、内存阅读状态与主窗口监督；业务开关变更复用关闭/按原位置唤起，关闭先等待当前 owner 回传草稿再回收窗口，5 秒无响应时保留最近快照退出；快速重新启用会取消关闭并恢复持久化状态；仅当前 owner 可补存关闭视图，不复制业务服务。
@@ -101,3 +101,7 @@ panel.Preferences 顶层 typography 单独持久化并验证 follow/custom、bod
 开发回读新增 model（最多六行四个数字：常用行数/滚动高度/可用高度/末行底部、常用区矩形、Fast 矩形、加号矩形、预设数/行数/滚动宽度/可用宽度、预设区矩形）和 displayGeometry（三个矩形：AppKit 屏幕、CDP 宿主、AppKit 面板），不记录模型名称、预设内容或聊天。
 
 术语 locate 命令校验已保存的 jumpOnClick、标注开关、词条编号及聊天身份，再经当前 CDP 调用宿主 locate；features 的术语操作继续先验 owner。设置缺省与旧配置均不自动跳转。
+
+- `config_cli.rs`：schema/get/set 配置命令、字段/操作白名单、JSON/file/stdin 输入、脱敏预览、修订/任务快照保护及危险操作确认；复用 Runtime 认证服务，不直接读写配置或启动宿主。reminders calendars/authorize 提供原列表读取和显式授权，绑定仍需 iCloudConfirmed。
+
+panel::Preferences.settings_theme 为可空设置页主题偏好，旧配置默认为 None；appearance 校验 codex/light/dark，保持其他外观字段。模型 preferences 修改 enabled 时同步现有功能视图，呈现失败单独回传 presentationError。ReadingState.taskView.editor 继续复用旧 JSON 字段，现承载任务详情草稿与原任务快照，不写入持久化配置。

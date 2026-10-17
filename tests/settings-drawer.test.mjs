@@ -123,12 +123,14 @@ test('initial links and search open the right drawer and retain its fields', asy
     assert.equal(await page.evaluate(() => document.activeElement.id), 'timeout');
     await page.getByRole('button', { name: '关闭高级设置', exact: true }).click();
     const search = page.getByRole('searchbox', { name: '搜索设置' });
+    await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('术语草稿');
     await search.press('Enter');
     await page.locator('#library-drawer[open]').waitFor();
     assert.equal(await page.evaluate(() => document.activeElement.id), 'term');
     await page.getByLabel('术语草稿').fill('保留词条');
     await page.getByRole('button', { name: '关闭词库管理', exact: true }).click();
+    await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('超时草稿');
     await search.press('Enter');
     await page.locator('#settings-limits-drawer[open]').waitFor();

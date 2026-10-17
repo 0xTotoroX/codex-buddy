@@ -347,13 +347,30 @@ impl App {
             bail!("保存预设必须提供当前版本");
         }
         let next = control.preferences.patched(&request["patch"])?;
+        let enabled_changed = next.enabled != control.preferences.enabled;
+        let enabled = next.enabled;
         write_private(
             &self.paths.root.join("model-control.json"),
             &serde_json::to_vec_pretty(&next)?,
         )?;
         control.preferences = next;
         control.revision += 1;
-        Ok(control.envelope(control.snapshot.clone()))
+        let mut result = control.envelope(control.snapshot.clone());
+        drop(control);
+        drop(_guard);
+        if enabled_changed {
+            let presentation = if enabled {
+                Box::pin(self.feature_request(json!({"op":"reveal","id":"model"})))
+                    .await
+                    .map(|_| ())
+            } else {
+                self.close_feature("model").await
+            };
+            if let Err(error) = presentation {
+                result["presentationError"] = json!(error.to_string());
+            }
+        }
+        Ok(result)
     }
 
     pub async fn open_model_control(&self) -> Result<Value> {

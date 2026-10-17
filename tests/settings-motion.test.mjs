@@ -89,7 +89,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       const rect = await preview.boundingBox();
       const tabs = page.getByRole('group', { name: '功能预览' });
       await preview.getByRole('button', { name: /完善实现方案/ }).click();
-      for (const name of ['大纲', '看板', '模型快切', '下一步']) {
+      for (const name of ['大纲', '看板', '模型切换', '下一步建议']) {
         await tabs.getByRole('button', { name, exact: true }).click();
         const frames = await page.locator('.preview-scenes').evaluate(async (el) => {
           const samples = [];
@@ -261,7 +261,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
           .evaluate((el) => el.getAnimations({ subtree: true }).length),
         0,
       );
-      await tabs.getByRole('button', { name: '模型快切', exact: true }).click();
+      await tabs.getByRole('button', { name: '模型切换', exact: true }).click();
       assert.equal(
         await page
           .locator('.preview-scenes')

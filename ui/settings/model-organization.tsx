@@ -251,7 +251,7 @@ export function ModelOrganization({
           </div>
         </fieldset>
         {!models.length && (
-          <p className="text-muted-foreground">暂无模型。开启模型快切后刷新可用列表。</p>
+          <p className="text-muted-foreground">暂无模型。开启模型切换后刷新可用列表。</p>
         )}
         {groups.map((group, index) => {
           const custom = prefs.groups?.find((g) => `custom:${g.id}` === group.id);

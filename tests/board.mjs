@@ -106,7 +106,18 @@ try {
   let state = await api('tasks/state');
   assert.equal(state.store.tasks[0].fields.column, 'doing');
   await page.getByText('整理下一次发布', { exact: true }).click();
-  assert.equal(await page.locator('dialog').count(), 0, 'task click has no detail modal');
+  const details = page.getByRole('dialog', { name: '任务详情' });
+  await details.waitFor();
+  await page.getByLabel('备注', { exact: true }).fill('保留任务说明');
+  await page.getByLabel('优先级', { exact: true }).selectOption('1');
+  await page.getByLabel('截止日期', { exact: true }).fill('2026-10-20');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await details.waitFor({ state: 'hidden' });
+  state = await api('tasks/state');
+  assert.equal(state.store.tasks[0].fields.priority, 1);
+  assert.equal(state.store.tasks[0].fields.notes, '保留任务说明');
+  assert.equal(state.store.tasks[0].fields.column, 'doing');
+  assert.equal(state.store.tasks[0].fields.due.day, 20);
   const remove = page.getByRole('button', { name: '删除任务：整理下一次发布', exact: true });
   await page.mouse.move(0, 0);
   await remove.evaluate(async (node) => {
@@ -216,9 +227,7 @@ try {
   assert.equal(await page.getByRole('button', { name: '新增分组', exact: true }).count(), 0);
   const settings = await browser.newPage({ viewport: { width: 980, height: 900 } });
   await settings.goto(`http://127.0.0.1:${runtime.port}/#token=${runtime.token}`);
-  await settings.getByRole('button', { name: '详细设置', exact: true }).click();
-  await settings.getByRole('link', { name: '功能与交互', exact: true }).click();
-  await settings.getByText('看板分组', { exact: true }).click();
+  await settings.getByRole('link', { name: '任务看板', exact: true }).click();
   await settings.getByLabel('分组名称：待办', { exact: true }).fill('准备做');
   await settings.getByRole('button', { name: '保存分组：待办', exact: true }).click();
   await settings.getByLabel('分组名称：准备做', { exact: true }).waitFor();

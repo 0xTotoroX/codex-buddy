@@ -13,8 +13,10 @@ import {
   type Task,
   type TaskRequest,
 } from './api';
+import { TaskDetails, type TaskDraft } from './details';
 import { Column, TaskCard, taskDragOver, taskDrop } from './card';
 export type BoardView = {
+  editor?: TaskDraft | null;
   search: string;
   stage: string;
   tab: string;
@@ -50,14 +52,21 @@ export function Board({
   const [search, setSearch] = useState(view?.search ?? '');
   const [searchOpen, setSearchOpen] = useState(!!view?.search);
   const [quickAdd, setQuickAdd] = useState(view?.quickAdd ?? null);
+  const [draft, setDraft] = useState<TaskDraft | null>(
+    view?.editor?.task?.id && view.editor.fields ? view.editor : null,
+  );
+  function updateDraft(next: TaskDraft | null) {
+    if (view) view.editor = next;
+    setDraft(next);
+  }
   const [dropTab, setDropTab] = useState('');
   const columns = state?.store.columns ?? defaults;
   useEffect(() => {
     if (!columns.some((c) => c.id === stage)) setStage('todo');
   }, [columns, stage]);
   useEffect(() => {
-    if (view) Object.assign(view, { search, stage, tab, quickAdd });
-  }, [view, search, stage, tab, quickAdd]);
+    if (view) Object.assign(view, { search, stage, tab, quickAdd, editor: draft });
+  }, [view, search, stage, tab, quickAdd, draft]);
   useEffect(() => {
     const resize = (e: Event) => {
       void request('tasks/command', { op: 'windowSize', size: (e as CustomEvent).detail }).catch(
@@ -80,7 +89,7 @@ export function Board({
         completed: column === 'done',
         column: column === 'done' ? task.fields.column : column,
       };
-      void command({ op: 'update', id, fields, before, archived: false });
+      void command({ op: 'update', id, fields, before, archived: false, expectedTask: task });
     },
     [state, busy, command],
   );
@@ -101,6 +110,20 @@ export function Board({
     <TaskCard
       key={task.id}
       task={task}
+      edit={() => {
+        if (draft?.task.id === task.id) return updateDraft({ ...draft, open: true });
+        if (
+          draft &&
+          JSON.stringify(draft.fields) !== JSON.stringify(draft.task.fields) &&
+          !confirm('放弃之前未保存的任务修改？')
+        )
+          return;
+        updateDraft({
+          task: structuredClone(task),
+          fields: structuredClone(task.fields),
+          open: true,
+        });
+      }}
       disabled={busy || !state.store.boardEnabled || state.store.inflight?.taskId === task.id}
       command={command}
       before={(id) => move(id, taskGroup(task), task.id)}
@@ -182,6 +205,36 @@ export function Board({
         <header className="board-header">
           <h1>我的任务看板</h1>
         </header>
+      )}
+      {draft && (
+        <TaskDetails
+          draft={draft}
+          current={state.store.tasks.find((t) => t.id === draft.task.id)}
+          busy={busy || state.store.inflight?.taskId === draft.task.id}
+          error={error}
+          syncEnabled={state.store.syncEnabled}
+          change={(fields) => updateDraft({ ...draft, fields })}
+          close={() => updateDraft({ ...draft, open: false })}
+          reload={() => {
+            const task = state.store.tasks.find((t) => t.id === draft.task.id);
+            if (task && confirm('丢弃未保存修改并载入最新任务？'))
+              updateDraft({
+                task: structuredClone(task),
+                fields: structuredClone(task.fields),
+                open: true,
+              });
+          }}
+          save={() => {
+            void command({
+              op: 'update',
+              id: draft.task.id,
+              expectedTask: draft.task,
+              fields: { ...draft.fields, title: draft.fields.title.trim() },
+            }).then((result) => {
+              if (result) updateDraft(null);
+            });
+          }}
+        />
       )}
       <main className="board-main">
         {narrow && (

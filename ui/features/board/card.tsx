@@ -3,7 +3,8 @@
  * [PROTOCOL]: Keep board/AGENTS.md in sync. */
 import { useState, type DragEvent, type ReactNode } from 'react';
 import { Icon } from '../../shared/icons/react';
-import type { Task } from './api';
+import { dueText, type Task } from './api';
+import { priorityLabel } from './details';
 import { Recovery } from './recovery';
 const taskType = 'application/x-codex-buddy-task';
 export function taskDragOver(event: DragEvent) {
@@ -23,8 +24,10 @@ export function TaskCard({
   disabled,
   command,
   before,
+  edit,
 }: {
   task: Task;
+  edit: () => void;
   disabled: boolean;
   command: (data: Record<string, unknown>) => Promise<unknown>;
   before: (id: string) => void;
@@ -63,7 +66,24 @@ export function TaskCard({
       }}
       className={`task-card ${dragging ? 'dragging' : ''} ${over ? 'drop-before' : ''}`}
     >
-      <span className="card-title">{task.fields.title}</span>
+      <button
+        type="button"
+        className="card-title card-open"
+        aria-label={`任务详情：${task.fields.title}`}
+        onClick={edit}
+      >
+        {task.fields.title}
+      </button>
+      {(task.fields.priority > 0 || task.fields.due) && (
+        <div className="card-meta card-details-meta">
+          {task.fields.priority > 0 && (
+            <span aria-label={`优先级：${priorityLabel(task.fields.priority)}`}>
+              {priorityLabel(task.fields.priority)}优先级
+            </span>
+          )}
+          {task.fields.due && <time>{dueText(task.fields.due)}</time>}
+        </div>
+      )}
       <button
         type="button"
         className="card-delete"

@@ -7,6 +7,7 @@ mod assets;
 mod cdp;
 mod codex_host;
 mod config;
+mod config_cli;
 mod directions;
 mod edge_window;
 mod feature_window;
@@ -46,6 +47,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
+    #[command(about = "查询、预览和修改本机配置（JSON），不自动启动后台")]
+    Config {
+        #[command(subcommand)]
+        command: config_cli::Command,
+    },
     #[command(hide = true)]
     CodexHostRestart {
         #[arg(long)]
@@ -157,6 +163,7 @@ async fn main() -> Result<()> {
         no_open: false,
         allow_fixture: false,
     }) {
+        Commands::Config { command } => config_cli::run(&paths, command).await,
         Commands::CodexHostRestart { lease } => codex_host::restart::run(&paths, &lease).await,
         Commands::RemindersWorker {
             lease,

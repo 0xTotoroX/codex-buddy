@@ -6,11 +6,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { closeSettingsDrawers, revealSettingsDrawer } from './settings-drawer';
 export const pageTitles = {
   features: '常用开关',
-  next: '下一步',
+  next: '下一步建议',
   prompts: '常用提示词',
   terminology: '术语释义',
   board: '任务看板',
-  'model-control': '模型快切',
+  'model-control': '模型切换',
   model: '生成模型',
   surfaces: '布局与位置',
   appearance: '外观与字体',
@@ -24,8 +24,8 @@ export const pageGroups: { title: string; pages: SettingsPage[] }[] = [
     title: '功能',
     pages: ['features', 'next', 'prompts', 'terminology', 'board', 'model-control'],
   },
-  { title: '生成', pages: ['model'] },
   { title: '界面', pages: ['surfaces', 'appearance'] },
+  { title: '模型', pages: ['model'] },
   { title: '系统', pages: ['connection', 'codex-host', 'dev'] },
 ];
 export const pageGroup = (page: SettingsPage) =>

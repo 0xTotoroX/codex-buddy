@@ -410,7 +410,7 @@ try {
       ['outline', '大纲'],
       ['next', '下一步'],
       ['board', '看板'],
-      ['model', '模型快切'],
+      ['model', '模型切换'],
     ]) {
       await nav.getByRole('link', { name: '常用开关', exact: true }).click();
       const control = page.getByRole('switch', { name: `启用${name}`, exact: true });

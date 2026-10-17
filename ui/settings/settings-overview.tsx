@@ -231,7 +231,7 @@ export function SettingsOverview({
       <section className="overview-surface" aria-label="下一步配置">
         <div className="overview-hero">
           <div className="overview-identity">
-            <h2>下一步</h2>
+            <h2>下一步建议</h2>
             <strong>
               <a href="#settings-model">{settings.model || '未配置模型'}</a>
             </strong>
@@ -289,10 +289,10 @@ export function SettingsOverview({
           ))}
         </dl>
       </section>
-      <section className="overview-surface overview-model" aria-label="模型快切配置">
+      <section className="overview-surface overview-model" aria-label="模型切换配置">
         <header className="overview-section-head">
           <h2>
-            <a href="#settings-model-control">模型快切</a>
+            <a href="#settings-model-control">模型切换</a>
           </h2>
           {!enabled.model && <span className="overview-muted">已停用</span>}
         </header>

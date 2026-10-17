@@ -171,6 +171,7 @@ pub struct Preferences {
     pub return_open: Option<bool>,
     pub always_on_top: bool,
     pub settings_target: String,
+    pub settings_theme: Option<String>,
     pub launcher_action: String,
     pub position: Option<Position>,
     pub ui: Ui,
@@ -215,6 +216,7 @@ impl Default for Preferences {
             return_open: None,
             always_on_top: true,
             settings_target: "plugin".into(),
+            settings_theme: None,
             launcher_action: "inside".into(),
             position: None,
             ui: Ui::default(),
@@ -764,6 +766,13 @@ impl App {
                 bail!("默认入口动作无效");
             }
             next.launcher_action = action.into();
+        }
+        if let Some(value) = input.get("settingsTheme") {
+            let theme = value.as_str().context("设置页主题无效")?;
+            if !["codex", "light", "dark"].contains(&theme) {
+                bail!("设置页主题无效");
+            }
+            next.settings_theme = Some(theme.into());
         }
         if let Some(value) = input.get("settingsTarget") {
             let target = value.as_str().context("设置打开方式无效")?;

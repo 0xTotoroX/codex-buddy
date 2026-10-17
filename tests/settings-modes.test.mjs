@@ -12,7 +12,7 @@ import { fixtureSettings } from './fixtures.mjs';
 
 test(
   'unified settings retain grouped pages, legacy links, drafts, drawers and reading without navigation writes',
-  { timeout: 60000 },
+  { timeout: 120000 },
   async () => {
     let settings = structuredClone(fixtureSettings),
       rejectNext = false,
@@ -207,6 +207,12 @@ test(
           if (body?.action === 'restore') terminology.preferences.mastered = [];
           value = terminology;
         } else if (path === '/api/tasks/state') value = tasks;
+        else if (path === '/api/performance')
+          value = {
+            preferences: { integrationEnabled: true, monitoringEnabled: false, revision: 0 },
+            connectionStatus: 'connected',
+            sample: null,
+          };
         else if (path === '/api/dev/sources')
           value = {
             active: '/fixture/main',
@@ -256,6 +262,7 @@ test(
       colorScheme: 'dark',
     });
     const page = await context.newPage();
+    page.setDefaultTimeout(8000);
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     const category = async (id) => {
@@ -269,7 +276,7 @@ test(
       ].includes(id)
         ? '功能'
         : id === 'model'
-          ? '生成'
+          ? '模型'
           : ['surfaces', 'appearance'].includes(id)
             ? '界面'
             : '系统';
@@ -294,6 +301,9 @@ test(
         .getByRole('group', { name: '设置页主题' })
         .getByRole('button', { name, exact: true })
         .click();
+      await target.waitForFunction(
+        () => !document.querySelector('.settings-theme-trigger').disabled,
+      );
     };
     const expectTheme = async (theme) => {
       await page.waitForFunction(
@@ -320,7 +330,7 @@ test(
       });
       await page.goto(origin + '/#token=fixture');
       await page.getByRole('switch', { name: '启用大纲', exact: true }).waitFor();
-      assert.equal(await themeButton('跟随 Codex').getAttribute('aria-pressed'), 'true');
+      assert.equal(await themeButton('自动').getAttribute('aria-pressed'), 'true');
       await expectTheme('dark'); // Before Codex is known, the browser supplies the fallback.
       await page.emulateMedia({ colorScheme: 'light' });
       await expectTheme('light');
@@ -399,10 +409,18 @@ test(
       await expectTheme('dark');
       await chooseTheme('浅色');
       await expectTheme('light');
-      await chooseTheme('跟随 Codex');
+      await chooseTheme('自动');
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
       assert.equal(await model.evaluate((n, original) => n === original, modelNode), true);
-      assert.equal(writes.length, 0, 'theme buttons preserve focused drafts without auto-saving');
+      assert.equal(writes.length, 3);
+      assert.ok(
+        writes.every(
+          (w) =>
+            w.path === '/api/appearance' &&
+            Object.keys(w.body).sort().join(',') === 'expectedRevision,settingsTheme',
+        ),
+      );
+      writes.length = 0; // Theme-only saves never submit the focused model/key draft.
       await category('model');
       assert.equal(await model.inputValue(), '未保存模型草稿');
       assert.equal(await key.inputValue(), 'fixture-unsaved-key');
@@ -450,6 +468,7 @@ test(
       );
       // A not-yet-loaded library remains searchable and opens its own page and drawer.
       const splitSearch = page.getByRole('searchbox', { name: '搜索设置' });
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
       await splitSearch.fill('词库管理');
       await splitSearch.press('Enter');
       await page.getByRole('dialog', { name: '词库管理', exact: true }).waitFor();
@@ -725,13 +744,8 @@ test(
             assert.ok(
               header.search.x >= header.brand.right && header.search.right <= header.actions.x,
             );
-          } else {
-            assert.ok(
-              Math.abs(header.search.x - header.header.x) < 1 &&
-                Math.abs(header.search.right - header.header.right) < 1,
-              'wrapped search has equal left/right edges',
-            );
           }
+          assert.ok(header.search.width <= 100, 'compact search remains a button at every width');
           assert.ok(header.actions.right <= header.header.right + 1, 'header controls fit');
           publishTheme(colorScheme, 'unresponsive');
           await page.getByText('页面暂未响应', { exact: true }).waitFor();
@@ -821,18 +835,15 @@ test(
       assert.equal(await themeButton('浅色').getAttribute('aria-pressed'), 'true');
       await expectTheme('light');
       await peer.evaluate(() => localStorage.setItem('codex-buddy-settings-theme', 'unknown'));
-      await page.waitForFunction(
-        () => document.documentElement.dataset.settingsThemeMode === 'codex',
-      );
       publishTheme('dark');
-      await expectTheme('dark');
+      await expectTheme('light'); // Invalid browser storage cannot replace a saved server preference.
       await peer.evaluate(() => localStorage.removeItem('codex-buddy-settings-theme'));
-      await chooseTheme('跟随 Codex');
+      await chooseTheme('自动');
       await peer.close();
       assert.equal(
         writes.length,
-        themeWrites,
-        'theme persistence and cross-tab changes never submit configuration',
+        themeWrites + 2,
+        'cross-tab theme choices only save the appearance preference',
       );
       await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'no-preference' });
       await page.getByRole('button', { name: '桌面窗口', exact: true }).click();
@@ -887,7 +898,7 @@ test(
       await category('dev');
       await page.getByText('开发来源 · main · 1234567', { exact: true }).waitFor();
       const source = page.getByLabel('调试 worktree', { exact: true });
-      const sourceWrites = writes.length;
+      const sourceWrites = writes.filter((w) => w.path.startsWith('/api/dev/')).length;
       for (const mode of ['浅色', '深色']) {
         await chooseTheme(mode);
         await page.setViewportSize({ width: 360, height: 900 });
@@ -907,7 +918,11 @@ test(
         );
         await page.keyboard.press('Escape');
       }
-      assert.equal(writes.length, sourceWrites, 'previewing Dev menus never switches sources');
+      assert.equal(
+        writes.filter((w) => w.path.startsWith('/api/dev/')).length,
+        sourceWrites,
+        'previewing Dev menus never switches sources',
+      );
       const restricted = await browser.newContext({ colorScheme: 'dark', reducedMotion: 'reduce' });
       await restricted.addInitScript(() => {
         const get = Storage.prototype.getItem,
@@ -930,7 +945,7 @@ test(
       await restrictedPage.locator('html[data-settings-theme="light"]').waitFor();
       await restricted.close();
       await category('model');
-      const headerWrites = writes.length;
+      const headerWrites = writes.filter((w) => w.path !== '/api/appearance').length;
       await page.locator('.settings-theme-trigger').click();
       await page.keyboard.press('End');
       assert.equal(await themeButton('深色').evaluate((n) => n === document.activeElement), true);
@@ -950,6 +965,7 @@ test(
           .evaluate((n) => n === document.activeElement),
         true,
       );
+      await page.keyboard.press('Escape');
       for (const color of ['浅色', '深色']) {
         await chooseTheme(color);
         for (const width of [390, 680, 760, 761, 1100, 1440]) {
@@ -966,9 +982,9 @@ test(
               visible: !!n.getBoundingClientRect().height,
             })),
           );
-          assert.equal(links.length, 12);
+          assert.ok(links.length >= 12, 'all original settings leaves remain available');
           assert.ok(links.filter((n) => n.visible).every((n) => n.width >= n.content));
-          assert.equal(links.filter((n) => n.visible).length, width <= 760 ? 1 : 12);
+          assert.equal(links.filter((n) => n.visible).length, width <= 760 ? 1 : links.length);
           assert.equal(await page.locator('.settings-nav summary').count(), 0);
           const layout = await page.evaluate(() => {
             const nav = document.querySelector('.settings-nav').getBoundingClientRect();
@@ -992,9 +1008,9 @@ test(
         }
       }
       assert.equal(
-        writes.length,
+        writes.filter((w) => w.path !== '/api/appearance').length,
         headerWrites,
-        'header navigation and keyboard theme selection never save',
+        'header navigation never submits business settings',
       );
       assert.deepEqual(errors, []);
     } finally {

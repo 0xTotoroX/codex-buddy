@@ -103,11 +103,11 @@ export function ModelControlSettings({
     <section
       id="settings-model-control"
       tabIndex={-1}
-      aria-label="模型快切设置"
+      aria-label="模型切换设置"
       className="settings-section"
     >
       <FeatureSwitch
-        name="模型快切"
+        name="模型切换"
         checked={enabled ?? false}
         disabled={!live || busy || enabled === null}
         onChange={(value) => void change(value)}

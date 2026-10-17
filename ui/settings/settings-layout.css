@@ -738,3 +738,101 @@ html:root .settings-nav {
     content: none;
   }
 }
+
+/* Search is a compact entry; the modal owns the full input and result list. */
+.settings-topline > .settings-search {
+  flex: 0 0 auto;
+  min-width: 0;
+  width: auto;
+  max-width: none;
+  margin-left: auto;
+  order: 0;
+}
+.settings-topline > .settings-header-actions {
+  margin-left: 0;
+}
+.settings-search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  padding: 6px 10px;
+  color: var(--buddy-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+.settings-search-dialog {
+  position: fixed;
+  inset: min(16vh, 120px) 0 auto;
+  margin-inline: auto;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(620px, 75dvh);
+  padding: 12px;
+  overflow: auto;
+  color: var(--buddy-text);
+  background: var(--buddy-surface);
+  border: 1px solid var(--buddy-border);
+  border-radius: 9px;
+  box-shadow: var(--settings-menu-shadow);
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms var(--settings-ease),
+    display 180ms allow-discrete,
+    overlay 180ms allow-discrete;
+}
+.settings-search-dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+.settings-search-dialog::backdrop {
+  background: #0003;
+}
+.settings-search-dialog .settings-search-input {
+  width: 100%;
+}
+.settings-search-dialog .settings-search-input > button {
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  color: var(--buddy-muted);
+}
+.settings-search-dialog .settings-search-input input {
+  width: 100%;
+  min-width: 0;
+}
+.settings-search-dialog ul {
+  position: static;
+  max-height: none;
+  margin: 8px 0 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+@starting-style {
+  .settings-search-dialog[open] {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .settings-search-dialog {
+    transition: none;
+  }
+}
+
+.settings-search-dialog li button {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px;
+}
+.settings-search-dialog li button > span {
+  min-width: 0;
+}
+.settings-search-dialog li small {
+  text-align: right;
+}

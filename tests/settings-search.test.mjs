@@ -29,9 +29,13 @@ test('settings search reaches hidden categories without remounting or indexing p
     await page.setContent('<div id="root"></div>');
     await page.addScriptTag({ content: script });
     const search = page.getByRole('searchbox', { name: '搜索设置' });
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('优化');
     await page.getByRole('button', { name: /启用提示词优化/ }).click();
     assert.equal(await page.locator('#mode').textContent(), 'features');
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('大纲字号');
     await search.press('Enter');
     await page.locator('#font\\:field').waitFor();
@@ -40,26 +44,53 @@ test('settings search reaches hidden categories without remounting or indexing p
     assert.equal(await page.locator('#font\\:field').inputValue(), '未保存的草稿');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'font:field');
     await page.locator('#font\\:field').fill('新的未保存内容');
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('CodexHost');
     await page.getByRole('button', { name: /启用 CodexHost/ }).click();
     assert.equal(await page.locator('#mode').textContent(), 'connection');
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('private-value-must-not-be-indexed');
     await page.getByRole('status').filter({ hasText: '没有找到设置' }).waitFor();
     assert.equal(
       await page.getByRole('button', { name: /private-value-must-not-be-indexed/ }).count(),
       0,
     );
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('密钥');
     await search.press('Enter');
     await page.getByLabel('API 密钥').waitFor();
     assert.equal(await page.locator('#mode').textContent(), 'model');
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('大纲字号');
     await search.press('Enter');
     assert.equal(await page.locator('#font\\:field').inputValue(), '新的未保存内容');
+    if (!(await search.isVisible()))
+      await page.getByRole('button', { name: '搜索设置', exact: true }).click();
     await search.fill('优化');
     await search.press('Escape');
-    assert.equal(await search.inputValue(), '');
-    assert.equal(await page.locator('#settings-search-results').count(), 0);
+    assert.equal(await page.locator('.settings-search-dialog input').inputValue(), '');
+    assert.equal(await page.getByRole('dialog', { name: '搜索设置' }).isVisible(), false);
+    assert.equal(
+      await page
+        .getByRole('button', { name: '搜索设置', exact: true })
+        .evaluate((n) => n === document.activeElement),
+      true,
+    );
+    await page.keyboard.press('Control+k');
+    await search.press('ArrowDown');
+    assert.equal(
+      await page
+        .locator('#settings-search-results button')
+        .first()
+        .evaluate((n) => n === document.activeElement),
+      true,
+    );
+    await page.keyboard.press('ArrowUp');
+    assert.equal(await search.evaluate((n) => n === document.activeElement), true);
   } finally {
     await browser.close();
   }

@@ -31,3 +31,5 @@ pencil 摘取同一固定公开提交的 Pencil.tsx，原路径和24px画布，�
 bolt-filled 复用同一固定提交 Bolt 的外轮廓路径，去除内轮廓形成实心变体，用于 Fast 开启状态与充电填充；保留来源署名、24px画布及18px显示。
 
 模型预设添加复用 bookmark（SavedXs）书签图标，保持18px图形与28px点击区，不另行放大路径。
+
+theme-auto 摘取上述固定提交的 MoonSunSystem.tsx，日月组合表示“自动”，供设置主题入口使用；保留原路径、24px 画布和 MIT 许可。

@@ -30,7 +30,7 @@ export function installFeatureControls(root) {
     const launch = document.createElement('select');
     launch.setAttribute('aria-label', '独立打开功能');
     launch.innerHTML =
-      '<option value="">独立打开…</option><option value="outline">大纲</option><option value="board">看板</option><option value="next">下一步</option><option value="model">模型快切</option>';
+      '<option value="">独立打开…</option><option value="outline">大纲</option><option value="board">看板</option><option value="next">下一步</option><option value="model">模型切换</option>';
     launch.onchange = () => {
       const id = launch.value;
       launch.value = '';

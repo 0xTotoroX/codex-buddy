@@ -1,15 +1,17 @@
 /* [INPUT]: Authenticated Codex theme snapshot, shared icons and this origin's display preference.
  * [OUTPUT]: Light/dark settings theme and a compact trigger with three retained preference options.
- * [POS]: Presentation only; never writes Codex appearance or business configuration.
+ * [POS]: Settings-only preference; revision-checked Buddy persistence, never writes Codex appearance.
  * [PROTOCOL]: Keep settings/AGENTS.md in sync. */
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Icon } from '../shared/icons/react';
+import type { AppearanceSettings } from '../shared/contracts';
+import { request } from './api';
 
 type Theme = 'light' | 'dark';
 type Preference = Theme | 'codex';
 const storageKey = 'codex-buddy-settings-theme';
 const options = [
-  ['codex', '跟随 Codex'],
+  ['codex', '自动'],
   ['light', '浅色'],
   ['dark', '深色'],
 ] as const;
@@ -24,7 +26,19 @@ function readPreference(): Preference {
   }
 }
 
-export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
+export function SettingsTheme({
+  codexTheme,
+  appearance,
+  notify,
+}: {
+  codexTheme?: string | null;
+  appearance?: AppearanceSettings;
+  notify?: (message: string, failed?: boolean) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const pending = useRef(false);
+  const acceptedRevision = useRef(-1);
+  const persisted = useRef(false);
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -42,6 +56,14 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
     return () => document.removeEventListener('pointerdown', outside);
   }, [open]);
   const [preference, setPreference] = useState<Preference>(readPreference);
+  useEffect(() => {
+    const value = appearance?.settingsTheme;
+    if (value && appearance.revision >= acceptedRevision.current) {
+      persisted.current = true;
+      acceptedRevision.current = appearance.revision;
+      remember(value);
+    }
+  }, [appearance?.settingsTheme, appearance?.revision]);
   const [systemTheme, setSystemTheme] = useState<Theme>(() =>
     matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   );
@@ -63,7 +85,9 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const syncSystem = () => setSystemTheme(media.matches ? 'dark' : 'light');
     const syncStorage = (event: StorageEvent) => {
-      if (event.key === storageKey || event.key === null) setPreference(readPreference());
+      if (event.key !== storageKey && event.key !== null) return;
+      if (persisted.current && !['codex', 'light', 'dark'].includes(event.newValue || '')) return;
+      setPreference(readPreference());
     };
     syncSystem();
     media.addEventListener('change', syncSystem);
@@ -74,7 +98,7 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
     };
   }, []);
 
-  function select(next: Preference) {
+  function remember(next: Preference) {
     setPreference(next);
     try {
       localStorage.setItem(storageKey, next);
@@ -83,9 +107,31 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
     }
   }
 
+  async function select(next: Preference) {
+    if (pending.current || (next === preference && persisted.current)) return;
+    if (!appearance) return remember(next);
+    pending.current = true;
+    setSaving(true);
+    try {
+      const latest = await request<AppearanceSettings>('appearance');
+      const saved = await request<AppearanceSettings>('appearance', {
+        expectedRevision: latest.revision,
+        settingsTheme: next,
+      });
+      persisted.current = true;
+      acceptedRevision.current = saved.revision;
+      remember(saved.settingsTheme || next);
+    } catch (error) {
+      notify?.(error instanceof Error ? error.message : '主题保存失败，请重试。', true);
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
+  }
+
   const label = options.find(([value]) => value === preference)![1];
   const symbol = (value: Preference) =>
-    value === 'codex' ? 'layout' : value === 'light' ? 'sun' : 'moon';
+    value === 'codex' ? 'theme-auto' : value === 'light' ? 'sun' : 'moon';
   return (
     <div
       className="settings-theme"
@@ -108,6 +154,8 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
         type="button"
         className="settings-theme-trigger"
         aria-label={`设置页主题：${label}`}
+        title={preference === 'codex' ? '自动跟随 Codex' : label}
+        disabled={saving}
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen(!open)}
@@ -143,7 +191,7 @@ export function SettingsTheme({ codexTheme }: { codexTheme?: string | null }) {
             aria-label={name}
             aria-pressed={preference === value}
             onClick={() => {
-              select(value);
+              void select(value);
               setOpen(false);
               trigger.current?.focus();
             }}

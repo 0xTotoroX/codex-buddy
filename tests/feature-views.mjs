@@ -299,7 +299,7 @@ try {
 
   await page
     .getByRole('navigation', { name: '功能' })
-    .getByRole('button', { name: '模型快切' })
+    .getByRole('button', { name: '模型切换' })
     .click();
   assert.equal(await page.getByLabel('收起面板').count(), 0);
   assert.equal(await page.getByLabel('展开功能面板').textContent(), '');
@@ -318,7 +318,7 @@ try {
   record('edge omits settings; blank handle and Escape preserve tab drafts');
   await page
     .getByRole('navigation', { name: '功能' })
-    .getByRole('button', { name: '模型快切' })
+    .getByRole('button', { name: '模型切换' })
     .click();
   const view = page.locator('[data-feature="model"]');
   const picker = () => view.locator('[data-model-picker]');
@@ -422,7 +422,7 @@ try {
   await refresh.waitFor({ state: 'hidden' });
   await page
     .getByRole('navigation', { name: '功能' })
-    .getByRole('button', { name: '模型快切', exact: true })
+    .getByRole('button', { name: '模型切换', exact: true })
     .click();
   await showOthers();
   await refresh.waitFor();
@@ -739,13 +739,13 @@ try {
     await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
   await board.getByLabel('新任务标题', { exact: true }).fill('还未保存');
 
-  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
+  await page.getByRole('tab', { name: '模型切换', exact: true }).click();
   await page.getByRole('tab', { name: '看板', exact: true }).click();
 
   assert.equal(await board.getByLabel('新任务标题', { exact: true }).inputValue(), '还未保存');
 
-  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
-  assert.equal(await page.getByLabel('模型快切显示位置').count(), 0);
+  await page.getByRole('tab', { name: '模型切换', exact: true }).click();
+  assert.equal(await page.getByLabel('模型切换显示位置').count(), 0);
   entries.find((e) => e.id === 'model').reveal++;
   await page.waitForFunction(() => window.nativeMessages.some((m) => m.kind === 'reveal'));
   await page.screenshot({ path: join(output, 'desktop-model.png') });
@@ -814,7 +814,7 @@ try {
   await page.getByRole('button', { name: '搜索任务', exact: true }).click();
   await board.getByText('隔离任务', { exact: true }).waitFor();
   await page.screenshot({ path: join(output, 'desktop-board-aligned.png') });
-  await page.getByRole('tab', { name: '模型快切', exact: true }).click();
+  await page.getByRole('tab', { name: '模型切换', exact: true }).click();
   await page.getByLabel('窗口置顶', { exact: true }).click();
   await page.getByLabel('取消窗口置顶', { exact: true }).waitFor();
   assert.equal(pinned, true);
@@ -1131,7 +1131,7 @@ try {
   await outer.focus();
   await outer.press('ArrowDown');
   assert.ok(Number(await outer.getAttribute('data-column-width')) > 50);
-  await page.getByRole('tab', { name: '下一步', exact: true }).dblclick();
+  await page.getByRole('tab', { name: '下一步建议', exact: true }).dblclick();
   assert.equal(await page.locator('.csw-feature-panes .csw-workbench-pane:visible').count(), 1);
   assert.equal(await page.getByRole('separator', { name: '调整分栏比例' }).count(), 0);
   await page.keyboard.press('Escape');

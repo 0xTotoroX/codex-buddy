@@ -717,7 +717,7 @@ export function ModelView({
       {(!prefs.enabled || s.message) && (
         <footer className="model-footer">
           <span role="status">
-            {!prefs.enabled ? '模型快切已停用，请在设置页开启。' : s.message}
+            {!prefs.enabled ? '模型切换已停用，请在设置页开启。' : s.message}
           </span>
         </footer>
       )}

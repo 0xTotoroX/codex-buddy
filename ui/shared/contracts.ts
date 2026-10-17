@@ -256,6 +256,7 @@ declare global {
 }
 
 export interface AppearanceSettings {
+  settingsTheme?: 'codex' | 'light' | 'dark' | null;
   typography?: import('./typography').TypographyPreferences;
   launcherAction?: 'inside' | 'outside' | 'settings';
   settingsTarget?: 'plugin' | 'web';

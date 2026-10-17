@@ -231,3 +231,6 @@ macOS 的 Tab 遍历受运行器系统键盘导航偏好影响；轮廓验收对
 统一设置验收：settings-modes 保留现有页面、保存失败、主题、响应式和联动预览测试，以跨页往返替代模式切换；增加旧 simple 偏好及 settings-simple/settings-overview 零写入兼容检查。settings-search/drawer 使用统一页面导航；e2e 与启动/模型快切用例直接进入对应分组页，不再寻找模式按钮。
 
 launcher-face 回归覆盖眼睛入口单击、双击、Enter/Space 与逐一点击内／外／设置，暂停实际动画检查眨眼尺寸与稳定点击区，验证运行时表情更新、减少动态效果、键盘触发、动作失败、重复触发取消以及销毁清理。
+
+- `board-details.test.mjs`：合成任务验证详情失败草稿、优先级原值、日期时区、关闭/重开/交接、外部冲突及确认重新载入；不连接真实提醒事项。
+- `config-cli.mjs`：隔离真实服务验证 CLI schema/get/set、dry-run 零写入、凭据脱敏/保留、陈旧修订与删除拒绝、任务局部修改及重启持久化；由 verify 调用。

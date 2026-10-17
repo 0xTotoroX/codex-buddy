@@ -178,3 +178,7 @@ CodexHost管理迁回main：独立src/codex_host.rs及codex_host子模块、认�
 统一字体偏好位于 panel.json 顶层 typography（默认 follow/body/100%、自定义16px）；术语卡、工作台与设置页共用只读字体快照。codex/typography 采集聊天正文/左侧会话标题/输入框样式及 CSS zoom，新读数稳定至少200ms后发布，来源缺失沿用最后有效值；state 通过原 CDP 状态同步及认证 SSE/功能投影传递，不传正文、不持久化快照，不改变生成修订。旧 ui.fontSizes/fontOffset 保留兼容，但新统一模式不叠加旧偏移。
 
 统一设置兼容旧 settings-simple/settings-overview 链接，进入常用开关；忽略旧模式偏好，不清除业务配置或密钥。页面记忆继续兼容旧分类键，所有表单保持单份挂载，导航不触发保存。
+
+设置分组按功能、界面、模型、系统排列；功能显示名采用“下一步建议”“模型切换”，内部标识不变。设置页搜索通过按钮或 Cmd/Ctrl+K 打开模态搜索，选择结果沿用原页面/抽屉定位，不提交表单。主题“自动”跟随 Codex，旧浏览器选择在后台 settingsTheme 未配置时继续保留；显式修改通过 appearance 修订号保存，CLI 与页面共享同一偏好。看板标题打开右侧任务详情，复用原 Fields 的备注、优先级和截止日期；详情草稿纳入临时 BoardView.editor，保存带 expectedTask，外部变化保留草稿并阻止覆盖。优先级/截止日期仅本地保存，提醒事项仍只同步原三项。
+
+配置自动化使用 `codex-buddy config schema/get/set`，通过已运行后台的认证 API 读写；支持 JSON/file/stdin、脱敏预览和显式确认，不直接改配置文件、不自动启动后台、不提供 MCP。配置域及操作以 `config schema` 为准，数组整体替换；未提及字段保留，并发冲突不自动重试。

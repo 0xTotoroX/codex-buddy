@@ -110,7 +110,11 @@ function App() {
           </a>
           <SettingsSearch navigate={navigate} />
           <div className="settings-header-actions">
-            <SettingsTheme codexTheme={view?.panelTheme} />
+            <SettingsTheme
+              codexTheme={view?.panelTheme}
+              appearance={view?.panelPreferences}
+              notify={notify}
+            />
             <span
               className="settings-connection-status"
               data-connected={connected}
@@ -155,7 +159,7 @@ function App() {
                 </div>
                 <div data-settings-page="next" hidden={!common && page !== 'next'}>
                   <FeatureSwitch
-                    name="下一步"
+                    name="下一步建议"
                     checked={editor.form?.enabled ?? false}
                     disabled={!live || !editor.form}
                     onChange={(v) => editor.change('enabled', v)}
