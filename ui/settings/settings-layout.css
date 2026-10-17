@@ -643,6 +643,8 @@ html:root .settings-nav {
 .settings-body:has(> .settings-preview[hidden]) {
   grid-template-columns: minmax(0, 1fr);
 }
+/* The page heading already names these sections; keep their DOM and accessible labels. */
+.settings-app[data-settings-category='model'] #model-title,
 .settings-app[data-settings-category='terminology']
   #settings-terminology
   > .settings-section-heading,

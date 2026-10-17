@@ -509,7 +509,7 @@ test(
       );
       rejectNext = true;
       await model.fill('失败后保留模型');
-      await page.getByRole('heading', { name: '生成模型', exact: true, level: 2 }).click();
+      await page.getByRole('heading', { name: '生成模型', exact: true, level: 1 }).click();
       await page.locator('.settings-feedback').filter({ hasText: '合成保存失败' }).waitFor();
       await roundTrip();
       assert.equal(await model.inputValue(), '失败后保留模型');
