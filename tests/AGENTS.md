@@ -2,7 +2,7 @@
 
 > L2 | 父级：[AGENTS.md](../AGENTS.md)
 
-- `performance.test.mjs`：隔离验证监测默认零计时器、短租约与嵌套计时；设置可见性/保存失败、相同宿主心跳零重绘、工具关闭清理与重启。Rust assets/state/performance 单测覆盖文件替换缓存、持久暂停/修订冲突/冷启动和采样合并；lifecycle 验证暂停 launch 不准备宿主，dev-launcher 验证重开不自动连接；不操作真实聊天。
+- `performance.test.mjs`：隔离验证监测默认零计时器、短租约与嵌套计时；设置可见性/保存失败、历史点数/时间上限、缺测断线/进程重启、320/680/1100px监视窗与减少动态效果、相同宿主心跳零重绘、工具关闭清理与重启。Rust assets/state/performance 单测覆盖文件替换缓存、持久暂停/修订冲突/冷启动和采样合并；lifecycle 验证暂停 launch 不准备宿主，dev-launcher 验证重开不自动连接；不操作真实聊天。
 
 集中维护契约、端到端、生命周期与原生验收，以及测试辅助和合成数据。Node 测试检查模块边界与审计器，许可集成测试读取 Cargo 元数据和已安装 npm 依赖；HTML fixture 供独立浏览器验收。需要二进制的测试通过 scripts/verify.mjs 准备与源码匹配的产物。运行数据仅写临时目录或 `target/reports/`。
 

@@ -1,5 +1,5 @@
 /* [INPUT]: Actual monitor, settings page and host runtime with synthetic APIs.
- * [OUTPUT]: Opt-in sampling, expiring leases, no-op rendering and disabled feature cleanup regressions.
+ * [OUTPUT]: Opt-in sampling, bounded visual history, expiring leases and disabled feature cleanup regressions.
  * [POS]: Isolated browsers and fake clocks; no real chat or model requests.
  * [PROTOCOL]: Keep tests/AGENTS.md in sync. */
 import test from 'node:test';
@@ -78,22 +78,66 @@ test('monitor is inert by default, counts nested work once and releases its obse
   assert.equal(clockReads, previous);
 });
 
+test('monitor history stays bounded, resets on restart and shows missing data as gaps', async () => {
+  const result = await build({
+    entryPoints: ['ui/settings/performance-history.ts'],
+    bundle: true,
+    write: false,
+    platform: 'node',
+    format: 'cjs',
+  });
+  const module = { exports: {} };
+  runInNewContext(result.outputFiles[0].text, { module });
+  const { appendPerformancePoint, chartGeometry } = module.exports;
+  const sample = (at, cpu = 2, pid = 42) => ({
+    sampledAt: at,
+    backend: { pid, cpuPercent: cpu, memoryBytes: 10485760 },
+    host: null,
+  });
+  let history = [];
+  for (let i = 0; i < 1000; i++) history = appendPerformancePoint(history, sample(i * 100));
+  assert.equal(history.length, 60, 'fast updates cannot grow beyond 60 points');
+  assert.equal(appendPerformancePoint(history, sample(99900)), history, 'deduplicate samples');
+  assert.equal(appendPerformancePoint(history, sample(0)), history, 'reject older responses');
+  history = appendPerformancePoint(history, sample(500000));
+  assert.equal(history.length, 1, 'discard samples older than five minutes');
+  history = appendPerformancePoint(history, sample(505000, 2, 43));
+  assert.equal(history.length, 1, 'restart starts a new history');
+  history = [];
+  for (const [at, cpu] of [
+    [0, 1],
+    [5000, 2],
+    [10000, null],
+    [15000, 3],
+    [35000, 4],
+  ])
+    history = appendPerformancePoint(history, sample(at, cpu));
+  const chart = chartGeometry(history, 'cpu', 5);
+  assert.equal(JSON.stringify(chart.segments.map((part) => part.length)), '[2,1,1]');
+  assert.equal(chart.minutes, 1);
+  assert.equal(chart.segments.at(-1)[0].x, 300);
+  const invalid = appendPerformancePoint([], sample(1000, -1));
+  assert.equal(invalid[0].cpu, null, 'missing and invalid readings are never invented zeros');
+  assert.equal(invalid[0].longTasks, null);
+});
+
 test('performance settings sample only while visible and preserve confirmed toggles after failure', async () => {
-  const script = (
-    await build({
-      stdin: {
-        resolveDir: process.cwd(),
-        loader: 'jsx',
-        contents: `
+  const bundle = await build({
+    stdin: {
+      resolveDir: process.cwd(),
+      loader: 'jsx',
+      contents: `
 import React,{useState}from'react';import{createRoot}from'react-dom/client';import{PerformanceSettings}from'./ui/settings/performance-settings';
 function App(){const[active,setActive]=useState(true);window.setActive=setActive;return <PerformanceSettings live active={active}/>};createRoot(document.getElementById('root')).render(<App/>);`,
-      },
-      bundle: true,
-      write: false,
-      jsx: 'automatic',
-      define: { 'process.env.NODE_ENV': '"production"' },
-    })
-  ).outputFiles[0].text;
+    },
+    bundle: true,
+    write: false,
+    outfile: 'target/reports/performance/settings-test.js',
+    jsx: 'automatic',
+    define: { 'process.env.NODE_ENV': '"production"' },
+  });
+  const script = bundle.outputFiles.find((file) => file.path.endsWith('.js')).text;
+  const css = bundle.outputFiles.find((file) => file.path.endsWith('.css')).text;
   const browser = await chromium.launch({ headless: true });
   try {
     const page = await browser.newPage();
@@ -125,15 +169,23 @@ function App(){const[active,setActive]=useState(true);window.setActive=setActive
         samples++;
         assert.equal(state.preferences.monitoringEnabled, true);
         state.sample = {
-          sampledAt: Date.now(),
-          backend: { cpuPercent: samples === 1 ? null : 2, memoryBytes: 10485760 },
-          host: null,
+          sampledAt: 1700000000000 + samples * 5000,
+          backend: { pid: 42, cpuPercent: samples === 1 ? null : 2, memoryBytes: 10485760 },
+          host: {
+            intervalMs: samples === 1 ? 0 : 5000,
+            busyMs: 12,
+            work: { scan: { count: 3, totalMs: 12, maxMs: 5 } },
+            hostJsHeapBytes: 104857600,
+            hostLongTasks: 1,
+            hostLongestTaskMs: 85,
+          },
         };
       }
       return route.fulfill({ json: state });
     });
     await page.goto('http://performance.test');
     await page.clock.install();
+    await page.addStyleTag({ content: css });
     await page.addScriptTag({ content: script });
     const monitor = page.getByRole('switch', { name: '性能监测' }),
       integration = page.getByRole('switch', { name: '连接到 Codex' });
@@ -148,6 +200,35 @@ function App(){const[active,setActive]=useState(true);window.setActive=setActive
     await page.getByText('10.0 MB', { exact: true }).waitFor();
     await page.clock.runFor(5100);
     await page.getByText('2.0%', { exact: true }).waitFor();
+    await page.getByRole('img', { name: /Buddy 后台 CPU.*1个采样点/ }).waitFor();
+    await page.getByRole('img', { name: /Buddy 后台物理内存.*2个采样点/ }).waitFor();
+    await page.getByText('查看工作明细', { exact: true }).click();
+    await page.getByText('聊天检查', { exact: true }).waitFor();
+    const beforeResize = requests;
+    for (const width of [320, 680, 1100]) {
+      await page.setViewportSize({ width, height: 900 });
+      const geometry = await page.locator('.performance-dashboard').evaluate((element) => {
+        const children = [...element.querySelectorAll('.performance-instrument')];
+        return {
+          width: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          tops: children.map((child) => child.getBoundingClientRect().top),
+        };
+      });
+      assert.ok(
+        geometry.scrollWidth <= geometry.width + 1,
+        `${width}px has no horizontal overflow`,
+      );
+      assert.equal(geometry.tops[0] === geometry.tops[1], width > 480);
+    }
+    assert.equal(requests, beforeResize, 'layout changes do not add sampling requests');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    assert.equal(
+      await page
+        .locator('.performance-dial-value')
+        .evaluate((element) => getComputedStyle(element).transitionDuration),
+      '0s',
+    );
     await page.evaluate(() => window.setActive(false));
     await page.waitForTimeout(10);
     const count = requests;
@@ -167,6 +248,7 @@ function App(){const[active,setActive]=useState(true);window.setActive=setActive
       () => document.querySelectorAll('[role=switch]')[1].getAttribute('aria-checked') === 'false',
     );
     const end = samples;
+    await page.getByRole('img', { name: /Buddy 后台 CPU.*0个采样点/ }).waitFor();
     await page.clock.runFor(15000);
     assert.equal(samples, end);
   } finally {
