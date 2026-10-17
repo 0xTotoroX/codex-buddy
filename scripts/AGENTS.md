@@ -22,7 +22,7 @@ npm 命令进入开发、构建、审计、安装和验证编排工具；具体�
 - [build-panel.mjs](build-panel.mjs)：从 ui/codex/runtime/lifecycle.js 入口解析 ES modules，输出可重复注入的脚本，供 Cargo 内嵌。
 - [install.mjs](install.mjs)：源码安装入口，不修改 shell PATH；本地 CLI / .app 启动器安装、旧默认数据目录迁移、旧程序保留和服务恢复；App 默认位于 /Applications。
 - [launcher.mjs](launcher.mjs)：为安装器生成带本地签名的 CodexBuddy.app；从 ui/icon.png 生成多尺寸 ICNS 并绑定应用图标；双击调用 launch --restart-running 按设置处理缺少连接的宿主，取消不再弹错误；连接后在受支持系统弹出，以后台应用方式运行、不显示运行中的 Dock 图标；macOS 14 遇到浮窗门槛时保留内嵌，其他错误用系统对话框显示。
-- [package.mjs](package.mjs)：本地打包入口，构建并校验当前 release、最低系统版本及许可；归档自带与其文件匹配的使用说明；生成 macOS arm64 分发目录、manifest、包内程序 SHA256SUMS、程序 tar.gz 与供 Release 正文追加的 release-checksums.md；不生成独立源码包或归档校验附件；使用 GitHub 标签归档交付 GPL 对应源码前，须核对该精确修订实际可用并包含必要构建、安装材料，旧标签不能替代。
+- [package.mjs](package.mjs)：本地打包入口，构建并校验当前 release、最低系统版本及许可；归档自带与其文件匹配的使用说明；生成 macOS arm64 分发目录、manifest、包内程序 SHA256SUMS、程序 tar.gz；清理旧版生成的发布校验稿，Release 直接使用已审核的版本说明，不展示摘要或校验命令，不生成独立源码包或归档校验附件；使用 GitHub 标签归档交付 GPL 对应源码前，须核对该精确修订实际可用并包含必要构建、安装材料，旧标签不能替代。
 - [project-licenses.mjs](project-licenses.mjs)：验证完整 GPL 原文、历史 MIT 原文及授权范围，并为主程序与独立材质工具复制统一许可包。
 - [source-audit.mjs](source-audit.mjs)：Git 与无 Git 源码目录共用文件清单，供审计、打包和测试复用；无 Git 时排除构建目录，拒绝私有文件与符号链接。核对包名、固定 GPL-3.0-only 元数据、完整许可与历史原文，并拒绝历史排除的上游诊断标记、私有文档、运行配置、凭据和个人绝对路径。
 - [license-texts.json](license-texts.json)：依赖包未附带的公开许可、署名原文与固定来源 URL，供许可生成器离线使用。

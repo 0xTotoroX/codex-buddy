@@ -1,6 +1,6 @@
 /*
  * [INPUT]: release 程序、source-audit 公开检查、项目完整许可包与锁定依赖。
- * [OUTPUT]: macOS arm64 程序包及供 Release 正文追加的归档校验说明。
+ * [OUTPUT]: macOS arm64 程序包，内含完整性校验；Release 正文独立维护。
  * [POS]: 本地打包入口，校验最低系统版本并携带许可。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md。
  */
@@ -123,23 +123,7 @@ const packed = spawnSync('tar', ['-czf', archive, '-C', join(root, 'dist'), name
   stdio: 'inherit',
 });
 if (packed.error || packed.status !== 0) throw new Error('tar 打包失败；单文件产物仍在 dist 目录');
-const archiveHash = createHash('sha256').update(readFileSync(archive)).digest('hex');
-const checksumNotes = join(root, 'dist', 'release-checksums.md');
-writeFileSync(
-  checksumNotes,
-  `\n\n## 下载与校验
-
-\`${name}.tar.gz\` 是 macOS 14.0+ Apple Silicon 预编译命令行程序包，无需 Node.js 或 Rust；不包含 App / DMG。源码必须对应本次分发的精确修订并包含许可所需构建、安装材料；使用本页 GitHub 自动生成的 Source code (zip / tar.gz) 前须确认标签归档确实满足这些要求。
-
-在下载目录执行以下命令校验程序归档：
-
-\`\`\`sh
-printf '%s\\n' '${archiveHash}  ${name}.tar.gz' | shasum -a 256 -c -
-\`\`\`
-
-解压后，在包内执行 \`shasum -a 256 -c SHA256SUMS\` 校验可执行程序。包内保留 LICENSE、LICENSING.md、licenses/LICENSE-MIT-legacy、THIRD_PARTY_NOTICES.md、dependencies.json 和 manifest.json。CLI 更新的 \`--sha256\` 参数使用包内程序摘要，不使用上述归档摘要。
-`,
-);
-console.log(
-  `产物：${archive}\nRelease 校验说明：${checksumNotes}\n归档 SHA-256：${archiveHash}\n二进制 SHA-256：${hash}`,
-);
+// 清理旧版生成的发布正文，避免继续使用自动追加校验段的旧稿。
+rmSync(join(root, 'dist', 'release-checksums.md'), { force: true });
+rmSync(join(root, 'dist', 'release-notes.md'), { force: true });
+console.log(`产物：${archive}`);

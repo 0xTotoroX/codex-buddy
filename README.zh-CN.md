@@ -205,7 +205,7 @@ npm run dev
 npm run verify         # 运行检查
 npm run verify:web     # 前端与合成浏览器试点（也可在 Linux 运行）
 npm run build          # 编译程序
-npm run package        # 生成 CLI 程序包和发布校验说明
+npm run package        # 生成 CLI 程序包
 npm run install:local  # 将当前代码安装到本机
 ```
 
