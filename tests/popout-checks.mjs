@@ -99,6 +99,13 @@ export async function checkPopout({
       },
     };
   });
+  const dockWithKeyboard = async () => {
+    await pop.locator('.csw-panel').hover();
+    const pin = pop.locator('[data-action=pin]');
+    await pin.focus();
+    assert.equal(await pin.evaluate((node) => document.activeElement === node), true);
+    await pin.press('Alt+Enter');
+  };
   const state = () =>
     pop.evaluate(() => {
       const p = window.__companionFloatingPanel;
@@ -830,7 +837,7 @@ export async function checkPopout({
       window.__companionFloatingPanel.panelReadingState(),
     );
     await pop.locator('.csw-head').hover();
-    await pop.locator('[data-action=pin]').press('Alt+Enter');
+    await dockWithKeyboard();
     await waitFor(
       async () =>
         (await desktop
@@ -920,7 +927,7 @@ export async function checkPopout({
     assert.equal(await pop.evaluate(() => window.__companionFloatingPanel.state.open), true);
     const chipAnchor = (await api('panel/anchor', { lease: chipLease })).body.anchor;
     assert.deepEqual(chipAnchor, await launcherAnchor(), 'Closed workspace returns to the rail');
-    await pop.locator('[data-action=pin]').press('Alt+Enter');
+    await dockWithKeyboard();
     await waitFor(
       async () => !(await desktop.evaluate(() => window.__companionFloatingPanel.state.detached)),
       'chip dock not restored',

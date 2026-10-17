@@ -257,10 +257,7 @@ const reserve = createServer();
 await new Promise((resolve) => reserve.listen(0, '127.0.0.1', resolve));
 const debugPort = reserve.address().port;
 await new Promise((resolve) => reserve.close(resolve));
-const localChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const executablePath =
-  process.env.CODEX_BUDDY_CHROME_BIN ||
-  (process.platform === 'darwin' && existsSync(localChrome) ? localChrome : undefined);
+const executablePath = process.env.CODEX_BUDDY_CHROME_BIN || undefined;
 let browser;
 let service;
 let serviceLog = '';
@@ -1497,14 +1494,23 @@ try {
     record('本机 HTTP 的 token、Origin 和 Host 校验');
 
     // 从靠近底边的胶囊向上展开，再缩短高度；松手不能翻转锚点导致跳位。
+    const resizePreferences = (await api('appearance')).body;
+    const resizeSaved = await api('appearance', {
+      expectedRevision: resizePreferences.revision,
+      ui: { ...resizePreferences.ui, activeTab: 'next', width: 400, height: 650 },
+    });
+    assert.equal(resizeSaved.status, 200);
+    await waitFor(
+      async () =>
+        desktop.evaluate(() => {
+          const panel = window.__companionFloatingPanel;
+          return panel.state.width === 400 && panel.state.height === 650;
+        }),
+      'Resize fixture preferences did not reach the host',
+    );
     await desktop.evaluate(async () => {
       const p = window.__companionFloatingPanel;
       await p.setDetached(false);
-      p.syncPanelPreferences(
-        { ...p.panelPreferences(), activeTab: 'next', width: 400, height: 650 },
-        100000,
-        false,
-      );
       const { bounds, chip } = p.state.layout;
       p.state.position.x = bounds.left + (bounds.width - chip.width) / 2;
       p.state.position.y = bounds.bottom - chip.height;
@@ -1533,7 +1539,11 @@ try {
     const upwardDuring = await desktop.locator('.csw-panel').boundingBox();
     await desktop.mouse.up();
     const upwardEnd = await desktop.locator('.csw-panel').boundingBox();
-    assert.ok(Math.abs(upwardDuring.y - upwardStart.y) < 2, 'Upward panel resize must fix the top');
+    assert.ok(
+      Math.abs(upwardDuring.y - upwardStart.y) < 2,
+      'Upward panel resize must fix the top: ' +
+        JSON.stringify({ upwardStart, upwardDuring, upwardEnd }),
+    );
     assert.ok(
       Math.abs(upwardEnd.y - upwardStart.y) < 2,
       'Releasing resize must not flip the anchor',

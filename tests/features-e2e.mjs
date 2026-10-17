@@ -41,13 +41,13 @@ try {
   await new Promise((r) => reserve.listen(0, '127.0.0.1', r));
   const debugPort = reserve.address().port;
   await new Promise((r) => reserve.close(r));
-  const executablePath = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   chrome = await chromium.launchServer({
-    executablePath: existsSync(executablePath) ? executablePath : undefined,
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
     headless: true,
     args: [`--remote-debugging-port=${debugPort}`],
   });
   browser = await chromium.connect(chrome.wsEndpoint());
+  report.browser = browser.version();
   const context = await browser.newContext({
     viewport: { width: 1440, height: 960 },
     reducedMotion: 'reduce',
@@ -151,6 +151,7 @@ try {
     return e?.open && !e.pending;
   }, 'board ready');
   const board = page.locator('[data-feature="board"]');
+  await page.locator('.csw-feature-panes [data-pane-tab="board"]').click();
   await board.getByRole('button', { name: '新建任务', exact: true }).first().click();
   await board.getByLabel('新任务标题', { exact: true }).fill('仍未保存的草稿');
 
