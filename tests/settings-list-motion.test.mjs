@@ -198,7 +198,8 @@ createRoot(document.getElementById('root')).render(<App/>);`,
         ),
         'survivors move',
       );
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(300); // Cover the save debounce independently of rendering.
+      await finishAnimations(page.locator('[data-settings-list="quick-prompts"]'));
       assert.equal(settings.quickPrompts.length, 2, 'deletion stays saved after blur debounce');
       assert.equal(writes, beforeDelete + 1, 'confirmation blur never submits an old draft');
       const moved = (await animations()).filter(

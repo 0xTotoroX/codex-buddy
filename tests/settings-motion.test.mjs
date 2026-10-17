@@ -259,7 +259,7 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       await refresh.locator('[data-action-state="success"]').waitFor();
       status = 500;
       await refresh.click();
-      await page.waitForTimeout(400);
+      await refresh.locator('[data-action-state="idle"]').waitFor();
       assert.equal(
         await refresh.locator('[data-action-state]').getAttribute('data-action-state'),
         'idle',
@@ -268,7 +268,6 @@ return <div className="settings-app" ref={ref}><div style={{width:430}}><Setting
       // Reduced motion cancels in-flight WAAPI and suppresses spinner/CSS transforms, but keeps state feedback.
       await tabs.getByRole('button', { name: '大纲', exact: true }).click();
       await emulateMedia(page, { reducedMotion: 'reduce' });
-      await page.waitForTimeout(30);
       assert.equal(
         await page
           .locator('.preview-scenes')
