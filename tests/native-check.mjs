@@ -1287,10 +1287,14 @@ try {
     output + '/failure.json',
     JSON.stringify(
       {
+        error: String(e),
         telemetry,
         log,
         dir,
         motionSamples,
+        presentationRequests: requests.filter((request) =>
+          ['/api/panel/ready', '/api/panel/presented'].includes(request.path),
+        ),
         requests: requests.slice(-80),
         events: events.slice(-20),
       },
