@@ -1,5 +1,5 @@
 /* [INPUT]: Original capsule expression and activePaneCue, supplied by the runtime.
- * [OUTPUT]: Compact shared face and a source dot on the existing launcher button.
+ * [OUTPUT]: Compact shared face, source dot and interruptible action acknowledgement without replacing the runtime expression.
  * [POS]: Presentation adapter; no new context selection, task reads or click handlers.
  * [PROTOCOL]: Keep embedded/AGENTS.md in sync. */
 import { eyeOffset } from './shell/effects.js';
@@ -19,6 +19,7 @@ export function launcherFaceHtml() {
 }
 export function createLauncherFace(button) {
   const dot = button.querySelector('.csw-launcher-source');
+  const eyes = button.querySelector('.csw-fab-face');
   const events = new AbortController();
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   let angle = null,
@@ -27,6 +28,11 @@ export function createLauncherFace(button) {
     expression = 'idle',
     pointerFrame = 0,
     pointer;
+  let feedback = null;
+  function clearFeedback() {
+    feedback?.cancel();
+    feedback = null;
+  }
   const setPoint = (value) => {
     const halfHeight = button.clientHeight / 2;
     button.style.setProperty('--source-x', `${18 + 16 * Math.cos(value)}px`);
@@ -67,7 +73,38 @@ export function createLauncherFace(button) {
   document.addEventListener('pointerleave', resetEyes, { signal: events.signal });
   document.addEventListener('visibilitychange', resetEyes, { signal: events.signal });
   reduced.addEventListener('change', resetEyes, { signal: events.signal });
+  reduced.addEventListener('change', clearFeedback, { signal: events.signal });
+  document.addEventListener(
+    'visibilitychange',
+    () => {
+      if (document.hidden) clearFeedback();
+    },
+    { signal: events.signal },
+  );
   return {
+    acknowledge() {
+      clearFeedback();
+      if (!eyes || !button.isConnected || document.hidden) return;
+      // 仅表示收到操作，不覆盖业务表情，也不等待或宣称窗口已打开。
+      const animation = eyes.animate(
+        reduced.matches
+          ? [{ opacity: 0.65 }, { opacity: 0.65 }]
+          : [
+              { transform: 'translateY(0) scale(1, 1)', offset: 0, easing: 'ease-out' },
+              { transform: 'translateY(1px) scale(1.05, .16)', offset: 0.28, easing: 'ease-out' },
+              { transform: 'translateY(-1px) scale(.98, 1.08)', offset: 0.65, easing: 'ease-out' },
+              { transform: 'translateY(0) scale(1, 1)', offset: 1 },
+            ],
+        { duration: reduced.matches ? 140 : 280 },
+      );
+      feedback = animation;
+      void animation.finished.then(
+        () => {
+          if (feedback === animation) clearFeedback();
+        },
+        () => {},
+      );
+    },
     update(value = {}) {
       expression = value.expression === 'hidden' ? 'idle' : value.expression || 'idle';
       if (button.dataset.expression !== expression) button.dataset.expression = expression;
@@ -114,6 +151,7 @@ export function createLauncherFace(button) {
     },
     destroy() {
       events.abort();
+      clearFeedback();
       cancelAnimationFrame(frame);
       resetEyes();
     },

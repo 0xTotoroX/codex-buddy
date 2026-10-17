@@ -28,3 +28,5 @@ Option+右键仅在当前聊天入口可用且已提供 settingsBrowser 回调�
 - `launcher-face.js`：独立眼睛复用 statusStageHtml 与共享 faceStyles；只接收 runtime 派生表情及 activePaneCue，36×28px按钮内适配原表情，合法多聊天来源以边缘小点标记并沿按钮边缘的椭圆轨迹平滑移动。保留按钮/菜单节点与事件，不读取正文或重选聊天；隐藏/模糊/销毁清理视线和动画帧。
 
 features.updateDock仅统计open或pending的功能；已关闭条目只保留配置，不占侧栏空间，也不因单击入口自动重开。
+
+内／外／设置三个菜单动作开始时，launcher 触发 launcher-face 的280ms轻眨/抬眼反馈；独立于运行时表情，不等待动作完成或表示成功。连续触发取消上一段，业务刷新保留反馈；减少动态效果使用140ms静态明暗反馈，隐藏/销毁/偏好变化清理动画。

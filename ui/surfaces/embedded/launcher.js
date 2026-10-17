@@ -240,7 +240,13 @@ export function syncLauncher(options) {
   const footerMargin = `${-railGap}px`;
   if (entry.style.marginBottom !== footerMargin) entry.style.marginBottom = footerMargin;
   if (!previewEnabled() && options.action && !radial)
-    radial = createLauncherMenu(entry.shadowRoot.querySelector('button'), () => current);
+    radial = createLauncherMenu(entry.shadowRoot.querySelector('button'), () => ({
+      ...current,
+      action: (action) => {
+        face?.acknowledge();
+        return current?.action?.(action);
+      },
+    }));
   if (!face) face = createLauncherFace(entry.shadowRoot.querySelector('button'));
   face.update(options);
   radial?.update();
