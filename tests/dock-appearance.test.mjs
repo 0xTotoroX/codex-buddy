@@ -6,7 +6,7 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -21,11 +21,10 @@ const bundle = await build({
   write: false,
   format: 'iife',
 });
-const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 test('dock appearances remember independent choices and leave shared window preferences intact', async () => {
   const browser = await chromium.launch({
-    executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || process.env.CHROME_PATH || undefined,
     headless: true,
   });
   try {
@@ -123,7 +122,7 @@ test('dock appearances remember independent choices and leave shared window pref
 
 test('opaque black host remains dark with a light system preference', async () => {
   const browser = await chromium.launch({
-    executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || process.env.CHROME_PATH || undefined,
     headless: true,
   });
   try {

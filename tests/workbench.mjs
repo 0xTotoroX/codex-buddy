@@ -9,7 +9,7 @@ import { showRetainedSettings } from './workbench-actions.mjs';
 import { independentFeatureCases } from './independent-features.mjs';
 import { featureSurfaceCases } from './feature-surfaces.mjs';
 import { chatBindingCases } from './workbench-binding.mjs';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { chromium } from 'playwright';
 import { buildPanel } from '../scripts/build-panel.mjs';
@@ -23,9 +23,9 @@ const hostUrl = 'http://127.0.0.1:47839/workbench-fixture';
 const slotSelector = '[data-codex-buddy-dock]';
 const panelSelector = '[data-companion-stepwise-root] .csw-panel';
 const wide = { width: 1440, height: 960 };
-const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
 const browser = await chromium.launch({
-  executablePath: process.env.CHROME_PATH || (existsSync(chrome) ? chrome : undefined),
+  executablePath: process.env.CODEX_BUDDY_CHROME_BIN || process.env.CHROME_PATH || undefined,
   headless: true,
 });
 const results = [];

@@ -6,7 +6,6 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { build } from 'esbuild';
@@ -123,12 +122,11 @@ test(
     });
     server.listen(0, '127.0.0.1');
     await once(server, 'listening');
-    const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
     let browser;
     try {
       browser = await chromium.launch({
-        executablePath:
-          process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
+        executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
       });
       const page = await browser.newPage();
       const errors = [];
@@ -407,9 +405,9 @@ test('Dev source widget survives settings unmount and remount', { timeout: 15000
     format: 'iife',
     jsx: 'automatic',
   });
-  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
   const browser = await chromium.launch({
-    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
   });
   try {
     const page = await browser.newPage();

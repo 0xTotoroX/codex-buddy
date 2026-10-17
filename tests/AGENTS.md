@@ -250,3 +250,5 @@ launcher-face 回归覆盖眼睛入口单击、双击、Enter/Space 与逐一点
 模型阅读恢复在同一帧比较实际scrollLeft与测量后的可用范围，并有界等待恢复；术语独立聊天滚动与卡片可见性在同一次浏览器执行中核对，避免两次CDP读取间混入其他事件。
 
 端到端合成宿主默认使用锁定Playwright Chromium，CODEX_BUDDY_CHROME_BIN仍允许显式兼容性检查；看板操作先选中对应标签，浮窗快捷键先显现控件并确认真实焦点。缩放场景通过隔离后台保存起始尺寸并等待宿主回读，不用前端伪造修订号与后台轮询竞争。
+
+全部合成浏览器验收默认使用锁文件对应的 Playwright Chromium，不自动选择运行器预装 Chrome；保留 CODEX_BUDDY_CHROME_BIN 与已有 CHROME_PATH 显式覆盖入口，避免系统浏览器更新或启动异常改变发布门禁环境。

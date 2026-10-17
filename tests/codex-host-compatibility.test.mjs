@@ -4,14 +4,13 @@
  * [PROTOCOL]: 变更时同步 tests/AGENTS.md。 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { records, installModelControlFixture } from './model-control-fixture.mjs';
 const source = readFileSync(new URL('../ui/codex/codex-host.js', import.meta.url), 'utf8');
 test('CodexHost adapter keeps Agent capability scoped to each composer', async () => {
-  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const browser = await chromium.launch({
-    executablePath: existsSync(chrome) ? chrome : undefined,
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
     headless: true,
   });
   try {
@@ -72,9 +71,8 @@ test('CodexHost adapter keeps Agent capability scoped to each composer', async (
 });
 
 test('official model adapter refuses external Agent without touching its menus', async () => {
-  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   const browser = await chromium.launch({
-    executablePath: existsSync(chrome) ? chrome : undefined,
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
     headless: true,
   });
   try {

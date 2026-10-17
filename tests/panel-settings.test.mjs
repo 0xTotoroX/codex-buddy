@@ -6,7 +6,6 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { existsSync } from 'node:fs';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -25,9 +24,9 @@ test('workbench settings save only their own preference fields', { timeout: 3000
     write: false,
     format: 'iife',
   });
-  const chrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
   const browser = await chromium.launch({
-    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || (existsSync(chrome) ? chrome : undefined),
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
   });
   try {
     const page = await browser.newPage();

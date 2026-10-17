@@ -106,11 +106,9 @@ try {
   await new Promise((done) => reserve.listen(0, '127.0.0.1', done));
   const debugPort = reserve.address().port;
   await new Promise((done) => reserve.close(done));
-  const installedChrome = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+
   chromeServer = await chromium.launchServer({
-    executablePath:
-      process.env.CODEX_BUDDY_CHROME_BIN ||
-      (existsSync(installedChrome) ? installedChrome : undefined),
+    executablePath: process.env.CODEX_BUDDY_CHROME_BIN || undefined,
     headless: true,
     timeout: 10000,
     args: [`--remote-debugging-port=${debugPort}`, '--remote-debugging-address=127.0.0.1'],

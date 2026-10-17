@@ -45,8 +45,7 @@ const server = createServer((req, res) => {
 });
 await new Promise((done) => server.listen(0, '127.0.0.1', done));
 const browser = await chromium.launch({
-  executablePath:
-    process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  executablePath: process.env.CODEX_BUDDY_CHROME_BIN || process.env.CHROME_PATH || undefined,
   headless: true,
 });
 const errors = [];
